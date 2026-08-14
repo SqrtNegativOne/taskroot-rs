@@ -16,7 +16,8 @@ struct ExistingIndices {
 }
 
 impl SyncQueue {
-    pub fn new(pool: Arc<SqlitePool>) -> Self {
+    #[must_use] 
+    pub const fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
     }
 
@@ -67,7 +68,7 @@ impl SyncQueue {
     }
 
     async fn insert_item(&self, item: &SyncQueueItem) -> Result<(), sqlx::Error> {
-        let payload = serde_json::to_string(item).unwrap();
+        let payload = serde_json::to_string(item).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
         let type_str = match item.r#type {
             SyncType::Task => "task",
             SyncType::Event => "event",
@@ -92,7 +93,7 @@ impl SyncQueue {
     }
 
     async fn update_item(&self, id: i64, item: &SyncQueueItem) -> Result<(), sqlx::Error> {
-        let payload = serde_json::to_string(item).unwrap();
+        let payload = serde_json::to_string(item).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
         let action_str = match item.action {
             SyncAction::Create => "create",
             SyncAction::Update => "update",
@@ -119,7 +120,7 @@ impl SyncQueue {
         for id in ids {
             separated.push_bind(id);
         }
-        drop(separated);
+        // separated goes out of scope here when we stop using it
         query_builder.push(")");
         query_builder.build().execute(&*self.pool).await?;
         Ok(())
@@ -141,9 +142,12 @@ impl SyncQueue {
         if indices.r#move.is_some() {
             return "move".to_string();
         }
-        "".to_string()
+        String::new()
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn push(&self, item: SyncQueueItem) -> Result<(), sqlx::Error> {
         let item_id = item.item.id();
         let (indices, existing_items) = self.get_existing(&item.r#type, &item_id).await?;
@@ -163,7 +167,7 @@ impl SyncQueue {
             SyncAction::Move => "move",
             SyncAction::Delete => "delete",
         };
-        let transition = format!("{}->{}", existing_state, action_str);
+        let transition = format!("{existing_state}->{action_str}");
 
         if item.action == SyncAction::Create {
             if transition == "delete->create" {
@@ -282,6 +286,9 @@ impl SyncQueue {
         Ok(())
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn shift(&self) -> Result<Option<(i64, SyncQueueItem)>, sqlx::Error> {
         let row = sqlx::query("SELECT id, payload FROM sync_queue ORDER BY id ASC LIMIT 1")
             .fetch_optional(&*self.pool)
@@ -299,6 +306,9 @@ impl SyncQueue {
         Ok(None)
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn peek(&self) -> Result<Option<(i64, SyncQueueItem)>, sqlx::Error> {
         let row = sqlx::query("SELECT id, payload FROM sync_queue ORDER BY id ASC LIMIT 1")
             .fetch_optional(&*self.pool)
@@ -315,10 +325,16 @@ impl SyncQueue {
         Ok(None)
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn remove(&self, id: i64) -> Result<(), sqlx::Error> {
         self.remove_items(&[id]).await
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn get_length(&self) -> Result<i64, sqlx::Error> {
         let row = sqlx::query("SELECT COUNT(*) as count FROM sync_queue")
             .fetch_one(&*self.pool)
@@ -327,6 +343,9 @@ impl SyncQueue {
         Ok(count)
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn get_items(&self) -> Result<Vec<SyncQueueItem>, sqlx::Error> {
         let rows = sqlx::query("SELECT payload FROM sync_queue ORDER BY id ASC")
             .fetch_all(&*self.pool)
@@ -342,6 +361,9 @@ impl SyncQueue {
         Ok(items)
     }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
     pub async fn clear(&self) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM sync_queue")
             .execute(&*self.pool)

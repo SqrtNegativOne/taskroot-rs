@@ -25,10 +25,11 @@ pub enum SyncItemData {
 }
 
 impl SyncItemData {
+    #[must_use] 
     pub fn id(&self) -> String {
         match self {
-            SyncItemData::Task(t) => t.id.clone(),
-            SyncItemData::Event(e) => e.id.clone(),
+            Self::Task(t) => t.id.clone(),
+            Self::Event(e) => e.id.clone(),
         }
     }
 }

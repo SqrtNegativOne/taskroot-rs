@@ -25,29 +25,27 @@ fn parse_iso_to_mins(iso: &str, day_start_prefix: &str) -> Option<f64> {
     // iso looks like "2026-08-12T14:30:00"
     if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M:%S") {
         let date_str = dt.date().format("%Y-%m-%d").to_string();
-        if date_str < day_start_prefix.to_string() {
+        if date_str.as_str() < day_start_prefix {
             return Some(0.0);
-        } else if date_str > day_start_prefix.to_string() {
+        } else if date_str.as_str() > day_start_prefix {
             return Some(1440.0);
         }
         let time = dt.time();
         return Some(
-            (time.format("%H").to_string().parse::<f64>().unwrap_or(0.0) * 60.0)
-                + time.format("%M").to_string().parse::<f64>().unwrap_or(0.0),
+            time.format("%H").to_string().parse::<f64>().unwrap_or(0.0).mul_add(60.0, time.format("%M").to_string().parse::<f64>().unwrap_or(0.0)),
         );
     }
     // Try without seconds
     if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M") {
         let date_str = dt.date().format("%Y-%m-%d").to_string();
-        if date_str < day_start_prefix.to_string() {
+        if date_str.as_str() < day_start_prefix {
             return Some(0.0);
-        } else if date_str > day_start_prefix.to_string() {
+        } else if date_str.as_str() > day_start_prefix {
             return Some(1440.0);
         }
         let time = dt.time();
         return Some(
-            (time.format("%H").to_string().parse::<f64>().unwrap_or(0.0) * 60.0)
-                + time.format("%M").to_string().parse::<f64>().unwrap_or(0.0),
+            time.format("%H").to_string().parse::<f64>().unwrap_or(0.0).mul_add(60.0, time.format("%M").to_string().parse::<f64>().unwrap_or(0.0)),
         );
     }
     None
@@ -64,8 +62,8 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
             let end_mins = parse_iso_to_mins(end_iso, date_str)?;
 
             // Filter out if not in this day
-            if end_iso < &format!("{}T00:00:00", date_str)
-                || start_iso > &format!("{}T23:59:59", date_str)
+            if end_iso < &format!("{date_str}T00:00:00")
+                || start_iso > &format!("{date_str}T23:59:59")
             {
                 return None;
             }
@@ -82,7 +80,7 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
 
     let mut placed: Vec<(f64, f64, i32)> = Vec::new();
 
-    for ev in mapped.iter_mut() {
+    for ev in &mut mapped {
         let mut lane = 0;
         loop {
             let conflict = placed
@@ -97,13 +95,11 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
         placed.push((ev.start_mins, ev.end_mins, lane));
     }
 
-    for ev in mapped.iter_mut() {
+    for ev in &mut mapped {
         let mut max_lane = ev.lane;
         for p in &placed {
-            if !(p.1 <= ev.start_mins || p.0 >= ev.end_mins) {
-                if p.2 > max_lane {
-                    max_lane = p.2;
-                }
+            if !(p.1 <= ev.start_mins || p.0 >= ev.end_mins) && p.2 > max_lane {
+                max_lane = p.2;
             }
         }
         ev.lanes = max_lane + 1;
@@ -112,6 +108,9 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
     mapped
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn get_plan_layout(
     app: tauri::AppHandle,
@@ -134,6 +133,9 @@ pub async fn get_plan_layout(
     Ok(result)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn get_filtered_tasks(
     app: tauri::AppHandle,

@@ -126,20 +126,23 @@ async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 fn window_minimize(window: tauri::Window) {
     let _ = window.minimize();
+    drop(window);
 }
 
 #[tauri::command]
 fn window_maximize(window: tauri::Window) {
-    if let Ok(true) = window.is_maximized() {
+    if matches!(window.is_maximized(), Ok(true)) {
         let _ = window.unmaximize();
     } else {
         let _ = window.maximize();
     }
+    drop(window);
 }
 
 #[tauri::command]
 fn window_close(window: tauri::Window) {
     let _ = window.close();
+    drop(window);
 }
 
 #[tauri::command]
@@ -149,6 +152,7 @@ fn window_restore_main(app: tauri::AppHandle) {
         let _ = main_win.unminimize();
         let _ = main_win.set_focus();
     }
+    drop(app);
 }
 
 #[tauri::command]
@@ -156,6 +160,7 @@ fn hide_launcher(app: tauri::AppHandle) {
     if let Some(launcher) = app.get_webview_window("launcher") {
         let _ = launcher.hide();
     }
+    drop(app);
 }
 
 #[tauri::command]
@@ -163,9 +168,13 @@ fn resize_launcher(app: tauri::AppHandle, height: f64) {
     if let Some(launcher) = app.get_webview_window("launcher") {
         let _ = launcher.set_size(tauri::Size::Logical(tauri::LogicalSize::new(640.0, height)));
     }
+    drop(app);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// # Panics
+///
+/// Panics if the tauri application fails to run.
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())

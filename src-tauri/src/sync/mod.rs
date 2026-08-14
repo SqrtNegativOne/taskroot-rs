@@ -70,11 +70,11 @@ async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
     // --- PULL: Fetch remote items ---
 
     if let Err(e) = crate::apis::google_calendar::sync(pool, &access_token).await {
-        eprintln!("Google Calendar Sync Error: {}", e);
+        eprintln!("Google Calendar Sync Error: {e}");
     }
 
     if let Err(e) = crate::apis::google_tasks::sync(pool, &access_token).await {
-        eprintln!("Google Tasks Sync Error: {}", e);
+        eprintln!("Google Tasks Sync Error: {e}");
     }
 
     Ok(())

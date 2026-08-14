@@ -20,6 +20,9 @@ struct GoogleTask {
     deleted: Option<bool>,
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
     let url = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showHidden=true";
@@ -41,11 +44,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_task_id = format!("google_{}", task.id);
             let is_deleted = task.deleted.unwrap_or(false);
 
-            let remote_updated_at = if let Some(upd) = &task.updated {
-                chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0)
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
+            let remote_updated_at = task.updated.as_ref().map_or_else(|| chrono::Utc::now().timestamp_millis(), |upd| chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0));
 
             if let Ok(Some(local_task)) = crate::db::get_task(pool, &app_task_id).await {
                 if let Some(local_updated) = local_task.updated_at {
@@ -92,7 +91,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             };
 
             if let Err(e) = crate::db::upsert_task(pool, app_task).await {
-                eprintln!("Failed to upsert Google task: {}", e);
+                eprintln!("Failed to upsert Google task: {e}");
             }
         }
     }
@@ -100,6 +99,9 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Result<String> {
     let client = Client::new();
     
@@ -115,17 +117,13 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
         "status": status,
     });
 
-    let (url, method) = if let Some(remote_id) = &task.remote_id {
-        (
-            format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{}", remote_id),
-            reqwest::Method::PUT
-        )
-    } else {
-        (
-            "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks".to_string(),
-            reqwest::Method::POST
-        )
-    };
+    let (url, method) = task.remote_id.as_ref().map_or_else(|| (
+        "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks".to_string(),
+        reqwest::Method::POST
+    ), |remote_id| (
+        format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{remote_id}"),
+        reqwest::Method::PUT
+    ));
 
     let response = client.request(method, &url)
         .bearer_auth(access_token)
@@ -135,16 +133,19 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to publish Google Task: {}", err));
+        return Err(anyhow::anyhow!("Failed to publish Google Task: {err}"));
     }
 
     let created: GoogleTask = response.json().await?;
     Ok(created.id)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
     let client = Client::new();
-    let url = format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{}", remote_id);
+    let url = format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{remote_id}");
     let response = client.request(reqwest::Method::DELETE, &url)
         .bearer_auth(access_token)
         .send()
@@ -152,7 +153,7 @@ pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to delete Google Task: {}", err));
+        return Err(anyhow::anyhow!("Failed to delete Google Task: {err}"));
     }
     Ok(())
 }

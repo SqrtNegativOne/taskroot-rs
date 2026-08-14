@@ -41,6 +41,9 @@ impl Default for AuthState {
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn get_google_auth_url(state: State<'_, AuthState>) -> Result<String, String> {
     let client = get_client!(|e: String| e);
@@ -66,6 +69,9 @@ pub async fn get_google_auth_url(state: State<'_, AuthState>) -> Result<String, 
     Ok(auth_url.to_string())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn exchange_google_auth_code(
     app: AppHandle,
@@ -110,19 +116,16 @@ pub async fn exchange_google_auth_code(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, anyhow::Error> {
     let access_token = db::get_setting(pool, "google_access_token").await?;
     let expires_at_str = db::get_setting(pool, "google_token_expires_at").await?;
 
-    let needs_refresh = if let Some(exp_str) = expires_at_str {
-        if let Ok(expires_at) = chrono::DateTime::parse_from_rfc3339(&exp_str) {
-            Utc::now() + Duration::minutes(5) > expires_at.with_timezone(&Utc)
-        } else {
-            true
-        }
-    } else {
-        true
-    };
+    let needs_refresh = expires_at_str.is_none_or(|exp_str| {
+        chrono::DateTime::parse_from_rfc3339(&exp_str).map_or(true, |expires_at| Utc::now() + Duration::minutes(5) > expires_at.with_timezone(&Utc))
+    });
 
     if !needs_refresh {
         if let Some(token) = access_token {
@@ -156,6 +159,9 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, anyhow:
     Ok(new_access_token.clone())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn is_logged_in(app: tauri::AppHandle) -> Result<bool, String> {
     let pool = app.try_state::<SqlitePool>().ok_or("Database not initialized")?;

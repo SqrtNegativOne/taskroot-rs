@@ -26,6 +26,9 @@ struct GoogleEventTime {
     date: Option<String>,
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
     let now = chrono::Utc::now().to_rfc3339();
@@ -51,11 +54,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_event_id = format!("google_{}", event.id);
             let is_deleted = event.status.as_deref() == Some("cancelled");
 
-            let remote_updated_at = if let Some(upd) = &event.updated {
-                chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0)
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
+            let remote_updated_at = event.updated.as_ref().map_or_else(|| chrono::Utc::now().timestamp_millis(), |upd| chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0));
 
             if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
                 if let Some(local_updated) = local_event.updated_at {
@@ -107,7 +106,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             };
 
             if let Err(e) = crate::db::upsert_event(pool, app_event).await {
-                eprintln!("Failed to upsert Google event: {}", e);
+                eprintln!("Failed to upsert Google event: {e}");
             }
         }
     }
@@ -115,6 +114,9 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Result<String> {
     let client = Client::new();
     
@@ -126,17 +128,13 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
         "end": { "dateTime": event.end_time }
     });
 
-    let (url, method) = if let Some(remote_id) = &event.remote_id {
-        (
-            format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{}", remote_id),
-            reqwest::Method::PUT
-        )
-    } else {
-        (
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events".to_string(),
-            reqwest::Method::POST
-        )
-    };
+    let (url, method) = event.remote_id.as_ref().map_or_else(|| (
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events".to_string(),
+        reqwest::Method::POST
+    ), |remote_id| (
+        format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{remote_id}"),
+        reqwest::Method::PUT
+    ));
 
     let response = client.request(method, &url)
         .bearer_auth(access_token)
@@ -146,16 +144,19 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to publish Google Event: {}", err));
+        return Err(anyhow::anyhow!("Failed to publish Google Event: {err}"));
     }
 
     let created: GoogleEvent = response.json().await?;
     Ok(created.id)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
     let client = Client::new();
-    let url = format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{}", remote_id);
+    let url = format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{remote_id}");
     let response = client.request(reqwest::Method::DELETE, &url)
         .bearer_auth(access_token)
         .send()
@@ -163,7 +164,7 @@ pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to delete Google Event: {}", err));
+        return Err(anyhow::anyhow!("Failed to delete Google Event: {err}"));
     }
     Ok(())
 }

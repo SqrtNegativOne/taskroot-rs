@@ -58,27 +58,27 @@
     }
 </script>
 
-<div class="h-screen w-screen flex flex-col items-center justify-center bg-zinc-950 text-white">
-    <div class="max-w-md w-full p-8 bg-zinc-900 rounded-xl shadow-2xl border border-zinc-800 text-center">
-        <h1 class="text-3xl font-bold mb-2">Welcome to Taskroot</h1>
-        <p class="text-zinc-400 mb-8">Sign in with Google to sync your calendar and tasks.</p>
+<div class="login-container">
+    <div class="login-card">
+        <h1>Welcome to Taskroot</h1>
+        <p class="subtitle">Sign in with Google to sync your calendar and tasks.</p>
         
         {#if error}
-            <div class="mb-6 p-3 bg-red-900/50 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            <div class="error-box">
                 {error}
             </div>
         {/if}
 
         <button 
-            class="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-4 rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="login-button"
             onclick={handleLogin}
             disabled={isLoading}
         >
             {#if isLoading}
-                <div class="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                <div class="spinner"></div>
                 <span>Waiting for authentication...</span>
             {:else}
-                <svg viewBox="0 0 24 24" class="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
+                <svg viewBox="0 0 24 24" class="google-icon" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -89,3 +89,93 @@
         </button>
     </div>
 </div>
+
+<style>
+    .login-container {
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bg-primary, #09090b);
+        color: var(--text-primary, #fff);
+    }
+    
+    .login-card {
+        max-width: 28rem;
+        width: 100%;
+        padding: 2rem;
+        background-color: var(--bg-secondary, #18181b);
+        border-radius: 12px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--border-color, #27272a);
+        text-align: center;
+    }
+    
+    .login-card h1 {
+        font-size: 1.875rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        margin-top: 0;
+    }
+    
+    .subtitle {
+        color: var(--text-secondary, #a1a1aa);
+        margin-bottom: 2rem;
+    }
+    
+    .error-box {
+        margin-bottom: 1.5rem;
+        padding: 0.75rem;
+        background-color: rgba(127, 29, 29, 0.5);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        border-radius: 8px;
+        color: #fecaca;
+        font-size: 0.875rem;
+    }
+    
+    .login-button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        background-color: #ffffff;
+        color: #000000;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .login-button:hover:not(:disabled) {
+        background-color: #e4e4e7;
+    }
+    
+    .login-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .google-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+    
+    .spinner {
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid rgba(0, 0, 0, 0.3);
+        border-top-color: #000;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>

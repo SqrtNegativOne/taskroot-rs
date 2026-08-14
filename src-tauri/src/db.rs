@@ -2,6 +2,9 @@ use crate::domain::{AppEvent, AppTask};
 use sqlx::{sqlite::SqliteConnectOptions, Row, SqlitePool};
 use std::str::FromStr;
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(db_path)?.create_if_missing(true);
 
@@ -84,6 +87,9 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     Ok(pool)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_setting(pool: &SqlitePool, key: &str) -> Result<Option<String>, sqlx::Error> {
     let row: Option<(String,)> = sqlx::query_as("SELECT value FROM settings WHERE key = ?")
         .bind(key)
@@ -92,6 +98,9 @@ pub async fn get_setting(pool: &SqlitePool, key: &str) -> Result<Option<String>,
     Ok(row.map(|r| r.0))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn set_setting(pool: &SqlitePool, key: &str, value: &str) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO settings (key, value) VALUES (?, ?)
@@ -136,6 +145,9 @@ fn row_to_task(row: &sqlx::sqlite::SqliteRow) -> Result<AppTask, sqlx::Error> {
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
     let rows = sqlx::query("SELECT * FROM tasks").fetch_all(pool).await?;
     let mut tasks = Vec::new();
@@ -147,6 +159,9 @@ pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
     Ok(tasks)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
     println!("db::get_events executing query...");
     let rows = sqlx::query("SELECT * FROM events").fetch_all(pool).await?;
@@ -184,6 +199,9 @@ pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error>
     Ok(events)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_task(pool: &SqlitePool, id: &str) -> Result<Option<AppTask>, sqlx::Error> {
     let row = sqlx::query("SELECT * FROM tasks WHERE id = ?")
         .bind(id)
@@ -197,6 +215,9 @@ pub async fn get_task(pool: &SqlitePool, id: &str) -> Result<Option<AppTask>, sq
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
     let row = sqlx::query("SELECT * FROM events WHERE id = ?")
         .bind(id)
@@ -234,17 +255,26 @@ pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, 
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_dirty_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
     let mut tasks = get_tasks(pool).await?;
     tasks.retain(|t| t.dirty == Some(true));
     Ok(tasks)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_dirty_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
     let mut events = get_events(pool).await?;
     events.retain(|e| e.dirty == Some(true));
     Ok(events)
 }
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
     let status_str = task
         .status
@@ -293,6 +323,9 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
     let status_str = task
         .status
@@ -342,6 +375,9 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
     let status_str = task
         .status
@@ -411,6 +447,9 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn delete_task(pool: &SqlitePool, id: String) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM tasks WHERE id = ?")
         .bind(id)
@@ -419,6 +458,9 @@ pub async fn delete_task(pool: &SqlitePool, id: String) -> Result<(), sqlx::Erro
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
     let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
     let exdates_str = event
@@ -456,6 +498,9 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
     let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
     let exdates_str = event
@@ -494,6 +539,9 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
     let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
     let exdates_str = event
@@ -549,6 +597,9 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM events WHERE id = ?")
         .bind(id)
@@ -557,6 +608,9 @@ pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Err
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub async fn get_filtered_tasks(
     pool: &SqlitePool,
     filters: Vec<crate::domain::AppFilter>,
@@ -571,11 +625,7 @@ pub async fn get_filtered_tasks(
             let op = f.operator.as_deref().unwrap_or("is");
             let is_not = op == "is not";
 
-            let values = if let Some(arr) = val.as_array() {
-                arr.clone()
-            } else {
-                vec![val.clone()]
-            };
+            let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
             if values.is_empty() {
                 continue;
             }
@@ -585,7 +635,7 @@ pub async fn get_filtered_tasks(
                 let mut separated = query_builder.separated(", ");
                 for v in &values {
                     if let Some(s) = v.as_str() {
-                        separated.push_bind(format!("\"{}\"", s));
+                        separated.push_bind(format!("\"{s}\""));
                     } else {
                         separated.push_bind(v.to_string());
                     }
@@ -596,7 +646,7 @@ pub async fn get_filtered_tasks(
                 let mut separated = query_builder.separated(", ");
                 for v in &values {
                     if let Some(n) = v.as_i64() {
-                        separated.push_bind(n as i32);
+                        separated.push_bind(i32::try_from(n).unwrap_or(0));
                     } else if let Some(s) = v.as_str() {
                         separated.push_bind(s.parse::<i32>().unwrap_or(-1));
                     }
@@ -609,7 +659,7 @@ pub async fn get_filtered_tasks(
                         query_builder.push(if is_not { " AND " } else { " OR " });
                     }
                     let vs = v.as_str().unwrap_or("");
-                    let like_str = format!("%\"{}\"%", vs);
+                    let like_str = format!("%\"{vs}\"%");
                     if is_not {
                         query_builder.push("(tags NOT LIKE ");
                         query_builder.push_bind(like_str);
