@@ -50,4 +50,3 @@ The following components are missing:
 - [ ] Full parity of models/events in `domain.ts`
 - [ ] Utils (`keybindings`, `notifications`, `sigil-parser`, `date-utils`, `logger`, `colors` / `constants`, `icons`)
 - [ ] Settings schema and configuration management
-- [ ] Legacy data repository parity (if not entirely handled by the Rust backend via Tauri IPC)

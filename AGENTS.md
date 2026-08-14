@@ -39,8 +39,9 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 ## Style (Important)
 - **Svelte 5 Idioms**: Strictly use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) instead of legacy Svelte 4 reactivity (`let foo = ...`, `$:`, `export let`).
 - **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.
+    - On the Typescript/Svelte end, we use the Neverthrow library.
 - **Typescript Idioms**: Strongly type your code. Avoid `any`. Prefer compile-time type inference.
 - **Test-Driven Development**: Write tests first as a contract. Do not modify them unless there is something truly wrong.
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
-- **Error Handling**: Errors are data. Handle them gracefully on both the frontend and backend. Display user-friendly error messages where appropriate.
+- Store assets offline.
