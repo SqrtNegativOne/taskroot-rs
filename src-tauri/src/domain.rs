@@ -26,25 +26,43 @@ pub struct Subtask {
 pub struct AppTask {
     pub id: String,
     pub title: String,
-    #[ts(optional)] pub status: Option<AppTaskStatus>,
-    #[ts(optional)] pub priority: Option<i32>,
-    #[ts(optional)] pub tags: Option<Vec<String>>,
-    #[ts(optional)] pub subtasks: Option<Vec<Subtask>>,
-    #[ts(optional)] pub parent_task: Option<String>,
-    #[ts(optional)] pub dependencies: Option<Vec<String>>,
-    #[ts(optional)] pub est: Option<i32>,
-    #[ts(optional)] pub added: Option<String>,
-    #[ts(optional)] pub canvas_x: Option<f64>,
-    #[ts(optional)] pub canvas_y: Option<f64>,
-    #[ts(optional)] pub on_canvas: Option<bool>,
-    #[ts(optional)] pub remote_id: Option<String>,
-    #[ts(optional)] pub notes: Option<String>,
-    #[ts(optional)] pub tabs: Option<String>,
-    #[ts(optional)] pub due: Option<String>,
+    #[ts(optional)]
+    pub status: Option<AppTaskStatus>,
+    #[ts(optional)]
+    pub priority: Option<i32>,
+    #[ts(optional)]
+    pub tags: Option<Vec<String>>,
+    #[ts(optional)]
+    pub subtasks: Option<Vec<Subtask>>,
+    #[ts(optional)]
+    pub parent_task: Option<String>,
+    #[ts(optional)]
+    pub dependencies: Option<Vec<String>>,
+    #[ts(optional)]
+    pub est: Option<i32>,
+    #[ts(optional)]
+    pub added: Option<String>,
+    #[ts(optional)]
+    pub canvas_x: Option<f64>,
+    #[ts(optional)]
+    pub canvas_y: Option<f64>,
+    #[ts(optional)]
+    pub on_canvas: Option<bool>,
+    #[ts(optional)]
+    pub remote_id: Option<String>,
+    #[ts(optional)]
+    pub notes: Option<String>,
+    #[ts(optional)]
+    pub tabs: Option<String>,
+    #[ts(optional)]
+    pub due: Option<String>,
     #[serde(rename = "_deleted")]
-    #[ts(optional)] pub deleted: Option<bool>,
-    #[ts(optional)] pub updated_at: Option<i64>,
-    #[ts(optional)] pub etag: Option<String>,
+    #[ts(optional)]
+    pub deleted: Option<bool>,
+    #[ts(optional)]
+    pub updated_at: Option<i64>,
+    #[ts(optional)]
+    pub etag: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -62,25 +80,38 @@ pub enum AppEventType {
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
     pub id: String,
-    #[ts(optional)] pub remote_id: Option<String>,
-    #[ts(optional)] pub remote_collection_id: Option<String>,
-    #[ts(optional)] pub task_id: Option<String>,
+    #[ts(optional)]
+    pub remote_id: Option<String>,
+    #[ts(optional)]
+    pub remote_collection_id: Option<String>,
+    #[ts(optional)]
+    pub task_id: Option<String>,
     pub title: String,
-    #[ts(optional)] pub description: Option<String>,
+    #[ts(optional)]
+    pub description: Option<String>,
     pub start_time: String,
     pub end_time: String,
     #[serde(rename = "type")]
     pub event_type: AppEventType,
-    #[ts(optional)] pub rrule: Option<String>,
-    #[ts(optional)] pub exdates: Option<Vec<String>>,
-    #[ts(optional)] pub recurring_event_id: Option<String>,
-    #[ts(optional)] pub original_start_time: Option<String>,
-    #[ts(optional)] pub cancelled: Option<bool>,
-    #[ts(optional)] pub updated_at: Option<i64>,
-    #[ts(optional)] pub color: Option<String>,
+    #[ts(optional)]
+    pub rrule: Option<String>,
+    #[ts(optional)]
+    pub exdates: Option<Vec<String>>,
+    #[ts(optional)]
+    pub recurring_event_id: Option<String>,
+    #[ts(optional)]
+    pub original_start_time: Option<String>,
+    #[ts(optional)]
+    pub cancelled: Option<bool>,
+    #[ts(optional)]
+    pub updated_at: Option<i64>,
+    #[ts(optional)]
+    pub color: Option<String>,
     #[serde(rename = "_deleted")]
-    #[ts(optional)] pub deleted: Option<bool>,
-    #[ts(optional)] pub etag: Option<String>,
+    #[ts(optional)]
+    pub deleted: Option<bool>,
+    #[ts(optional)]
+    pub etag: Option<String>,
 }
 
 #[cfg(test)]
@@ -146,7 +177,7 @@ mod tests {
 
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains(r#""type":"busy""#));
-        
+
         let deserialized: AppEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.event_type, AppEventType::Busy);
     }

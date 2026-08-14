@@ -12,9 +12,22 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "taskroot",
+        "width": 1000,
+        "height": 700
+      },
+      {
+        "label": "launcher",
+        "title": "Launcher",
+        "width": 640,
+        "height": 60,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "url": "/"
       }
     ],
     "security": {

@@ -1,13 +1,12 @@
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool, Row};
+use crate::domain::{AppEvent, AppTask};
+use sqlx::{sqlite::SqliteConnectOptions, Row, SqlitePool};
 use std::str::FromStr;
-use crate::domain::{AppTask, AppEvent};
 
 pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
-    let options = SqliteConnectOptions::from_str(db_path)?
-        .create_if_missing(true);
-        
+    let options = SqliteConnectOptions::from_str(db_path)?.create_if_missing(true);
+
     let pool = SqlitePool::connect_with(options).await?;
-    
+
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS tasks (
             id TEXT PRIMARY KEY,
@@ -30,7 +29,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             deleted BOOLEAN,
             updated_at INTEGER,
             etag TEXT
-        );"
+        );",
     )
     .execute(&pool)
     .await?;
@@ -54,7 +53,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             updated_at INTEGER,
             deleted BOOLEAN,
             etag TEXT
-        );"
+        );",
     )
     .execute(&pool)
     .await?;
@@ -65,7 +64,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
 pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
     let rows = sqlx::query("SELECT * FROM tasks").fetch_all(pool).await?;
     let mut tasks = Vec::new();
-    
+
     for row in rows {
         let status_str: Option<String> = row.try_get("status")?;
         let tags_str: Option<String> = row.try_get("tags")?;
@@ -75,7 +74,8 @@ pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
         tasks.push(AppTask {
             id: row.try_get("id")?,
             title: row.try_get("title")?,
-            status: status_str.and_then(|s| serde_json::from_value(serde_json::Value::String(s)).ok()),
+            status: status_str
+                .and_then(|s| serde_json::from_value(serde_json::Value::String(s)).ok()),
             priority: row.try_get("priority")?,
             tags: tags_str.and_then(|s| serde_json::from_str(&s).ok()),
             subtasks: subtasks_str.and_then(|s| serde_json::from_str(&s).ok()),
@@ -95,7 +95,7 @@ pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
             etag: row.try_get("etag")?,
         });
     }
-    
+
     Ok(tasks)
 }
 
@@ -118,7 +118,8 @@ pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error>
             description: row.try_get("description")?,
             start_time: row.try_get("start_time")?,
             end_time: row.try_get("end_time")?,
-            event_type: serde_json::from_value(serde_json::Value::String(type_str)).unwrap_or(crate::domain::AppEventType::Info),
+            event_type: serde_json::from_value(serde_json::Value::String(type_str))
+                .unwrap_or(crate::domain::AppEventType::Info),
             rrule: row.try_get("rrule")?,
             exdates: exdates_str.and_then(|s| serde_json::from_str(&s).ok()),
             recurring_event_id: row.try_get("recurring_event_id")?,
@@ -134,17 +135,25 @@ pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error>
     Ok(events)
 }
 pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
-    let status_str = task.status.map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let tags_str = task.tags.map(|t| serde_json::to_string(&t).unwrap_or_default());
-    let subtasks_str = task.subtasks.map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let deps_str = task.dependencies.map(|d| serde_json::to_string(&d).unwrap_or_default());
+    let status_str = task
+        .status
+        .map(|s| serde_json::to_string(&s).unwrap_or_default());
+    let tags_str = task
+        .tags
+        .map(|t| serde_json::to_string(&t).unwrap_or_default());
+    let subtasks_str = task
+        .subtasks
+        .map(|s| serde_json::to_string(&s).unwrap_or_default());
+    let deps_str = task
+        .dependencies
+        .map(|d| serde_json::to_string(&d).unwrap_or_default());
 
     sqlx::query(
         "INSERT INTO tasks (
             id, title, status, priority, tags, subtasks, parent_task, dependencies, 
             est, added, canvas_x, canvas_y, on_canvas, remote_id, notes, tabs, 
             due, deleted, updated_at, etag
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(task.id)
     .bind(task.title)
@@ -168,15 +177,23 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(task.etag)
     .execute(pool)
     .await?;
-    
+
     Ok(())
 }
 
 pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
-    let status_str = task.status.map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let tags_str = task.tags.map(|t| serde_json::to_string(&t).unwrap_or_default());
-    let subtasks_str = task.subtasks.map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let deps_str = task.dependencies.map(|d| serde_json::to_string(&d).unwrap_or_default());
+    let status_str = task
+        .status
+        .map(|s| serde_json::to_string(&s).unwrap_or_default());
+    let tags_str = task
+        .tags
+        .map(|t| serde_json::to_string(&t).unwrap_or_default());
+    let subtasks_str = task
+        .subtasks
+        .map(|s| serde_json::to_string(&s).unwrap_or_default());
+    let deps_str = task
+        .dependencies
+        .map(|d| serde_json::to_string(&d).unwrap_or_default());
 
     sqlx::query(
         "UPDATE tasks SET 
@@ -184,7 +201,7 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
             parent_task = ?, dependencies = ?, est = ?, added = ?, canvas_x = ?, 
             canvas_y = ?, on_canvas = ?, remote_id = ?, notes = ?, tabs = ?, 
             due = ?, deleted = ?, updated_at = ?, etag = ?
-        WHERE id = ?"
+        WHERE id = ?",
     )
     .bind(task.title)
     .bind(status_str)
@@ -222,14 +239,16 @@ pub async fn delete_task(pool: &SqlitePool, id: String) -> Result<(), sqlx::Erro
 
 pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
     let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-    let exdates_str = event.exdates.map(|e| serde_json::to_string(&e).unwrap_or_default());
+    let exdates_str = event
+        .exdates
+        .map(|e| serde_json::to_string(&e).unwrap_or_default());
 
     sqlx::query(
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, event_type, rrule, exdates, recurring_event_id, 
             original_start_time, cancelled, updated_at, deleted, etag
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -250,13 +269,15 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.etag)
     .execute(pool)
     .await?;
-    
+
     Ok(())
 }
 
 pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
     let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-    let exdates_str = event.exdates.map(|e| serde_json::to_string(&e).unwrap_or_default());
+    let exdates_str = event
+        .exdates
+        .map(|e| serde_json::to_string(&e).unwrap_or_default());
 
     sqlx::query(
         "UPDATE events SET 
@@ -264,7 +285,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             description = ?, start_time = ?, end_time = ?, event_type = ?, 
             rrule = ?, exdates = ?, recurring_event_id = ?, original_start_time = ?, 
             cancelled = ?, updated_at = ?, deleted = ?, etag = ?
-        WHERE id = ?"
+        WHERE id = ?",
     )
     .bind(event.remote_id)
     .bind(event.remote_collection_id)
@@ -304,16 +325,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_init_db_in_memory() {
-        let pool = init_db("sqlite::memory:").await.expect("Failed to init in-memory db");
-        
+        let pool = init_db("sqlite::memory:")
+            .await
+            .expect("Failed to init in-memory db");
+
         let row: (i64,) = sqlx::query_as("SELECT count(*) FROM tasks")
             .fetch_one(&pool)
             .await
             .expect("Failed to query tasks count");
-            
+
         assert_eq!(row.0, 0);
     }
-    
+
     #[tokio::test]
     async fn test_get_empty_tasks() {
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
