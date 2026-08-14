@@ -5,14 +5,35 @@
     import { emit } from '@tauri-apps/api/event';
     import { store } from '$lib/store.svelte';
     import { useAppIntegration } from '$lib/useAppIntegration.svelte';
+    import { invoke } from '@tauri-apps/api/core';
+    import { goto } from '$app/navigation';
 
     let { children } = $props();
     let isLauncher = $state(false);
+    let isCheckingAuth = $state(true);
 
-    onMount(() => {
-        store.init();
+    onMount(async () => {
         const appWindow = getCurrentWindow();
         isLauncher = appWindow.label === 'launcher';
+        
+        if (!isLauncher) {
+            try {
+                const loggedIn = await invoke<boolean>('is_logged_in');
+                if (!loggedIn && window.location.pathname !== '/login') {
+                    await goto('/login');
+                } else if (loggedIn && window.location.pathname === '/login') {
+                    await goto('/plan');
+                }
+            } catch (e) {
+                console.error("Failed to check auth state:", e);
+            } finally {
+                isCheckingAuth = false;
+                store.init(); // Initialize store only after auth check to avoid fetching without token
+            }
+        } else {
+            isCheckingAuth = false;
+            store.init();
+        }
     });
 
     useAppIntegration();
@@ -37,5 +58,11 @@
         </div>
     </div>
 {:else}
-    {@render children()}
+    {#if isCheckingAuth}
+        <div class="h-screen w-screen bg-zinc-950 flex items-center justify-center">
+            <div class="w-8 h-8 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin"></div>
+        </div>
+    {:else}
+        {@render children()}
+    {/if}
 {/if}

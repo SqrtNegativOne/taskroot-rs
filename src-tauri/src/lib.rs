@@ -5,8 +5,11 @@
 use tauri::Manager;
 
 pub mod db;
+pub mod apis;
 pub mod domain;
 pub mod screens;
+pub mod auth;
+pub mod sync;
 
 #[tauri::command]
 async fn get_tasks(app: tauri::AppHandle) -> Result<Vec<domain::AppTask>, String> {
@@ -25,20 +28,40 @@ async fn get_events(app: tauri::AppHandle) -> Result<Vec<domain::AppEvent>, Stri
 }
 
 #[tauri::command]
-async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), String> {
+async fn create_task(app: tauri::AppHandle, mut task: domain::AppTask) -> Result<(), String> {
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
+        
+    task.dirty = Some(true); // default to dirty
+
+    if let Ok(token) = auth::get_valid_access_token(&pool).await {
+        if let Ok(remote_id) = apis::google_tasks::publish(&task, &token).await {
+            task.remote_id = Some(remote_id);
+            task.dirty = Some(false);
+        }
+    }
+
     db::create_task(&pool, task)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), String> {
+async fn update_task(app: tauri::AppHandle, mut task: domain::AppTask) -> Result<(), String> {
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
+        
+    task.dirty = Some(true);
+
+    if let Ok(token) = auth::get_valid_access_token(&pool).await {
+        if let Ok(remote_id) = apis::google_tasks::publish(&task, &token).await {
+            task.remote_id = Some(remote_id);
+            task.dirty = Some(false);
+        }
+    }
+
     db::update_task(&pool, task)
         .await
         .map_err(|e| e.to_string())
@@ -53,20 +76,40 @@ async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn create_event(app: tauri::AppHandle, event: domain::AppEvent) -> Result<(), String> {
+async fn create_event(app: tauri::AppHandle, mut event: domain::AppEvent) -> Result<(), String> {
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
+        
+    event.dirty = Some(true);
+
+    if let Ok(token) = auth::get_valid_access_token(&pool).await {
+        if let Ok(remote_id) = apis::google_calendar::publish(&event, &token).await {
+            event.remote_id = Some(remote_id);
+            event.dirty = Some(false);
+        }
+    }
+
     db::create_event(&pool, event)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn update_event(app: tauri::AppHandle, event: domain::AppEvent) -> Result<(), String> {
+async fn update_event(app: tauri::AppHandle, mut event: domain::AppEvent) -> Result<(), String> {
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
+        
+    event.dirty = Some(true);
+
+    if let Ok(token) = auth::get_valid_access_token(&pool).await {
+        if let Ok(remote_id) = apis::google_calendar::publish(&event, &token).await {
+            event.remote_id = Some(remote_id);
+            event.dirty = Some(false);
+        }
+    }
+
     db::update_event(&pool, event)
         .await
         .map_err(|e| e.to_string())
@@ -133,7 +176,51 @@ pub fn run() {
             }
         }))
         .setup(|app| {
+            dotenvy::dotenv().ok();
+            app.manage(auth::AuthState::default());
             let handle = app.handle().clone();
+
+            let open_i = tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
+            let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
+            let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
+
+            let mut tray_builder = tauri::tray::TrayIconBuilder::new()
+                .menu(&menu)
+                .show_menu_on_left_click(false);
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+            let _tray = tray_builder
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => {
+                        if let Some(main_win) = app.get_webview_window("main") {
+                            let _ = main_win.show();
+                            let _ = main_win.unminimize();
+                            let _ = main_win.set_focus();
+                        }
+                    }
+                    "exit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(main_win) = app.get_webview_window("main") {
+                            let _ = main_win.show();
+                            let _ = main_win.unminimize();
+                            let _ = main_win.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             tauri::async_runtime::spawn(async move {
                 if let Ok(app_data_dir) = handle.path().app_data_dir() {
                     if std::fs::create_dir_all(&app_data_dir).is_ok() {
@@ -142,7 +229,8 @@ pub fn run() {
                             let db_path_str = format!("sqlite:{db_path_str}");
                             match db::init_db(&db_path_str).await {
                                 Ok(pool) => {
-                                    handle.manage(pool);
+                                    handle.manage(pool.clone());
+                                    sync::start_sync_engine(handle.clone(), pool);
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to initialize DB: {e}");
@@ -172,7 +260,10 @@ pub fn run() {
             window_close,
             window_restore_main,
             hide_launcher,
-            resize_launcher
+            resize_launcher,
+            auth::get_google_auth_url,
+            auth::exchange_google_auth_code,
+            auth::is_logged_in
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));

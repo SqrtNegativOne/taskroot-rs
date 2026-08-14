@@ -4497,6 +4497,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "dotenvy",
  "oauth2",
  "reqwest 0.13.4",
  "serde",

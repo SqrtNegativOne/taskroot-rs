@@ -10,7 +10,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Frontend Framework**: Svelte 5 with SvelteKit configured for SPA (Single Page Application) mode (`ssr = false`). Uses Svelte runes for reactivity.
 - **Build Tool**: Vite (via SvelteKit).
 - **Desktop Wrapper**: Tauri v2 (Rust backend, configured in `src-tauri/tauri.conf.json`).
-- **Linter**: ESLint (configured for Svelte & TypeScript) and Rust `clippy` (`cargo clippy`). Run `bun run check` for frontend type checking.
+- **Linter**: ESLint (configured for Svelte & TypeScript) and Rust `clippy` (`cargo clippy`). Run `bun run check` for frontend type checking. For Rust, prefer running `cargo clippy` directly, or you can use `cargo c` if it's configured to run both checks.
 - **Language**: TypeScript (`.ts`, `.svelte`) on the frontend, Rust (`.rs`) on the backend.
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.
 - **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`). Data is queried via Tauri IPC commands.
@@ -25,6 +25,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/lib.rs`: Entry point for Tauri, IPC command registration, and window management.
   - `src-tauri/src/db.rs`: SQLite database operations using `sqlx`.
   - `src-tauri/src/domain.rs`: Rust data structures for tasks and events.
+  - `src-tauri/src/sync/`: Global sync engine and queue management.
 
 ## Key Concepts
 - **State Management**: Frontend state is managed using Svelte 5 Runes (`$state`, `$effect`). The primary store is located in `src/lib/store.svelte.ts`, which syncs with the Rust backend via Tauri IPC (`invoke`).
@@ -35,6 +36,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Inter-Window Communication**: Communication between the Main Window and the Launcher Window is handled purely on the frontend via Tauri's native event system (`emit` and `listen` from `@tauri-apps/api/event`), orchestrated in `useAppIntegration.svelte.ts`.
 - **Database**: All tasks and events are stored locally in an SQLite database (`taskroot.db`) located in the app data directory. The Rust backend handles all CRUD operations.
 - **Deep Linking**: The app registers a custom protocol (`taskroot://`) to handle deep links, which are received by the Tauri backend and emitted to the frontend.
+- **Authentication & Environment**: The app requires Google OAuth 2.0 credentials for Tasks and Calendar sync. The Rust backend uses `dotenvy` to read `GOOGLE_CLIENT_ID` from a `.env` file in `src-tauri/`. The OAuth flow leverages PKCE and redirects back to the app via the `taskroot://auth-callback` deep link. The frontend intercepts this deep link on the Login screen and calls the backend to complete the token exchange.
 
 ## Style (Important)
 - **Svelte 5 Idioms**: Strictly use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) instead of legacy Svelte 4 reactivity (`let foo = ...`, `$:`, `export let`).

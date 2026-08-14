@@ -63,6 +63,8 @@ pub struct AppTask {
     pub updated_at: Option<i64>,
     #[ts(optional)]
     pub etag: Option<String>,
+    #[ts(optional)]
+    pub dirty: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -112,6 +114,8 @@ pub struct AppEvent {
     pub deleted: Option<bool>,
     #[ts(optional)]
     pub etag: Option<String>,
+    #[ts(optional)]
+    pub dirty: Option<bool>,
 }
 
 #[cfg(test)]
@@ -142,6 +146,7 @@ mod tests {
             deleted: None,
             updated_at: None,
             etag: None,
+            dirty: None,
         };
 
         let json = serde_json::to_string(&task).unwrap();
@@ -173,6 +178,7 @@ mod tests {
             color: None,
             deleted: None,
             etag: None,
+            dirty: None,
         };
 
         let json = serde_json::to_string(&event).unwrap();
@@ -181,4 +187,11 @@ mod tests {
         let deserialized: AppEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.event_type, AppEventType::Busy);
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppFilter {
+    pub column: Option<String>,
+    pub operator: Option<String>,
+    pub value: Option<serde_json::Value>,
 }

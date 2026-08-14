@@ -1,0 +1,237 @@
+/* ── Stopwatch hero ──────────────────────────────────────────────────── */
+
+.stopwatch-hero {
+  width: 100%;
+  min-height: calc(100vh - 45px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+  border-bottom: 1px dashed var(--border);
+  position: relative;
+}
+.stopwatch-stage {
+  width: 90%;
+  max-width: 1500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.stopwatch-meta-top, .stopwatch-meta-bottom {
+  display: flex; align-items: baseline; gap: 6px;
+  color: var(--fg-dim);
+  font-size: 0.95em;
+  letter-spacing: 0.08em;
+}
+.stopwatch-meta-label, .stopwatch-meta-status {
+  color: var(--fg-muted);
+}
+
+.stopwatch-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  width: max-content;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  user-select: none;
+  line-height: 1;
+  cursor: pointer;
+}
+.sw-digits {
+  font-size: clamp(120px, 24vw, 320px);
+  color: var(--fg-dim, #888);
+  font-feature-settings: 'ss01';
+  transition: color 200ms, opacity 200ms;
+  opacity: 1;
+}
+.stopwatch-display:hover .sw-digits { opacity: 0.6; }
+.stopwatch-display.is-running .sw-digits { color: var(--fg, #fff); }
+.stopwatch-display.is-running:hover .sw-digits { opacity: 0.6; }
+.sw-colon {
+  font-size: clamp(80px, 14vw, 220px);
+  color: var(--fg-dim);
+  padding: 0 0.04em;
+  position: relative;
+  top: -0.05em;
+  animation: sw-blink 1s infinite;
+  animation-play-state: paused;
+}
+.stopwatch-display.is-running .sw-colon { animation-play-state: running; }
+@keyframes sw-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.32; }
+}
+.sw-centi {
+  font-size: clamp(24px, 3.5vw, 52px);
+  color: var(--fg-dim);
+  padding-left: 0.1em;
+  align-self: flex-end;
+  padding-bottom: 0.2em;
+  letter-spacing: 0;
+}
+
+.stopwatch-tickbar {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.sw-ticks {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  max-width: 900px;
+}
+.sw-tick {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+}
+.sw-tick.is-active { background: var(--bg-surface-hover); border-top-color: var(--accent-dim); }
+.sw-tick.is-current { background: var(--accent); box-shadow: 0 0 8px oklch(81.32% 0.1084 77.46 / 0.5); }
+
+.stopwatch-controls {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 8px;
+}
+.sw-btn {
+  appearance: none; background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--fg);
+  font: inherit;
+  padding: 10px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: 0.05em;
+  transition: background 80ms, border-color 80ms, color 80ms;
+}
+.sw-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-line);
+}
+.sw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sw-btn-primary {
+  background: var(--accent-soft);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  min-width: 200px;
+  justify-content: center;
+}
+.sw-btn-primary:hover:not(:disabled) {
+  background: oklch(81.32% 0.1084 77.46 / 0.16);
+  border-color: var(--accent);
+}
+.sw-btn-primary.is-running {
+  background: oklch(67.24% 0.1308 38.76 / 0.14);
+  border-color: oklch(67.24% 0.1308 38.76 / 0.4);
+  color: var(--p0);
+}
+.sw-btn-primary.is-running:hover { background: var(--p0-hover); }
+.sw-btn-icon { font-size: 0.85em; }
+.sw-btn-label { font-weight: 400; }
+.sw-btn-key {
+  margin-left: 8px;
+  color: var(--fg-dim);
+  font-size: 0.78em;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+  padding: 0 6px;
+  border-radius: 2px;
+}
+
+.stopwatch-scroll-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-dim);
+  font-size: 0.82em;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.stopwatch-scroll-arrow {
+  color: var(--fg-dimmer);
+  animation: sw-bob 2.5s ease-in-out infinite;
+}
+@keyframes sw-bob {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50%      { transform: translateY(3px); opacity: 1; }
+}
+
+/* ── Active Task Display ────────────────────────────────────────────────── */
+
+.active-task-btn {
+  margin-top: 16px;
+  font-size: 18px;
+  color: var(--fg, #fff);
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  font: inherit;
+}
+.active-task-btn:hover {
+  color: var(--accent, #66b2ff);
+}
+.active-task-label {
+  color: var(--fg-dim, #888);
+  margin-right: 8px;
+}
+.active-task-title {
+  font-weight: 400;
+}
+.no-active-task {
+  margin-top: 16px;
+  font-size: 18px;
+  color: var(--fg-dim, #888);
+  text-align: center;
+}
+
+/* ── Display Internals ──────────────────────────────────────────────────── */
+
+.stopwatch-display {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+.sw-digits {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.sw-digits.col {
+  flex-direction: column;
+}
+.sw-digits.row {
+  flex-direction: row;
+}
+.sw-play-icon {
+  margin-left: 0.1em;
+}
+.sw-secondary-text {
+  font-size: 0.08em;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sw-primary-text {
+  font-size: inherit;
+  margin: 0;
+}
+.sw-primary-text.has-secondary {
+  font-size: 0.7em;
+  margin: 2px 0;
+}

@@ -1,5 +1,5 @@
 use crate::db;
-use crate::domain::{AppEvent, AppTask};
+use crate::domain::{AppEvent, AppFilter, AppTask};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -19,13 +19,6 @@ pub struct LaidEvent {
 pub struct PlanDayLayout {
     pub date: String,
     pub events: Vec<LaidEvent>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct AppFilter {
-    pub column: Option<String>,
-    pub operator: Option<String>,
-    pub value: Option<serde_json::Value>,
 }
 
 fn parse_iso_to_mins(iso: &str, day_start_prefix: &str) -> Option<f64> {
@@ -151,95 +144,8 @@ pub async fn get_filtered_tasks(
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
-    let mut tasks = db::get_tasks(&pool).await.map_err(|e| e.to_string())?;
-
-    // Filtering logic (in memory for now, fast enough for 10,000 items in rust)
-    if !filters.is_empty() {
-        tasks.retain(|t| {
-            // we port checkTaskAgainstFilters to Rust
-            for f in &filters {
-                if let (Some(col), Some(val)) = (&f.column, &f.value) {
-                    let op = f.operator.as_deref().unwrap_or("is");
-
-                    let mut match_found = false;
-                    let values = if let Some(arr) = val.as_array() {
-                        arr.clone()
-                    } else {
-                        vec![val.clone()]
-                    };
-                    if values.is_empty() {
-                        continue;
-                    }
-
-                    if col == "status" {
-                        let status = match t.status {
-                            Some(crate::domain::AppTaskStatus::Todo) => "todo",
-                            Some(crate::domain::AppTaskStatus::NextUp) => "next-up",
-                            Some(crate::domain::AppTaskStatus::Doing) => "doing",
-                            Some(crate::domain::AppTaskStatus::Done) => "done",
-                            None => "",
-                        };
-                        match_found = values.iter().any(|v| v.as_str().unwrap_or("") == status);
-                    } else if col == "priority" {
-                        let prio = t.priority.unwrap_or(0);
-                        match_found = values.iter().any(|v| {
-                            if let Some(n) = v.as_i64() {
-                                n as i32 == prio
-                            } else if let Some(s) = v.as_str() {
-                                s.parse::<i32>().unwrap_or(-1) == prio
-                            } else {
-                                false
-                            }
-                        });
-                    } else if col == "tag" {
-                        let tags = t.tags.as_ref().unwrap_or(&vec![]).clone();
-                        match_found = values.iter().any(|v| {
-                            let vs = v.as_str().unwrap_or("");
-                            tags.iter().any(|t| t == vs)
-                        });
-                    }
-
-                    let is_keep = if op == "is not" {
-                        !match_found
-                    } else {
-                        match_found
-                    };
-                    if !is_keep {
-                        return false;
-                    }
-                }
-            }
-            true
-        });
-    }
-
-    // Sort logic
-    tasks.sort_by(|a, b| {
-        if sort == "priority" {
-            let pa = a.priority.unwrap_or(0);
-            let pb = b.priority.unwrap_or(0);
-            pb.cmp(&pa)
-        } else if sort == "due" {
-            let da = a.due.as_deref().unwrap_or("9999");
-            let db = b.due.as_deref().unwrap_or("9999");
-            da.cmp(db)
-        } else if sort == "title" {
-            a.title.cmp(&b.title)
-        } else {
-            std::cmp::Ordering::Equal
-        }
-    });
-
-    // Query search logic
-    if !query.trim().is_empty() {
-        let q = query.to_lowercase();
-        tasks.retain(|t| {
-            t.title.to_lowercase().contains(&q)
-                || t.tags.as_ref().map_or(false, |tags| {
-                    tags.iter().any(|tag| tag.to_lowercase().contains(&q))
-                })
-        });
-    }
-
-    Ok(tasks)
+    
+    db::get_filtered_tasks(&pool, filters, sort, query)
+        .await
+        .map_err(|e| e.to_string())
 }
