@@ -270,8 +270,7 @@ pub fn run() {
             window_restore_main,
             hide_launcher,
             resize_launcher,
-            auth::get_google_auth_url,
-            auth::exchange_google_auth_code,
+            auth::login_with_google,
             auth::is_logged_in
         ])
         .run(tauri::generate_context!())

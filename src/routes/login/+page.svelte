@@ -1,57 +1,18 @@
 <script lang="ts">
     import { invoke } from '@tauri-apps/api/core';
-    import { openUrl } from '@tauri-apps/plugin-opener';
-    import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
     import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
 
     let error = $state<string | null>(null);
     let isLoading = $state(false);
-
-    onMount(() => {
-        let unlisten: () => void;
-        
-        onOpenUrl((urls) => {
-            for (const url of urls) {
-                if (url.startsWith('taskroot://auth-callback')) {
-                    const urlObj = new URL(url);
-                    const code = urlObj.searchParams.get('code');
-                    const stateToken = urlObj.searchParams.get('state');
-                    if (code && stateToken) {
-                        exchangeCode(code, stateToken);
-                    }
-                }
-            }
-        }).then((fn) => {
-            unlisten = fn;
-        });
-        
-        return () => {
-            if (unlisten) unlisten();
-        };
-    });
-
-    async function exchangeCode(code: string, stateToken: string) {
-        try {
-            isLoading = true;
-            await invoke('exchange_google_auth_code', { code, stateToken });
-            await goto('/plan');
-        } catch (err) {
-            console.error('Failed to exchange code:', err);
-            error = String(err);
-            isLoading = false;
-        }
-    }
 
     async function handleLogin() {
         try {
             isLoading = true;
             error = null;
-            const authUrl = await invoke<string>('get_google_auth_url');
-            await openUrl(authUrl);
-            // We remain in loading state until the deep link comes back
+            await invoke('login_with_google');
+            await goto('/plan');
         } catch (err) {
-            console.error('Failed to get auth url:', err);
+            console.error('Failed to login:', err);
             error = String(err);
             isLoading = false;
         }
