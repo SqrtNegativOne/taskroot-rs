@@ -1,0 +1,134 @@
+  /* ── Month calendar ─────────────────────────────────────────────────── */
+
+  .date-grid-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .cal-grid {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: 0 16px 8px;
+  }
+  .cal-dow {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .cal-dow-cell {
+    font-size: 0.78em;
+    color: var(--fg-dim);
+    letter-spacing: 0.08em;
+    padding: 0 6px;
+  }
+  .cal-cells {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-left: 1px solid var(--border-soft);
+    border-top: 1px solid var(--border-soft);
+  }
+  .cal-cells.is-grid { grid-template-rows: repeat(6, 1fr); }
+  .cal-cells.is-strip-1 { grid-template-rows: 1fr; }
+  .cal-cells.is-strip-3 { grid-template-rows: repeat(3, 1fr); }
+
+  .day-cell {
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 4px 6px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg);
+    transition: background 80ms;
+  }
+  .day-cell:hover { background: var(--bg-highlight); }
+  .day-cell.is-past .day-cell-num { color: var(--fg-dim); }
+  .day-cell.is-out { background: var(--bg); }
+  .day-cell.is-out:hover { background: var(--bg-highlight); }
+  .day-cell.is-out .day-cell-num { color: var(--fg-dimmest); }
+  .day-cell.is-today { background: var(--bg-highlight); }
+  .day-cell.is-today .day-cell-num { 
+    background: #e81123; 
+    color: white; 
+    border-radius: 4px; 
+    padding: 0px 4px;
+    font-weight: 500; 
+  }
+
+  @keyframes eventEnter {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes eventExit {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(4px) scale(0.98); }
+  }
+  .day-cell-event.is-entering { animation: eventEnter 150ms ease-out forwards; }
+  .day-cell-event.is-removing { animation: eventExit 150ms ease-in forwards; pointer-events: none; }
+
+  .day-cell.can-accept { cursor: copy; }
+  .day-cell.is-drag-over {
+    background: var(--accent-soft);
+    outline: 1px dashed var(--accent);
+    outline-offset: -1px;
+  }
+  .day-cell-hd {
+    display: flex; align-items: baseline; gap: 4px;
+    margin-bottom: 3px;
+  }
+  .day-cell-num {
+    font-size: 0.82em;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .day-cell-today-flag {
+    font-size: 0.7em;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  .day-cell-events {
+    display: flex; flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .day-cell-event {
+    font-size: 0.74em;
+    line-height: 1.25;
+    padding: 1px 4px 1px 5px;
+    color: white;
+    border-left: 2px solid var(--fg-dimmer);
+    background: var(--bg-surface);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: flex; gap: 4px;
+    flex-shrink: 0;
+  }
+  .day-cell-event:hover {
+    filter: brightness(1.15);
+  }
+  .day-cell-event.ev-plan { border-left-color: var(--accent); background: var(--accent-soft); color: white; }
+  .day-cell-event.ev-meeting { border-left-color: var(--fg-dim); background: var(--bg-surface); }
+  .day-cell-event.pri-bar-0 { border-left-color: #6a7c92; }
+  .day-cell-event.pri-bar-1 { border-left-color: #719379; }
+  .day-cell-event.pri-bar-2 { border-left-color: #b59864; }
+  .day-cell-event.pri-bar-3 { border-left-color: #c47e68; }
+  .day-cell-event.pri-bar-4 { border-left-color: #c96b7f; }
+  .day-cell-event.is-done { color: white; text-decoration: line-through; opacity: 0.75; border-left-color: var(--border); background: var(--bg-hover); }
+  .day-cell-event-time { color: white; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
+  .day-cell-more {
+    font-size: 0.7em;
+    color: var(--fg-dim);
+    padding-left: 5px;
+  }
+  .day-cell-drop-hint {
+    position: absolute; left: 6px; bottom: 4px;
+    font-size: 0.72em;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  /* Week mode — make cells taller */
+  .day-cell.is-strip { padding: 6px 8px; }
+  .day-cell.is-strip .day-cell-num { font-size: 0.95em; }
+

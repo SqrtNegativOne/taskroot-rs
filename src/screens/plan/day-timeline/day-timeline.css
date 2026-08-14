@@ -1,0 +1,227 @@
+  /* ── Day calendar ───────────────────────────────────────────────────── */
+
+  .day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .day-pane-stats {
+    font-size: 0.85em; color: var(--fg-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .day-scroll {
+    flex: 1; min-height: 0;
+    overflow-y: auto;
+    padding: 4px 16px 48px 16px;
+    scrollbar-width: thin;
+  }
+
+  .day-grid {
+    position: relative;
+    width: 100%;
+  }
+  .day-hour {
+    position: absolute; left: 0; right: 0;
+    border-top: 1px solid var(--border-soft);
+  }
+  .day-hour:first-child { border-top-color: var(--border); }
+  .day-hour-label {
+    position: absolute; left: 0; top: 0;
+    transform: translateY(-50%);
+    font-size: 0.7em;
+    color: var(--fg-dim);
+    background: var(--bg);
+    letter-spacing: 0.02em;
+    width: 44px;
+    text-align: right;
+    padding: 0 6px 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-hour-line { display: none; }
+  .day-hour-half {
+    position: absolute; left: 56px; right: 0;
+    top: 50%;
+    border-top: 1px dashed var(--border-soft);
+    opacity: 0.6;
+  }
+
+  .day-now {
+    position: absolute; left: 0; right: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .day-now-label {
+    position: absolute; left: 0; top: 0;
+    transform: translateY(-50%);
+    font-size: 0.7em;
+    color: var(--accent);
+    background: var(--bg);
+    letter-spacing: 0.02em;
+    width: 44px;
+    text-align: right;
+    padding: 0 6px 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-now-line {
+    position: absolute; left: 44px; right: 0; top: 0;
+    border-top: 1px solid var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  .day-event {
+    position: absolute;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--fg-dimmer);
+    padding: 4px 8px 0 8px;
+    overflow: hidden;
+    cursor: grab;
+    transition: border-color 80ms, background 80ms;
+  }
+  .day-event:hover { border-color: var(--accent-line); }
+  .day-event.ev-plan {
+    background: linear-gradient(180deg, var(--bg-surface-hover), var(--bg-surface));
+    border-left-color: var(--accent);
+  }
+  .day-event.ev-meeting {
+    background: var(--bg-surface);
+    border-left-color: var(--fg-muted);
+  }
+  .day-event.pri-bar-0 { border-left-color: #6a7c92; }
+  .day-event.pri-bar-1 { border-left-color: #719379; }
+  .day-event.pri-bar-2 { border-left-color: #b59864; }
+  .day-event.pri-bar-3 { border-left-color: #c47e68; }
+  .day-event.pri-bar-4 { border-left-color: #c96b7f; }
+  .day-event.is-done { opacity: 0.75; border: 1px dashed var(--border); background: var(--bg-hover); border-left: 2px solid var(--border); }
+  .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
+  .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-style: dashed; background: transparent !important; }
+  .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-color: var(--accent); opacity: 0.95; cursor: grabbing; }
+  .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+  .day-event-time {
+    font-size: 0.74em;
+    color: white;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+  .day-event-title {
+    font-size: 0.88em;
+    color: white;
+    line-height: 1.25;
+    display: flex; align-items: baseline; gap: 5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .day-event-tags { display: flex; gap: 6px; font-size: 0.74em; color: white; margin-top: 2px; }
+  .day-event-tag { color: white; }
+  .day-event.is-compact .day-event-time { display: none; }
+  .day-event.is-compact { padding: 1px 8px; }
+  .day-event.is-compact .day-event-title { font-size: 0.78em; }
+  
+  .day-event.is-short .day-event-inner {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .day-event.is-short .day-event-title {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .day-event.is-short .day-event-time {
+    flex: 0 0 auto;
+  }
+  .day-event.is-short .day-event-tags {
+    display: none;
+  }
+
+  .day-event-handle {
+    position: absolute; left: 0; right: 0;
+    height: 6px;
+    cursor: ns-resize;
+    z-index: 2;
+  }
+  .day-event-handle-top { top: 0; }
+  .day-event-handle-bottom {
+    bottom: 0;
+    text-align: center;
+    color: var(--fg-dimmer);
+    line-height: 6px;
+    font-size: 0.6em;
+  }
+  .day-event:hover .day-event-handle-bottom { color: var(--fg-dim); }
+  .day-event-handle-grip { letter-spacing: -2px; }
+
+  .day-drop-preview {
+    position: absolute;
+    left: 56px;
+    right: 0;
+    border: 1px dashed var(--accent);
+    background: var(--accent-soft);
+    pointer-events: none;
+    z-index: 4;
+    display: flex; align-items: flex-start;
+    padding: 4px 8px;
+  }
+  .day-drop-preview-label {
+    font-size: 0.78em;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Drag ghost ─────────────────────────────────────────────────────── */
+
+  .drag-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: var(--bg-surface);
+    border: 1px solid var(--accent-line);
+    box-shadow: 0 8px 32px var(--shadow-dark), 0 0 0 1px var(--bg) inset;
+    padding: 8px 12px;
+    max-width: 320px;
+  }
+  .drag-ghost.is-bracket {
+    background: var(--bg-surface);
+    border: 1px dashed var(--accent);
+  }
+  .drag-ghost.is-bracket::before {
+    content: '▌';
+    color: var(--accent);
+    position: absolute; left: -1px; top: 0; bottom: 0;
+    display: flex; align-items: center;
+  }
+  .drag-ghost-inner {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.92em;
+  }
+  .drag-ghost-title {
+    color: var(--fg);
+    max-width: 240px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .drag-ghost-meta {
+    font-size: 0.74em;
+    color: var(--fg-dim);
+    margin-top: 3px;
+  }
+
+  .task-row-actions {
+    display: flex;
+    opacity: 0;
+    pointer-events: none;
+    margin-left: auto;
+    gap: 4px;
+  }
+  .task-row:hover .task-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .task-row-actions button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 0.85em;
+  }
+  .task-row-actions button:hover {
+    background: var(--bg-surface-hover);
+    color: var(--fg);
+    border-color: var(--accent);
+  }
+
+
