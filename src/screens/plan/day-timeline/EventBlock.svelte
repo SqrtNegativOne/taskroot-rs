@@ -176,7 +176,6 @@
     </div>
 {/snippet}
 
-<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -->
 {#if dragOffset !== undefined}
     {@render renderBlock(startMins, endMins, true, false)}
     {@render renderBlock(startMins + dragOffset, endMins + dragOffset, false, true)}

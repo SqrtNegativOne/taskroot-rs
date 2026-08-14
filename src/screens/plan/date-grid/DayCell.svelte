@@ -16,7 +16,7 @@
         today: Date;
         events: AppEvent[];
         isWeek: boolean;
-        dragState?: { target?: { kind: string; date?: string }; event?: { id: string } };
+        dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
         onAddEvent?: (date: Date) => void;
     } = $props();

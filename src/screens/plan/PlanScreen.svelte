@@ -24,9 +24,11 @@
     let anchor = $state(new Date());
     let timelineDate = $state(new Date());
     
+    import type { AppFilter } from '../../components/tasklist/filters';
+
     // UI state — task list
     let query = $state('');
-    let filters = $state<unknown[]>([]);
+    let filters = $state<AppFilter[]>([]);
     let sort = $state('priority');
 
     // Hydrate events with tasks

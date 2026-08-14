@@ -27,6 +27,9 @@ export default tseslint.config(
         extraFileExtensions: ['.svelte'],
       },
     },
+    rules: {
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+    },
   },
   {
     ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', 'build/', 'legacy-src/'],
@@ -41,6 +44,10 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'svelte/valid-compile': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     }
   }
 );

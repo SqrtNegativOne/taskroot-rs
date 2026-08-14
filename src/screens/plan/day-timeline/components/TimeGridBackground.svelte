@@ -12,7 +12,6 @@
     }
 </script>
 
-<!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
 {#each Array.from({ length: 24 }) as _, h (h)}
     <div
         class="day-hour"

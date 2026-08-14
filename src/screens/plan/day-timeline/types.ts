@@ -17,7 +17,7 @@ export interface DragStateTarget {
 
 export interface DragState {
     target?: DragStateTarget;
-    event?: unknown;
+    event?: { id: string } | any;
 }
 
 import type { AppEvent } from '../../../lib/domain';
