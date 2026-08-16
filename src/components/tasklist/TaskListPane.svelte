@@ -3,7 +3,7 @@
     import TaskRow from './TaskRow.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
-    import { invoke } from '@tauri-apps/api/core';
+    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
 
     let {
         tasks,
@@ -53,17 +53,13 @@
     // We can assume empty for now.
     const pastDueTaskIds = new Set<string>();
 
-    let filtered = $state<AppTask[]>([]);
+    let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks');
+    let filtered = $derived(tasksQuery.data ?? []);
 
     $effect(() => {
         // Trigger fetch when tasks, filters, sort, or query changes
         void tasks;
-        
-        invoke<AppTask[]>('get_filtered_tasks', { filters, sort, query })
-            .then(res => {
-                filtered = res;
-            })
-            .catch(console.error);
+        tasksQuery.execute({ filters, sort, query });
     });
 
     function handleAddTask() {

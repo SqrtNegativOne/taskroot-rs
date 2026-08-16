@@ -1,4 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
+import { safeInvoke } from './safeInvoke.svelte';
+import { ResultAsync } from 'neverthrow';
 import type { AppTask, AppEvent } from './domain';
 
 export class AppStore {
@@ -10,18 +11,20 @@ export class AppStore {
     async init() {
         let attempts = 0;
         while (attempts < 50) {
-            try {
-                const [fetchedTasks, fetchedEvents] = await Promise.all([
-                    invoke<AppTask[]>('get_tasks'),
-                    invoke<AppEvent[]>('get_events')
-                ]);
-                
+            const result = await ResultAsync.combine([
+                safeInvoke<AppTask[]>('get_tasks'),
+                safeInvoke<AppEvent[]>('get_events')
+            ]);
+            
+            if (result.isOk()) {
+                const [fetchedTasks, fetchedEvents] = result.value;
                 this.tasks = fetchedTasks;
                 this.events = fetchedEvents;
                 this.loaded = true;
                 this.error = null;
                 return;
-            } catch (e: unknown) {
+            } else {
+                const e = result.error;
                 const errStr = e instanceof Error ? e.toString() : String(e);
                 if (errStr.includes("state not managed") || errStr.includes("not managed") || errStr.includes("not initialized")) {
                     attempts++;
@@ -37,11 +40,10 @@ export class AppStore {
 
     async addTask(task: AppTask) {
         this.tasks.push(task);
-        try {
-            await invoke('create_task', { task });
-        } catch (e) {
+        const result = await safeInvoke('create_task', { task });
+        if (result.isErr()) {
             this.tasks = this.tasks.filter(t => t.id !== task.id);
-            throw e;
+            throw result.error;
         }
     }
 
@@ -53,32 +55,29 @@ export class AppStore {
         
         this.tasks[idx] = newTask;
         
-        try {
-            await invoke('update_task', { task: newTask });
-        } catch (e) {
+        const result = await safeInvoke('update_task', { task: newTask });
+        if (result.isErr()) {
             this.tasks[idx] = oldTask;
-            throw e;
+            throw result.error;
         }
     }
 
     async deleteTask(id: string) {
         const oldTasks = [...this.tasks];
         this.tasks = this.tasks.filter(t => t.id !== id);
-        try {
-            await invoke('delete_task', { id });
-        } catch (e) {
+        const result = await safeInvoke('delete_task', { id });
+        if (result.isErr()) {
             this.tasks = oldTasks;
-            throw e;
+            throw result.error;
         }
     }
 
     async addEvent(event: AppEvent) {
         this.events.push(event);
-        try {
-            await invoke('create_event', { event });
-        } catch (e) {
+        const result = await safeInvoke('create_event', { event });
+        if (result.isErr()) {
             this.events = this.events.filter(ev => ev.id !== event.id);
-            throw e;
+            throw result.error;
         }
     }
 
@@ -90,22 +89,20 @@ export class AppStore {
         
         this.events[idx] = newEvent;
         
-        try {
-            await invoke('update_event', { event: newEvent });
-        } catch (e) {
+        const result = await safeInvoke('update_event', { event: newEvent });
+        if (result.isErr()) {
             this.events[idx] = oldEvent;
-            throw e;
+            throw result.error;
         }
     }
 
     async deleteEvent(id: string) {
         const oldEvents = [...this.events];
         this.events = this.events.filter(e => e.id !== id);
-        try {
-            await invoke('delete_event', { id });
-        } catch (e) {
+        const result = await safeInvoke('delete_event', { id });
+        if (result.isErr()) {
             this.events = oldEvents;
-            throw e;
+            throw result.error;
         }
     }
 }

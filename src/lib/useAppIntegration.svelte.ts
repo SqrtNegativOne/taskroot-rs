@@ -5,12 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { store } from './store.svelte';
 import type { AppTask } from './domain';
-
-// Basic sigil parser replacement for the example
-function parseSigils(taskName: string) {
-    // A simplified version. The original taskroot parses priority, tags, est, due.
-    return { cleanTitle: taskName, properties: { priority: undefined, tags: [], duration: undefined, day: undefined } };
-}
+import type { ParsedSigils } from './bindings/ParsedSigils';
 
 export function useAppIntegration() {
     onMount(() => {
@@ -38,7 +33,7 @@ export function useAppIntegration() {
                     case 'PLAN_TASK':
                     case 'ADD_TASK': {
                         if (!payload?.taskName) break;
-                        const { cleanTitle, properties } = parseSigils(payload.taskName);
+                        const { cleanTitle, properties } = await invoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',
@@ -54,7 +49,7 @@ export function useAppIntegration() {
                     }
                     case 'DO_TASK': {
                         if (!payload?.taskName) break;
-                        const { cleanTitle, properties } = parseSigils(payload.taskName);
+                        const { cleanTitle, properties } = await invoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',

@@ -2,4 +2,4 @@
 import type { AppTaskStatus } from "./AppTaskStatus";
 import type { Subtask } from "./Subtask";
 
-export interface AppTask { id: string, title: string, status?: AppTaskStatus, priority?: number, tags?: string[], subtasks?: Subtask[], parentTask?: string, dependencies?: string[], est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: string, notes?: string, tabs?: string, due?: string, _deleted?: boolean, updatedAt?: bigint, etag?: string, }
+export type AppTask = { id: string, title: string, status?: AppTaskStatus, priority?: number, tags?: Array<string>, subtasks?: Array<Subtask>, parentTask?: string, dependencies?: Array<string>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: string, notes?: string, tabs?: string, due?: string, _deleted?: boolean, updatedAt?: bigint, etag?: string, dirty?: boolean, };

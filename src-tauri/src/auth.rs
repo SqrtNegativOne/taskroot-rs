@@ -63,7 +63,7 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), String> {
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    tauri_plugin_opener::open_url(auth_url.to_string(), None::<&str>).map_err(|e| e.to_string())?;
+    tauri_plugin_opener::open_url(&auth_url, None::<&str>).map_err(|e| e.to_string())?;
 
     // Block the tokio worker thread to wait for the HTTP callback
     let (mut stream, _) = tokio::task::spawn_blocking(move || {

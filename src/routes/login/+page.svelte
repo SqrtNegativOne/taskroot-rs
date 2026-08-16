@@ -1,19 +1,21 @@
 <script lang="ts">
-    import { invoke } from '@tauri-apps/api/core';
+    import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
 
     let error = $state<string | null>(null);
     let isLoading = $state(false);
 
     async function handleLogin() {
-        try {
-            isLoading = true;
-            error = null;
-            await invoke('login_with_google');
+        isLoading = true;
+        error = null;
+        
+        const result = await safeInvoke('login_with_google');
+        
+        if (result.isOk()) {
             await goto('/plan');
-        } catch (err) {
-            console.error('Failed to login:', err);
-            error = String(err);
+        } else {
+            console.error('Failed to login:', result.error);
+            error = String(result.error);
             isLoading = false;
         }
     }

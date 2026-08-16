@@ -5,7 +5,7 @@
     import { emit } from '@tauri-apps/api/event';
     import { store } from '$lib/store.svelte';
     import { useAppIntegration } from '$lib/useAppIntegration.svelte';
-    import { invoke } from '@tauri-apps/api/core';
+    import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
 
     let { children } = $props();
@@ -17,19 +17,21 @@
         isLauncher = appWindow.label === 'launcher';
         
         if (!isLauncher) {
-            try {
-                const loggedIn = await invoke<boolean>('is_logged_in');
+            const authResult = await safeInvoke<boolean>('is_logged_in');
+            
+            if (authResult.isOk()) {
+                const loggedIn = authResult.value;
                 if (!loggedIn && window.location.pathname !== '/login') {
                     await goto('/login');
                 } else if (loggedIn && window.location.pathname === '/login') {
                     await goto('/plan');
                 }
-            } catch (e) {
-                console.error("Failed to check auth state:", e);
-            } finally {
-                isCheckingAuth = false;
-                store.init(); // Initialize store only after auth check to avoid fetching without token
+            } else {
+                console.error("Failed to check auth state:", authResult.error);
             }
+            
+            isCheckingAuth = false;
+            store.init(); // Initialize store only after auth check to avoid fetching without token
         } else {
             isCheckingAuth = false;
             store.init();

@@ -19,7 +19,8 @@
     "@tauri-apps/plugin-opener": "^2",
     "fuse.js": "^7.5.0",
     "material-icons": "^1.13.14",
-    "material-symbols": "^0.46.0"
+    "material-symbols": "^0.46.0",
+    "neverthrow": "^8.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -10,6 +10,13 @@ pub mod domain;
 pub mod screens;
 pub mod auth;
 pub mod sync;
+pub mod time_utils;
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn parse_sigils(task_name: String) -> domain::ParsedSigils {
+    domain::parse_sigils(&task_name)
+}
 
 #[tauri::command]
 async fn get_tasks(app: tauri::AppHandle) -> Result<Vec<domain::AppTask>, String> {
@@ -254,6 +261,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            parse_sigils,
             get_tasks,
             get_events,
             create_task,

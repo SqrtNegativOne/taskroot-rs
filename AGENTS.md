@@ -19,12 +19,16 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - `src/`: SvelteKit frontend codebase.
   - `src/routes/`: SvelteKit routing (`+layout.svelte`, `+page.svelte`).
   - `src/lib/`: Shared logic, Svelte runes (`store.svelte.ts`), and inter-window integration (`useAppIntegration.svelte.ts`).
+  - `src/lib/bindings/`: Generated TypeScript bindings for Rust data structures.
   - `src/screens/`: Major UI views (e.g., `plan/`, `do/`).
   - `src/components/`: Reusable UI components.
 - `src-tauri/`: Tauri Rust backend.
   - `src-tauri/src/lib.rs`: Entry point for Tauri, IPC command registration, and window management.
+  - `src-tauri/src/apis/`: 3rd party API integrations (e.g., Google Calendar, Google Tasks).
+  - `src-tauri/src/auth.rs`: OAuth authentication and token management.
   - `src-tauri/src/db.rs`: SQLite database operations using `sqlx`.
   - `src-tauri/src/domain.rs`: Rust data structures for tasks and events.
+  - `src-tauri/src/screens/`: Screen-specific backend commands and logic.
   - `src-tauri/src/sync/`: Global sync engine and queue management.
 
 ## Key Concepts
@@ -41,8 +45,8 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 ## Style (Important)
 - **Svelte 5 Idioms**: Strictly use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) instead of legacy Svelte 4 reactivity (`let foo = ...`, `$:`, `export let`).
 - **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.
-    - On the Typescript/Svelte end, we use the Neverthrow library.
 - **Typescript Idioms**: Strongly type your code. Avoid `any`. Prefer compile-time type inference.
+- **Frontend Error Handling (`neverthrow`)**: Use the `neverthrow` library to handle errors functionally on the frontend, mirroring the Rust backend's `Result` type. Do not use standard `try/catch` for expected errors. When calling Tauri's `invoke`, use the `safeInvoke` wrapper (or `useTauriQuery` rune) located in `src/lib/safeInvoke.svelte.ts` to ensure type-safe `ResultAsync` returns.
 - **Test-Driven Development**: Write tests first as a contract. Do not modify them unless there is something truly wrong.
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.

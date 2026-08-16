@@ -4,7 +4,7 @@
     import type { DragState, LaidEvent, PlanDayLayout } from './types';
     import type { AppEvent } from '../../../lib/domain';
     import { SvelteDate } from 'svelte/reactivity';
-    import { invoke } from '@tauri-apps/api/core';
+    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
 
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
@@ -52,19 +52,19 @@
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
-    let planLayout = $state<Record<string, LaidEvent[]>>({});
-    
+    let layoutQuery = useTauriQuery<PlanDayLayout[]>('get_plan_layout');
+
+    let planLayout = $derived.by(() => {
+        const layoutMap: Record<string, LaidEvent[]> = {};
+        for (const day of layoutQuery.data ?? []) {
+            layoutMap[day.date] = day.events;
+        }
+        return layoutMap;
+    });
+
     $effect(() => {
-        const ds = dates.map(ymd);
         void events; // Trigger re-run when events change
-        
-        invoke<PlanDayLayout[]>('get_plan_layout', { dates: ds }).then((res) => {
-            const layoutMap: Record<string, LaidEvent[]> = {};
-            for (const day of res) {
-                layoutMap[day.date] = day.events;
-            }
-            planLayout = layoutMap;
-        }).catch(console.error);
+        layoutQuery.execute({ dates: dates.map(ymd) });
     });
     
     // Auto scroll logic
