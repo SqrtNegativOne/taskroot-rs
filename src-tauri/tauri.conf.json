@@ -15,7 +15,8 @@
         "label": "main",
         "title": "taskroot",
         "width": 1000,
-        "height": 700
+        "height": 700,
+        "decorations": false
       },
       {
         "label": "launcher",
@@ -28,6 +29,18 @@
         "skipTaskbar": true,
         "visible": false,
         "url": "/"
+      },
+      {
+        "label": "minitracker",
+        "title": "Mini Tracker",
+        "width": 300,
+        "height": 100,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "url": "/minitracker"
       }
     ],
     "security": {

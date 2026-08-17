@@ -1,4 +1,5 @@
 # Taskroot-rs TODOs
+This application is a rewrite of an Electron+React application written in typescript, located at /../taskroot. Here are the features this app lacks which the legacy app has.
 
 ## Backend (Tauri / Rust)
 

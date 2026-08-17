@@ -11,6 +11,7 @@ pub mod screens;
 pub mod auth;
 pub mod sync;
 pub mod time_utils;
+pub mod stopwatch;
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -153,13 +154,31 @@ fn window_close(window: tauri::Window) {
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
 fn window_restore_main(app: tauri::AppHandle) {
     if let Some(main_win) = app.get_webview_window("main") {
         let _ = main_win.show();
         let _ = main_win.unminimize();
         let _ = main_win.set_focus();
     }
-    drop(app);
+    // Automatically hide minitracker when restoring main
+    if let Some(mini_win) = app.get_webview_window("minitracker") {
+        let _ = mini_win.hide();
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn show_minitracker(app: tauri::AppHandle) {
+    if let Some(mini_win) = app.get_webview_window("minitracker") {
+        let _ = mini_win.show();
+        let _ = mini_win.unminimize();
+        let _ = mini_win.set_focus();
+    }
+    // Also minimize or hide main when showing minitracker
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.hide();
+    }
 }
 
 #[tauri::command]
@@ -179,6 +198,7 @@ fn resize_launcher(app: tauri::AppHandle, height: f64) {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[allow(clippy::too_many_lines)]
 /// # Panics
 ///
 /// Panics if the tauri application fails to run.
@@ -194,6 +214,7 @@ pub fn run() {
         .setup(|app| {
             dotenvy::dotenv().ok();
             app.manage(auth::AuthState::default());
+            app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(stopwatch::StopwatchState::default())));
             let handle = app.handle().clone();
 
             let open_i = tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
@@ -203,9 +224,11 @@ pub fn run() {
             let mut tray_builder = tauri::tray::TrayIconBuilder::new()
                 .menu(&menu)
                 .show_menu_on_left_click(false);
+            
             if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
+            
             let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
@@ -260,6 +283,14 @@ pub fn run() {
         })
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             parse_sigils,
             get_tasks,
@@ -276,10 +307,15 @@ pub fn run() {
             window_maximize,
             window_close,
             window_restore_main,
+            show_minitracker,
             hide_launcher,
             resize_launcher,
             auth::login_with_google,
-            auth::is_logged_in
+            auth::is_logged_in,
+            stopwatch::get_stopwatch_state,
+            stopwatch::toggle_stopwatch,
+            stopwatch::reset_stopwatch,
+            stopwatch::set_stopwatch_state
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));

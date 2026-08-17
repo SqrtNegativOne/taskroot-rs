@@ -38,6 +38,11 @@
         }
     }
 
+    async function openMinitracker() {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('show_minitracker');
+    }
+
     function startWithTask(taskId: string) {
         // Find task and set to 'doing', set others to 'todo'
         // Since store doesn't have an updater for this easily, we loop
@@ -108,6 +113,11 @@
             engine={stopwatchState} 
             onToggle={toggleStopwatch} 
         />
+        <div style="position: absolute; right: 0; top: 0;">
+            <button onclick={openMinitracker} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin: 8px;" title="Open Mini Tracker">
+                Mini Tracker
+            </button>
+        </div>
 
         {#if (stopwatchState.running || stopwatchState.isBreak) && (activeTask || allowNoTask)}
             <ActiveTaskDisplay

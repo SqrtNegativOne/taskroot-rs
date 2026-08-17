@@ -13,6 +13,7 @@
         children: Snippet;
     } = $props();
 
+    // svelte-ignore state_referenced_locally
     let isOpen = $state(defaultOpen);
 
     function toggle() {

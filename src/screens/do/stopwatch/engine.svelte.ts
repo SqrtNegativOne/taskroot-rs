@@ -1,7 +1,6 @@
-import { store } from '../../../lib/store.svelte';
-import type { AppTask } from '../../../lib/domain';
+import { safeInvoke } from '../../../lib/safeInvoke.svelte';
+import { listen } from '@tauri-apps/api/event';
 
-// A simple local stopwatch store since we don't have the full store yet
 export class StopwatchState {
     elapsed = $state(0);
     runningSince = $state<number | undefined>(undefined);
@@ -9,6 +8,30 @@ export class StopwatchState {
     breakAllowedMs = $state(5 * 60 * 1000);
     breakStartedAt = $state<number | undefined>(undefined);
     breakSoundPlayed = $state(false);
+
+    constructor() {
+        this.init();
+    }
+
+    async init() {
+        const result = await safeInvoke<any>('get_stopwatch_state');
+        if (result.isOk()) {
+            this.updateFromPayload(result.value);
+        }
+
+        listen('stopwatch-updated', (event) => {
+            this.updateFromPayload(event.payload as any);
+        });
+    }
+
+    updateFromPayload(payload: any) {
+        this.elapsed = payload.elapsed;
+        this.runningSince = payload.runningSince ?? undefined;
+        this.isBreak = payload.isBreak;
+        this.breakAllowedMs = payload.breakAllowedMs;
+        this.breakStartedAt = payload.breakStartedAt ?? undefined;
+        this.breakSoundPlayed = payload.breakSoundPlayed;
+    }
 
     get running() {
         return this.runningSince !== undefined;
@@ -22,21 +45,18 @@ export class StopwatchState {
         return this.currentMs === 0 && !this.running && !this.isBreak;
     }
 
-    toggle() {
-        if (this.runningSince) {
-            // Stop
-            this.elapsed += Date.now() - this.runningSince;
-            this.runningSince = undefined;
-            // TODO: Log session
-        } else {
-            // Start
-            this.runningSince = Date.now();
+    async toggle() {
+        const result = await safeInvoke<any>('toggle_stopwatch');
+        if (result.isOk()) {
+            this.updateFromPayload(result.value);
         }
     }
 
-    reset() {
-        this.elapsed = 0;
-        this.runningSince = undefined;
+    async reset() {
+        const result = await safeInvoke<any>('reset_stopwatch');
+        if (result.isOk()) {
+            this.updateFromPayload(result.value);
+        }
     }
 }
 

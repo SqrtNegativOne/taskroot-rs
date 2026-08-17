@@ -36,8 +36,8 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Multi-Window Architecture**: The app uses multiple windows:
   - **Main Window**: The primary Svelte app.
   - **Launcher Window**: A spotlight-like global command palette triggered by a global shortcut.
-  - **Mini Tracker Window**: A minimal window for tracking time (pending implementation).
-- **Inter-Window Communication**: Communication between the Main Window and the Launcher Window is handled purely on the frontend via Tauri's native event system (`emit` and `listen` from `@tauri-apps/api/event`), orchestrated in `useAppIntegration.svelte.ts`.
+  - **Mini Tracker Window**: A minimal window for tracking time (`minitracker` window). It runs independently but reads state from the Rust backend.
+- **Inter-Window Communication**: Communication between the Main Window and the Launcher Window is handled purely on the frontend via Tauri's native event system (`emit` and `listen` from `@tauri-apps/api/event`), orchestrated in `useAppIntegration.svelte.ts`. The Stopwatch state, however, is stored in Rust and synced across windows using Tauri commands (`get_stopwatch_state`, `toggle_stopwatch`, etc.) and the `stopwatch-updated` event.
 - **Database**: All tasks and events are stored locally in an SQLite database (`taskroot.db`) located in the app data directory. The Rust backend handles all CRUD operations.
 
 ## Style (Important)

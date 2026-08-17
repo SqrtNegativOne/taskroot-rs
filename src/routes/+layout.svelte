@@ -7,16 +7,19 @@
     import { useAppIntegration } from '$lib/useAppIntegration.svelte';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
+    import TitleBar from '../components/TitleBar.svelte';
 
     let { children } = $props();
     let isLauncher = $state(false);
+    let isMinitracker = $state(false);
     let isCheckingAuth = $state(true);
 
     onMount(async () => {
         const appWindow = getCurrentWindow();
         isLauncher = appWindow.label === 'launcher';
+        isMinitracker = appWindow.label === 'minitracker';
         
-        if (!isLauncher) {
+        if (!isLauncher && !isMinitracker) {
             const authResult = await safeInvoke<boolean>('is_logged_in');
             
             if (authResult.isOk()) {
@@ -42,7 +45,7 @@
 
     // Effect to sync data to launcher when store changes
     $effect(() => {
-        if (!isLauncher && store.loaded) {
+        if (!isLauncher && !isMinitracker && store.loaded) {
             emit('launcher-data-update', {
                 tasks: $state.snapshot(store.tasks),
                 events: $state.snapshot(store.events)
@@ -65,6 +68,9 @@
             <div class="w-8 h-8 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin"></div>
         </div>
     {:else}
-        {@render children()}
+        <div class="app">
+            <TitleBar />
+            {@render children()}
+        </div>
     {/if}
 {/if}
