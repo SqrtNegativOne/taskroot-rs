@@ -8,7 +8,7 @@ use oauth2::{
 };
 use sqlx::SqlitePool;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use std::io::{Read, Write};
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -46,9 +46,9 @@ macro_rules! get_client {
 /// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn login_with_google(app: AppHandle) -> Result<(), String> {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let listener = std::net::TcpListener::bind("127.0.0.1:14265").map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let redirect_uri = format!("http://127.0.0.1:{port}");
+    let redirect_uri = format!("http://localhost:{port}");
 
     let client = get_client!(&redirect_uri, |e: String| e);
 
@@ -59,11 +59,12 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), String> {
         .add_scope(Scope::new("https://www.googleapis.com/auth/calendar.events".to_string()))
         .add_scope(Scope::new("https://www.googleapis.com/auth/tasks".to_string()))
         .add_extra_param("access_type", "offline")
-        .add_extra_param("prompt", "consent")
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    tauri_plugin_opener::open_url(&auth_url, None::<&str>).map_err(|e| e.to_string())?;
+    // Emit the URL instead of opening it automatically so the user can copy it
+    app.emit("oauth_url", auth_url.to_string()).map_err(|e| e.to_string())?;
+    // tauri_plugin_opener::open_url(&auth_url, None::<&str>).map_err(|e| e.to_string())?;
 
     // Block the tokio worker thread to wait for the HTTP callback
     let (mut stream, _) = tokio::task::spawn_blocking(move || {
@@ -77,30 +78,33 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), String> {
     stream.read(&mut buffer).map_err(|e| e.to_string())?;
     let request = String::from_utf8_lossy(&buffer);
 
-    let mut code = None;
-    let mut state = None;
-
-    if let Some(line) = request.lines().next() {
-        if line.starts_with("GET /?") {
-            let query = line.trim_start_matches("GET /?").split(' ').next().unwrap_or("");
-            for pair in query.split('&') {
-                let mut parts = pair.split('=');
-                if let (Some(key), Some(value)) = (parts.next(), parts.next()) {
-                    if key == "code" {
-                        code = Some(value.to_string());
-                    } else if key == "state" {
-                        state = Some(value.to_string());
-                    }
-                }
+    let parsed_params = (|| -> Option<(String, String)> {
+        let line = request.lines().next()?;
+        let path = line.strip_prefix("GET ")?.split(' ').next()?;
+        if !path.starts_with("/?") {
+            return None;
+        }
+        
+        let parsed_url = url::Url::parse(&format!("http://localhost{path}")).ok()?;
+        
+        let mut parsed_code = None;
+        let mut parsed_state = None;
+        
+        for (key, value) in parsed_url.query_pairs() {
+            match key.as_ref() {
+                "code" => parsed_code = Some(value.into_owned()),
+                "state" => parsed_state = Some(value.into_owned()),
+                _ => {}
             }
         }
-    }
+        
+        Some((parsed_code?, parsed_state?))
+    })();
 
     let response = "HTTP/1.1 200 OK\r\n\r\n<html><body><h1>Login successful! You can close this window and return to Taskroot.</h1><script>window.close()</script></body></html>";
     let _ = stream.write_all(response.as_bytes());
 
-    let code = code.ok_or("No code received from Google")?;
-    let state = state.ok_or("No state received from Google")?;
+    let (code, state) = parsed_params.ok_or("No code or state received from Google")?;
 
     if state != *csrf_token.secret() {
         return Err("Invalid state token".to_string());
@@ -154,7 +158,7 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, anyhow:
         .await?
         .ok_or_else(|| anyhow!("No refresh token found. User needs to log in again."))?;
 
-    let client = get_client!("http://127.0.0.1", |e: String| anyhow!(e));
+    let client = get_client!("http://localhost", |e: String| anyhow!(e));
 
     let token_result = client
         .exchange_refresh_token(&RefreshToken::new(refresh_token_str))

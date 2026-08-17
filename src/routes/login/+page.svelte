@@ -1,18 +1,32 @@
 <script lang="ts">
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
+    import { Routes } from '$lib/routes';
+    import { listen } from '@tauri-apps/api/event';
+    import { onMount } from 'svelte';
 
     let error = $state<string | null>(null);
     let isLoading = $state(false);
+    let manualUrl = $state<string | null>(null);
+
+    onMount(() => {
+        const unlisten = listen('oauth_url', (event) => {
+            manualUrl = event.payload as string;
+        });
+        return () => {
+            unlisten.then(f => f());
+        };
+    });
 
     async function handleLogin() {
         isLoading = true;
         error = null;
+        manualUrl = null;
         
         const result = await safeInvoke('login_with_google');
         
         if (result.isOk()) {
-            await goto('/plan');
+            await goto(Routes.HOME);
         } else {
             console.error('Failed to login:', result.error);
             error = String(result.error);
@@ -32,15 +46,30 @@
             </div>
         {/if}
 
-        <button 
-            class="login-button"
-            onclick={handleLogin}
-            disabled={isLoading}
-        >
-            {#if isLoading}
-                <div class="spinner"></div>
-                <span>Waiting for authentication...</span>
-            {:else}
+            {#if manualUrl}
+                <div style="margin-bottom: 1.5rem; text-align: left;">
+                    <p style="margin-bottom: 0.5rem; color: #a1a1aa; font-size: 0.875rem;">Please copy this URL and paste it in your browser to log in:</p>
+                    <textarea 
+                        readonly 
+                        rows="4" 
+                        style="width: 100%; padding: 0.5rem; background: #27272a; color: #fff; border: 1px solid #3f3f46; border-radius: 4px; font-family: monospace; font-size: 0.75rem; resize: none;"
+                        onclick={(e) => e.currentTarget.select()}
+                    >{manualUrl}</textarea>
+                </div>
+            {/if}
+
+            <button 
+                class="login-button"
+                onclick={handleLogin}
+                disabled={isLoading && !manualUrl}
+            >
+                {#if isLoading && !manualUrl}
+                    <div class="spinner"></div>
+                    <span>Waiting for URL...</span>
+                {:else if isLoading && manualUrl}
+                    <div class="spinner"></div>
+                    <span>Waiting for authentication...</span>
+                {:else}
                 <svg viewBox="0 0 24 24" class="google-icon" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

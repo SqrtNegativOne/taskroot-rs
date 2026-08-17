@@ -39,8 +39,6 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - **Mini Tracker Window**: A minimal window for tracking time (pending implementation).
 - **Inter-Window Communication**: Communication between the Main Window and the Launcher Window is handled purely on the frontend via Tauri's native event system (`emit` and `listen` from `@tauri-apps/api/event`), orchestrated in `useAppIntegration.svelte.ts`.
 - **Database**: All tasks and events are stored locally in an SQLite database (`taskroot.db`) located in the app data directory. The Rust backend handles all CRUD operations.
-- **Deep Linking**: The app registers a custom protocol (`taskroot://`) to handle deep links, which are received by the Tauri backend and emitted to the frontend.
-- **Authentication & Environment**: The app requires Google OAuth 2.0 credentials for Tasks and Calendar sync. The Rust backend uses `dotenvy` to read `GOOGLE_CLIENT_ID` from a `.env` file in `src-tauri/`. The OAuth flow leverages PKCE and redirects back to the app via the `taskroot://auth-callback` deep link. The frontend intercepts this deep link on the Login screen and calls the backend to complete the token exchange.
 
 ## Style (Important)
 - **Svelte 5 Idioms**: Strictly use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) instead of legacy Svelte 4 reactivity (`let foo = ...`, `$:`, `export let`).
@@ -50,4 +48,5 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Test-Driven Development**: Write tests first as a contract. Do not modify them unless there is something truly wrong.
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
+- **Routing**: Never use magic strings for route paths (e.g., `goto('/login')`). Always import and use the centralized constants from `src/lib/routes.ts` (e.g., `goto(Routes.LOGIN)`).
 - Store assets offline.
