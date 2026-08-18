@@ -2,7 +2,7 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 pub mod db;
 pub mod apis;
@@ -129,6 +129,23 @@ async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), String> {
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
     db::delete_event(&pool, id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn force_sync(app: tauri::AppHandle) -> Result<(), String> {
+    let pool = app
+        .try_state::<sqlx::SqlitePool>()
+        .ok_or("Database not initialized yet")?;
+    
+    // Attempt sync and emit the same events the background engine does
+    let _ = app.emit("sync-started", ());
+    if let Err(e) = sync::sync_with_google(&pool).await {
+        let err_str = e.to_string();
+        let _ = app.emit("sync-error", err_str.clone());
+        return Err(err_str);
+    }
+    let _ = app.emit("sync-finished", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -301,6 +318,7 @@ pub fn run() {
             create_event,
             update_event,
             delete_event,
+            force_sync,
             screens::plan::get_plan_layout,
             screens::plan::get_filtered_tasks,
             window_minimize,

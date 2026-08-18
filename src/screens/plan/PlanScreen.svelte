@@ -129,8 +129,8 @@
                         setTasks={() => {
                             // Stub
                         }}
-                        {filters}
-                        {sort}
+                        bind:filters
+                        bind:sort
                         {query}
                         setQuery={(q: string) => { query = q; }}
                         onDragStart={onTaskDragStart}

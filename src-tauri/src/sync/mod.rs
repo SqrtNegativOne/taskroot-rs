@@ -29,7 +29,7 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
     });
 }
 
-async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
+pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
     let Ok(access_token) = auth::get_valid_access_token(pool).await else {
         return Ok(());
     };

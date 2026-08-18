@@ -21,7 +21,7 @@
 <button
     type="button"
     class="task-circle {priority !== undefined ? `pri-bg-${priority.toString()}` : ''}"
-    style="border: none; padding: 0; font: inherit; color: inherit; cursor: pointer;"
+    style="padding: 0; font: inherit; color: inherit; cursor: pointer;"
     {title}
     aria-label={ariaLabel ?? (priority !== undefined ? `Priority ${priority.toString()}` : 'Toggle Done')}
     {onclick}

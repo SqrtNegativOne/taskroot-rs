@@ -38,6 +38,22 @@ export class AppStore {
         this.error = "Error loading data from backend: Database failed to initialize in time.";
     }
 
+    async refresh() {
+        const result = await ResultAsync.combine([
+            safeInvoke<AppTask[]>('get_tasks'),
+            safeInvoke<AppEvent[]>('get_events')
+        ]);
+        
+        if (result.isOk()) {
+            const [fetchedTasks, fetchedEvents] = result.value;
+            this.tasks = fetchedTasks;
+            this.events = fetchedEvents;
+            this.error = null;
+        } else {
+            console.error("Failed to refresh store:", result.error);
+        }
+    }
+
     async addTask(task: AppTask) {
         this.tasks.push(task);
         const result = await safeInvoke('create_task', { task });

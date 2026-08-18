@@ -193,3 +193,12 @@
     font: inherit; cursor: pointer;
   }
   .cal-nav-btn:hover { color: var(--fg); }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
+

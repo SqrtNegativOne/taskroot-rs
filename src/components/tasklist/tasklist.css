@@ -105,8 +105,8 @@
     min-height: 18px;
     aspect-ratio: 1;
     border-radius: 50%;
-    border: 2px solid var(--circle-border);
-    background-color: var(--circle-fill);
+    border: 2px solid var(--circle-border, var(--border));
+    background-color: var(--circle-fill, transparent);
     margin-right: 14px;
     flex-shrink: 0;
     cursor: pointer;

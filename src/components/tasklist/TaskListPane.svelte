@@ -1,6 +1,7 @@
 <script lang="ts">
     import { computeFilterDefaults, type AppFilter } from './filters';
     import TaskRow from './TaskRow.svelte';
+    import FilterSortButtons from './FilterSortButtons.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
     import { useTauriQuery } from '../../lib/safeInvoke.svelte';
@@ -8,8 +9,8 @@
     let {
         tasks,
         setTasks,
-        filters,
-        sort,
+        filters = $bindable([]),
+        sort = $bindable('priority'),
         query,
         setQuery,
         onDragStart,
@@ -20,8 +21,8 @@
     }: {
         tasks: AppTask[];
         setTasks: (updater: (prev: AppTask[]) => AppTask[]) => void;
-        filters: AppFilter[];
-        sort: string;
+        filters?: AppFilter[];
+        sort?: string;
         query: string;
         setQuery: (q: string) => void;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
@@ -77,7 +78,7 @@
             style="width: 100%; margin-bottom: 8px; padding: 4px 8px;"
         />
         <div class="task-pane-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
-            <!-- FilterSortButtons stub, can be populated later -->
+            <FilterSortButtons bind:filters bind:sort />
             <button
                 style="margin-left: auto; background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
                 title="Add Task"

@@ -32,12 +32,14 @@ struct GoogleEventTime {
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
     let now = chrono::Utc::now().to_rfc3339();
-    let url = format!(
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin={}&maxResults=50&singleEvents=true&orderBy=startTime",
-        now.as_str()
-    );
+    let mut url = url::Url::parse("https://www.googleapis.com/calendar/v3/calendars/primary/events").expect("Valid URL");
+    url.query_pairs_mut()
+        .append_pair("timeMin", &now)
+        .append_pair("maxResults", "50")
+        .append_pair("singleEvents", "true")
+        .append_pair("orderBy", "startTime");
 
-    let response: reqwest::Response = client.get(&url)
+    let response: reqwest::Response = client.get(url.as_str())
         .bearer_auth(access_token)
         .send()
         .await?;
