@@ -8,7 +8,7 @@
 
     let {
         tasks,
-        setTasks,
+        onUpdateTask,
         filters = $bindable([]),
         sort = $bindable('priority'),
         query,
@@ -20,7 +20,7 @@
         footer,
     }: {
         tasks: AppTask[];
-        setTasks: (updater: (prev: AppTask[]) => AppTask[]) => void;
+        onUpdateTask?: (id: string, transform: (t: AppTask) => AppTask) => void;
         filters?: AppFilter[];
         sort?: string;
         query: string;
@@ -33,21 +33,13 @@
     } = $props();
 
     function updateTask(id: string, transform: (t: AppTask) => AppTask) {
-        setTasks(ts => {
-            const target = ts.find(t => t.id === id);
-            const newStatus = target ? transform(target).status : undefined;
-            const becomingDoing = newStatus === "doing";
-            return ts.map(t => {
-                if (t.id === id) return transform(t);
-                if (becomingDoing && t.status === "doing") return { ...t, status: "todo" };
-                return t;
-            });
-        });
+        if (onUpdateTask) {
+            onUpdateTask(id, transform);
+        }
     }
 
     function deleteTask(id: string) {
         if (onDeleteTask) onDeleteTask(id);
-        else setTasks(ts => ts.filter(t => t.id !== id));
     }
     
     // Note: event-based past due calculation is deferred since we don't have global events accessible easily here without context

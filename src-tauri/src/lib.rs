@@ -12,6 +12,7 @@ pub mod auth;
 pub mod sync;
 pub mod time_utils;
 pub mod stopwatch;
+pub mod settings;
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -333,7 +334,10 @@ pub fn run() {
             stopwatch::get_stopwatch_state,
             stopwatch::toggle_stopwatch,
             stopwatch::reset_stopwatch,
-            stopwatch::set_stopwatch_state
+            stopwatch::set_stopwatch_state,
+            settings::get_settings_schema,
+            settings::get_settings,
+            settings::update_setting
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));

@@ -126,8 +126,8 @@
                 >
                     <TaskListPane
                         tasks={store.tasks}
-                        setTasks={() => {
-                            // Stub
+                        onUpdateTask={(id, transform) => {
+                            void store.updateTask(id, transform);
                         }}
                         bind:filters
                         bind:sort

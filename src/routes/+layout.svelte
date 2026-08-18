@@ -7,6 +7,7 @@
     import { useAppIntegration } from '$lib/useAppIntegration.svelte';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
+    import { Routes } from '$lib/routes';
     import TitleBar from '../components/TitleBar.svelte';
 
     let { children } = $props();
@@ -24,10 +25,10 @@
             
             if (authResult.isOk()) {
                 const loggedIn = authResult.value;
-                if (!loggedIn && window.location.pathname !== '/login') {
-                    await goto('/login');
-                } else if (loggedIn && window.location.pathname === '/login') {
-                    await goto('/plan');
+                if (!loggedIn && window.location.pathname !== Routes.LOGIN) {
+                    await goto(Routes.LOGIN);
+                } else if (loggedIn && window.location.pathname === Routes.LOGIN) {
+                    await goto(Routes.HOME);
                 }
             } else {
                 console.error("Failed to check auth state:", authResult.error);

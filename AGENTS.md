@@ -10,7 +10,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Frontend Framework**: Svelte 5 with SvelteKit configured for SPA (Single Page Application) mode (`ssr = false`). Uses Svelte runes for reactivity.
 - **Build Tool**: Vite (via SvelteKit).
 - **Desktop Wrapper**: Tauri v2 (Rust backend, configured in `src-tauri/tauri.conf.json`).
-- **Linter**: ESLint (configured for Svelte & TypeScript) and Rust `clippy` (`cargo clippy`). Run `bun run check` for frontend type checking. For Rust, prefer running `cargo clippy` directly, or you can use `cargo c` if it's configured to run both checks.
+- **Linter**: ESLint (configured for Svelte & TypeScript) and Rust `clippy` (`cargo clippy`). **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
 - **Language**: TypeScript (`.ts`, `.svelte`) on the frontend, Rust (`.rs`) on the backend.
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.
 - **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`). Data is queried via Tauri IPC commands.

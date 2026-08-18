@@ -112,20 +112,9 @@
             {#if task.status === "next-up"}
                 <span class="status-pill status-nextup">next up</span>
             {/if}
-            <select
-                class="status-select"
-                value={task.status ?? "todo"}
-                onchange={(e) => {
-                    const val = (e.target as HTMLSelectElement).value as AppTaskStatus;
-                    updateTask(task.id, t => ({ ...t, status: val }));
-                }}
-                onclick={(e) => { e.stopPropagation(); }}
-            >
-                <option value="todo">todo</option>
-                <option value="doing">doing</option>
-                <option value="next-up">next up</option>
-                <option value="done">done</option>
-            </select>
+            {#if task.status === "doing"}
+                <span class="status-pill status-doing">DOING</span>
+            {/if}
             <div class="task-row-actions">
                 <button
                     onclick={(e) => {

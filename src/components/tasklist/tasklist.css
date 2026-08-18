@@ -75,7 +75,7 @@
     user-select: none;
     transition: background 80ms;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
   }
   .task-row:hover { background: var(--bg-highlight); }
   .task-row.is-dragging { opacity: 0.32; background: var(--bg-highlight); }
@@ -107,7 +107,8 @@
     border-radius: 50%;
     border: 2px solid var(--circle-border, var(--border));
     background-color: var(--circle-fill, transparent);
-    margin-right: 14px;
+    margin-right: 8px;
+    margin-top: 2px;
     flex-shrink: 0;
     cursor: pointer;
     display: flex;
