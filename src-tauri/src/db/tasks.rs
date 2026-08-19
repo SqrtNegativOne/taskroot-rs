@@ -1,66 +1,23 @@
 use crate::domain::AppTask;
-use sqlx::{Row, SqlitePool};
-
-pub fn row_to_task(row: &sqlx::sqlite::SqliteRow) -> Result<AppTask, sqlx::Error> {
-    let status_str: Option<String> = row.try_get("status")?;
-    let tags_str: Option<String> = row.try_get("tags")?;
-    let subtasks_str: Option<String> = row.try_get("subtasks")?;
-    let dependencies_str: Option<String> = row.try_get("dependencies")?;
-
-    Ok(AppTask {
-        id: row.try_get("id")?,
-        title: row.try_get("title")?,
-        status: status_str
-            .and_then(|s| serde_json::from_value(serde_json::Value::String(s)).ok()),
-        priority: row.try_get("priority")?,
-        tags: tags_str.and_then(|s| serde_json::from_str(&s).ok()),
-        subtasks: subtasks_str.and_then(|s| serde_json::from_str(&s).ok()),
-        parent_task: row.try_get("parent_task")?,
-        dependencies: dependencies_str.and_then(|s| serde_json::from_str(&s).ok()),
-        est: row.try_get("est")?,
-        added: row.try_get("added")?,
-        canvas_x: row.try_get("canvas_x")?,
-        canvas_y: row.try_get("canvas_y")?,
-        on_canvas: row.try_get("on_canvas")?,
-        remote_id: row.try_get("remote_id")?,
-        notes: row.try_get("notes")?,
-        tabs: row.try_get("tabs")?,
-        due: row.try_get("due")?,
-        deleted: row.try_get("deleted")?,
-        updated_at: row.try_get("updated_at")?,
-        etag: row.try_get("etag")?,
-        dirty: row.try_get("dirty").unwrap_or(Some(false)),
-    })
-}
+use sqlx::SqlitePool;
 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
-    let rows = sqlx::query("SELECT * FROM tasks").fetch_all(pool).await?;
-    let mut tasks = Vec::new();
-
-    for row in rows {
-        tasks.push(row_to_task(&row)?);
-    }
-
-    Ok(tasks)
+    sqlx::query_as::<_, AppTask>("SELECT * FROM tasks")
+        .fetch_all(pool)
+        .await
 }
 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub async fn get_task(pool: &SqlitePool, id: &str) -> Result<Option<AppTask>, sqlx::Error> {
-    let row = sqlx::query("SELECT * FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, AppTask>("SELECT * FROM tasks WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
-        .await?;
-    
-    if let Some(r) = row {
-        Ok(Some(row_to_task(&r)?))
-    } else {
-        Ok(None)
-    }
+        .await
 }
 
 /// # Errors
@@ -76,19 +33,6 @@ pub async fn get_dirty_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Er
 ///
 /// Returns an error if the operation fails.
 pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
-    let status_str = task
-        .status
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let tags_str = task
-        .tags
-        .map(|t| serde_json::to_string(&t).unwrap_or_default());
-    let subtasks_str = task
-        .subtasks
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let deps_str = task
-        .dependencies
-        .map(|d| serde_json::to_string(&d).unwrap_or_default());
-
     sqlx::query(
         "INSERT INTO tasks (
             id, title, status, priority, tags, subtasks, parent_task, dependencies, 
@@ -98,12 +42,12 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     )
     .bind(task.id)
     .bind(task.title)
-    .bind(status_str)
+    .bind(task.status)
     .bind(task.priority)
-    .bind(tags_str)
-    .bind(subtasks_str)
+    .bind(task.tags.map(sqlx::types::Json))
+    .bind(task.subtasks.map(sqlx::types::Json))
     .bind(task.parent_task)
-    .bind(deps_str)
+    .bind(task.dependencies.map(sqlx::types::Json))
     .bind(task.est)
     .bind(task.added)
     .bind(task.canvas_x)
@@ -127,19 +71,6 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
 ///
 /// Returns an error if the operation fails.
 pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
-    let status_str = task
-        .status
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let tags_str = task
-        .tags
-        .map(|t| serde_json::to_string(&t).unwrap_or_default());
-    let subtasks_str = task
-        .subtasks
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let deps_str = task
-        .dependencies
-        .map(|d| serde_json::to_string(&d).unwrap_or_default());
-
     sqlx::query(
         "UPDATE tasks SET 
             title = ?, status = ?, priority = ?, tags = ?, subtasks = ?, 
@@ -149,12 +80,12 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
         WHERE id = ?",
     )
     .bind(task.title)
-    .bind(status_str)
+    .bind(task.status)
     .bind(task.priority)
-    .bind(tags_str)
-    .bind(subtasks_str)
+    .bind(task.tags.map(sqlx::types::Json))
+    .bind(task.subtasks.map(sqlx::types::Json))
     .bind(task.parent_task)
-    .bind(deps_str)
+    .bind(task.dependencies.map(sqlx::types::Json))
     .bind(task.est)
     .bind(task.added)
     .bind(task.canvas_x)
@@ -179,19 +110,6 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
 ///
 /// Returns an error if the operation fails.
 pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
-    let status_str = task
-        .status
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let tags_str = task
-        .tags
-        .map(|t| serde_json::to_string(&t).unwrap_or_default());
-    let subtasks_str = task
-        .subtasks
-        .map(|s| serde_json::to_string(&s).unwrap_or_default());
-    let deps_str = task
-        .dependencies
-        .map(|d| serde_json::to_string(&d).unwrap_or_default());
-
     sqlx::query(
         "INSERT INTO tasks (
             id, title, status, priority, tags, subtasks, parent_task, dependencies, 
@@ -222,12 +140,12 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     )
     .bind(task.id)
     .bind(task.title)
-    .bind(status_str)
+    .bind(task.status)
     .bind(task.priority)
-    .bind(tags_str)
-    .bind(subtasks_str)
+    .bind(task.tags.map(sqlx::types::Json))
+    .bind(task.subtasks.map(sqlx::types::Json))
     .bind(task.parent_task)
-    .bind(deps_str)
+    .bind(task.dependencies.map(sqlx::types::Json))
     .bind(task.est)
     .bind(task.added)
     .bind(task.canvas_x)
@@ -344,11 +262,7 @@ pub async fn get_filtered_tasks(
         query_builder.push("id ASC");
     }
 
-    let rows = query_builder.build().fetch_all(pool).await?;
-    let mut tasks = Vec::new();
-    for row in rows {
-        tasks.push(row_to_task(&row)?);
-    }
+    let tasks = query_builder.build_query_as::<AppTask>().fetch_all(pool).await?;
 
     Ok(tasks)
 }

@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTaskStatus.ts")]
 #[serde(rename_all = "kebab-case")]
+#[sqlx(type_name = "TEXT", rename_all = "kebab-case")]
 pub enum AppTaskStatus {
     Todo,
     NextUp,
@@ -20,7 +21,7 @@ pub struct Subtask {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
@@ -31,12 +32,15 @@ pub struct AppTask {
     #[ts(optional)]
     pub priority: Option<i32>,
     #[ts(optional)]
+    #[sqlx(json)]
     pub tags: Option<Vec<String>>,
     #[ts(optional)]
+    #[sqlx(json)]
     pub subtasks: Option<Vec<Subtask>>,
     #[ts(optional)]
     pub parent_task: Option<String>,
     #[ts(optional)]
+    #[sqlx(json)]
     pub dependencies: Option<Vec<String>>,
     #[ts(optional)]
     pub est: Option<i32>,
@@ -67,9 +71,10 @@ pub struct AppTask {
     pub dirty: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEventType.ts")]
 #[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum AppEventType {
     Busy,
     Info,
@@ -77,7 +82,7 @@ pub enum AppEventType {
     Log,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEvent.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
@@ -98,6 +103,7 @@ pub struct AppEvent {
     #[ts(optional)]
     pub rrule: Option<String>,
     #[ts(optional)]
+    #[sqlx(json)]
     pub exdates: Option<Vec<String>>,
     #[ts(optional)]
     pub recurring_event_id: Option<String>,

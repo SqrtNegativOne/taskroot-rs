@@ -1,43 +1,15 @@
 use crate::domain::AppEvent;
-use sqlx::{Row, SqlitePool};
+use sqlx::SqlitePool;
 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
     println!("db::get_events executing query...");
-    let rows = sqlx::query("SELECT * FROM events").fetch_all(pool).await?;
+    let events = sqlx::query_as::<_, AppEvent>("SELECT * FROM events")
+        .fetch_all(pool)
+        .await?;
     println!("db::get_events fetched rows!");
-    let mut events = Vec::new();
-
-    for row in rows {
-        let type_str: String = row.try_get("event_type")?;
-        let exdates_str: Option<String> = row.try_get("exdates")?;
-
-        events.push(AppEvent {
-            id: row.try_get("id")?,
-            remote_id: row.try_get("remote_id")?,
-            remote_collection_id: row.try_get("remote_collection_id")?,
-            task_id: row.try_get("task_id")?,
-            title: row.try_get("title")?,
-            description: row.try_get("description")?,
-            start_time: row.try_get("start_time")?,
-            end_time: row.try_get("end_time")?,
-            event_type: serde_json::from_value(serde_json::Value::String(type_str))
-                .unwrap_or(crate::domain::AppEventType::Info),
-            rrule: row.try_get("rrule")?,
-            exdates: exdates_str.and_then(|s| serde_json::from_str(&s).ok()),
-            recurring_event_id: row.try_get("recurring_event_id")?,
-            original_start_time: row.try_get("original_start_time")?,
-            cancelled: row.try_get("cancelled")?,
-            updated_at: row.try_get("updated_at")?,
-            color: None, // We don't have it in db yet
-            deleted: row.try_get("deleted")?,
-            etag: row.try_get("etag")?,
-            dirty: row.try_get("dirty").unwrap_or(Some(false)),
-        });
-    }
-
     Ok(events)
 }
 
@@ -45,40 +17,10 @@ pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error>
 ///
 /// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
-    let row = sqlx::query("SELECT * FROM events WHERE id = ?")
+    sqlx::query_as::<_, AppEvent>("SELECT * FROM events WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
-        .await?;
-
-    if let Some(r) = row {
-        let type_str: String = r.try_get("event_type")?;
-        let exdates_str: Option<String> = r.try_get("exdates")?;
-
-        Ok(Some(AppEvent {
-            id: r.try_get("id")?,
-            remote_id: r.try_get("remote_id")?,
-            remote_collection_id: r.try_get("remote_collection_id")?,
-            task_id: r.try_get("task_id")?,
-            title: r.try_get("title")?,
-            description: r.try_get("description")?,
-            start_time: r.try_get("start_time")?,
-            end_time: r.try_get("end_time")?,
-            event_type: serde_json::from_value(serde_json::Value::String(type_str))
-                .unwrap_or(crate::domain::AppEventType::Info),
-            rrule: r.try_get("rrule")?,
-            exdates: exdates_str.and_then(|s| serde_json::from_str(&s).ok()),
-            recurring_event_id: r.try_get("recurring_event_id")?,
-            original_start_time: r.try_get("original_start_time")?,
-            cancelled: r.try_get("cancelled")?,
-            updated_at: r.try_get("updated_at")?,
-            color: None,
-            deleted: r.try_get("deleted")?,
-            etag: r.try_get("etag")?,
-            dirty: r.try_get("dirty").unwrap_or(Some(false)),
-        }))
-    } else {
-        Ok(None)
-    }
+        .await
 }
 
 /// # Errors
@@ -94,11 +36,6 @@ pub async fn get_dirty_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::
 ///
 /// Returns an error if the operation fails.
 pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
-    let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-    let exdates_str = event
-        .exdates
-        .map(|e| serde_json::to_string(&e).unwrap_or_default());
-
     sqlx::query(
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
@@ -114,9 +51,9 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(type_str.trim_matches('"'))
+    .bind(event.event_type)
     .bind(event.rrule)
-    .bind(exdates_str)
+    .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
     .bind(event.cancelled)
@@ -134,11 +71,6 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
 ///
 /// Returns an error if the operation fails.
 pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
-    let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-    let exdates_str = event
-        .exdates
-        .map(|e| serde_json::to_string(&e).unwrap_or_default());
-
     sqlx::query(
         "UPDATE events SET 
             remote_id = ?, remote_collection_id = ?, task_id = ?, title = ?, 
@@ -154,9 +86,9 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(type_str.trim_matches('"'))
+    .bind(event.event_type)
     .bind(event.rrule)
-    .bind(exdates_str)
+    .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
     .bind(event.cancelled)
@@ -175,11 +107,6 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
 ///
 /// Returns an error if the operation fails.
 pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx::Error> {
-    let type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
-    let exdates_str = event
-        .exdates
-        .map(|e| serde_json::to_string(&e).unwrap_or_default());
-
     sqlx::query(
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
@@ -213,9 +140,9 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(type_str.trim_matches('"'))
+    .bind(event.event_type)
     .bind(event.rrule)
-    .bind(exdates_str)
+    .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
     .bind(event.cancelled)
