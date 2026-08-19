@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { invoke } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
     import { onMount } from 'svelte';
     import { store } from '$lib/store.svelte';
+    import { safeInvoke } from '$lib/safeInvoke.svelte';
 
     let isSyncing = $state(false);
 
@@ -35,13 +35,12 @@
     async function handleSync() {
         if (isSyncing) return;
         isSyncing = true;
-        try {
-            await invoke('force_sync');
-        } catch (e) {
-            console.error("Force sync failed:", e);
-        } finally {
-            isSyncing = false;
-        }
+        const res = await safeInvoke('force_sync');
+        res.match(
+            () => {},
+            (e) => console.error("Force sync failed:", e)
+        );
+        isSyncing = false;
     }
 </script>
 

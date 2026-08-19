@@ -47,8 +47,8 @@
             } else if (e.key === 'r' && e.ctrlKey && e.altKey) {
                 e.preventDefault();
                 // Restore main window
-                const { invoke } = await import('@tauri-apps/api/core');
-                invoke('window_restore_main');
+                const { safeInvoke } = await import('../../lib/safeInvoke.svelte');
+                safeInvoke('window_restore_main');
             }
         };
 
@@ -67,8 +67,8 @@
     };
 
     const handleDoubleClick = async () => {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('window_restore_main');
+        const { safeInvoke } = await import('../../lib/safeInvoke.svelte');
+        await safeInvoke('window_restore_main');
     };
 </script>
 

@@ -26,8 +26,8 @@
         const result = await safeInvoke('login_with_google');
         
         if (result.isOk()) {
-            import('@tauri-apps/api/core').then(({ invoke }) => {
-                invoke('force_sync').catch(console.error);
+            safeInvoke('force_sync').then(res => {
+                if (res.isErr()) console.error(res.error);
             });
             await goto(Routes.HOME);
         } else {

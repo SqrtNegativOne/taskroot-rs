@@ -26,7 +26,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/lib.rs`: Entry point for Tauri, IPC command registration, and window management.
   - `src-tauri/src/apis/`: 3rd party API integrations (e.g., Google Calendar, Google Tasks).
   - `src-tauri/src/auth.rs`: OAuth authentication and token management.
-  - `src-tauri/src/db.rs`: SQLite database operations using `sqlx`.
+  - `src-tauri/src/db/`: Modularized SQLite database operations using `sqlx` (`tasks.rs`, `events.rs`, `settings.rs`).
   - `src-tauri/src/domain.rs`: Rust data structures for tasks and events.
   - `src-tauri/src/screens/`: Screen-specific backend commands and logic.
   - `src-tauri/src/sync/`: Global sync engine and queue management.

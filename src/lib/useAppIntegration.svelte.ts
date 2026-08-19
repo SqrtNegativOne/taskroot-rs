@@ -1,9 +1,9 @@
 import { onMount } from 'svelte';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, emit } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { store } from './store.svelte';
+import { safeInvoke } from './safeInvoke.svelte';
 import type { AppTask } from './domain';
 import type { ParsedSigils } from './bindings/ParsedSigils';
 
@@ -33,7 +33,9 @@ export function useAppIntegration() {
                     case 'PLAN_TASK':
                     case 'ADD_TASK': {
                         if (!payload?.taskName) break;
-                        const { cleanTitle, properties } = await invoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
+                        const parseRes = await safeInvoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
+                        if (parseRes.isErr()) break;
+                        const { cleanTitle, properties } = parseRes.value;
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',
@@ -49,7 +51,9 @@ export function useAppIntegration() {
                     }
                     case 'DO_TASK': {
                         if (!payload?.taskName) break;
-                        const { cleanTitle, properties } = await invoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
+                        const parseRes = await safeInvoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
+                        if (parseRes.isErr()) break;
+                        const { cleanTitle, properties } = parseRes.value;
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',
@@ -77,7 +81,7 @@ export function useAppIntegration() {
                 }
 
                 // Restore main window after executing command
-                await invoke('window_restore_main');
+                await safeInvoke('window_restore_main');
             }).then(un => { unlistenCommands = un; });
 
             // 2. Listen for deep links

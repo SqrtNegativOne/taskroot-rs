@@ -39,8 +39,8 @@
     }
 
     async function openMinitracker() {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('show_minitracker');
+        const { safeInvoke } = await import('../../../lib/safeInvoke.svelte');
+        await safeInvoke('show_minitracker');
     }
 
     function startWithTask(taskId: string) {
