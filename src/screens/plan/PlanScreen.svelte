@@ -24,7 +24,7 @@
     let anchor = $state(new Date());
     let timelineDate = $state(new Date());
     
-    import type { AppFilter } from '../../components/tasklist/filters';
+    import type { AppFilter } from '../../lib/bindings/AppFilter';
 
     // UI state — task list
     let query = $state('');

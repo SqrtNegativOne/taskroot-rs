@@ -1,10 +1,13 @@
 <script lang="ts">
-    import { computeFilterDefaults, type AppFilter } from './filters';
+    import type { AppFilter } from '../../lib/bindings/AppFilter';
     import TaskRow from './TaskRow.svelte';
     import FilterSortButtons from './FilterSortButtons.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
-    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import { useTauriQuery, safeInvoke } from '../../lib/safeInvoke.svelte';
+    import type { AppTaskDefaults } from '../../lib/bindings/AppTaskDefaults';
+    import { slide } from 'svelte/transition';
+    import { flip } from 'svelte/animate';
 
     let {
         tasks,
@@ -55,8 +58,18 @@
         tasksQuery.execute({ filters, sort, query });
     });
 
-    function handleAddTask() {
-        onAddTask(computeFilterDefaults(filters));
+    async function handleAddTask() {
+        const result = await safeInvoke<AppTaskDefaults>('compute_filter_defaults', { filters });
+        result.match(
+            (defaults) => {
+                const safeDefaults: Partial<AppTask> = {};
+                if (defaults.status !== null) safeDefaults.status = defaults.status;
+                if (defaults.priority !== null) safeDefaults.priority = defaults.priority;
+                if (defaults.tags !== null) safeDefaults.tags = defaults.tags;
+                onAddTask(safeDefaults);
+            },
+            () => onAddTask()
+        );
     }
 </script>
 
@@ -97,15 +110,16 @@
             </div>
         {:else}
             {#each filtered as t (t.id)}
-                <TaskRow
-                    task={t}
-                    {onDragStart}
-                    dragging={activeDragId === t.id}
-                    {updateTask}
-                    {deleteTask}
-                    {filters}
-                    isPastDue={pastDueTaskIds.has(t.id)}
-                />
+                <div animate:flip={{ duration: 300 }} transition:slide={{ duration: 250 }}>
+                    <TaskRow
+                        task={t}
+                        {onDragStart}
+                        dragging={activeDragId === t.id}
+                        {updateTask}
+                        {deleteTask}
+                        isPastDue={pastDueTaskIds.has(t.id)}
+                    />
+                </div>
             {/each}
         {/if}
     </div>

@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic, clippy::nursery)]
+#![allow(clippy::missing_errors_doc)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 
@@ -216,7 +217,7 @@ fn resize_launcher(app: tauri::AppHandle, height: f64) {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::large_stack_frames)]
 /// # Panics
 ///
 /// Panics if the tauri application fails to run.
@@ -322,6 +323,7 @@ pub fn run() {
             force_sync,
             screens::plan::get_plan_layout,
             screens::plan::get_filtered_tasks,
+            screens::plan::compute_filter_defaults,
             window_minimize,
             window_maximize,
             window_close,

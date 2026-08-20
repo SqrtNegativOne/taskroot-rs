@@ -1,9 +1,6 @@
 <script lang="ts">
-    import { checkTaskAgainstFilters, type AppFilter } from './filters';
     import TaskCircle from '../TaskCircle.svelte';
     import type { AppTask, AppTaskStatus } from '../../lib/domain';
-
-    const TRANSITION_DURATION_MS = 400;
 
     let {
         task,
@@ -11,7 +8,6 @@
         dragging,
         updateTask,
         deleteTask,
-        filters,
         isPastDue,
     }: {
         task: AppTask;
@@ -19,11 +15,9 @@
         dragging?: boolean;
         updateTask: (id: string, transform: (task: AppTask) => AppTask) => void;
         deleteTask: (id: string) => void;
-        filters: AppFilter[];
         isPastDue?: boolean;
     } = $props();
 
-    let isExiting = $state(false);
     let isChecking = $state(false);
 
     function handlePointerDown(e: PointerEvent | MouseEvent) {
@@ -36,28 +30,13 @@
         if (onDragStart) onDragStart(e, task);
     }
     
-    function willBeFilteredOut(newStatus: AppTaskStatus) {
-        return checkTaskAgainstFilters({ ...task, status: newStatus }, filters);
-    }
-    
     function handleCircleClick(e: MouseEvent) {
         e.stopPropagation();
         const newStatus = task.status === "done" ? "todo" : "done";
-        const isRemoving = willBeFilteredOut(newStatus);
         
         if (newStatus === "done") {
             isChecking = true;
             // sound effect play here
-        }
-
-        if (isRemoving) {
-            isExiting = true;
-            setTimeout(() => {
-                updateTask(task.id, t => ({ ...t, status: newStatus }));
-                isChecking = false;
-                isExiting = false;
-            }, TRANSITION_DURATION_MS);
-            return;
         }
 
         updateTask(task.id, t => ({ ...t, status: newStatus }));
@@ -89,7 +68,6 @@
     class="task-row"
     class:is-dragging={dragging}
     class:is-done={task.status === "done"}
-    class:is-exiting={isExiting}
     onpointerdown={handlePointerDown}
 >
     <TaskCircle
@@ -120,8 +98,7 @@
                     onclick={(e) => {
                         e.stopPropagation();
                         if (e.shiftKey || confirm("Delete task?")) {
-                            isExiting = true;
-                            setTimeout(() => { deleteTask(task.id); }, TRANSITION_DURATION_MS);
+                            deleteTask(task.id);
                         }
                     }}
                     title="Delete"

@@ -179,6 +179,66 @@ pub async fn delete_task(pool: &SqlitePool, id: String) -> Result<(), sqlx::Erro
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+pub trait FilterColumnExt {
+    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value);
+}
+
+impl FilterColumnExt for crate::domain::FilterColumn {
+    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value) {
+        let is_not = op == "is not";
+        let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
+        if values.is_empty() {
+            return;
+        }
+
+        match self {
+            Self::Status => {
+                builder.push(if is_not { " AND status NOT IN (" } else { " AND status IN (" });
+                let mut separated = builder.separated(", ");
+                for v in &values {
+                    if let Some(s) = v.as_str() {
+                        separated.push_bind(format!("\"{s}\""));
+                    } else {
+                        separated.push_bind(v.to_string());
+                    }
+                }
+                builder.push(")");
+            }
+            Self::Priority => {
+                builder.push(if is_not { " AND priority NOT IN (" } else { " AND priority IN (" });
+                let mut separated = builder.separated(", ");
+                for v in &values {
+                    if let Some(n) = v.as_i64() {
+                        separated.push_bind(i32::try_from(n).unwrap_or(0));
+                    } else if let Some(s) = v.as_str() {
+                        separated.push_bind(s.parse::<i32>().unwrap_or(-1));
+                    }
+                }
+                builder.push(")");
+            }
+            Self::Tag => {
+                builder.push(" AND (");
+                for (i, v) in values.iter().enumerate() {
+                    if i > 0 {
+                        builder.push(if is_not { " AND " } else { " OR " });
+                    }
+                    let vs = v.as_str().unwrap_or("");
+                    let like_str = format!("%\"{vs}\"%");
+                    if is_not {
+                        builder.push("(tags NOT LIKE ");
+                        builder.push_bind(like_str);
+                        builder.push(" OR tags IS NULL)");
+                    } else {
+                        builder.push("tags LIKE ");
+                        builder.push_bind(like_str);
+                    }
+                }
+                builder.push(")");
+            }
+        }
+    }
+}
+
 pub async fn get_filtered_tasks(
     pool: &SqlitePool,
     filters: Vec<crate::domain::AppFilter>,
@@ -191,54 +251,7 @@ pub async fn get_filtered_tasks(
     for f in &filters {
         if let (Some(col), Some(val)) = (&f.column, &f.value) {
             let op = f.operator.as_deref().unwrap_or("is");
-            let is_not = op == "is not";
-
-            let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
-            if values.is_empty() {
-                continue;
-            }
-
-            if col == "status" {
-                query_builder.push(if is_not { " AND status NOT IN (" } else { " AND status IN (" });
-                let mut separated = query_builder.separated(", ");
-                for v in &values {
-                    if let Some(s) = v.as_str() {
-                        separated.push_bind(format!("\"{s}\""));
-                    } else {
-                        separated.push_bind(v.to_string());
-                    }
-                }
-                query_builder.push(")");
-            } else if col == "priority" {
-                query_builder.push(if is_not { " AND priority NOT IN (" } else { " AND priority IN (" });
-                let mut separated = query_builder.separated(", ");
-                for v in &values {
-                    if let Some(n) = v.as_i64() {
-                        separated.push_bind(i32::try_from(n).unwrap_or(0));
-                    } else if let Some(s) = v.as_str() {
-                        separated.push_bind(s.parse::<i32>().unwrap_or(-1));
-                    }
-                }
-                query_builder.push(")");
-            } else if col == "tag" {
-                query_builder.push(" AND (");
-                for (i, v) in values.iter().enumerate() {
-                    if i > 0 {
-                        query_builder.push(if is_not { " AND " } else { " OR " });
-                    }
-                    let vs = v.as_str().unwrap_or("");
-                    let like_str = format!("%\"{vs}\"%");
-                    if is_not {
-                        query_builder.push("(tags NOT LIKE ");
-                        query_builder.push_bind(like_str);
-                        query_builder.push(" OR tags IS NULL)");
-                    } else {
-                        query_builder.push("tags LIKE ");
-                        query_builder.push_bind(like_str);
-                    }
-                }
-                query_builder.push(")");
-            }
+            col.apply_sql(&mut query_builder, op, val);
         }
     }
 
@@ -266,3 +279,5 @@ pub async fn get_filtered_tasks(
 
     Ok(tasks)
 }
+
+

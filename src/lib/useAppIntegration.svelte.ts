@@ -36,11 +36,12 @@ export function useAppIntegration() {
                         const parseRes = await safeInvoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
                         if (parseRes.isErr()) break;
                         const { cleanTitle, properties } = parseRes.value;
+                        const p = properties.priority;
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',
                             status: 'todo',
-                            priority: properties.priority,
+                            priority: (p === 0 || p === 1 || p === 2 || p === 3 || p === 4) ? p : undefined,
                             tags: properties.tags,
                             est: properties.duration,
                             due: properties.day as any
@@ -54,11 +55,12 @@ export function useAppIntegration() {
                         const parseRes = await safeInvoke<ParsedSigils>('parse_sigils', { taskName: payload.taskName });
                         if (parseRes.isErr()) break;
                         const { cleanTitle, properties } = parseRes.value;
+                        const p = properties.priority;
                         const newTask: AppTask = {
                             id: crypto.randomUUID(),
                             title: cleanTitle || 'New Task',
                             status: 'doing',
-                            priority: properties.priority,
+                            priority: (p === 0 || p === 1 || p === 2 || p === 3 || p === 4) ? p : undefined,
                             tags: properties.tags,
                             est: properties.duration,
                             due: properties.day as any

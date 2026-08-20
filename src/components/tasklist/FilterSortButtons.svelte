@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { AppFilter } from './filters';
+    import type { AppFilter } from '../../lib/bindings/AppFilter';
+    import type { FilterColumn } from '../../lib/bindings/FilterColumn';
 
     let {
         filters = $bindable([]),
@@ -47,7 +48,10 @@
     });
 
     function addFilter() {
-        filters = [...filters, { column: columns[0]?.id || '', operator: 'is', value: [] }];
+        const id = columns[0]?.id || 'status';
+        if (id === 'status' || id === 'priority' || id === 'tag') {
+            filters = [...filters, { column: id, operator: 'is', value: [] }];
+        }
     }
 
     function removeFilter(index: number) {
@@ -83,7 +87,12 @@
                 <div class="filter-row">
                     <select 
                         value={f.column} 
-                        onchange={(e) => updateFilter(i, { column: e.currentTarget.value, value: [] })}
+                        onchange={(e) => {
+                            const val = e.currentTarget.value;
+                            if (val === 'status' || val === 'priority' || val === 'tag') {
+                                updateFilter(i, { column: val, value: [] });
+                            }
+                        }}
                         style="flex: 1;"
                         class="form-select"
                     >

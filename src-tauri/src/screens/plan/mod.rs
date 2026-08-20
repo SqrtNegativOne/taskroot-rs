@@ -151,3 +151,8 @@ pub async fn get_filtered_tasks(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> Result<crate::domain::AppTaskDefaults, String> {
+    Ok(crate::domain::compute_filter_defaults(filters))
+}

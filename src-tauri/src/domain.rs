@@ -12,6 +12,20 @@ pub enum AppTaskStatus {
     Done,
 }
 
+use serde_repr::{Serialize_repr, Deserialize_repr};
+
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS, sqlx::Type)]
+#[ts(export, export_to = "../../src/lib/bindings/TaskPriority.ts")]
+#[ts(type = "0 | 1 | 2 | 3 | 4")]
+#[repr(i32)]
+pub enum TaskPriority {
+    None = 0,
+    Low = 1,
+    Medium = 2,
+    High = 3,
+    Urgent = 4,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/Subtask.ts")]
 pub struct Subtask {
@@ -30,7 +44,7 @@ pub struct AppTask {
     #[ts(optional)]
     pub status: Option<AppTaskStatus>,
     #[ts(optional)]
-    pub priority: Option<i32>,
+    pub priority: Option<TaskPriority>,
     #[ts(optional)]
     #[sqlx(json)]
     pub tags: Option<Vec<String>>,
@@ -292,9 +306,66 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(serde::Serialize, Default, ts_rs::TS)]
+#[ts(export, export_to = "../../src/lib/bindings/AppTaskDefaults.ts")]
+pub struct AppTaskDefaults {
+    pub status: Option<AppTaskStatus>,
+    pub priority: Option<TaskPriority>,
+    pub tags: Option<Vec<String>>,
+}
+
+pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> AppTaskDefaults {
+    let mut defaults = AppTaskDefaults::default();
+    
+    for f in filters {
+        if f.operator.as_deref().unwrap_or("is") == "is" {
+            if let (Some(col), Some(val)) = (f.column, f.value) {
+                let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
+                if values.len() == 1 {
+                    let v = &values[0];
+                    match col {
+                        FilterColumn::Status => {
+                            if let Ok(status) = serde_json::from_value(v.clone()) {
+                                defaults.status = Some(status);
+                            }
+                        }
+                        FilterColumn::Priority => {
+                            if let Ok(priority) = serde_json::from_value(v.clone()) {
+                                defaults.priority = Some(priority);
+                            } else if let Some(n) = v.as_i64() {
+                                if let Ok(priority) = serde_json::from_value(serde_json::json!(n)) {
+                                    defaults.priority = Some(priority);
+                                }
+                            }
+                        }
+                        FilterColumn::Tag => {
+                            if let Some(s) = v.as_str() {
+                                defaults.tags = Some(vec![s.to_string()]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    defaults
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/FilterColumn.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum FilterColumn {
+    Status,
+    Priority,
+    Tag,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/AppFilter.ts")]
 pub struct AppFilter {
-    pub column: Option<String>,
+    pub column: Option<FilterColumn>,
     pub operator: Option<String>,
+    #[ts(type = "unknown")]
     pub value: Option<serde_json::Value>,
 }

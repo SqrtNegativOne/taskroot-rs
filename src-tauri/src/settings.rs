@@ -1,3 +1,5 @@
+#![allow(clippy::struct_excessive_bools)]
+
 use crate::db;
 use serde_json::Value;
 use sqlx::SqlitePool;
@@ -6,6 +8,7 @@ use sqlx::SqlitePool;
 include!(concat!(env!("OUT_DIR"), "/settings_generated.rs"));
 
 #[tauri::command]
+#[allow(clippy::must_use_candidate)]
 pub fn get_settings_schema() -> Value {
     let schema_json = include_str!(concat!(env!("OUT_DIR"), "/settings_schema.json"));
     serde_json::from_str(schema_json).unwrap_or_default()
@@ -21,9 +24,8 @@ pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, String> 
     let mut settings = AppSettings::default();
     
     // Parse it to a Map to easily insert generic DB values over defaults
-    let mut map = match serde_json::to_value(&settings) {
-        Ok(Value::Object(m)) => m,
-        _ => return Ok(settings),
+    let Ok(Value::Object(mut map)) = serde_json::to_value(&settings) else {
+        return Ok(settings);
     };
     
     // Override with DB values

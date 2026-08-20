@@ -130,7 +130,10 @@
                             value={task.priority ?? 2}
                             onchange={(e) => {
                                 const val = parseInt(e.currentTarget.value) || 0;
-                                updateTask(task.id, t => ({...t, priority: Math.max(0, Math.min(4, val))}));
+                                const clamped = Math.max(0, Math.min(4, val));
+                                if (clamped === 0 || clamped === 1 || clamped === 2 || clamped === 3 || clamped === 4) {
+                                    updateTask(task.id, t => ({...t, priority: clamped}));
+                                }
                             }}
                         />
                     </div>

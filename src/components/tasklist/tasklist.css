@@ -80,13 +80,7 @@
   .task-row:hover { background: var(--bg-highlight); }
   .task-row.is-dragging { opacity: 0.32; background: var(--bg-highlight); }
   .task-row.is-done .task-row-title { color: var(--fg-dim); text-decoration: line-through; }
-  .task-row.is-exiting {
-    animation: fadeOutRow 0.4s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-  }
-  @keyframes fadeOutRow {
-    0% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(0.95); }
-  }
+
 
   .task-row-content {
     display: flex;
