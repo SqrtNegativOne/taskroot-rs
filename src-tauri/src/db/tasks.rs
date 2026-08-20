@@ -176,14 +176,7 @@ pub async fn delete_task(pool: &SqlitePool, id: String) -> Result<(), sqlx::Erro
     Ok(())
 }
 
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub trait FilterColumnExt {
-    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value);
-}
-
-impl FilterColumnExt for crate::domain::FilterColumn {
+impl super::FilterColumnExt for crate::domain::TaskFilterColumn {
     fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value) {
         let is_not = op == "is not";
         let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
@@ -239,9 +232,11 @@ impl FilterColumnExt for crate::domain::FilterColumn {
     }
 }
 
+use super::FilterColumnExt;
+
 pub async fn get_filtered_tasks(
     pool: &SqlitePool,
-    filters: Vec<crate::domain::AppFilter>,
+    filters: Vec<crate::domain::AppTaskFilter>,
     sort: String,
     query_text: String,
 ) -> Result<Vec<AppTask>, sqlx::Error> {

@@ -314,7 +314,7 @@ pub struct AppTaskDefaults {
     pub tags: Option<Vec<String>>,
 }
 
-pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> AppTaskDefaults {
+pub fn compute_filter_defaults(filters: Vec<AppTaskFilter>) -> AppTaskDefaults {
     let mut defaults = AppTaskDefaults::default();
     
     for f in filters {
@@ -324,12 +324,12 @@ pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> AppTaskDefaults {
                 if values.len() == 1 {
                     let v = &values[0];
                     match col {
-                        FilterColumn::Status => {
+                        TaskFilterColumn::Status => {
                             if let Ok(status) = serde_json::from_value(v.clone()) {
                                 defaults.status = Some(status);
                             }
                         }
-                        FilterColumn::Priority => {
+                        TaskFilterColumn::Priority => {
                             if let Ok(priority) = serde_json::from_value(v.clone()) {
                                 defaults.priority = Some(priority);
                             } else if let Some(n) = v.as_i64() {
@@ -338,7 +338,7 @@ pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> AppTaskDefaults {
                                 }
                             }
                         }
-                        FilterColumn::Tag => {
+                        TaskFilterColumn::Tag => {
                             if let Some(s) = v.as_str() {
                                 defaults.tags = Some(vec![s.to_string()]);
                             }
@@ -353,18 +353,35 @@ pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> AppTaskDefaults {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/FilterColumn.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/TaskFilterColumn.ts")]
 #[serde(rename_all = "camelCase")]
-pub enum FilterColumn {
+pub enum TaskFilterColumn {
     Status,
     Priority,
     Tag,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/AppFilter.ts")]
-pub struct AppFilter {
-    pub column: Option<FilterColumn>,
+#[ts(export, export_to = "../../src/lib/bindings/AppTaskFilter.ts")]
+pub struct AppTaskFilter {
+    pub column: Option<TaskFilterColumn>,
+    pub operator: Option<String>,
+    #[ts(type = "unknown")]
+    pub value: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/EventFilterColumn.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum EventFilterColumn {
+    EventType,
+    Calendar,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/AppEventFilter.ts")]
+pub struct AppEventFilter {
+    pub column: Option<EventFilterColumn>,
     pub operator: Option<String>,
     #[ts(type = "unknown")]
     pub value: Option<serde_json::Value>,

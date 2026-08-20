@@ -1,5 +1,5 @@
 use crate::db;
-use crate::domain::{AppEvent, AppFilter, AppTask};
+use crate::domain::{AppEvent, AppTaskFilter, AppEventFilter, AppTask};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -115,11 +115,17 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
 pub async fn get_plan_layout(
     app: tauri::AppHandle,
     dates: Vec<String>,
+    filters: Option<Vec<AppEventFilter>>,
+    query: Option<String>,
 ) -> Result<Vec<PlanDayLayout>, String> {
     let pool = app
         .try_state::<sqlx::SqlitePool>()
         .ok_or("Database not initialized yet")?;
-    let all_events = db::get_events(&pool).await.map_err(|e| e.to_string())?;
+    let all_events = if filters.is_some() || query.is_some() {
+        db::get_filtered_events(&pool, filters.unwrap_or_default(), query.unwrap_or_default()).await.map_err(|e| e.to_string())?
+    } else {
+        db::get_events(&pool).await.map_err(|e| e.to_string())?
+    };
 
     let mut result = Vec::new();
     for date in dates {
@@ -139,7 +145,7 @@ pub async fn get_plan_layout(
 #[tauri::command]
 pub async fn get_filtered_tasks(
     app: tauri::AppHandle,
-    filters: Vec<AppFilter>,
+    filters: Vec<AppTaskFilter>,
     sort: String,
     query: String,
 ) -> Result<Vec<AppTask>, String> {
@@ -153,6 +159,21 @@ pub async fn get_filtered_tasks(
 }
 
 #[tauri::command]
-pub fn compute_filter_defaults(filters: Vec<AppFilter>) -> Result<crate::domain::AppTaskDefaults, String> {
+pub fn compute_filter_defaults(filters: Vec<AppTaskFilter>) -> Result<crate::domain::AppTaskDefaults, String> {
     Ok(crate::domain::compute_filter_defaults(filters))
+}
+
+#[tauri::command]
+pub async fn get_filtered_events(
+    app: tauri::AppHandle,
+    filters: Vec<AppEventFilter>,
+    query: String,
+) -> Result<Vec<AppEvent>, String> {
+    let pool = app
+        .try_state::<sqlx::SqlitePool>()
+        .ok_or("Database not initialized yet")?;
+    
+    db::get_filtered_events(&pool, filters, query)
+        .await
+        .map_err(|e| e.to_string())
 }

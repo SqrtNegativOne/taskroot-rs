@@ -1,10 +1,6 @@
-<script lang="ts">
-    import type { AppFilter } from '../../lib/bindings/AppFilter';
-    import type { FilterColumn } from '../../lib/bindings/FilterColumn';
-
+<script lang="ts" generics="F extends { column?: any | null, operator?: string | null, value?: any | null }">
     let {
         filters = $bindable([]),
-        sort = $bindable('priority'),
         columns = [
             { id: 'status', label: 'Status' },
             { id: 'priority', label: 'Priority' },
@@ -13,34 +9,23 @@
         getValuesForColumn = (col: string) => {
             if (col === 'status') return ['todo', 'doing', 'done', 'nextup'];
             if (col === 'priority') return ['0', '1', '2', '3', '4'];
-            // tags can be any string, but without a store context here we just return a few examples or leave empty for free text
             return [];
         },
-        sortOptions = [
-            { id: 'priority', label: 'Priority' },
-            { id: 'due', label: 'Due Date' },
-            { id: 'title', label: 'Title' },
-            { id: 'id', label: 'Created' }
-        ],
         align = "left",
     }: {
-        filters: AppFilter[];
-        sort: string;
+        filters: F[];
         columns?: {id: string, label: string}[];
         getValuesForColumn?: (col: string) => string[];
-        sortOptions?: {id: string, label: string}[];
         align?: "left" | "right";
     } = $props();
 
     let filterMenuOpen = $state(false);
-    let sortMenuOpen = $state(false);
     let containerRef: HTMLDivElement | undefined = $state();
 
     $effect(() => {
         function onClick(e: MouseEvent) {
             if (containerRef && !containerRef.contains(e.target as Node)) {
                 filterMenuOpen = false;
-                sortMenuOpen = false;
             }
         }
         document.addEventListener('pointerdown', onClick);
@@ -49,37 +34,28 @@
 
     function addFilter() {
         const id = columns[0]?.id || 'status';
-        if (id === 'status' || id === 'priority' || id === 'tag') {
-            filters = [...filters, { column: id, operator: 'is', value: [] }];
-        }
+        filters = [...filters, { column: id, operator: 'is', value: [] } as unknown as F];
     }
 
     function removeFilter(index: number) {
         filters = filters.filter((_, i) => i !== index);
     }
 
-    function updateFilter(index: number, updates: Partial<AppFilter>) {
+    function updateFilter(index: number, updates: Partial<F>) {
         const newFilters = [...filters];
-        newFilters[index] = { ...newFilters[index], ...updates };
+        newFilters[index] = { ...newFilters[index], ...(updates as any) };
         filters = newFilters;
     }
 </script>
 
 <div class="filter-sort-container" bind:this={containerRef}>
-    <button class="menu-trigger-button {filterMenuOpen || filters.length > 0 ? 'is-active' : ''}" onclick={() => { filterMenuOpen = !filterMenuOpen; sortMenuOpen = false; }}>
+    <button class="menu-trigger-button {filterMenuOpen || filters.length > 0 ? 'is-active' : ''}" onclick={() => { filterMenuOpen = !filterMenuOpen; }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
         Filter
         {#if filters.length > 0}
             <span class="menu-trigger-badge">{filters.length}</span>
         {/if}
     </button>
-
-    {#if sortOptions.length > 0}
-        <button class="menu-trigger-button {sortMenuOpen ? 'is-active' : ''}" onclick={() => { sortMenuOpen = !sortMenuOpen; filterMenuOpen = false; }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-            Sort
-        </button>
-    {/if}
 
     {#if filterMenuOpen}
         <div class="shared-floating-menu align-{align}" style="min-width: 320px;">
@@ -90,7 +66,7 @@
                         onchange={(e) => {
                             const val = e.currentTarget.value;
                             if (val === 'status' || val === 'priority' || val === 'tag') {
-                                updateFilter(i, { column: val, value: [] });
+                                updateFilter(i, { column: val, value: [] } as any);
                             }
                         }}
                         style="flex: 1;"
@@ -102,7 +78,7 @@
                     </select>
                     <select 
                         value={f.operator} 
-                        onchange={(e) => updateFilter(i, { operator: e.currentTarget.value })}
+                        onchange={(e) => updateFilter(i, { operator: e.currentTarget.value } as any)}
                         style="width: 75px;"
                         class="form-select"
                     >
@@ -111,18 +87,18 @@
                     </select>
 
                     <div style="flex: 1; display: flex;">
-                        {#if getValuesForColumn(f.column || '').length > 0}
+                        {#if getValuesForColumn((f.column as string) || '').length > 0}
                             <select 
                                 multiple 
                                 value={Array.isArray(f.value) ? f.value : (f.value ? [f.value] : [])} 
                                 onchange={(e) => {
                                     const opts = Array.from(e.currentTarget.selectedOptions).map(o => o.value);
-                                    updateFilter(i, { value: opts });
+                                    updateFilter(i, { value: opts } as any);
                                 }}
                                 style="flex: 1; height: auto; min-height: 2em; padding: 2px;"
                                 class="form-select"
                             >
-                                {#each getValuesForColumn(f.column || '') as val}
+                                {#each getValuesForColumn((f.column as string) || '') as val}
                                     <option value={val}>{val}</option>
                                 {/each}
                             </select>
@@ -131,7 +107,7 @@
                                 type="text"
                                 placeholder="Value..."
                                 value={Array.isArray(f.value) ? f.value.join(', ') : f.value || ''}
-                                oninput={(e) => updateFilter(i, { value: [e.currentTarget.value] })}
+                                oninput={(e) => updateFilter(i, { value: [e.currentTarget.value] } as any)}
                                 style="flex: 1; width: 100%;"
                                 class="form-input"
                             />
@@ -147,24 +123,6 @@
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add filter
             </button>
-        </div>
-    {/if}
-
-    {#if sortMenuOpen && sortOptions.length > 0}
-        <div class="shared-floating-menu align-{align}" style="min-width: 200px;">
-            <div class="sort-row">
-                <span class="sort-label">Sort by</span>
-                <select 
-                    value={sort} 
-                    onchange={(e) => sort = e.currentTarget.value}
-                    style="flex: 1;"
-                    class="form-select"
-                >
-                    {#each sortOptions as o}
-                        <option value={o.id}>{o.label}</option>
-                    {/each}
-                </select>
-            </div>
         </div>
     {/if}
 </div>

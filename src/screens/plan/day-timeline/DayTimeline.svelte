@@ -12,6 +12,8 @@
     let {
         events,
         filterMenu,
+        eventFilters = [],
+        eventQuery = '',
         today,
         timelineDate,
         setTimelineDate,
@@ -24,6 +26,8 @@
     }: {
         events: AppEvent[];
         filterMenu?: import('svelte').Snippet;
+        eventFilters?: import('../../../lib/bindings/AppEventFilter').AppEventFilter[];
+        eventQuery?: string;
         today: Date;
         timelineDate: Date;
         setTimelineDate: (d: Date) => void;
@@ -64,7 +68,7 @@
 
     $effect(() => {
         void events; // Trigger re-run when events change
-        layoutQuery.execute({ dates: dates.map(ymd) });
+        layoutQuery.execute({ dates: dates.map(ymd), filters: eventFilters, query: eventQuery });
     });
     
     // Auto scroll logic

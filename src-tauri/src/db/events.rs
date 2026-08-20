@@ -166,3 +166,71 @@ pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Err
         .await?;
     Ok(())
 }
+
+use super::FilterColumnExt;
+
+impl FilterColumnExt for crate::domain::EventFilterColumn {
+    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value) {
+        let is_not = op == "is not";
+        let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
+        if values.is_empty() {
+            return;
+        }
+
+        match self {
+            Self::EventType => {
+                builder.push(if is_not { " AND event_type NOT IN (" } else { " AND event_type IN (" });
+                let mut separated = builder.separated(", ");
+                for v in &values {
+                    if let Some(s) = v.as_str() {
+                        separated.push_bind(format!("\"{s}\""));
+                    } else {
+                        separated.push_bind(v.to_string());
+                    }
+                }
+                builder.push(")");
+            }
+            Self::Calendar => {
+                builder.push(if is_not { " AND remote_collection_id NOT IN (" } else { " AND remote_collection_id IN (" });
+                let mut separated = builder.separated(", ");
+                for v in &values {
+                    if let Some(s) = v.as_str() {
+                        separated.push_bind(s.to_string());
+                    } else {
+                        separated.push_bind(v.to_string());
+                    }
+                }
+                builder.push(")");
+            }
+        }
+    }
+}
+
+pub async fn get_filtered_events(
+    pool: &SqlitePool,
+    filters: Vec<crate::domain::AppEventFilter>,
+    query_text: String,
+) -> Result<Vec<AppEvent>, sqlx::Error> {
+    let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
+        sqlx::QueryBuilder::new("SELECT * FROM events WHERE 1=1");
+
+    for f in &filters {
+        if let (Some(col), Some(val)) = (&f.column, &f.value) {
+            let op = f.operator.as_deref().unwrap_or("is");
+            col.apply_sql(&mut query_builder, op, val);
+        }
+    }
+
+    if !query_text.trim().is_empty() {
+        let q = format!("%{}%", query_text.trim().to_lowercase());
+        query_builder.push(" AND (LOWER(title) LIKE ");
+        query_builder.push_bind(q.clone());
+        query_builder.push(" OR LOWER(description) LIKE ");
+        query_builder.push_bind(q);
+        query_builder.push(")");
+    }
+
+    let events = query_builder.build_query_as::<AppEvent>().fetch_all(pool).await?;
+
+    Ok(events)
+}

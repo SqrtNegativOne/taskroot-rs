@@ -323,6 +323,7 @@ pub fn run() {
             force_sync,
             screens::plan::get_plan_layout,
             screens::plan::get_filtered_tasks,
+            screens::plan::get_filtered_events,
             screens::plan::compute_filter_defaults,
             window_minimize,
             window_maximize,

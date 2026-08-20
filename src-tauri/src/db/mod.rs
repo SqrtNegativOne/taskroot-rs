@@ -9,6 +9,10 @@ pub use tasks::*;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
 
+pub trait FilterColumnExt {
+    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value);
+}
+
 /// # Errors
 ///
 /// Returns an error if the operation fails.

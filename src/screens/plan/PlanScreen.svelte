@@ -24,16 +24,33 @@
     let anchor = $state(new Date());
     let timelineDate = $state(new Date());
     
-    import type { AppFilter } from '../../lib/bindings/AppFilter';
+    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter';
+    import type { AppEventFilter } from '../../lib/bindings/AppEventFilter';
+    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import FilterButton from '../../components/FilterButton.svelte';
 
     // UI state — task list
     let query = $state('');
-    let filters = $state<AppFilter[]>([]);
+    let filters = $state<AppTaskFilter[]>([]);
     let sort = $state('priority');
+
+    // UI state — events
+    let eventQuery = $state('');
+    let eventFilters = $state<AppEventFilter[]>([]);
+
+    let filteredEventsQuery = useTauriQuery<AppEvent[]>('get_filtered_events');
+    let filteredEvents = $derived(filteredEventsQuery.data ?? store.events);
+
+    $effect(() => {
+        void store.events; // Re-run when events in store change
+        if (store.loaded) {
+            filteredEventsQuery.execute({ filters: eventFilters, query: eventQuery });
+        }
+    });
 
     // Hydrate events with tasks
     let hydratedEvents = $derived.by(() => {
-        return store.events.map(ev => {
+        return filteredEvents.map(ev => {
             if (ev.taskId) {
                 const task = store.tasks.find(t => t.id === ev.taskId);
                 return { ...ev, task };
@@ -142,6 +159,32 @@
 
             {#snippet pane2()}
                 <div class="right-pane" style="height: 100%; display: flex; flex-direction: column;">
+                    {#snippet eventFilterMenu()}
+                        <FilterButton 
+                            bind:filters={eventFilters}
+                            columns={[
+                                { id: 'eventType', label: 'Event Type' },
+                                { id: 'calendar', label: 'Calendar' }
+                            ]}
+                            getValuesForColumn={(col) => {
+                                if (col === 'eventType') return ['busy', 'plan', 'info', 'log'];
+                                if (col === 'calendar') {
+                                    const cals = new Set(store.events.map(e => e.remoteCollectionId).filter(Boolean));
+                                    return Array.from(cals) as string[];
+                                }
+                                return [];
+                            }}
+                            align="right"
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="Search events..." 
+                            value={eventQuery}
+                            oninput={(e) => { eventQuery = e.currentTarget.value; }}
+                            style="margin-left: 8px; padding: 4px 8px; width: 120px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--fg);"
+                        />
+                    {/snippet}
+
                     <SplitPane
                         direction="vertical"
                         defaultSize={450}
@@ -155,6 +198,7 @@
                                 {anchor}
                                 setAnchor={(a: Date) => { anchor = a; }}
                                 events={hydratedEvents}
+                                filterMenu={eventFilterMenu}
                                 today={new Date()}
                                 {dragState}
                                 {onEventDragStart}
@@ -165,6 +209,9 @@
                         {#snippet pane2()}
                             <DayTimeline
                                 events={hydratedEvents}
+                                filterMenu={eventFilterMenu}
+                                {eventFilters}
+                                {eventQuery}
                                 today={new Date()}
                                 {timelineDate}
                                 setTimelineDate={(d: Date) => { timelineDate = d; }}
