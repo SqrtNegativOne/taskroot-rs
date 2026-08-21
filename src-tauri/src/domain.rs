@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
-#[ts(export, export_to = "../../src/lib/bindings/AppTaskStatus.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppTaskStatus.generated.ts")]
 #[serde(rename_all = "kebab-case")]
 #[sqlx(type_name = "TEXT", rename_all = "kebab-case")]
 pub enum AppTaskStatus {
@@ -15,7 +15,7 @@ pub enum AppTaskStatus {
 use serde_repr::{Serialize_repr, Deserialize_repr};
 
 #[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS, sqlx::Type)]
-#[ts(export, export_to = "../../src/lib/bindings/TaskPriority.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/TaskPriority.generated.ts")]
 #[ts(type = "0 | 1 | 2 | 3 | 4")]
 #[repr(i32)]
 pub enum TaskPriority {
@@ -27,7 +27,7 @@ pub enum TaskPriority {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/Subtask.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/Subtask.generated.ts")]
 pub struct Subtask {
     pub done: bool,
     #[serde(flatten)]
@@ -36,7 +36,7 @@ pub struct Subtask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq)]
-#[ts(export, export_to = "../../src/lib/bindings/Tag.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/Tag.generated.ts")]
 pub struct Tag {
     pub id: String,
     pub name: String,
@@ -45,7 +45,7 @@ pub struct Tag {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
-#[ts(export, export_to = "../../src/lib/bindings/AppTask.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
     pub id: String,
@@ -95,7 +95,7 @@ pub struct AppTask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
-#[ts(export, export_to = "../../src/lib/bindings/AppEventType.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppEventType.generated.ts")]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum AppEventType {
@@ -106,7 +106,7 @@ pub enum AppEventType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
-#[ts(export, export_to = "../../src/lib/bindings/AppEvent.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
     pub id: String,
@@ -149,7 +149,7 @@ pub struct AppEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/ParsedSigils.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/ParsedSigils.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct ParsedSigils {
     pub clean_title: String,
@@ -157,7 +157,7 @@ pub struct ParsedSigils {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/SigilProperties.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/SigilProperties.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct SigilProperties {
     #[ts(optional)]
@@ -317,7 +317,7 @@ mod tests {
 }
 
 #[derive(serde::Serialize, Default, ts_rs::TS)]
-#[ts(export, export_to = "../../src/lib/bindings/AppTaskDefaults.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppTaskDefaults.generated.ts")]
 pub struct AppTaskDefaults {
     pub status: Option<AppTaskStatus>,
     pub priority: Option<TaskPriority>,
@@ -363,7 +363,7 @@ pub fn compute_filter_defaults(filters: Vec<AppTaskFilter>) -> AppTaskDefaults {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/TaskFilterColumn.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/TaskFilterColumn.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub enum TaskFilterColumn {
     Status,
@@ -372,7 +372,7 @@ pub enum TaskFilterColumn {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/AppTaskFilter.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppTaskFilter.generated.ts")]
 pub struct AppTaskFilter {
     pub column: Option<TaskFilterColumn>,
     pub operator: Option<String>,
@@ -381,7 +381,7 @@ pub struct AppTaskFilter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/EventFilterColumn.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/EventFilterColumn.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub enum EventFilterColumn {
     EventType,
@@ -389,7 +389,7 @@ pub enum EventFilterColumn {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/AppEventFilter.ts")]
+#[ts(export, export_to = "../../src/lib/bindings/AppEventFilter.generated.ts")]
 pub struct AppEventFilter {
     pub column: Option<EventFilterColumn>,
     pub operator: Option<String>,

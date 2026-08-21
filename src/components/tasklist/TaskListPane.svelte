@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter';
+    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter.generated';
     import TaskRow from './TaskRow.svelte';
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
     import { useTauriQuery, safeInvoke } from '../../lib/safeInvoke.svelte';
-    import type { AppTaskDefaults } from '../../lib/bindings/AppTaskDefaults';
+    import type { AppTaskDefaults } from '../../lib/bindings/AppTaskDefaults.generated';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 

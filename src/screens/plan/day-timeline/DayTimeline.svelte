@@ -26,7 +26,7 @@
     }: {
         events: AppEvent[];
         filterMenu?: import('svelte').Snippet;
-        eventFilters?: import('../../../lib/bindings/AppEventFilter').AppEventFilter[];
+        eventFilters?: import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[];
         eventQuery?: string;
         today: Date;
         timelineDate: Date;

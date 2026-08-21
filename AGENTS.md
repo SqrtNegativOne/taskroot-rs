@@ -19,7 +19,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - `src/`: SvelteKit frontend codebase.
   - `src/routes/`: SvelteKit routing (`+layout.svelte`, `+page.svelte`).
   - `src/lib/`: Shared logic, Svelte runes (`store.svelte.ts`), and inter-window integration (`useAppIntegration.svelte.ts`).
-  - `src/lib/bindings/`: Generated TypeScript bindings for Rust data structures.
+  - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo test` in `src-tauri`).
   - `src/screens/`: Major UI views (e.g., `plan/`, `do/`).
   - `src/components/`: Reusable UI components.
 - `src-tauri/`: Tauri Rust backend.

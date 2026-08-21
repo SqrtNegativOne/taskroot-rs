@@ -5,7 +5,7 @@ import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { store } from './store.svelte';
 import { safeInvoke } from './safeInvoke.svelte';
 import type { AppTask } from './domain';
-import type { ParsedSigils } from './bindings/ParsedSigils';
+import type { ParsedSigils } from './bindings/ParsedSigils.generated';
 
 export function useAppIntegration() {
     onMount(() => {

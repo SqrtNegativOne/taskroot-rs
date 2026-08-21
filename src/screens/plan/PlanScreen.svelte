@@ -35,8 +35,8 @@
     let anchor = $state(new Date());
     let timelineDate = $state(new Date());
     
-    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter';
-    import type { AppEventFilter } from '../../lib/bindings/AppEventFilter';
+    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter.generated';
+    import type { AppEventFilter } from '../../lib/bindings/AppEventFilter.generated';
     import { useTauriQuery } from '../../lib/safeInvoke.svelte';
     import FilterButton from '../../components/FilterButton.svelte';
 
