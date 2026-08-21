@@ -19,8 +19,19 @@
         void store.init();
     });
 
+    function getStored<T>(key: string, def: T): T {
+        try {
+            const val = localStorage.getItem(key);
+            return val ? JSON.parse(val) : def;
+        } catch {
+            return def;
+        }
+    }
+
     // We will patch the store's init method to also log to our visual console
-    let view = $state<DateGridView>(DateGridView.Month);
+    let view = $state<DateGridView>(
+        (localStorage.getItem('taskroot_dategrid_view') as DateGridView) || DateGridView.ThreeWeeks
+    );
     let anchor = $state(new Date());
     let timelineDate = $state(new Date());
     
@@ -31,12 +42,21 @@
 
     // UI state — task list
     let query = $state('');
-    let filters = $state<AppTaskFilter[]>([]);
-    let sort = $state('priority');
+    let filters = $state<AppTaskFilter[]>(
+        getStored('taskroot_task_filters', [{ column: 'status', operator: 'is not', value: ['done'] }])
+    );
+    let sort = $state(localStorage.getItem('taskroot_task_sort') || 'priority');
 
     // UI state — events
     let eventQuery = $state('');
-    let eventFilters = $state<AppEventFilter[]>([]);
+    let eventFilters = $state<AppEventFilter[]>(getStored('taskroot_event_filters', []));
+
+    $effect(() => {
+        localStorage.setItem('taskroot_dategrid_view', view);
+        localStorage.setItem('taskroot_task_filters', JSON.stringify(filters));
+        localStorage.setItem('taskroot_task_sort', sort);
+        localStorage.setItem('taskroot_event_filters', JSON.stringify(eventFilters));
+    });
 
     let filteredEventsQuery = useTauriQuery<AppEvent[]>('get_filtered_events');
     let filteredEvents = $derived(filteredEventsQuery.data ?? store.events);
@@ -153,6 +173,9 @@
                         onDragStart={onTaskDragStart}
                         {onAddTask}
                         {onDeleteTask}
+                        onTaskClick={(task) => {
+                            inspectorState = { type: 'task', id: task.id };
+                        }}
                     />
                 </div>
             {/snippet}
@@ -176,13 +199,6 @@
                             }}
                             align="right"
                         />
-                        <input 
-                            type="text" 
-                            placeholder="Search events..." 
-                            value={eventQuery}
-                            oninput={(e) => { eventQuery = e.currentTarget.value; }}
-                            style="margin-left: 8px; padding: 4px 8px; width: 120px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--fg);"
-                        />
                     {/snippet}
 
                     <SplitPane
@@ -203,6 +219,7 @@
                                 {dragState}
                                 {onEventDragStart}
                                 onAddEvent={(d: Date) => { onAddEvent(d); }}
+                                {onEventClick}
                             />
                         {/snippet}
                         

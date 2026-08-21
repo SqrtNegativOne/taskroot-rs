@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 ///
 /// Returns an error if the operation fails.
 pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
-    sqlx::query_as::<_, AppTask>("SELECT * FROM tasks")
+    sqlx::query_as::<_, AppTask>("SELECT t.id, t.title, t.status, t.priority, (SELECT CASE WHEN COUNT(tg.id) > 0 THEN json_group_array(json_object('id', tg.id, 'name', tg.name, 'color', tg.color)) ELSE 'null' END FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id) as tags, COALESCE(t.subtasks, 'null') as subtasks, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.deleted, t.updated_at, t.etag, t.dirty FROM tasks t")
         .fetch_all(pool)
         .await
 }
@@ -14,7 +14,7 @@ pub async fn get_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Error> {
 ///
 /// Returns an error if the operation fails.
 pub async fn get_task(pool: &SqlitePool, id: &str) -> Result<Option<AppTask>, sqlx::Error> {
-    sqlx::query_as::<_, AppTask>("SELECT * FROM tasks WHERE id = ?")
+    sqlx::query_as::<_, AppTask>("SELECT t.id, t.title, t.status, t.priority, (SELECT CASE WHEN COUNT(tg.id) > 0 THEN json_group_array(json_object('id', tg.id, 'name', tg.name, 'color', tg.color)) ELSE 'null' END FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id) as tags, COALESCE(t.subtasks, 'null') as subtasks, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.deleted, t.updated_at, t.etag, t.dirty FROM tasks t WHERE t.id = ?")
         .bind(id)
         .fetch_optional(pool)
         .await
@@ -32,38 +32,58 @@ pub async fn get_dirty_tasks(pool: &SqlitePool) -> Result<Vec<AppTask>, sqlx::Er
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+
+async fn sync_task_tags(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, task_id: &str, tags: Option<Vec<crate::domain::Tag>>) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM task_tags WHERE task_id = ?").bind(task_id).execute(&mut **tx).await?;
+    if let Some(tags) = tags {
+        for tag in tags {
+            sqlx::query("INSERT INTO tags (id, name, color) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET color = excluded.color, id = excluded.id")
+                .bind(&tag.id)
+                .bind(&tag.name)
+                .bind(&tag.color)
+                .execute(&mut **tx).await?;
+            sqlx::query("INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)")
+                .bind(task_id)
+                .bind(&tag.id)
+                .execute(&mut **tx).await?;
+        }
+    }
+    Ok(())
+}
 pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
         "INSERT INTO tasks (
-            id, title, status, priority, tags, subtasks, parent_task, dependencies, 
+            id, title, status, priority, subtasks, parent_task, dependencies, 
             est, added, canvas_x, canvas_y, on_canvas, remote_id, notes, tabs, 
             due, deleted, updated_at, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(task.id)
-    .bind(task.title)
-    .bind(task.status)
-    .bind(task.priority)
-    .bind(task.tags.map(sqlx::types::Json))
-    .bind(task.subtasks.map(sqlx::types::Json))
-    .bind(task.parent_task)
-    .bind(task.dependencies.map(sqlx::types::Json))
-    .bind(task.est)
-    .bind(task.added)
-    .bind(task.canvas_x)
-    .bind(task.canvas_y)
-    .bind(task.on_canvas)
-    .bind(task.remote_id)
-    .bind(task.notes)
-    .bind(task.tabs)
-    .bind(task.due)
-    .bind(task.deleted)
-    .bind(task.updated_at)
-    .bind(task.etag)
-    .bind(task.dirty)
-    .execute(pool)
+    .bind(&task.id)
+    .bind(&task.title)
+    .bind(&task.status)
+    .bind(&task.priority)
+    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(&task.parent_task)
+    .bind(task.dependencies.as_ref().map(|d| sqlx::types::Json(d.clone())))
+    .bind(&task.est)
+    .bind(&task.added)
+    .bind(&task.canvas_x)
+    .bind(&task.canvas_y)
+    .bind(&task.on_canvas)
+    .bind(&task.remote_id)
+    .bind(&task.notes)
+    .bind(&task.tabs)
+    .bind(&task.due)
+    .bind(&task.deleted)
+    .bind(&task.updated_at)
+    .bind(&task.etag)
+    .bind(&task.dirty)
+    .execute(&mut *tx)
     .await?;
 
+    sync_task_tags(&mut tx, &task.id, task.tags).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -71,38 +91,40 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
 ///
 /// Returns an error if the operation fails.
 pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
         "UPDATE tasks SET 
-            title = ?, status = ?, priority = ?, tags = ?, subtasks = ?, 
+            title = ?, status = ?, priority = ?, subtasks = ?, 
             parent_task = ?, dependencies = ?, est = ?, added = ?, canvas_x = ?, 
             canvas_y = ?, on_canvas = ?, remote_id = ?, notes = ?, tabs = ?, 
             due = ?, deleted = ?, updated_at = ?, etag = ?, dirty = ?
         WHERE id = ?",
     )
-    .bind(task.title)
-    .bind(task.status)
-    .bind(task.priority)
-    .bind(task.tags.map(sqlx::types::Json))
-    .bind(task.subtasks.map(sqlx::types::Json))
-    .bind(task.parent_task)
-    .bind(task.dependencies.map(sqlx::types::Json))
-    .bind(task.est)
-    .bind(task.added)
-    .bind(task.canvas_x)
-    .bind(task.canvas_y)
-    .bind(task.on_canvas)
-    .bind(task.remote_id)
-    .bind(task.notes)
-    .bind(task.tabs)
-    .bind(task.due)
-    .bind(task.deleted)
-    .bind(task.updated_at)
-    .bind(task.etag)
-    .bind(task.dirty)
-    .bind(task.id)
-    .execute(pool)
+    .bind(&task.title)
+    .bind(&task.status)
+    .bind(&task.priority)
+    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(&task.parent_task)
+    .bind(task.dependencies.as_ref().map(|d| sqlx::types::Json(d.clone())))
+    .bind(&task.est)
+    .bind(&task.added)
+    .bind(&task.canvas_x)
+    .bind(&task.canvas_y)
+    .bind(&task.on_canvas)
+    .bind(&task.remote_id)
+    .bind(&task.notes)
+    .bind(&task.tabs)
+    .bind(&task.due)
+    .bind(&task.deleted)
+    .bind(&task.updated_at)
+    .bind(&task.etag)
+    .bind(&task.dirty)
+    .bind(&task.id)
+    .execute(&mut *tx)
     .await?;
 
+    sync_task_tags(&mut tx, &task.id, task.tags).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -110,17 +132,17 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
 ///
 /// Returns an error if the operation fails.
 pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
         "INSERT INTO tasks (
-            id, title, status, priority, tags, subtasks, parent_task, dependencies, 
+            id, title, status, priority, subtasks, parent_task, dependencies, 
             est, added, canvas_x, canvas_y, on_canvas, remote_id, notes, tabs, 
             due, deleted, updated_at, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             title = excluded.title, 
             status = excluded.status, 
             priority = excluded.priority, 
-            tags = excluded.tags, 
             subtasks = excluded.subtasks, 
             parent_task = excluded.parent_task, 
             dependencies = excluded.dependencies, 
@@ -138,30 +160,31 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
             etag = excluded.etag,
             dirty = excluded.dirty",
     )
-    .bind(task.id)
-    .bind(task.title)
-    .bind(task.status)
-    .bind(task.priority)
-    .bind(task.tags.map(sqlx::types::Json))
-    .bind(task.subtasks.map(sqlx::types::Json))
-    .bind(task.parent_task)
-    .bind(task.dependencies.map(sqlx::types::Json))
-    .bind(task.est)
-    .bind(task.added)
-    .bind(task.canvas_x)
-    .bind(task.canvas_y)
-    .bind(task.on_canvas)
-    .bind(task.remote_id)
-    .bind(task.notes)
-    .bind(task.tabs)
-    .bind(task.due)
-    .bind(task.deleted)
-    .bind(task.updated_at)
-    .bind(task.etag)
-    .bind(task.dirty)
-    .execute(pool)
+    .bind(&task.id)
+    .bind(&task.title)
+    .bind(&task.status)
+    .bind(&task.priority)
+    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(&task.parent_task)
+    .bind(task.dependencies.as_ref().map(|d| sqlx::types::Json(d.clone())))
+    .bind(&task.est)
+    .bind(&task.added)
+    .bind(&task.canvas_x)
+    .bind(&task.canvas_y)
+    .bind(&task.on_canvas)
+    .bind(&task.remote_id)
+    .bind(&task.notes)
+    .bind(&task.tabs)
+    .bind(&task.due)
+    .bind(&task.deleted)
+    .bind(&task.updated_at)
+    .bind(&task.etag)
+    .bind(&task.dirty)
+    .execute(&mut *tx)
     .await?;
 
+    sync_task_tags(&mut tx, &task.id, task.tags).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -216,14 +239,14 @@ impl super::FilterColumnExt for crate::domain::TaskFilterColumn {
                         builder.push(if is_not { " AND " } else { " OR " });
                     }
                     let vs = v.as_str().unwrap_or("");
-                    let like_str = format!("%\"{vs}\"%");
                     if is_not {
-                        builder.push("(tags NOT LIKE ");
-                        builder.push_bind(like_str);
-                        builder.push(" OR tags IS NULL)");
+                        builder.push("t.id NOT IN (SELECT task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name LIKE ");
+                        builder.push_bind(format!("%{vs}%"));
+                        builder.push(")");
                     } else {
-                        builder.push("tags LIKE ");
-                        builder.push_bind(like_str);
+                        builder.push("t.id IN (SELECT task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name LIKE ");
+                        builder.push_bind(format!("%{vs}%"));
+                        builder.push(")");
                     }
                 }
                 builder.push(")");
@@ -241,7 +264,7 @@ pub async fn get_filtered_tasks(
     query_text: String,
 ) -> Result<Vec<AppTask>, sqlx::Error> {
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
-        sqlx::QueryBuilder::new("SELECT * FROM tasks WHERE 1=1");
+        sqlx::QueryBuilder::new("SELECT t.id, t.title, t.status, t.priority, (SELECT CASE WHEN COUNT(tg.id) > 0 THEN json_group_array(json_object('id', tg.id, 'name', tg.name, 'color', tg.color)) ELSE 'null' END FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id) as tags, COALESCE(t.subtasks, 'null') as subtasks, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.deleted, t.updated_at, t.etag, t.dirty FROM tasks t WHERE 1=1");
 
     for f in &filters {
         if let (Some(col), Some(val)) = (&f.column, &f.value) {
@@ -252,11 +275,11 @@ pub async fn get_filtered_tasks(
 
     if !query_text.trim().is_empty() {
         let q = format!("%{}%", query_text.trim().to_lowercase());
-        query_builder.push(" AND (LOWER(title) LIKE ");
+        query_builder.push(" AND (LOWER(t.title) LIKE ");
         query_builder.push_bind(q.clone());
-        query_builder.push(" OR LOWER(tags) LIKE ");
+        query_builder.push(" OR t.id IN (SELECT task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE LOWER(tg.name) LIKE ");
         query_builder.push_bind(q);
-        query_builder.push(")");
+        query_builder.push("))");
     }
 
     query_builder.push(" ORDER BY ");

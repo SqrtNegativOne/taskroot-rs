@@ -17,6 +17,7 @@
         dragState,
         onEventDragStart,
         onAddEvent,
+        onEventClick,
     }: {
         view: DateGridView;
         setView: (v: DateGridView) => void;
@@ -28,6 +29,7 @@
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
         onAddEvent?: (date: Date) => void;
+        onEventClick?: (ev: AppEvent) => void;
     } = $props();
 
     const DAYS_IN_CALENDAR_GRID = 42;
@@ -155,6 +157,7 @@
                     {dragState}
                     {onEventDragStart}
                     {onAddEvent}
+                    {onEventClick}
                 />
             {/each}
         </div>

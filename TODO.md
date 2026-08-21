@@ -57,4 +57,4 @@ The following components are missing:
 ### Core Logic & State Management
 - [ ] Full parity of models/events in `domain.ts`
 - [ ] Utils (`keybindings`, `notifications`, `logger`, `colors` / `constants`, `icons`)
-- [ ] Settings schema and configuration management
+- [ ] Settings schema and configuration management- [ ] Update frontend to use colored tags

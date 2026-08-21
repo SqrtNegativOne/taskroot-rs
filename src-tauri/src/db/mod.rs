@@ -17,7 +17,9 @@ pub trait FilterColumnExt {
 ///
 /// Returns an error if the operation fails.
 pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
-    let options = SqliteConnectOptions::from_str(db_path)?.create_if_missing(true);
+    let options = SqliteConnectOptions::from_str(db_path)?
+        .create_if_missing(true)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
     let pool = SqlitePool::connect_with(options).await?;
 
@@ -90,6 +92,28 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             item_id TEXT NOT NULL,
             action TEXT NOT NULL,
             payload TEXT NOT NULL
+        );",
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            color TEXT
+        );",
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS task_tags (
+            task_id TEXT NOT NULL,
+            tag_id TEXT NOT NULL,
+            PRIMARY KEY (task_id, tag_id),
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
         );",
     )
     .execute(&pool)

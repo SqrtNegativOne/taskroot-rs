@@ -11,6 +11,7 @@
         dragState,
         onEventDragStart,
         onAddEvent,
+        onEventClick,
     }: {
         cell: { date: Date; outOfMonth: boolean };
         today: Date;
@@ -19,6 +20,7 @@
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
         onAddEvent?: (date: Date) => void;
+        onEventClick?: (ev: AppEvent) => void;
     } = $props();
 
     function ymd(d: Date) {
@@ -92,6 +94,10 @@
                     {ev.color ? `background-color: ${ev.color}; border-left-color: ${ev.color};` : ''}
                 "
                 onpointerdown={(e) => onEventDragStart?.(e, ev)}
+                onclick={(e) => {
+                    e.stopPropagation();
+                    if (onEventClick) onEventClick(ev);
+                }}
             >
                 {#if !isAllDay}
                     <span class="day-cell-event-time">

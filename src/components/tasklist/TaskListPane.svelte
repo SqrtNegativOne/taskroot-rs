@@ -21,6 +21,7 @@
         activeDragId,
         onAddTask,
         onDeleteTask,
+        onTaskClick,
         footer,
     }: {
         tasks: AppTask[];
@@ -33,6 +34,7 @@
         activeDragId?: string;
         onAddTask: (defaults?: Partial<AppTask>) => void;
         onDeleteTask?: (id: string) => void;
+        onTaskClick?: (task: AppTask) => void;
         footer?: import('svelte').Snippet;
     } = $props();
 
@@ -66,7 +68,7 @@
                 const safeDefaults: Partial<AppTask> = {};
                 if (defaults.status !== null) safeDefaults.status = defaults.status;
                 if (defaults.priority !== null) safeDefaults.priority = defaults.priority;
-                if (defaults.tags !== null) safeDefaults.tags = defaults.tags;
+                if (defaults.tags !== null) safeDefaults.tags = defaults.tags.map(t => ({ id: crypto.randomUUID(), name: t }));
                 onAddTask(safeDefaults);
             },
             () => onAddTask()
@@ -120,6 +122,7 @@
                         {updateTask}
                         {deleteTask}
                         isPastDue={pastDueTaskIds.has(t.id)}
+                        {onTaskClick}
                     />
                 </div>
             {/each}

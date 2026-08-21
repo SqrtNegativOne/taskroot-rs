@@ -42,7 +42,7 @@ export function useAppIntegration() {
                             title: cleanTitle || 'New Task',
                             status: 'todo',
                             priority: (p === 0 || p === 1 || p === 2 || p === 3 || p === 4) ? p : undefined,
-                            tags: properties.tags,
+                            tags: properties.tags?.map(t => ({ id: crypto.randomUUID(), name: t })),
                             est: properties.duration,
                             due: properties.day as any
                         };
@@ -61,7 +61,7 @@ export function useAppIntegration() {
                             title: cleanTitle || 'New Task',
                             status: 'doing',
                             priority: (p === 0 || p === 1 || p === 2 || p === 3 || p === 4) ? p : undefined,
-                            tags: properties.tags,
+                            tags: properties.tags?.map(t => ({ id: crypto.randomUUID(), name: t })),
                             est: properties.duration,
                             due: properties.day as any
                         };

@@ -35,6 +35,15 @@ pub struct Subtask {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq)]
+#[ts(export, export_to = "../../src/lib/bindings/Tag.ts")]
+pub struct Tag {
+    pub id: String,
+    pub name: String,
+    #[ts(optional)]
+    pub color: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.ts")]
 #[serde(rename_all = "camelCase")]
@@ -47,7 +56,7 @@ pub struct AppTask {
     pub priority: Option<TaskPriority>,
     #[ts(optional)]
     #[sqlx(json)]
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<Vec<Tag>>,
     #[ts(optional)]
     #[sqlx(json)]
     pub subtasks: Option<Vec<Subtask>>,
@@ -128,6 +137,7 @@ pub struct AppEvent {
     #[ts(optional)]
     pub updated_at: Option<i64>,
     #[ts(optional)]
+    #[sqlx(default)]
     pub color: Option<String>,
     #[serde(rename = "_deleted")]
     #[ts(optional)]
@@ -223,7 +233,7 @@ mod tests {
             title: "My Task".into(),
             status: Some(AppTaskStatus::NextUp),
             priority: None,
-            tags: Some(vec!["work".into()]),
+            tags: Some(vec![Tag { id: "tag-1".into(), name: "work".into(), color: None }]),
             subtasks: None,
             parent_task: None,
             dependencies: None,

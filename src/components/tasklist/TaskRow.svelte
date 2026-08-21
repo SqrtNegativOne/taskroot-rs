@@ -9,6 +9,7 @@
         updateTask,
         deleteTask,
         isPastDue,
+        onTaskClick,
     }: {
         task: AppTask;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
@@ -16,6 +17,7 @@
         updateTask: (id: string, transform: (task: AppTask) => AppTask) => void;
         deleteTask: (id: string) => void;
         isPastDue?: boolean;
+        onTaskClick?: (task: AppTask) => void;
     } = $props();
 
     let isChecking = $state(false);
@@ -69,6 +71,14 @@
     class:is-dragging={dragging}
     class:is-done={task.status === "done"}
     onpointerdown={handlePointerDown}
+    onclick={(e) => {
+        if (e.target instanceof Element && (
+            e.target.closest('.task-row-subtask-toggle') ||
+            e.target.closest('.task-row-actions') ||
+            e.target.closest('.task-circle')
+        )) return;
+        if (onTaskClick) onTaskClick(task);
+    }}
 >
     <TaskCircle
         priority={task.priority ?? undefined}
@@ -79,14 +89,12 @@
     />
     <div class="task-row-content">
         <div class="task-row-line1">
-            <span class="task-row-title">
-                {#if isPastDue && task.status !== "done"}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; color: var(--p0); vertical-align: middle;">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                {/if}
-                {task.title}
-            </span>
+            {#if isPastDue && task.status !== "done"}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--p0); flex-shrink: 0;">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            {/if}
+            <span class="task-row-title">{task.title}</span>
             {#if task.status === "next-up"}
                 <span class="status-pill status-nextup">next up</span>
             {/if}

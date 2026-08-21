@@ -49,9 +49,8 @@
 </script>
 
 <div class="filter-sort-container" bind:this={containerRef}>
-    <button class="menu-trigger-button {filterMenuOpen || filters.length > 0 ? 'is-active' : ''}" onclick={() => { filterMenuOpen = !filterMenuOpen; }}>
+    <button class="menu-trigger-button {filterMenuOpen || filters.length > 0 ? 'is-active' : ''}" onclick={() => { filterMenuOpen = !filterMenuOpen; }} title="Filter">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-        Filter
         {#if filters.length > 0}
             <span class="menu-trigger-badge">{filters.length}</span>
         {/if}

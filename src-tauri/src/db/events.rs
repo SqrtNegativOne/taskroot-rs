@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 /// Returns an error if the operation fails.
 pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
     println!("db::get_events executing query...");
-    let events = sqlx::query_as::<_, AppEvent>("SELECT * FROM events")
+    let events = sqlx::query_as::<_, AppEvent>("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events")
         .fetch_all(pool)
         .await?;
     println!("db::get_events fetched rows!");
@@ -17,7 +17,7 @@ pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error>
 ///
 /// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
-    sqlx::query_as::<_, AppEvent>("SELECT * FROM events WHERE id = ?")
+    sqlx::query_as::<_, AppEvent>("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
         .await
@@ -212,7 +212,7 @@ pub async fn get_filtered_events(
     query_text: String,
 ) -> Result<Vec<AppEvent>, sqlx::Error> {
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
-        sqlx::QueryBuilder::new("SELECT * FROM events WHERE 1=1");
+        sqlx::QueryBuilder::new("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events WHERE 1=1");
 
     for f in &filters {
         if let (Some(col), Some(val)) = (&f.column, &f.value) {
