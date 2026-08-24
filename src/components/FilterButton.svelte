@@ -1,4 +1,9 @@
-<script lang="ts" generics="F extends { column?: any | null, operator?: string | null, value?: any | null }">
+<script lang="ts" generics="F extends { column?: string | null, operator?: string | null, value?: unknown }">
+    import type { AppTaskStatus } from '../lib/domain';
+
+    const STATUSES: AppTaskStatus[] = ['todo', 'next-up', 'doing', 'done'];
+    const PRIORITIES: string[] = ['0', '1', '2', '3', '4'];
+
     let {
         filters = $bindable([]),
         columns = [
@@ -6,14 +11,14 @@
             { id: 'priority', label: 'Priority' },
             { id: 'tag', label: 'Tag' }
         ],
-        getValuesForColumn = (col: string) => {
-            if (col === 'status') return ['todo', 'doing', 'done', 'nextup'];
-            if (col === 'priority') return ['0', '1', '2', '3', '4'];
+        getValuesForColumn = (col: string): string[] => {
+            if (col === 'status') return STATUSES;
+            if (col === 'priority') return PRIORITIES;
             return [];
         },
         align = "left",
     }: {
-        filters: F[];
+        filters?: F[];
         columns?: {id: string, label: string}[];
         getValuesForColumn?: (col: string) => string[];
         align?: "left" | "right";
@@ -33,18 +38,19 @@
     });
 
     function addFilter() {
-        const id = columns[0]?.id || 'status';
-        filters = [...filters, { column: id, operator: 'is', value: [] } as unknown as F];
+        const id = columns[0]?.id ?? 'status';
+        const blankFilter = {} as F;
+        filters = [...filters, { ...blankFilter, column: id, operator: 'is', value: [] }];
     }
 
     function removeFilter(index: number) {
         filters = filters.filter((_, i) => i !== index);
     }
 
-    function updateFilter(index: number, updates: Partial<F>) {
-        const newFilters = [...filters];
-        newFilters[index] = { ...newFilters[index], ...(updates as any) };
-        filters = newFilters;
+    function updateFilter(index: number, updates: { column?: string | null, operator?: string | null, value?: unknown }) {
+        if (index >= filters.length) return;
+        Object.assign(filters[index], updates);
+        filters = [...filters];
     }
 </script>
 
@@ -58,26 +64,28 @@
 
     {#if filterMenuOpen}
         <div class="shared-floating-menu align-{align}" style="min-width: 320px;">
-            {#each filters as f, i}
+            {#each filters as f, i (i)}
+                {@const column = f.column ?? ''}
+                {@const availableValues = getValuesForColumn(column)}
                 <div class="filter-row">
-                    <select 
-                        value={f.column} 
+                    <select
+                        value={f.column}
                         onchange={(e) => {
                             const val = e.currentTarget.value;
                             if (val === 'status' || val === 'priority' || val === 'tag') {
-                                updateFilter(i, { column: val, value: [] } as any);
+                                updateFilter(i, { column: val, value: [] });
                             }
                         }}
                         style="flex: 1;"
                         class="form-select"
                     >
-                        {#each columns as c}
+                        {#each columns as c (c.id)}
                             <option value={c.id}>{c.label}</option>
                         {/each}
                     </select>
-                    <select 
-                        value={f.operator} 
-                        onchange={(e) => updateFilter(i, { operator: e.currentTarget.value } as any)}
+                    <select
+                        value={f.operator}
+                        onchange={(e) => updateFilter(i, { operator: e.currentTarget.value })}
                         style="width: 75px;"
                         class="form-select"
                     >
@@ -86,27 +94,27 @@
                     </select>
 
                     <div style="flex: 1; display: flex;">
-                        {#if getValuesForColumn((f.column as string) || '').length > 0}
-                            <select 
-                                multiple 
-                                value={Array.isArray(f.value) ? f.value : (f.value ? [f.value] : [])} 
+                        {#if availableValues.length > 0}
+                            <select
+                                multiple
+                                value={Array.isArray(f.value) ? f.value : (f.value != null ? [f.value] : [])}
                                 onchange={(e) => {
                                     const opts = Array.from(e.currentTarget.selectedOptions).map(o => o.value);
-                                    updateFilter(i, { value: opts } as any);
+                                    updateFilter(i, { value: opts });
                                 }}
                                 style="flex: 1; height: auto; min-height: 2em; padding: 2px;"
                                 class="form-select"
                             >
-                                {#each getValuesForColumn((f.column as string) || '') as val}
+                                {#each availableValues as val (val)}
                                     <option value={val}>{val}</option>
                                 {/each}
                             </select>
                         {:else}
-                            <input 
+                            <input
                                 type="text"
                                 placeholder="Value..."
-                                value={Array.isArray(f.value) ? f.value.join(', ') : f.value || ''}
-                                oninput={(e) => updateFilter(i, { value: [e.currentTarget.value] } as any)}
+                                value={Array.isArray(f.value) ? f.value.join(', ') : (f.value ?? '')}
+                                oninput={(e) => updateFilter(i, { value: [e.currentTarget.value] })}
                                 style="flex: 1; width: 100%;"
                                 class="form-input"
                             />

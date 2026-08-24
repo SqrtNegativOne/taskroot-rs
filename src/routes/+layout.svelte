@@ -1,77 +1,129 @@
 <script lang="ts">
     import '../app.css';
     import { onMount } from 'svelte';
+    import type { Snippet } from 'svelte';
     import { getCurrentWindow } from '@tauri-apps/api/window';
-    import { emit } from '@tauri-apps/api/event';
-    import { store } from '$lib/store.svelte';
-    import { useAppIntegration } from '$lib/useAppIntegration.svelte';
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
+    import { store, describeError } from '$lib/store.svelte';
+    import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
     import TitleBar from '../components/TitleBar.svelte';
 
-    let { children } = $props();
+    let { children }: { children: Snippet } = $props();
     let isLauncher = $state(false);
     let isMinitracker = $state(false);
     let isCheckingAuth = $state(true);
+
+    async function redirectToInitialRoute(isLoggedIn: boolean): Promise<void> {
+        if (!isLoggedIn && window.location.pathname !== Routes.LOGIN) {
+            await goto(resolve(Routes.LOGIN));
+        } else if (isLoggedIn && window.location.pathname === Routes.LOGIN) {
+            await goto(resolve(Routes.HOME));
+        }
+    }
 
     onMount(async () => {
         const appWindow = getCurrentWindow();
         isLauncher = appWindow.label === 'launcher';
         isMinitracker = appWindow.label === 'minitracker';
-        
+
         if (!isLauncher && !isMinitracker) {
             const authResult = await safeInvoke<boolean>('is_logged_in');
-            
             if (authResult.isOk()) {
-                const loggedIn = authResult.value;
-                if (!loggedIn && window.location.pathname !== Routes.LOGIN) {
-                    await goto(Routes.LOGIN);
-                } else if (loggedIn && window.location.pathname === Routes.LOGIN) {
-                    await goto(Routes.HOME);
-                }
+                await redirectToInitialRoute(authResult.value);
             } else {
-                console.error("Failed to check auth state:", authResult.error);
+                console.error('Failed to check auth state:', authResult.error);
             }
-            
-            isCheckingAuth = false;
-            store.init(); // Initialize store only after auth check to avoid fetching without token
-        } else {
-            isCheckingAuth = false;
-            store.init();
         }
-    });
 
-    useAppIntegration();
+        isCheckingAuth = false;
 
-    // Effect to sync data to launcher when store changes
-    $effect(() => {
-        if (!isLauncher && !isMinitracker && store.loaded) {
-            emit('launcher-data-update', {
-                tasks: $state.snapshot(store.tasks),
-                events: $state.snapshot(store.events)
-            });
+        const initResult = await store.init();
+        if (initResult.isErr()) {
+            store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
         }
     });
 </script>
 
 {#if isLauncher}
-    <div class="h-screen w-screen bg-transparent p-2">
-        <div class="w-full h-full bg-zinc-900 rounded-lg shadow-lg border border-zinc-700 p-4 text-white flex items-center">
-            <!-- Temporary Launcher UI Placeholder -->
-            <span class="text-zinc-400 mr-3">Cmd</span>
-            <input type="text" class="bg-transparent outline-none flex-1 text-lg" placeholder="Type a command..." />
+    <div class="launcher-shell">
+        <div class="launcher-panel">
+            <span class="launcher-prefix">Cmd</span>
+            <input type="text" class="launcher-input" placeholder="Type a command..." />
         </div>
     </div>
+{:else if isCheckingAuth}
+    <div class="boot-screen">
+        <div class="boot-spinner"></div>
+    </div>
 {:else}
-    {#if isCheckingAuth}
-        <div class="h-screen w-screen bg-zinc-950 flex items-center justify-center">
-            <div class="w-8 h-8 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin"></div>
-        </div>
-    {:else}
-        <div class="app">
-            <TitleBar />
-            {@render children()}
-        </div>
-    {/if}
+    <div class="app">
+        <TitleBar />
+        {@render children()}
+    </div>
 {/if}
+
+<style>
+    .launcher-shell {
+        height: 100vh;
+        width: 100vw;
+        padding: 8px;
+        background: transparent;
+    }
+
+    .launcher-panel {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        padding: 16px;
+        color: var(--fg);
+        background: var(--bg-surface);
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        box-shadow: var(--shadow-btn-hover);
+    }
+
+    .launcher-prefix {
+        margin-right: 12px;
+        color: var(--fg-muted);
+    }
+
+    .launcher-input {
+        flex: 1;
+        font: inherit;
+        font-size: 1.15em;
+        color: inherit;
+        background: transparent;
+        border: none;
+        outline: none;
+    }
+
+    .boot-screen {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        width: 100vw;
+        background: var(--bg);
+    }
+
+    .boot-spinner {
+        width: 32px;
+        height: 32px;
+        border: 2px solid var(--border);
+        border-top-color: var(--fg-muted);
+        border-radius: 50%;
+        animation: boot-spin 1s linear infinite;
+    }
+
+    @keyframes boot-spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>

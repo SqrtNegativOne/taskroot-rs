@@ -1,27 +1,46 @@
 <script lang="ts">
     import { getCurrentWindow } from '@tauri-apps/api/window';
-    import { page } from '$app/stores';
+    import { page } from '$app/state';
     import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { Routes } from '$lib/routes';
     import SyncButton from './SyncButton.svelte';
+
+    const STAGE_ROUTES = {
+        plan: Routes.HOME,
+        do: Routes.DO,
+        dev: Routes.DEV,
+        docs: Routes.DOCS,
+        graph: Routes.GRAPH,
+        launcher: Routes.LAUNCHER,
+        minitracker: Routes.MINITRACKER,
+        recap: Routes.RECAP,
+        settings: Routes.SETTINGS,
+        stats: Routes.STATS,
+        wrap: Routes.WRAP
+    } as const;
+
+    type Stage = keyof typeof STAGE_ROUTES;
+
+    const stages = Object.keys(STAGE_ROUTES) as Stage[];
+
+    function isStage(value: string): value is Stage {
+        return value in STAGE_ROUTES;
+    }
 
     const handleMinimize = () => getCurrentWindow().minimize();
     const handleMaximize = () => getCurrentWindow().toggleMaximize();
     const handleClose = () => getCurrentWindow().close();
 
-    let current = $derived($page.url.pathname === Routes.HOME ? 'plan' : $page.url.pathname.substring(1));
+    let current = $derived(page.url.pathname === Routes.HOME ? 'plan' : page.url.pathname.substring(1));
 
-    function navigate(stage: string) {
-        if (stage === 'plan') {
-            void goto(Routes.HOME);
-        } else {
-            const key = stage.toUpperCase() as keyof typeof Routes;
-            if (Routes[key]) {
-                void goto(Routes[key]);
-            } else {
-                void goto(`/${stage}`);
-            }
-        }
+    function navigate(stage: Stage): void {
+        void goto(resolve(STAGE_ROUTES[stage]));
+    }
+
+    function handleStageChange(event: Event & { currentTarget: EventTarget & HTMLSelectElement }): void {
+        const stage = event.currentTarget.value;
+        if (isStage(stage)) navigate(stage);
     }
 </script>
 
@@ -31,14 +50,14 @@
         <button onclick={() => navigate('settings')} class="stage {current === 'settings' ? 'is-current' : ''}" style="padding: 0 4px; display: flex; background: none; border: none; cursor: pointer; color: inherit;" aria-label="Settings">
             <span class="material-symbols-outlined" style="font-size: 18px;">settings</span>
         </button>
-        <select class="stage-name" style="background: none; border: none; color: inherit; font: inherit; outline: none; cursor: pointer; padding: 0;" onchange={(e) => { navigate(e.currentTarget.value); }}>
-            {#each ['plan', 'do', 'dev', 'docs', 'graph', 'launcher', 'minitracker', 'recap', 'settings', 'stats', 'wrap'] as p}
-                <option value={p} selected={current === p}>{p}</option>
+        <select class="stage-name" aria-label="Active stage" style="background: transparent; border: none; color: var(--fg); font: inherit; outline: none; cursor: pointer; padding: 0;" onchange={handleStageChange}>
+            {#each stages as p (p)}
+                <option value={p} selected={current === p} style="background: var(--bg-surface); color: var(--fg);">{p}</option>
             {/each}
         </select>
     </div>
     <div class="topbar-right"></div>
-    
+
     <div class="window-controls">
         <SyncButton />
         <button class="win-btn minimize" onclick={handleMinimize} title="Minimize" aria-label="Minimize">

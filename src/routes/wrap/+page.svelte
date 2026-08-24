@@ -1,7 +1,9 @@
 <script lang="ts">
+    import ComingSoon from '../../components/ComingSoon.svelte';
+    import { Routes } from '$lib/routes';
+
+    const routeName = Routes.WRAP.substring(1);
+    const title = `${routeName.charAt(0).toUpperCase()}${routeName.substring(1)}`;
 </script>
 
-<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--fg-dim);">
-    <h2>Coming Soon</h2>
-    <p>The wrap screen has not been implemented yet.</p>
-</div>
+<ComingSoon {title} />

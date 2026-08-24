@@ -1,30 +1,18 @@
 <script lang="ts">
     import { splitTime, type StopwatchState } from './engine.svelte';
+    import { useNow } from '../../../lib/useNow.svelte';
+
+    const NOW_INTERVAL_MS = 250;
 
     let { engine, onToggle } = $props<{
         engine: StopwatchState,
         onToggle: () => void
     }>();
 
-    let tick = $state(0);
-
-    $effect(() => {
-        let raf: number;
-        const loop = () => {
-            tick++;
-            raf = requestAnimationFrame(loop);
-        };
-        if (engine.running) {
-            raf = requestAnimationFrame(loop);
-        }
-        return () => {
-            if (raf) cancelAnimationFrame(raf);
-        };
-    });
+    const now = useNow(NOW_INTERVAL_MS);
 
     let displayData = $derived.by(() => {
-        // Depend on tick to recalculate on animation frame
-        tick;
+        void now.ms;
         const { m } = splitTime(engine.currentMs);
         return {
             primaryText: m,
@@ -36,7 +24,9 @@
 <button
     type="button"
     aria-label="Toggle stopwatch"
-    class="stopwatch-display {engine.running ? 'is-running' : ''} {engine.isPristine ? 'is-pristine' : ''}"
+    class="stopwatch-display"
+    class:is-running={engine.running}
+    class:is-pristine={engine.isPristine}
     onclick={onToggle}
     title="Click to start/stop"
 >

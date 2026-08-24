@@ -1,5 +1,9 @@
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
+import type { AppError } from './errors';
+
+export type { AppError, AppErrorCode } from './errors';
+export { describeAppError, normalizeAppError, unknownAppError } from './errors';
 
 /**
  * A wrapper around Tauri's `invoke` that returns a `ResultAsync` from `neverthrow`.
@@ -9,7 +13,7 @@ import { ResultAsync } from 'neverthrow';
  * @param args The arguments for the command
  * @returns A ResultAsync containing the success data or the error
  */
-export function safeInvoke<T, E = Error>(cmd: string, args?: InvokeArgs): ResultAsync<T, E> {
+export function safeInvoke<T, E = AppError>(cmd: string, args?: InvokeArgs): ResultAsync<T, E> {
     return ResultAsync.fromPromise(
         invoke<T>(cmd, args),
         (e) => e as E
@@ -17,38 +21,84 @@ export function safeInvoke<T, E = Error>(cmd: string, args?: InvokeArgs): Result
 }
 
 /**
+ * Declares reactive dependencies for a `$effect` that drives a `useTauriQuery`
+ * execution. Svelte tracks any value read here, so the effect re-runs whenever
+ * one of them changes — without resorting to bare `void x` statements.
+ */
+export function queryDependency(...dependencies: unknown[]): number {
+    return dependencies.reduce<number>((count, value) => (value !== undefined ? count + 1 : count), 0);
+}
+
+interface UseTauriQueryOptions<T, E> {
+    args?: InvokeArgs;
+    debounceMs?: number;
+    initialData?: T;
+    onError?: (error: E) => void;
+}
+
+/**
  * A reactive Svelte 5 Rune wrapper for executing Tauri commands.
- * It manages loading, data, and error states automatically.
+ * It manages loading, data, and error states automatically. Overlapping
+ * executions are stale-guarded: only the most recently requested response is
+ * applied. Pass `debounceMs` to coalesce rapid calls (e.g. search keystrokes).
  *
  * @param cmd The Tauri command name
- * @param args Default arguments for the command (optional)
+ * @param options Default arguments, debounce window, initial data and an error hook
  * @returns An object with reactive state and an execute function
  */
-export function useTauriQuery<T, E = Error>(cmd: string, args?: InvokeArgs) {
-    let data = $state<T | undefined>(undefined);
+export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQueryOptions<T, E> = {}) {
+    let data = $state<T | undefined>(options.initialData);
     let error = $state<E | undefined>(undefined);
-    let isLoading = $state<boolean>(false);
+    let isLoading = $state(false);
+
+    let latestRequestId = 0;
+    let inflight: Promise<void> | undefined;
+    let debounceHandle: ReturnType<typeof setTimeout> | undefined;
+
+    async function dispatch(args: InvokeArgs | undefined): Promise<void> {
+        const requestId = ++latestRequestId;
+        isLoading = true;
+        error = undefined;
+
+        inflight = (async () => {
+            const result = await safeInvoke<T, E>(cmd, args ?? options.args);
+            if (requestId !== latestRequestId) return;
+
+            result.match(
+                (value) => {
+                    data = value;
+                    isLoading = false;
+                },
+                (errValue) => {
+                    error = errValue;
+                    isLoading = false;
+                }
+            );
+            if (result.isErr()) options.onError?.(result.error);
+        })();
+
+        await inflight;
+    }
+
+    function scheduleDispatch(args: InvokeArgs | undefined): Promise<void> {
+        if (debounceHandle !== undefined) clearTimeout(debounceHandle);
+        isLoading = true;
+
+        return new Promise<void>((resolve) => {
+            debounceHandle = setTimeout(() => {
+                debounceHandle = undefined;
+                void dispatch(args).finally(resolve);
+            }, options.debounceMs ?? 0);
+        });
+    }
 
     /**
      * Executes the Tauri command.
      * @param newArgs Optional overriding arguments
      */
-    async function execute(newArgs?: InvokeArgs) {
-        isLoading = true;
-        error = undefined;
-        
-        const result = await safeInvoke<T, E>(cmd, newArgs ?? args);
-        
-        result.match(
-            (v) => {
-                data = v;
-                isLoading = false;
-            },
-            (e) => {
-                error = e;
-                isLoading = false;
-            }
-        );
+    async function execute(newArgs?: InvokeArgs): Promise<void> {
+        if (options.debounceMs === undefined) return dispatch(newArgs);
+        return scheduleDispatch(newArgs);
     }
 
     return {

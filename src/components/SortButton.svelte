@@ -1,4 +1,4 @@
-<script lang="ts" generics="F extends { column?: any | null, operator?: string | null, value?: any | null }">
+<script lang="ts">
     let {
         sort = $bindable('priority'),
         sortOptions = [
@@ -30,7 +30,12 @@
 
 <div class="filter-sort-container" bind:this={containerRef}>
     {#if sortOptions.length > 0}
-        <button class="menu-trigger-button {sortMenuOpen ? 'is-active' : ''}" onclick={() => { sortMenuOpen = !sortMenuOpen; }} title="Sort">
+        <button
+            class="menu-trigger-button"
+            class:is-active={sortMenuOpen}
+            onclick={() => { sortMenuOpen = !sortMenuOpen; }}
+            title="Sort"
+        >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
         </button>
     {/if}
@@ -45,7 +50,7 @@
                     style="flex: 1;"
                     class="form-select"
                 >
-                    {#each sortOptions as o}
+                    {#each sortOptions as o (o.id)}
                         <option value={o.id}>{o.label}</option>
                     {/each}
                 </select>

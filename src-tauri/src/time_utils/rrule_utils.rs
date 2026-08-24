@@ -14,14 +14,14 @@ pub fn get_occurrences(
 ) -> Result<Vec<DateTime<rrule::Tz>>> {
     let rrule_set = RRuleSet::from_str(rrule_str)
         .map_err(|e| anyhow::anyhow!("Failed to parse rrule: {e:?}"))?;
-    
+
     let dt_start_tz = dt_start.with_timezone(&rrule::Tz::UTC);
     let end_date_tz = end_date.with_timezone(&rrule::Tz::UTC);
-    
+
     let rrule_set = rrule_set.after(dt_start_tz).before(end_date_tz);
-    
+
     let occurrences = rrule_set.all(100).dates;
-    
+
     Ok(occurrences)
 }
 
@@ -33,9 +33,14 @@ mod tests {
     #[test]
     fn test_rrule_parsing() {
         let start = Utc::now();
-        let end = start.checked_add_signed(chrono::Duration::try_days(10).unwrap()).unwrap();
-        let rule = format!("DTSTART:{}\nRRULE:FREQ=DAILY;COUNT=5", start.format("%Y%m%dT%H%M%SZ"));
-        
+        let end = start
+            .checked_add_signed(chrono::Duration::try_days(10).unwrap())
+            .unwrap();
+        let rule = format!(
+            "DTSTART:{}\nRRULE:FREQ=DAILY;COUNT=5",
+            start.format("%Y%m%dT%H%M%SZ")
+        );
+
         let occ = get_occurrences(&rule, &start, &end).unwrap();
         assert!(!occ.is_empty());
     }

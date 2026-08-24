@@ -27,10 +27,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
     let url = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showHidden=true";
 
-    let response: reqwest::Response = client.get(url)
-        .bearer_auth(access_token)
-        .send()
-        .await?;
+    let response: reqwest::Response = client.get(url).bearer_auth(access_token).send().await?;
 
     if !response.status().is_success() {
         let err = response.text().await?;
@@ -44,7 +41,14 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_task_id = format!("google_{}", task.id);
             let is_deleted = task.deleted.unwrap_or(false);
 
-            let remote_updated_at = task.updated.as_ref().map_or_else(|| chrono::Utc::now().timestamp_millis(), |upd| chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0));
+            let remote_updated_at = task.updated.as_ref().map_or_else(
+                || chrono::Utc::now().timestamp_millis(),
+                |upd| {
+                    chrono::DateTime::parse_from_rfc3339(upd)
+                        .map(|dt| dt.timestamp_millis())
+                        .unwrap_or(0)
+                },
+            );
 
             if let Ok(Some(local_task)) = crate::db::get_task(pool, &app_task_id).await {
                 if let Some(local_updated) = local_task.updated_at {
@@ -60,7 +64,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             }
 
             let title = task.title.unwrap_or_else(|| "No Title".to_string());
-            
+
             let status = match task.status.as_deref() {
                 Some("completed") => Some(crate::domain::AppTaskStatus::Done),
                 _ => Some(crate::domain::AppTaskStatus::Todo), // "needsAction" usually
@@ -104,7 +108,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 /// Returns an error if the operation fails.
 pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Result<String> {
     let client = Client::new();
-    
+
     let status = match task.status {
         Some(crate::domain::AppTaskStatus::Done) => "completed",
         _ => "needsAction",
@@ -117,15 +121,23 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
         "status": status,
     });
 
-    let (url, method) = task.remote_id.as_ref().map_or_else(|| (
-        "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks".to_string(),
-        reqwest::Method::POST
-    ), |remote_id| (
-        format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{remote_id}"),
-        reqwest::Method::PUT
-    ));
+    let (url, method) = task.remote_id.as_ref().map_or_else(
+        || {
+            (
+                "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks".to_string(),
+                reqwest::Method::POST,
+            )
+        },
+        |remote_id| {
+            (
+                format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{remote_id}"),
+                reqwest::Method::PUT,
+            )
+        },
+    );
 
-    let response = client.request(method, &url)
+    let response = client
+        .request(method, &url)
         .bearer_auth(access_token)
         .json(&google_task)
         .send()
@@ -146,7 +158,8 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
 pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
     let client = Client::new();
     let url = format!("https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/{remote_id}");
-    let response = client.request(reqwest::Method::DELETE, &url)
+    let response = client
+        .request(reqwest::Method::DELETE, &url)
         .bearer_auth(access_token)
         .send()
         .await?;

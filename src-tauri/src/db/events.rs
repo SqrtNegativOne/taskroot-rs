@@ -1,28 +1,38 @@
 use crate::domain::AppEvent;
 use sqlx::SqlitePool;
 
+macro_rules! event_select_sql {
+    ($suffix:literal) => {
+        concat!(
+            "SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, ",
+            "rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, ",
+            "updated_at, deleted, etag, dirty FROM events",
+            $suffix
+        )
+    };
+}
+
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
-    println!("db::get_events executing query...");
-    let events = sqlx::query_as::<_, AppEvent>("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events")
+    sqlx::query_as::<_, AppEvent>(event_select_sql!(""))
         .fetch_all(pool)
-        .await?;
-    println!("db::get_events fetched rows!");
-    Ok(events)
+        .await
 }
 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
-    sqlx::query_as::<_, AppEvent>("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events WHERE id = ?")
+    sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE id = ?"))
         .bind(id)
         .fetch_optional(pool)
         .await
 }
 
+/// Dirty-event feed for the offline-enqueue roadmap (see TODO.md).
+#[allow(dead_code)]
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -39,9 +49,9 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     sqlx::query(
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
-            start_time, end_time, event_type, rrule, exdates, recurring_event_id, 
+            start_time, end_time, rrule, exdates, recurring_event_id, 
             original_start_time, cancelled, updated_at, deleted, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -51,7 +61,6 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(event.event_type)
     .bind(event.rrule)
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
@@ -74,7 +83,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     sqlx::query(
         "UPDATE events SET 
             remote_id = ?, remote_collection_id = ?, task_id = ?, title = ?, 
-            description = ?, start_time = ?, end_time = ?, event_type = ?, 
+            description = ?, start_time = ?, end_time = ?, 
             rrule = ?, exdates = ?, recurring_event_id = ?, original_start_time = ?, 
             cancelled = ?, updated_at = ?, deleted = ?, etag = ?, dirty = ?
         WHERE id = ?",
@@ -86,7 +95,6 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(event.event_type)
     .bind(event.rrule)
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
@@ -110,9 +118,9 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     sqlx::query(
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
-            start_time, end_time, event_type, rrule, exdates, recurring_event_id, 
+            start_time, end_time, rrule, exdates, recurring_event_id, 
             original_start_time, cancelled, updated_at, deleted, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             remote_id = excluded.remote_id, 
             remote_collection_id = excluded.remote_collection_id, 
@@ -121,7 +129,6 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             description = excluded.description, 
             start_time = excluded.start_time, 
             end_time = excluded.end_time, 
-            event_type = excluded.event_type, 
             rrule = excluded.rrule, 
             exdates = excluded.exdates, 
             recurring_event_id = excluded.recurring_event_id, 
@@ -140,7 +147,6 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.description)
     .bind(event.start_time)
     .bind(event.end_time)
-    .bind(event.event_type)
     .bind(event.rrule)
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
@@ -170,28 +176,27 @@ pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Err
 use super::FilterColumnExt;
 
 impl FilterColumnExt for crate::domain::EventFilterColumn {
-    fn apply_sql(&self, builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, op: &str, val: &serde_json::Value) {
+    fn apply_sql(
+        &self,
+        builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+        op: &str,
+        val: &serde_json::Value,
+    ) {
         let is_not = op == "is not";
-        let values = val.as_array().map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
+        let values = val
+            .as_array()
+            .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
         if values.is_empty() {
             return;
         }
 
         match self {
-            Self::EventType => {
-                builder.push(if is_not { " AND event_type NOT IN (" } else { " AND event_type IN (" });
-                let mut separated = builder.separated(", ");
-                for v in &values {
-                    if let Some(s) = v.as_str() {
-                        separated.push_bind(format!("\"{s}\""));
-                    } else {
-                        separated.push_bind(v.to_string());
-                    }
-                }
-                builder.push(")");
-            }
             Self::Calendar => {
-                builder.push(if is_not { " AND remote_collection_id NOT IN (" } else { " AND remote_collection_id IN (" });
+                builder.push(if is_not {
+                    " AND remote_collection_id NOT IN ("
+                } else {
+                    " AND remote_collection_id IN ("
+                });
                 let mut separated = builder.separated(", ");
                 for v in &values {
                     if let Some(s) = v.as_str() {
@@ -212,7 +217,7 @@ pub async fn get_filtered_events(
     query_text: String,
 ) -> Result<Vec<AppEvent>, sqlx::Error> {
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
-        sqlx::QueryBuilder::new("SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, event_type, rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, updated_at, deleted, etag, dirty FROM events WHERE 1=1");
+        sqlx::QueryBuilder::new(event_select_sql!(" WHERE 1=1"));
 
     for f in &filters {
         if let (Some(col), Some(val)) = (&f.column, &f.value) {
@@ -230,7 +235,10 @@ pub async fn get_filtered_events(
         query_builder.push(")");
     }
 
-    let events = query_builder.build_query_as::<AppEvent>().fetch_all(pool).await?;
+    let events = query_builder
+        .build_query_as::<AppEvent>()
+        .fetch_all(pool)
+        .await?;
 
     Ok(events)
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
     import TaskCircle from '../TaskCircle.svelte';
-    import type { AppTask, AppTaskStatus } from '../../lib/domain';
+    import type { AppTask } from '../../lib/domain';
 
     let {
         task,
@@ -65,7 +65,7 @@
     let hasEst = $derived(est > 0);
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div
     class="task-row"
     class:is-dragging={dragging}
@@ -122,8 +122,8 @@
                     {#if hasTags}<span class="meta-sep">·</span>{/if}
                 {/if}
                 {#if task.tags}
-                    {#each task.tags as tag, i (tag)}
-                        <span class="meta-tag">#{tag}</span>
+                    {#each task.tags as tag, i (tag.id)}
+                        <span class="meta-tag">#{tag.name}</span>
                         {#if i < task.tags.length - 1}<span class="meta-tag-sep">,</span>{/if}
                     {/each}
                 {/if}

@@ -32,14 +32,16 @@ struct GoogleEventTime {
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
     let now = chrono::Utc::now().to_rfc3339();
-    let mut url = url::Url::parse("https://www.googleapis.com/calendar/v3/calendars/primary/events")?;
+    let mut url =
+        url::Url::parse("https://www.googleapis.com/calendar/v3/calendars/primary/events")?;
     url.query_pairs_mut()
         .append_pair("timeMin", &now)
         .append_pair("maxResults", "50")
         .append_pair("singleEvents", "true")
         .append_pair("orderBy", "startTime");
 
-    let response: reqwest::Response = client.get(url.as_str())
+    let response: reqwest::Response = client
+        .get(url.as_str())
         .bearer_auth(access_token)
         .send()
         .await?;
@@ -56,7 +58,14 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_event_id = format!("google_{}", event.id);
             let is_deleted = event.status.as_deref() == Some("cancelled");
 
-            let remote_updated_at = event.updated.as_ref().map_or_else(|| chrono::Utc::now().timestamp_millis(), |upd| chrono::DateTime::parse_from_rfc3339(upd).map(|dt| dt.timestamp_millis()).unwrap_or(0));
+            let remote_updated_at = event.updated.as_ref().map_or_else(
+                || chrono::Utc::now().timestamp_millis(),
+                |upd| {
+                    chrono::DateTime::parse_from_rfc3339(upd)
+                        .map(|dt| dt.timestamp_millis())
+                        .unwrap_or(0)
+                },
+            );
 
             if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
                 if let Some(local_updated) = local_event.updated_at {
@@ -72,7 +81,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             }
 
             let title = event.summary.unwrap_or_else(|| "No Title".to_string());
-            
+
             let start_time = if let Some(st) = event.start {
                 st.date_time.unwrap_or_else(|| st.date.unwrap_or_default())
             } else {
@@ -94,7 +103,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                 description: event.description,
                 start_time,
                 end_time,
-                event_type: crate::domain::AppEventType::Busy,
+
                 rrule: None,
                 exdates: None,
                 recurring_event_id: None,
@@ -121,7 +130,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 /// Returns an error if the operation fails.
 pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Result<String> {
     let client = Client::new();
-    
+
     // We only send the fields we care about.
     let google_event = serde_json::json!({
         "summary": event.title,
@@ -130,15 +139,24 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
         "end": { "dateTime": event.end_time }
     });
 
-    let (url, method) = event.remote_id.as_ref().map_or_else(|| (
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events".to_string(),
-        reqwest::Method::POST
-    ), |remote_id| (
+    let (url, method) =
+        event.remote_id.as_ref().map_or_else(
+            || {
+                (
+                    "https://www.googleapis.com/calendar/v3/calendars/primary/events".to_string(),
+                    reqwest::Method::POST,
+                )
+            },
+            |remote_id| {
+                (
         format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{remote_id}"),
         reqwest::Method::PUT
-    ));
+    )
+            },
+        );
 
-    let response = client.request(method, &url)
+    let response = client
+        .request(method, &url)
         .bearer_auth(access_token)
         .json(&google_event)
         .send()
@@ -158,8 +176,10 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
 /// Returns an error if the operation fails.
 pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
     let client = Client::new();
-    let url = format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{remote_id}");
-    let response = client.request(reqwest::Method::DELETE, &url)
+    let url =
+        format!("https://www.googleapis.com/calendar/v3/calendars/primary/events/{remote_id}");
+    let response = client
+        .request(reqwest::Method::DELETE, &url)
         .bearer_auth(access_token)
         .send()
         .await?;

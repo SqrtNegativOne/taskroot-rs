@@ -1,6 +1,22 @@
-import { safeInvoke } from './safeInvoke.svelte';
-import { ResultAsync } from 'neverthrow';
+import { safeInvoke, type AppError } from './safeInvoke.svelte';
+import { err, ok, ResultAsync, type Result } from 'neverthrow';
+import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import type { AppTask, AppEvent } from './domain';
+
+const MAX_INIT_ATTEMPTS = 50;
+const INIT_RETRY_DELAY_MS = 100;
+
+export function describeError(error: unknown): string {
+    return describeAppError(error);
+}
+
+function isBackendNotReady(error: AppError): boolean {
+    return error.code === 'not-ready';
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
 export class AppStore {
     tasks = $state<AppTask[]>([]);
@@ -8,118 +24,76 @@ export class AppStore {
     loaded = $state(false);
     error = $state<string | null>(null);
 
-    async init() {
-        let attempts = 0;
-        while (attempts < 50) {
-            const result = await ResultAsync.combine([
-                safeInvoke<AppTask[]>('get_tasks'),
-                safeInvoke<AppEvent[]>('get_events')
-            ]);
-            
-            if (result.isOk()) {
-                const [fetchedTasks, fetchedEvents] = result.value;
-                this.tasks = fetchedTasks;
-                this.events = fetchedEvents;
-                this.loaded = true;
-                this.error = null;
-                return;
-            } else {
-                const e = result.error;
-                const errStr = e instanceof Error ? e.toString() : String(e);
-                if (errStr.includes("state not managed") || errStr.includes("not managed") || errStr.includes("not initialized")) {
-                    attempts++;
-                    await new Promise(r => setTimeout(r, 100));
-                    continue;
-                }
-                this.error = `Error loading data from backend: ${errStr}`;
-                return;
-            }
-        }
-        this.error = "Error loading data from backend: Database failed to initialize in time.";
+    private initPromise: Promise<Result<void, AppError>> | undefined;
+
+    init(): Promise<Result<void, AppError>> {
+        this.initPromise ??= this.bootstrap();
+        return this.initPromise;
     }
 
-    async refresh() {
+    private async bootstrap(): Promise<Result<void, AppError>> {
+        for (let attempt = 0; attempt < MAX_INIT_ATTEMPTS; attempt++) {
+            const result = await this.refresh();
+            if (result.isOk()) {
+                this.loaded = true;
+                return ok(undefined);
+            }
+            if (!isBackendNotReady(result.error)) return result;
+            await delay(INIT_RETRY_DELAY_MS);
+        }
+        return err(unknownAppError('Database failed to initialize in time.'));
+    }
+
+    async refresh(): Promise<Result<void, AppError>> {
         const result = await ResultAsync.combine([
             safeInvoke<AppTask[]>('get_tasks'),
             safeInvoke<AppEvent[]>('get_events')
         ]);
-        
-        if (result.isOk()) {
-            const [fetchedTasks, fetchedEvents] = result.value;
-            this.tasks = fetchedTasks;
-            this.events = fetchedEvents;
-            this.error = null;
-        } else {
-            console.error("Failed to refresh store:", result.error);
+
+        if (result.isErr()) {
+            console.error('Failed to refresh store:', result.error);
+            return err(normalizeAppError(result.error));
         }
+
+        const [fetchedTasks, fetchedEvents] = result.value;
+        this.tasks = fetchedTasks;
+        this.events = fetchedEvents;
+        this.error = null;
+        return ok(undefined);
     }
 
-    async addTask(task: AppTask) {
-        this.tasks.push(task);
-        const result = await safeInvoke('create_task', { task });
-        if (result.isErr()) {
-            this.tasks = this.tasks.filter(t => t.id !== task.id);
-            throw result.error;
-        }
+    addTask(task: AppTask): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('create_task', { task }));
     }
 
-    async updateTask(id: string, updater: (t: AppTask) => AppTask) {
-        const idx = this.tasks.findIndex(t => t.id === id);
-        if (idx === -1) return;
-        const oldTask = this.tasks[idx];
-        const newTask = updater(oldTask);
-        
-        this.tasks[idx] = newTask;
-        
-        const result = await safeInvoke('update_task', { task: newTask });
-        if (result.isErr()) {
-            this.tasks[idx] = oldTask;
-            throw result.error;
-        }
+    updateTask(id: string, updater: (task: AppTask) => AppTask): Promise<Result<void, AppError>> {
+        const current = this.tasks.find((task) => task.id === id);
+        if (!current) return Promise.resolve(ok(undefined));
+        return this.commit(safeInvoke('update_task', { task: updater(current) }));
     }
 
-    async deleteTask(id: string) {
-        const oldTasks = [...this.tasks];
-        this.tasks = this.tasks.filter(t => t.id !== id);
-        const result = await safeInvoke('delete_task', { id });
-        if (result.isErr()) {
-            this.tasks = oldTasks;
-            throw result.error;
-        }
+    deleteTask(id: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('delete_task', { id }));
     }
 
-    async addEvent(event: AppEvent) {
-        this.events.push(event);
-        const result = await safeInvoke('create_event', { event });
-        if (result.isErr()) {
-            this.events = this.events.filter(ev => ev.id !== event.id);
-            throw result.error;
-        }
+    addEvent(event: AppEvent): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('create_event', { event }));
     }
 
-    async updateEvent(id: string, updater: (ev: AppEvent) => AppEvent) {
-        const idx = this.events.findIndex(e => e.id === id);
-        if (idx === -1) return;
-        const oldEvent = this.events[idx];
-        const newEvent = updater(oldEvent);
-        
-        this.events[idx] = newEvent;
-        
-        const result = await safeInvoke('update_event', { event: newEvent });
-        if (result.isErr()) {
-            this.events[idx] = oldEvent;
-            throw result.error;
-        }
+    updateEvent(id: string, updater: (event: AppEvent) => AppEvent): Promise<Result<void, AppError>> {
+        const current = this.events.find((event) => event.id === id);
+        if (!current) return Promise.resolve(ok(undefined));
+        return this.commit(safeInvoke('update_event', { event: updater(current) }));
     }
 
-    async deleteEvent(id: string) {
-        const oldEvents = [...this.events];
-        this.events = this.events.filter(e => e.id !== id);
-        const result = await safeInvoke('delete_event', { id });
-        if (result.isErr()) {
-            this.events = oldEvents;
-            throw result.error;
-        }
+    deleteEvent(id: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('delete_event', { id }));
+    }
+
+    private async commit(command: ResultAsync<unknown, AppError>): Promise<Result<void, AppError>> {
+        const result = await command;
+        if (result.isErr()) return err(result.error);
+        return this.refresh();
     }
 }
 

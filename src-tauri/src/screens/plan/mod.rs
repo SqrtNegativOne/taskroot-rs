@@ -1,10 +1,14 @@
 use crate::db;
-use crate::domain::{AppEvent, AppTaskFilter, AppEventFilter, AppTask};
-use chrono::NaiveDateTime;
+use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter};
+use crate::error::AppError;
+use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use tauri::Manager;
+use ts_rs::TS;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/LaidEvent.generated.ts")]
 pub struct LaidEvent {
     pub event: AppEvent,
     #[serde(rename = "startMins")]
@@ -15,40 +19,56 @@ pub struct LaidEvent {
     pub lanes: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, TS)]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/PlanDayLayout.generated.ts"
+)]
 pub struct PlanDayLayout {
     pub date: String,
     pub events: Vec<LaidEvent>,
 }
 
-fn parse_iso_to_mins(iso: &str, day_start_prefix: &str) -> Option<f64> {
-    // iso looks like "2026-08-12T14:30:00"
-    if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M:%S") {
-        let date_str = dt.date().format("%Y-%m-%d").to_string();
-        if date_str.as_str() < day_start_prefix {
-            return Some(0.0);
-        } else if date_str.as_str() > day_start_prefix {
-            return Some(1440.0);
-        }
-        let time = dt.time();
-        return Some(
-            time.format("%H").to_string().parse::<f64>().unwrap_or(0.0).mul_add(60.0, time.format("%M").to_string().parse::<f64>().unwrap_or(0.0)),
-        );
+const MINUTES_PER_DAY: f64 = 1440.0;
+
+fn minutes_of(time: NaiveTime) -> f64 {
+    f64::from(time.hour()).mul_add(60.0, f64::from(time.minute()))
+}
+
+/// Positions an event's date relative to the laid-out day:
+/// before -> 0.0, after -> full day, same day -> None (caller computes time).
+fn clamp_to_day(date_str: &str, day_start_prefix: &str) -> Option<f64> {
+    match date_str.cmp(day_start_prefix) {
+        Ordering::Less => Some(0.0),
+        Ordering::Greater => Some(MINUTES_PER_DAY),
+        Ordering::Equal => None,
     }
-    // Try without seconds
+}
+
+fn parse_iso_parts(iso: &str) -> Option<(String, Option<NaiveTime>)> {
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(iso) {
+        let local = dt.naive_local();
+        return Some((
+            local.date().format("%Y-%m-%d").to_string(),
+            Some(local.time()),
+        ));
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M:%S") {
+        return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
+    }
     if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M") {
-        let date_str = dt.date().format("%Y-%m-%d").to_string();
-        if date_str.as_str() < day_start_prefix {
-            return Some(0.0);
-        } else if date_str.as_str() > day_start_prefix {
-            return Some(1440.0);
-        }
-        let time = dt.time();
-        return Some(
-            time.format("%H").to_string().parse::<f64>().unwrap_or(0.0).mul_add(60.0, time.format("%M").to_string().parse::<f64>().unwrap_or(0.0)),
-        );
+        return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
+    }
+    if iso.len() >= 10 {
+        return Some((iso[0..10].to_string(), None));
     }
     None
+}
+
+fn parse_iso_to_mins(iso: &str, day_start_prefix: &str) -> Option<f64> {
+    let (date_str, time) = parse_iso_parts(iso)?;
+    clamp_to_day(&date_str, day_start_prefix)
+        .map_or_else(|| Some(time.map_or(0.0, minutes_of)), Some)
 }
 
 fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
@@ -108,6 +128,11 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
     mapped
 }
 
+fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, sqlx::SqlitePool>, AppError> {
+    app.try_state::<sqlx::SqlitePool>()
+        .ok_or_else(|| AppError::NotReady("Database not initialized yet".to_string()))
+}
+
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -117,14 +142,17 @@ pub async fn get_plan_layout(
     dates: Vec<String>,
     filters: Option<Vec<AppEventFilter>>,
     query: Option<String>,
-) -> Result<Vec<PlanDayLayout>, String> {
-    let pool = app
-        .try_state::<sqlx::SqlitePool>()
-        .ok_or("Database not initialized yet")?;
+) -> Result<Vec<PlanDayLayout>, AppError> {
+    let pool = db_pool(&app)?;
     let all_events = if filters.is_some() || query.is_some() {
-        db::get_filtered_events(&pool, filters.unwrap_or_default(), query.unwrap_or_default()).await.map_err(|e| e.to_string())?
+        db::get_filtered_events(
+            &pool,
+            filters.unwrap_or_default(),
+            query.unwrap_or_default(),
+        )
+        .await?
     } else {
-        db::get_events(&pool).await.map_err(|e| e.to_string())?
+        db::get_events(&pool).await?
     };
 
     let mut result = Vec::new();
@@ -148,32 +176,27 @@ pub async fn get_filtered_tasks(
     filters: Vec<AppTaskFilter>,
     sort: String,
     query: String,
-) -> Result<Vec<AppTask>, String> {
-    let pool = app
-        .try_state::<sqlx::SqlitePool>()
-        .ok_or("Database not initialized yet")?;
-    
-    db::get_filtered_tasks(&pool, filters, sort, query)
-        .await
-        .map_err(|e| e.to_string())
+) -> Result<Vec<AppTask>, AppError> {
+    let pool = db_pool(&app)?;
+    Ok(db::get_filtered_tasks(&pool, filters, sort, query).await?)
 }
 
 #[tauri::command]
-pub fn compute_filter_defaults(filters: Vec<AppTaskFilter>) -> Result<crate::domain::AppTaskDefaults, String> {
+pub fn compute_filter_defaults(
+    filters: Vec<AppTaskFilter>,
+) -> Result<crate::domain::AppTaskDefaults, AppError> {
     Ok(crate::domain::compute_filter_defaults(filters))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn get_filtered_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
     query: String,
-) -> Result<Vec<AppEvent>, String> {
-    let pool = app
-        .try_state::<sqlx::SqlitePool>()
-        .ok_or("Database not initialized yet")?;
-    
-    db::get_filtered_events(&pool, filters, query)
-        .await
-        .map_err(|e| e.to_string())
+) -> Result<Vec<AppEvent>, AppError> {
+    let pool = db_pool(&app)?;
+    Ok(db::get_filtered_events(&pool, filters, query).await?)
 }

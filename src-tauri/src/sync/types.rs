@@ -1,11 +1,22 @@
-use serde::{Deserialize, Serialize};
 use crate::domain::{AppEvent, AppTask};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SyncType {
     Task,
     Event,
+}
+
+impl fmt::Display for SyncType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Task => "task",
+            Self::Event => "event",
+        };
+        f.write_str(label)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -17,6 +28,18 @@ pub enum SyncAction {
     Move,
 }
 
+impl fmt::Display for SyncAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Create => "create",
+            Self::Update => "update",
+            Self::Delete => "delete",
+            Self::Move => "move",
+        };
+        f.write_str(label)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SyncItemData {
@@ -25,7 +48,7 @@ pub enum SyncItemData {
 }
 
 impl SyncItemData {
-    #[must_use] 
+    #[must_use]
     pub fn id(&self) -> String {
         match self {
             Self::Task(t) => t.id.clone(),

@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { AppEvent } from '../../../lib/domain';
+    import { sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
 
@@ -23,14 +24,6 @@
         onEventClick?: (ev: AppEvent) => void;
     } = $props();
 
-    function ymd(d: Date) {
-        return d.toISOString().split('T')[0];
-    }
-    
-    function sameDay(a: Date, b: Date) {
-        return ymd(a) === ymd(b);
-    }
-    
     function extractHourMinuteFromISO(iso: string) {
         const d = new Date(iso);
         return `${d.getHours().toString()}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -45,8 +38,8 @@
     // Animation logic
     let displayEvents = $derived(events);
 
-    function isEventAllDay(e: AppEvent) {
-        return e.type === 'plan' && !e.startTime;
+    function isEventAllDay(e: AppEvent): boolean {
+        return !e.startTime.includes('T');
     }
     
     function checkPastDue(ev: AppEvent): boolean {
@@ -84,8 +77,9 @@
             {@const isPastDue = checkPastDue(ev)}
             {@const isAllDay = isEventAllDay(ev)}
             
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
-                class="day-cell-event ev-{ev.type}"
+                class="day-cell-event"
                 class:is-done={isDone}
                 title="{isAllDay ? 'All Day' : extractHourMinuteFromISO(ev.startTime)} — {title}"
                 style="

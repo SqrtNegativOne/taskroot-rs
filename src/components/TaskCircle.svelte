@@ -16,11 +16,18 @@
         title?: string;
         ariaLabel?: string;
     } = $props();
+
+    let priorityLevel = $derived(priority === undefined ? undefined : Number(priority));
 </script>
 
 <button
     type="button"
-    class="task-circle {priority !== undefined ? `pri-bg-${priority.toString()}` : ''}"
+    class="task-circle"
+    class:pri-bg-0={priorityLevel === 0}
+    class:pri-bg-1={priorityLevel === 1}
+    class:pri-bg-2={priorityLevel === 2}
+    class:pri-bg-3={priorityLevel === 3}
+    class:pri-bg-4={priorityLevel === 4}
     style="padding: 0; font: inherit; color: inherit; cursor: pointer;"
     {title}
     aria-label={ariaLabel ?? (priority !== undefined ? `Priority ${priority.toString()}` : 'Toggle Done')}

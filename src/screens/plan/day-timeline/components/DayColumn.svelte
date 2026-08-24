@@ -1,12 +1,15 @@
 <script lang="ts">
-    import { HOURS_PER_DAY, MINUTES_IN_HOUR, PX_PER_MIN, SNAP_MIN, type DragState, type LaidEvent } from '../types';
+    import { HOURS_PER_DAY, MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
+    import type { DragState, LaidEvent } from '../types';
     import type { AppEvent } from '../../../../lib/domain';
+    import { sameDay, ymd } from '../../../../lib/time';
 
     import EventBlock from '../EventBlock.svelte';
     import TimeGridBackground from './TimeGridBackground.svelte';
     import CurrentTimeLine from './CurrentTimeLine.svelte';
     import CreationPreview from './CreationPreview.svelte';
     import DropPreview from './DropPreview.svelte';
+    import { createPointerGestureRecognizer } from '../hooks/pointerGesture.svelte';
 
     let {
         date,
@@ -32,14 +35,6 @@
         showTimeLabels?: boolean;
     } = $props();
 
-    function ymd(d: Date) {
-        return d.toISOString().split('T')[0];
-    }
-    
-    function sameDay(a: Date, b: Date) {
-        return ymd(a) === ymd(b);
-    }
-
     let isToday = $derived(sameDay(date, today));
     let cellDateStr = $derived(ymd(date));
     
@@ -62,6 +57,18 @@
     let containerRef = $state<HTMLDivElement | null>(null);
     let createPreview = $state<{ start: number; end: number } | undefined>(undefined);
 
+    const trackPointerGesture = createPointerGestureRecognizer();
+
+    function snappedMinutesFromOffset(offsetPx: number) {
+        return Math.round(offsetPx / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+    }
+
+    function previewRange(startMin: number, currentMin: number) {
+        const s = Math.min(startMin, currentMin);
+        const eMin = Math.max(startMin, currentMin);
+        return { start: s, end: eMin === s ? s + SNAP_MIN : eMin };
+    }
+
     function onGridPointerDown(e: PointerEvent) {
         if (!(e.target instanceof Element)) return;
         if (e.target.closest('.day-event') || e.target.closest('.day-now')) return;
@@ -70,41 +77,26 @@
 
         if (!containerRef) return;
         const rect = containerRef.getBoundingClientRect();
-        const startY = e.clientY - rect.top;
-        const startMin = Math.round(startY / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-
+        const startMin = snappedMinutesFromOffset(e.clientY - rect.top);
         let active = false;
 
-        const move = (ev: PointerEvent) => {
-            active = true;
-            const currentY = ev.clientY - rect.top;
-            const moveMin = Math.round(currentY / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-            const s = Math.min(startMin, moveMin);
-            const eMin = Math.max(startMin, moveMin);
-            createPreview = {
-                start: s,
-                end: eMin === s ? s + SNAP_MIN : eMin,
-            };
-        };
-
-        const up = (ev: PointerEvent) => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            if (!active) {
-                if (onAddEvent) onAddEvent(date, startMin, startMin + MINUTES_IN_HOUR);
-                return;
-            }
-            const currentY = ev.clientY - rect.top;
-            const moveMin = Math.round(currentY / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-            const s = Math.min(startMin, moveMin);
-            const eMin = Math.max(startMin, moveMin);
-            const finalEnd = eMin === s ? s + SNAP_MIN : eMin;
-            createPreview = undefined;
-            if (onAddEvent) onAddEvent(date, s, finalEnd);
-        };
-
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
+        trackPointerGesture({
+            onMove: (ev) => {
+                active = true;
+                const moveMin = snappedMinutesFromOffset(ev.clientY - rect.top);
+                createPreview = previewRange(startMin, moveMin);
+            },
+            onEnd: (ev) => {
+                createPreview = undefined;
+                const range = active
+                    ? previewRange(startMin, snappedMinutesFromOffset(ev.clientY - rect.top))
+                    : { start: startMin, end: startMin + MINUTES_IN_HOUR };
+                onAddEvent?.(date, range.start, range.end);
+            },
+            onCancel: () => {
+                createPreview = undefined;
+            },
+        });
     }
 
     let dropPreview = $derived(
@@ -162,7 +154,7 @@
             onResize={handleResize}
             onMove={handleMove}
             {onEventClick}
-            labelOffset={showTimeLabels ? 56 : 8}
+            labelOffset={showTimeLabels ? PIXELS_PER_HOUR : 8}
         />
     {/each}
 

@@ -2,61 +2,77 @@
     import { onMount } from 'svelte';
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import { store } from '../../lib/store.svelte';
+    import { safeInvoke } from '../../lib/safeInvoke.svelte';
+    import { useNow } from '../../lib/useNow.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
 
+    const BREAK_COLOR_HEX = '#3b82f6';
+    const RUNNING_COLOR_HEX = '#eab308';
+    const IDLE_COLOR_HEX = '#71717a';
+
+    type ShortcutAction = 'toggleDimmed' | 'restoreMainWindow';
+
+    interface KeyboardShortcut {
+        readonly key: string;
+        readonly ctrl?: boolean;
+        readonly alt?: boolean;
+        readonly action: ShortcutAction;
+    }
+
+    const KEYBOARD_SHORTCUTS: readonly KeyboardShortcut[] = [
+        { key: 'h', action: 'toggleDimmed' },
+        { key: 'r', ctrl: true, alt: true, action: 'restoreMainWindow' },
+    ];
+
+    function matchesShortcut(e: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
+        return (
+            e.key === shortcut.key &&
+            e.ctrlKey === !!shortcut.ctrl &&
+            e.altKey === !!shortcut.alt &&
+            !e.metaKey &&
+            !e.shiftKey
+        );
+    }
+
     let isDimmed = $state(false);
-    let tick = $state(0);
-    
-    // We just need a simple clock display that shows the active task or work session
+
     let activeTask = $derived.by(() => {
         return store.tasks.find(t => t.status === 'doing');
     });
 
+    const now = useNow();
+
     let currentMs = $derived.by(() => {
-        tick;
+        void now.ms;
         return stopwatchState.currentMs;
     });
-    
+
     let timeParts = $derived(splitTime(currentMs));
 
-    let displayText = $derived.by(() => {
-        let suffix = activeTask ? activeTask.title : "Work session";
-        if (stopwatchState.isBreak) {
-            suffix = "left in break";
-        } else {
-            suffix = `left for ${activeTask ? activeTask.title : 'Work session'}`;
-        }
-        return `${timeParts.m}m ${suffix}`;
-    });
+    let textColor = $derived(
+        stopwatchState.isBreak ? BREAK_COLOR_HEX : stopwatchState.running ? RUNNING_COLOR_HEX : IDLE_COLOR_HEX,
+    );
 
-    let textColor = $derived(stopwatchState.isBreak ? '#3b82f6' : (stopwatchState.running ? '#eab308' : '#71717a'));
+    async function runShortcut(action: ShortcutAction) {
+        if (action === 'toggleDimmed') {
+            isDimmed = !isDimmed;
+            return;
+        }
+        await safeInvoke('window_restore_main');
+    }
 
     onMount(() => {
-        let raf: number;
-        const loop = () => {
-            tick++;
-            raf = requestAnimationFrame(loop);
-        };
-        raf = requestAnimationFrame(loop);
-
-        const appWindow = getCurrentWindow();
-
-        const handleKeyDown = async (e: KeyboardEvent) => {
-            if (e.key === 'h' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-                isDimmed = !isDimmed;
-            } else if (e.key === 'r' && e.ctrlKey && e.altKey) {
-                e.preventDefault();
-                // Restore main window
-                const { safeInvoke } = await import('../../lib/safeInvoke.svelte');
-                safeInvoke('window_restore_main');
-            }
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const shortcut = KEYBOARD_SHORTCUTS.find((s) => matchesShortcut(e, s));
+            if (!shortcut) return;
+            e.preventDefault();
+            void runShortcut(shortcut.action);
         };
 
         window.addEventListener('keydown', handleKeyDown);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
-            cancelAnimationFrame(raf);
         };
     });
 
@@ -67,16 +83,15 @@
     };
 
     const handleDoubleClick = async () => {
-        const { safeInvoke } = await import('../../lib/safeInvoke.svelte');
         await safeInvoke('window_restore_main');
     };
 </script>
 
 <div
-    role="application"
+    role="region"
+    aria-label="Mini tracker"
     class="minitracker-container"
     class:is-dimmed={isDimmed}
-    class:show-border={true}
     ondblclick={handleDoubleClick}
     onpointerdown={handlePointerDown}
     title="Double-click to restore main window"
@@ -118,15 +133,12 @@
         overflow: hidden;
         container-type: size;
         border-radius: 8px; /* Optional: rounding corners */
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
     .minitracker-container.is-dimmed {
         opacity: 0.2;
-    }
-
-    .minitracker-container.show-border {
-        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
     .clock {

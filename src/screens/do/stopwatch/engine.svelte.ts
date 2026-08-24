@@ -1,5 +1,7 @@
-import { safeInvoke } from '../../../lib/safeInvoke.svelte';
 import { listen } from '@tauri-apps/api/event';
+import { safeInvoke } from '../../../lib/safeInvoke.svelte';
+import { STOPWATCH_UPDATED } from '../../../lib/events';
+import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 
 export class StopwatchState {
     elapsed = $state(0);
@@ -9,22 +11,36 @@ export class StopwatchState {
     breakStartedAt = $state<number | undefined>(undefined);
     breakSoundPlayed = $state(false);
 
+    private unlisten: (() => void) | undefined;
+    private connection: Promise<void> | undefined;
+
     constructor() {
-        this.init();
+        void this.init();
     }
 
-    async init() {
-        const result = await safeInvoke<any>('get_stopwatch_state');
-        if (result.isOk()) {
-            this.updateFromPayload(result.value);
-        }
+    async init(): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('get_stopwatch_state');
+        if (result.isOk()) this.updateFromPayload(result.value);
 
-        listen('stopwatch-updated', (event) => {
-            this.updateFromPayload(event.payload as any);
+        await this.connect();
+    }
+
+    dispose(): void {
+        this.unlisten?.();
+        this.unlisten = undefined;
+        this.connection = undefined;
+    }
+
+    private connect(): Promise<void> {
+        this.connection ??= listen<StopwatchSnapshot>(STOPWATCH_UPDATED, (event) => {
+            this.updateFromPayload(event.payload);
+        }).then((unlisten) => {
+            this.unlisten = unlisten;
         });
+        return this.connection;
     }
 
-    updateFromPayload(payload: any) {
+    updateFromPayload(payload: StopwatchSnapshot): void {
         this.elapsed = payload.elapsed;
         this.runningSince = payload.runningSince ?? undefined;
         this.isBreak = payload.isBreak;
@@ -38,25 +54,21 @@ export class StopwatchState {
     }
 
     get currentMs() {
-        return this.elapsed + (this.running && !this.isBreak ? Date.now() - (this.runningSince || 0) : 0);
+        return this.elapsed + (this.running && !this.isBreak ? Date.now() - (this.runningSince ?? 0) : 0);
     }
 
     get isPristine() {
         return this.currentMs === 0 && !this.running && !this.isBreak;
     }
 
-    async toggle() {
-        const result = await safeInvoke<any>('toggle_stopwatch');
-        if (result.isOk()) {
-            this.updateFromPayload(result.value);
-        }
+    async toggle(): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('toggle_stopwatch');
+        if (result.isOk()) this.updateFromPayload(result.value);
     }
 
-    async reset() {
-        const result = await safeInvoke<any>('reset_stopwatch');
-        if (result.isOk()) {
-            this.updateFromPayload(result.value);
-        }
+    async reset(): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('reset_stopwatch');
+        if (result.isOk()) this.updateFromPayload(result.value);
     }
 }
 

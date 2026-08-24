@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { MINUTES_IN_HOUR, PX_PER_MIN } from '../types';
+    import { MINUTES_IN_HOUR, PX_PER_MIN } from '../constants';
     import { useCurrentTime } from '../hooks/useCurrentTime.svelte';
 
     let { isToday, showLabels = true }: { isToday: boolean; showLabels?: boolean; } = $props();

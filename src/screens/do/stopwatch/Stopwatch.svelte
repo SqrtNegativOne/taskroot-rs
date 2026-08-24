@@ -4,17 +4,16 @@
     import StopwatchDisplay from './StopwatchDisplay.svelte';
     import ActiveTaskDisplay from './ActiveTaskDisplay.svelte';
     import TaskSelector from '../TaskSelector.svelte';
-    import { store } from '../../../lib/store.svelte';
+    import { store, describeError } from '../../../lib/store.svelte';
+    import type { AppTaskStatus } from '../../../lib/domain';
     import './stopwatch.css';
 
-    let { onBreakStatusChange } = $props<{
-        onBreakStatusChange?: (status: boolean) => void;
-    }>();
+    let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
 
     let selectorOpen = $state(false);
-    let allowNoTask = $state(true); // Using a default value for now until settings are ported
+    let allowNoTask = $state<boolean>(true);
 
-    let activeTask = $derived(store.tasks.find(t => t.status === 'doing'));
+    let activeTask = $derived(store.tasks.find((task) => task.status === 'doing'));
 
     // If no active task and we require one, open the selector
     $effect(() => {
@@ -25,46 +24,50 @@
 
     // Notify break status changes
     $effect(() => {
-        if (onBreakStatusChange) {
-            onBreakStatusChange(stopwatchState.isBreak);
-        }
+        onBreakStatusChange?.(stopwatchState.isBreak);
     });
 
-    function toggleStopwatch() {
-        if (stopwatchState.isPristine && !activeTask && !allowNoTask) {
-            selectorOpen = true;
-        } else {
-            stopwatchState.toggle();
+    async function updateTaskStatus(taskId: string, status: AppTaskStatus): Promise<void> {
+        const result = await store.updateTask(taskId, (task) => ({ ...task, status }));
+        if (result.isErr()) {
+            store.error = `Failed to update task status: ${describeError(result.error)}`;
         }
     }
 
-    async function openMinitracker() {
-        const { safeInvoke } = await import('../../../lib/safeInvoke.svelte');
-        await safeInvoke('show_minitracker');
-    }
-
-    function startWithTask(taskId: string) {
-        // Find task and set to 'doing', set others to 'todo'
-        // Since store doesn't have an updater for this easily, we loop
+    async function setActiveTask(taskId: string): Promise<void> {
         for (const task of store.tasks) {
             if (task.id === taskId) {
-                store.updateTask(task.id, t => ({ ...t, status: 'doing' }));
+                await updateTaskStatus(task.id, 'doing');
             } else if (task.status === 'doing') {
-                store.updateTask(task.id, t => ({ ...t, status: 'todo' }));
+                await updateTaskStatus(task.id, 'todo');
             }
         }
         selectorOpen = false;
-        
-        // Start the stopwatch if it wasn't running
+
         if (!stopwatchState.running) {
-            stopwatchState.toggle();
+            await stopwatchState.toggle();
+        }
+    }
+
+    async function toggleStopwatch(): Promise<void> {
+        if (stopwatchState.isPristine && !activeTask && !allowNoTask) {
+            selectorOpen = true;
+            return;
+        }
+        await stopwatchState.toggle();
+    }
+
+    async function openMinitracker(): Promise<void> {
+        const { safeInvoke } = await import('../../../lib/safeInvoke.svelte');
+        const result = await safeInvoke('show_minitracker');
+        if (result.isErr()) {
+            store.error = `Failed to open mini tracker: ${describeError(result.error)}`;
         }
     }
 
     // Keyboard shortcuts
     function handleKeydown(e: KeyboardEvent) {
-        const target = e.target as HTMLElement;
-        if (target && target.matches('input:not(.task-search-input), textarea, [contenteditable]')) {
+        if (e.target instanceof HTMLElement && e.target.matches('input:not(.task-search-input), textarea, [contenteditable]')) {
             return;
         }
 
@@ -74,13 +77,13 @@
             case "Space":
                 if (!selectorOpen) {
                     e.preventDefault();
-                    toggleStopwatch();
+                    void toggleStopwatch();
                 }
                 break;
             case "KeyR":
                 if (isModifier) {
                     e.preventDefault();
-                    stopwatchState.reset();
+                    void stopwatchState.reset();
                 }
                 break;
             case "Enter":
@@ -109,17 +112,17 @@
 
 <section class="stopwatch-hero">
     <div class="stopwatch-stage" style="position: relative;">
-        <StopwatchDisplay 
-            engine={stopwatchState} 
-            onToggle={toggleStopwatch} 
+        <StopwatchDisplay
+            engine={stopwatchState}
+            onToggle={() => { void toggleStopwatch(); }}
         />
         <div style="position: absolute; right: 0; top: 0;">
-            <button onclick={openMinitracker} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin: 8px;" title="Open Mini Tracker">
+            <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin: 8px;" title="Open Mini Tracker">
                 Mini Tracker
             </button>
         </div>
 
-        {#if (stopwatchState.running || stopwatchState.isBreak) && (activeTask || allowNoTask)}
+        {#if (stopwatchState.running || stopwatchState.isBreak) && (activeTask ?? allowNoTask)}
             <ActiveTaskDisplay
                 activeTask={activeTask}
                 onOpenSelector={() => selectorOpen = true}
@@ -131,7 +134,7 @@
             onCloseSelector={() => selectorOpen = false}
             tasks={store.tasks}
             activeTask={activeTask}
-            onStartWithTask={startWithTask}
+            onStartWithTask={(taskId: string) => { void setActiveTask(taskId); }}
         />
     </div>
 </section>

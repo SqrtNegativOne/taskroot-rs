@@ -42,7 +42,7 @@
 <style>
     .collapsible {
         margin-bottom: 16px;
-        border: 1px solid var(--border-color, #333);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         overflow: hidden;
     }
@@ -52,8 +52,8 @@
         align-items: center;
         width: 100%;
         padding: 12px 16px;
-        background: var(--bg-secondary, #1a1a1a);
-        color: var(--text-primary, #fff);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
         border: none;
         cursor: pointer;
         text-align: left;
@@ -74,6 +74,6 @@
 
     .collapsible-content {
         padding: 16px;
-        background: var(--bg-primary, #000);
+        background: var(--bg-primary);
     }
 </style>

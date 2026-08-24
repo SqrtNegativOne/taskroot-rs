@@ -81,7 +81,8 @@
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}
-        class="split-pane-divider {isDragging ? 'dragging' : ''}"
+        class="split-pane-divider"
+        class:dragging={isDragging}
         style="
             {isHoriz ? 'width' : 'height'}: 6px;
             {isHoriz ? 'margin-left' : 'margin-top'}: -3px;

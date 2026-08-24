@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { MINUTES_IN_HOUR, PX_PER_MIN, type DragStateTarget } from '../types';
+    import { MINUTES_IN_HOUR, PX_PER_MIN } from '../constants';
+    import type { DragStateTarget } from '../types';
 
     let { target }: { target: DragStateTarget } = $props();
 

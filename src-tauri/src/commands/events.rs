@@ -1,0 +1,53 @@
+use crate::db;
+use crate::domain;
+use crate::error::AppError;
+use crate::sync;
+
+/// # Errors
+///
+/// Returns an error if the database is unavailable or the query fails.
+#[tauri::command]
+pub async fn get_events(app: tauri::AppHandle) -> Result<Vec<domain::AppEvent>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    Ok(db::get_events(&pool).await?)
+}
+
+/// # Errors
+///
+/// Returns an error if the database is unavailable or the write fails.
+#[tauri::command]
+pub async fn create_event(
+    app: tauri::AppHandle,
+    mut event: domain::AppEvent,
+) -> Result<(), AppError> {
+    let pool = crate::db_pool(&app)?;
+    sync::push::push_or_enqueue(&pool, &mut event, sync::types::SyncAction::Create).await;
+    Ok(db::create_event(&pool, event).await?)
+}
+
+/// # Errors
+///
+/// Returns an error if the database is unavailable or the write fails.
+#[tauri::command]
+pub async fn update_event(
+    app: tauri::AppHandle,
+    mut event: domain::AppEvent,
+) -> Result<(), AppError> {
+    let pool = crate::db_pool(&app)?;
+    sync::push::push_or_enqueue(&pool, &mut event, sync::types::SyncAction::Update).await;
+    Ok(db::update_event(&pool, event).await?)
+}
+
+/// # Errors
+///
+/// Returns an error if the database is unavailable or the delete fails.
+#[tauri::command]
+pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
+    let pool = crate::db_pool(&app)?;
+
+    if let Ok(Some(event)) = db::get_event(&pool, &id).await {
+        sync::push::push_delete_or_enqueue(&pool, &event).await;
+    }
+
+    Ok(db::delete_event(&pool, id).await?)
+}

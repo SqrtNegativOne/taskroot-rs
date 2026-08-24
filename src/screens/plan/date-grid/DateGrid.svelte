@@ -5,6 +5,7 @@
     import DayCell from './DayCell.svelte';
     import type { AppEvent } from '../../../lib/domain';
     import { SvelteDate } from 'svelte/reactivity';
+    import { ymd } from '../../../lib/time';
     
     let {
         view,
@@ -140,8 +141,8 @@
             {/each}
         </div>
         <div class="cal-cells" class:is-grid={!isStrip} class:is-strip-3={isStrip && is3Weeks} class:is-strip-1={isStrip && !is3Weeks}>
-            {#each cells as c (c.date.toISOString())}
-                {@const cellDateStr = c.date.toISOString().split('T')[0]}
+            {#each cells as c (ymd(c.date))}
+                {@const cellDateStr = ymd(c.date)}
                 {@const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime()}
                 {@const cellEnd = cellStart + 86400000}
                 

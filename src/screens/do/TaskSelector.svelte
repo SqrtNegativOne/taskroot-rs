@@ -5,7 +5,6 @@
         selectorOpen,
         onCloseSelector,
         tasks = [],
-        activeTask,
         onStartWithTask
     } = $props<{
         selectorOpen: boolean;
@@ -20,11 +19,10 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="task-selector-overlay" role="presentation" onclick={onCloseSelector}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div class="task-selector-modal" role="dialog" tabindex="-1" onclick={(e) => e.stopPropagation()}>
             <h3>Select a task</h3>
             <ul class="task-list">
-                {#each tasks as task}
+                {#each tasks as task (task.id)}
                     <li>
                         <button onclick={() => onStartWithTask(task.id)}>
                             {task.title}

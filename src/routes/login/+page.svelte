@@ -1,38 +1,40 @@
 <script lang="ts">
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { Routes } from '$lib/routes';
     import { listen } from '@tauri-apps/api/event';
-    import { onMount } from 'svelte';
+    import { OAUTH_URL } from '$lib/events';
+    import { describeError } from '$lib/store.svelte';
 
     let error = $state<string | null>(null);
     let isLoading = $state(false);
     let manualUrl = $state<string | null>(null);
 
-    onMount(() => {
-        const unlisten = listen('oauth_url', (event) => {
-            manualUrl = event.payload as string;
+    $effect(() => {
+        const subscription = listen<string>(OAUTH_URL, (event) => {
+            manualUrl = event.payload;
         });
         return () => {
-            unlisten.then(f => f());
+            void subscription.then((unlisten) => unlisten());
         };
     });
 
-    async function handleLogin() {
+    async function handleLogin(): Promise<void> {
         isLoading = true;
         error = null;
         manualUrl = null;
-        
+
         const result = await safeInvoke('login_with_google');
-        
+
         if (result.isOk()) {
-            safeInvoke('force_sync').then(res => {
-                if (res.isErr()) console.error(res.error);
+            void safeInvoke('force_sync').then((syncResult) => {
+                if (syncResult.isErr()) console.error(syncResult.error);
             });
-            await goto(Routes.HOME);
+            await goto(resolve(Routes.HOME));
         } else {
             console.error('Failed to login:', result.error);
-            error = String(result.error);
+            error = describeError(result.error);
             isLoading = false;
         }
     }
@@ -42,37 +44,37 @@
     <div class="login-card">
         <h1>Welcome to Taskroot</h1>
         <p class="subtitle">Sign in with Google to sync your calendar and tasks.</p>
-        
+
         {#if error}
             <div class="error-box">
                 {error}
             </div>
         {/if}
 
-            {#if manualUrl}
-                <div style="margin-bottom: 1.5rem; text-align: left;">
-                    <p style="margin-bottom: 0.5rem; color: #a1a1aa; font-size: 0.875rem;">Please copy this URL and paste it in your browser to log in:</p>
-                    <textarea 
-                        readonly 
-                        rows="4" 
-                        style="width: 100%; padding: 0.5rem; background: #27272a; color: #fff; border: 1px solid #3f3f46; border-radius: 4px; font-family: monospace; font-size: 0.75rem; resize: none;"
-                        onclick={(e) => e.currentTarget.select()}
-                    >{manualUrl}</textarea>
-                </div>
-            {/if}
+        {#if manualUrl}
+            <div class="manual-url">
+                <p class="manual-url-hint">Please copy this URL and paste it in your browser to log in:</p>
+                <textarea
+                    readonly
+                    rows="4"
+                    class="manual-url-box"
+                    onclick={(e) => e.currentTarget.select()}
+                >{manualUrl}</textarea>
+            </div>
+        {/if}
 
-            <button 
-                class="login-button"
-                onclick={handleLogin}
-                disabled={isLoading && !manualUrl}
-            >
-                {#if isLoading && !manualUrl}
-                    <div class="spinner"></div>
-                    <span>Waiting for URL...</span>
-                {:else if isLoading && manualUrl}
-                    <div class="spinner"></div>
-                    <span>Waiting for authentication...</span>
-                {:else}
+        <button
+            class="login-button"
+            onclick={handleLogin}
+            disabled={isLoading && !manualUrl}
+        >
+            {#if isLoading && !manualUrl}
+                <div class="spinner"></div>
+                <span>Waiting for URL...</span>
+            {:else if isLoading && manualUrl}
+                <div class="spinner"></div>
+                <span>Waiting for authentication...</span>
+            {:else}
                 <svg viewBox="0 0 24 24" class="google-icon" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -93,33 +95,33 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background-color: var(--bg-primary, #09090b);
-        color: var(--text-primary, #fff);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
     }
-    
+
     .login-card {
         max-width: 28rem;
         width: 100%;
         padding: 2rem;
-        background-color: var(--bg-secondary, #18181b);
+        background-color: var(--bg-secondary);
         border-radius: 12px;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        border: 1px solid var(--border-color, #27272a);
+        border: 1px solid var(--border-color);
         text-align: center;
     }
-    
+
     .login-card h1 {
         font-size: 1.875rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
         margin-top: 0;
     }
-    
+
     .subtitle {
-        color: var(--text-secondary, #a1a1aa);
+        color: var(--text-secondary);
         margin-bottom: 2rem;
     }
-    
+
     .error-box {
         margin-bottom: 1.5rem;
         padding: 0.75rem;
@@ -129,7 +131,30 @@
         color: #fecaca;
         font-size: 0.875rem;
     }
-    
+
+    .manual-url {
+        margin-bottom: 1.5rem;
+        text-align: left;
+    }
+
+    .manual-url-hint {
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .manual-url-box {
+        width: 100%;
+        padding: 0.5rem;
+        background: var(--bg-input);
+        color: var(--fg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        resize: none;
+    }
+
     .login-button {
         width: 100%;
         display: flex;
@@ -146,21 +171,21 @@
         cursor: pointer;
         transition: background-color 0.2s;
     }
-    
+
     .login-button:hover:not(:disabled) {
         background-color: #e4e4e7;
     }
-    
+
     .login-button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
     }
-    
+
     .google-icon {
         width: 1.25rem;
         height: 1.25rem;
     }
-    
+
     .spinner {
         width: 1.25rem;
         height: 1.25rem;
@@ -169,7 +194,7 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
-    
+
     @keyframes spin {
         to { transform: rotate(360deg); }
     }

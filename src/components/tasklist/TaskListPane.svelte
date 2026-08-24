@@ -5,7 +5,7 @@
     import SortButton from '../SortButton.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
-    import { useTauriQuery, safeInvoke } from '../../lib/safeInvoke.svelte';
+    import { useTauriQuery, safeInvoke, queryDependency } from '../../lib/safeInvoke.svelte';
     import type { AppTaskDefaults } from '../../lib/bindings/AppTaskDefaults.generated';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
@@ -52,13 +52,14 @@
     // We can assume empty for now.
     const pastDueTaskIds = new Set<string>();
 
-    let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks');
+    const TASK_QUERY_DEBOUNCE_MS = 150;
+
+    let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
     let filtered = $derived(tasksQuery.data ?? []);
 
     $effect(() => {
-        // Trigger fetch when tasks, filters, sort, or query changes
-        void tasks;
-        tasksQuery.execute({ filters, sort, query });
+        queryDependency(tasks);
+        void tasksQuery.execute({ filters, sort, query });
     });
 
     async function handleAddTask() {
@@ -66,9 +67,9 @@
         result.match(
             (defaults) => {
                 const safeDefaults: Partial<AppTask> = {};
-                if (defaults.status !== null) safeDefaults.status = defaults.status;
-                if (defaults.priority !== null) safeDefaults.priority = defaults.priority;
-                if (defaults.tags !== null) safeDefaults.tags = defaults.tags.map(t => ({ id: crypto.randomUUID(), name: t }));
+                if (defaults.status) safeDefaults.status = defaults.status;
+                if (defaults.priority != null) safeDefaults.priority = defaults.priority;
+                if (defaults.tags) safeDefaults.tags = defaults.tags.map(t => ({ id: crypto.randomUUID(), name: t }));
                 onAddTask(safeDefaults);
             },
             () => onAddTask()
@@ -104,7 +105,7 @@
         ondblclick={(e) => {
             if (!(e.target instanceof Element)) return;
             if (!e.target.closest('.task-row') && !e.target.closest('button')) {
-                handleAddTask();
+                void handleAddTask();
             }
         }}
     >

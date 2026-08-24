@@ -1,9 +1,14 @@
-export const MINUTES_IN_HOUR = 60;
-export const HOURS_PER_DAY = 24;
+export type { LaidEvent, PlanDayLayout } from '../../../lib/domain';
 
-export const PIXELS_PER_HOUR = 56;
-export const PX_PER_MIN = PIXELS_PER_HOUR / MINUTES_IN_HOUR; // 56 / 60
-export const SNAP_MIN = 15;
+export {
+    MINUTES_IN_HOUR,
+    HOURS_PER_DAY,
+    PIXELS_PER_HOUR,
+    PX_PER_MIN,
+    SNAP_MIN,
+    COMPACT_EVENT_HEIGHT_PX,
+    DRAG_THRESHOLD_PX,
+} from './constants';
 
 export interface DragStateTarget {
     kind: string;
@@ -17,20 +22,5 @@ export interface DragStateTarget {
 
 export interface DragState {
     target?: DragStateTarget;
-    event?: { id: string } | any;
-}
-
-import type { AppEvent } from '../../../lib/domain';
-
-export interface LaidEvent {
-    event: AppEvent;
-    startMins: number;
-    endMins: number;
-    lane: number;
-    lanes: number;
-}
-
-export interface PlanDayLayout {
-    date: string;
-    events: LaidEvent[];
+    event?: { id: string };
 }

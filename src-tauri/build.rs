@@ -72,7 +72,10 @@ fn main() {
                 };
 
                 struct_fields.push_str(&format!("    pub {}: {},\n", setting.id, rust_type));
-                default_impls.push_str(&format!("            {}: {},\n", setting.id, default_val_str));
+                default_impls.push_str(&format!(
+                    "            {}: {},\n",
+                    setting.id, default_val_str
+                ));
             }
         }
     }
@@ -83,7 +86,7 @@ use serde::{{Deserialize, Serialize}};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[ts(export, export_to = "../../src/lib/bindings/AppSettings.generated.ts")]
 pub struct AppSettings {{
 {}
 }}
@@ -102,7 +105,7 @@ impl Default for AppSettings {{
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("settings_generated.rs");
     fs::write(&dest_path, generated_code).unwrap();
-    
+
     // Convert YAML directly to JSON without the intermediate restrictive struct
     let original_yaml: serde_yaml::Value = serde_yaml::from_str(&yaml_str).unwrap();
     let final_json = serde_json::to_string(&original_yaml).unwrap();

@@ -1,11 +1,19 @@
 <script lang="ts">
-    import { HOURS_PER_DAY, MINUTES_IN_HOUR, PX_PER_MIN, SNAP_MIN } from './types';
-    import { DRAG_THRESHOLD_PX, COMPACT_EVENT_HEIGHT_PX } from './constants';
+    import {
+        COMPACT_EVENT_HEIGHT_PX,
+        DRAG_THRESHOLD_PX,
+        HOURS_PER_DAY,
+        MINUTES_IN_HOUR,
+        PIXELS_PER_HOUR,
+        PX_PER_MIN,
+        SNAP_MIN,
+    } from './constants';
     import type { AppEvent } from '../../../lib/domain';
+    import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
     const SHORT_EVENT_DURATION_MINS = 30;
-    const DEFAULT_LABEL_OFFSET_PX = 56;
+    const DEFAULT_LABEL_OFFSET_PX = PIXELS_PER_HOUR;
 
     let {
         event,
@@ -35,6 +43,16 @@
     // Since task data is minimal in AppEvent in the new domain, we can mock or extend it later.
     const isRecurring = $derived(!!event.rrule || !!event.recurringEventId);
 
+    const trackPointerGesture = createPointerGestureRecognizer();
+
+    function clamp(value: number, min: number, max: number) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function snappedDeltaMinutes(deltaPx: number) {
+        return Math.round(deltaPx / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+    }
+
     function onResizeStart(edge: 'top' | 'bottom') {
         return (e: PointerEvent) => {
             e.stopPropagation();
@@ -43,32 +61,18 @@
             const startStart = startMins;
             const startEnd = endMins;
 
-            const move = (ev: PointerEvent) => {
-                const dy = ev.clientY - startY;
-                const dm = Math.round(dy / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-                
-                if (edge === 'bottom') {
-                    const newEnd = Math.max(
-                        startStart + SNAP_MIN,
-                        Math.min(HOURS_PER_DAY * MINUTES_IN_HOUR, startEnd + dm)
-                    );
-                    if (onResize) onResize(event.id, startStart, newEnd);
-                } else {
-                    const newStart = Math.max(
-                        0,
-                        Math.min(startEnd - SNAP_MIN, startStart + dm)
-                    );
-                    if (onResize) onResize(event.id, newStart, startEnd);
-                }
-            };
-
-            const up = () => {
-                window.removeEventListener('pointermove', move);
-                window.removeEventListener('pointerup', up);
-            };
-
-            window.addEventListener('pointermove', move);
-            window.addEventListener('pointerup', up);
+            trackPointerGesture({
+                onMove: (ev) => {
+                    const dm = snappedDeltaMinutes(ev.clientY - startY);
+                    if (edge === 'bottom') {
+                        const newEnd = clamp(startEnd + dm, startStart + SNAP_MIN, HOURS_PER_DAY * MINUTES_IN_HOUR);
+                        onResize?.(event.id, startStart, newEnd);
+                    } else {
+                        const newStart = clamp(startStart + dm, 0, startEnd - SNAP_MIN);
+                        onResize?.(event.id, newStart, startEnd);
+                    }
+                },
+            });
         };
     }
 
@@ -76,7 +80,7 @@
         if (!(e.target instanceof Element)) return;
         if (e.target.closest('.day-event-handle')) return;
         if (e.button !== 0) return;
-        
+
         e.preventDefault();
         const startY = e.clientY;
         const startStart = startMins;
@@ -84,38 +88,37 @@
         let moved = false;
         let finalDm = 0;
 
-        const move = (ev: PointerEvent) => {
-            const dy = ev.clientY - startY;
-            if (!moved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
-            moved = true;
-            
-            const dm = Math.round(dy / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-            const minDm = -startStart;
-            const maxDm = HOURS_PER_DAY * MINUTES_IN_HOUR - startEnd;
-            finalDm = Math.max(minDm, Math.min(maxDm, dm));
-            dragOffset = finalDm;
-        };
+        trackPointerGesture({
+            onMove: (ev) => {
+                const dy = ev.clientY - startY;
+                if (!moved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+                moved = true;
 
-        const up = () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            
-            if (!moved) {
-                if (onEventClick) onEventClick(event);
-                return;
-            }
-            dragOffset = undefined;
-            if (finalDm !== 0 && onMove) {
-                onMove(
-                    event.id,
-                    startStart + finalDm,
-                    startStart + finalDm + (startEnd - startStart)
+                finalDm = clamp(
+                    snappedDeltaMinutes(dy),
+                    -startStart,
+                    HOURS_PER_DAY * MINUTES_IN_HOUR - startEnd,
                 );
-            }
-        };
-
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
+                dragOffset = finalDm;
+            },
+            onEnd: () => {
+                if (!moved) {
+                    onEventClick?.(event);
+                    return;
+                }
+                dragOffset = undefined;
+                if (finalDm !== 0) {
+                    onMove?.(
+                        event.id,
+                        startStart + finalDm,
+                        startStart + finalDm + (startEnd - startStart),
+                    );
+                }
+            },
+            onCancel: () => {
+                dragOffset = undefined;
+            },
+        });
     }
 
     function pad2(n: number) {
@@ -131,7 +134,7 @@
     
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="day-event ev-{event.type}"
+        class="day-event"
         class:ev-plan={!!event.taskId}
         class:is-compact={compact}
         class:is-short={isShort && !compact}

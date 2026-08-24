@@ -2,9 +2,10 @@
     import './day-timeline.css';
     import { onMount } from 'svelte';
     import type { DragState, LaidEvent, PlanDayLayout } from './types';
+    import { PX_PER_MIN } from './constants';
     import type { AppEvent } from '../../../lib/domain';
-    import { SvelteDate } from 'svelte/reactivity';
     import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
 
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
@@ -39,18 +40,8 @@
         onAddEvent?: (d: Date, start: number, end: number) => void;
     } = $props();
 
-    function ymd(d: Date) {
-        return d.toISOString().split('T')[0];
-    }
-    
-    function addDays(d: Date, days: number) {
-        const nd = new SvelteDate(d);
-        nd.setDate(nd.getDate() + days);
-        return nd;
-    }
-
     let viewDate = $derived(timelineDate);
-    let isToday = $derived(ymd(viewDate) === ymd(today));
+    let isToday = $derived(sameDay(viewDate, today));
     
     let numDays = $state(1);
     
@@ -68,17 +59,16 @@
 
     $effect(() => {
         void events; // Trigger re-run when events change
-        layoutQuery.execute({ dates: dates.map(ymd), filters: eventFilters, query: eventQuery });
+        void layoutQuery.execute({ dates: dates.map(ymd), filters: eventFilters, query: eventQuery });
     });
     
     // Auto scroll logic
     let scrollRef = $state<HTMLDivElement | null>(null);
+    const AUTO_SCROLL_LEAD_MINUTES = 120;
     onMount(() => {
         if (scrollRef) {
-            const now = new Date();
-            const pxPerMin = 56 / 60;
-            const scrollMins = Math.max(0, now.getHours() * 60 + now.getMinutes() - 120);
-            scrollRef.scrollTop = scrollMins * pxPerMin;
+            const scrollMins = Math.max(0, minutesSinceMidnight(new Date()) - AUTO_SCROLL_LEAD_MINUTES);
+            scrollRef.scrollTop = scrollMins * PX_PER_MIN;
         }
     });
 </script>

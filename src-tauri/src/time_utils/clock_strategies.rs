@@ -42,19 +42,29 @@ impl PomodoroTimer {
     }
 
     pub fn pause(&mut self, now_ms: u64) {
-        if let TimerState::Running { start_time_ms, elapsed_ms } = self.state {
+        if let TimerState::Running {
+            start_time_ms,
+            elapsed_ms,
+        } = self.state
+        {
             let current_elapsed = elapsed_ms + now_ms.saturating_sub(start_time_ms);
-            self.state = TimerState::Paused { elapsed_ms: current_elapsed };
+            self.state = TimerState::Paused {
+                elapsed_ms: current_elapsed,
+            };
         }
     }
-    
+
     pub fn reset(&mut self) {
         self.state = TimerState::Idle;
         self.is_break = false;
     }
 
     pub fn tick(&mut self, now_ms: u64) -> Option<bool> {
-        if let TimerState::Running { start_time_ms, elapsed_ms } = self.state {
+        if let TimerState::Running {
+            start_time_ms,
+            elapsed_ms,
+        } = self.state
+        {
             let total_elapsed = elapsed_ms + now_ms.saturating_sub(start_time_ms);
             let current_duration = if self.is_break {
                 u64::try_from(self.break_duration.as_millis()).unwrap_or(u64::MAX)
@@ -80,10 +90,10 @@ mod tests {
     fn test_pomodoro_flow() {
         let mut timer = PomodoroTimer::new(25, 5);
         assert_eq!(timer.state, TimerState::Idle);
-        
+
         timer.start(1000);
         assert!(matches!(timer.state, TimerState::Running { .. }));
-        
+
         // Advance 25 mins
         let res = timer.tick(1000 + 25 * 60 * 1000);
         assert_eq!(res, Some(true)); // transitioned to break
