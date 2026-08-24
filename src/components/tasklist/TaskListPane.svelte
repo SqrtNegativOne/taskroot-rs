@@ -3,10 +3,10 @@
     import TaskRow from './TaskRow.svelte';
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
+    import SearchBar from '../SearchBar.svelte';
     import type { AppTask } from '../../lib/domain';
     import './tasklist.css';
     import { useTauriQuery, safeInvoke, queryDependency } from '../../lib/safeInvoke.svelte';
-    import type { AppTaskDefaults } from '../../lib/bindings/AppTaskDefaults.generated';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
@@ -54,41 +54,60 @@
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
+    import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
+    import type { AppTaskFilterColumn } from '../../lib/bindings/AppTaskFilterColumn.generated';
+
     let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
+    let schemaQuery = useTauriQuery<AppTaskColumnDef[]>('get_task_schema');
+    let schema = $derived(schemaQuery.data ?? []);
+    
+    let filterColumns = $derived(schema.map(c => ({ id: c.id, label: c.label })));
+    let sortColumns = $derived(schema.filter(c => c.sortable).map(c => ({ id: c.id, label: c.label })));
+
+    function getFilterValues(colId: string): string[] {
+        const col = schema.find(c => c.id === colId);
+        if (col && typeof col.filter_type === 'object' && 'Enum' in col.filter_type) {
+            return col.filter_type.Enum;
+        }
+        return [];
+    }
+
     let filtered = $derived(tasksQuery.data ?? []);
 
     $effect(() => {
         queryDependency(tasks);
         void tasksQuery.execute({ filters, sort, query });
+        void schemaQuery.execute();
     });
 
-    async function handleAddTask() {
-        const result = await safeInvoke<AppTaskDefaults>('compute_filter_defaults', { filters });
-        result.match(
-            (defaults) => {
-                const safeDefaults: Partial<AppTask> = {};
-                if (defaults.status) safeDefaults.status = defaults.status;
-                if (defaults.priority != null) safeDefaults.priority = defaults.priority;
-                if (defaults.tags) safeDefaults.tags = defaults.tags.map(t => ({ id: crypto.randomUUID(), name: t }));
-                onAddTask(safeDefaults);
-            },
-            () => onAddTask()
-        );
+    function handleAddTask() {
+        const safeDefaults: Partial<AppTask> = {};
+        for (const f of filters ?? []) {
+            if (f.operator === 'is' && f.value != null) {
+                const vals = Array.isArray(f.value) ? f.value : [f.value];
+                if (vals.length === 1) {
+                    if (f.column === 'status') safeDefaults.status = vals[0] as any;
+                    if (f.column === 'priority') safeDefaults.priority = Number(vals[0]) as any;
+                    if (f.column === 'tags') safeDefaults.tags = [{ id: crypto.randomUUID(), name: vals[0] as string }];
+                }
+            }
+        }
+        onAddTask(safeDefaults);
     }
 </script>
 
 <aside class="task-pane">
     <header class="task-pane-hd">
-        <input 
-            type="text" 
-            placeholder="Search tasks..." 
-            value={query}
-            oninput={(e) => { setQuery(e.currentTarget.value); }}
-            style="width: 100%; margin-bottom: 8px; padding: 4px 8px;"
-        />
+        <div style="width: 100%; margin-bottom: 8px;">
+            <SearchBar 
+                placeholder="Search tasks..." 
+                value={query}
+                onchange={setQuery}
+            />
+        </div>
         <div class="task-pane-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
-            <FilterButton bind:filters />
-            <SortButton bind:sort />
+            <FilterButton bind:filters columns={filterColumns} getValuesForColumn={getFilterValues} />
+            <SortButton bind:sort sortOptions={sortColumns} />
             <button
                 style="margin-left: auto; background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
                 title="Add Task"

@@ -181,16 +181,8 @@ pub async fn get_filtered_tasks(
     Ok(db::get_filtered_tasks(&pool, filters, sort, query).await?)
 }
 
-#[tauri::command]
-pub fn compute_filter_defaults(
-    filters: Vec<AppTaskFilter>,
-) -> Result<crate::domain::AppTaskDefaults, AppError> {
-    Ok(crate::domain::compute_filter_defaults(filters))
-}
 
-/// # Errors
-///
-/// Returns an error if the operation fails.
+
 #[tauri::command]
 pub async fn get_filtered_events(
     app: tauri::AppHandle,
@@ -199,4 +191,14 @@ pub async fn get_filtered_events(
 ) -> Result<Vec<AppEvent>, AppError> {
     let pool = db_pool(&app)?;
     Ok(db::get_filtered_events(&pool, filters, query).await?)
+}
+
+#[tauri::command]
+pub fn get_task_schema() -> Vec<crate::domain::AppTaskColumnDef> {
+    crate::domain::AppTask::get_schema()
+}
+
+#[tauri::command]
+pub fn get_event_schema() -> Vec<crate::domain::AppEventColumnDef> {
+    crate::domain::AppEvent::get_schema()
 }

@@ -1,21 +1,8 @@
 <script lang="ts" generics="F extends { column?: string | null, operator?: string | null, value?: unknown }">
-    import type { AppTaskStatus } from '../lib/domain';
-
-    const STATUSES: AppTaskStatus[] = ['todo', 'next-up', 'doing', 'done'];
-    const PRIORITIES: string[] = ['0', '1', '2', '3', '4'];
-
     let {
         filters = $bindable([]),
-        columns = [
-            { id: 'status', label: 'Status' },
-            { id: 'priority', label: 'Priority' },
-            { id: 'tag', label: 'Tag' }
-        ],
-        getValuesForColumn = (col: string): string[] => {
-            if (col === 'status') return STATUSES;
-            if (col === 'priority') return PRIORITIES;
-            return [];
-        },
+        columns = [],
+        getValuesForColumn = (col: string): string[] => [],
         align = "left",
     }: {
         filters?: F[];

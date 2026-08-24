@@ -4,6 +4,8 @@
     import type { AppTask, AppEvent } from '../../lib/domain';
     import InspectorTaskFields from './InspectorTaskFields.svelte';
     import InspectorEventFields from './InspectorEventFields.svelte';
+    import DescriptionInput from '../inputs/DescriptionInput.svelte';
+    import TitleInput from '../inputs/TitleInput.svelte';
 
     let {
         inspectorState,
@@ -70,23 +72,21 @@
 >
     {#if currentItem}
         <header class="inspector-hd">
-            <input
-                class="inspector-title-input"
+            <TitleInput
                 value={currentItem.title}
-                onchange={(e) => handleTitleChange(e.currentTarget.value)}
+                onchange={handleTitleChange}
+                class="inspector-title-input"
             />
             <button class="icon-btn" onclick={onClose}>✕</button>
         </header>
 
         <div class="inspector-body">
             <div class="inspector-field">
-                <textarea
-                    id="desc"
+                <DescriptionInput
+                    value={currentTask ? currentTask.notes : currentEvent?.description}
+                    onchange={handleDescriptionChange}
                     class="inspector-desc-input"
-                    placeholder="Description / Notes"
-                    value={currentTask ? currentTask.notes ?? '' : currentEvent?.description ?? ''}
-                    onchange={(e) => handleDescriptionChange(e.currentTarget.value)}
-                ></textarea>
+                />
             </div>
 
             {#if currentTask}

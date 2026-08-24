@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { SettingsSchemaItem, SettingValue } from './schema';
+    import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
+    import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
 
     interface Props {
         item: SettingsSchemaItem;
@@ -33,11 +35,10 @@
                 {/each}
             </select>
         {:else if item.type === 'checkbox'}
-            <input
-                type="checkbox"
-                id={item.id}
+            <ToggleSwitch
                 checked={Boolean(selectValue())}
-                onchange={(e) => onchange(e.currentTarget.checked)}
+                onchange={(checked) => onchange(checked)}
+                ariaLabel={item.label}
             />
         {:else if item.type === 'number'}
             <input
@@ -56,11 +57,9 @@
                 oninput={(e) => onchange(Number(e.currentTarget.value))}
             />
         {:else if item.type === 'keybinding'}
-            <input
-                type="text"
-                id={item.id}
-                value={selectValue()}
-                oninput={(e) => onchange(e.currentTarget.value)}
+            <KeybindingInput
+                value={selectValue() as string}
+                onchange={(val: string) => onchange(val)}
             />
         {:else if item.type === 'custom' || item.type === 'action'}
             <button onclick={() => console.log(`Custom action clicked: ${item.id}`)}>

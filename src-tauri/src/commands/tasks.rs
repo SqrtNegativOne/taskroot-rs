@@ -46,7 +46,10 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
     let pool = crate::db_pool(&app)?;
 
     if let Ok(Some(task)) = db::get_task(&pool, &id).await {
-        sync::push::push_delete_or_enqueue(&pool, &task).await;
+        let pool_clone = (*pool).clone();
+        tokio::spawn(async move {
+            sync::push::push_delete_or_enqueue(&pool_clone, &task).await;
+        });
     }
 
     Ok(db::delete_task(&pool, id).await?)

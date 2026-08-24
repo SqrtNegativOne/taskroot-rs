@@ -1,12 +1,7 @@
 <script lang="ts">
     let {
         sort = $bindable('priority'),
-        sortOptions = [
-            { id: 'priority', label: 'Priority' },
-            { id: 'due', label: 'Due Date' },
-            { id: 'title', label: 'Title' },
-            { id: 'id', label: 'Created' }
-        ],
+        sortOptions = [],
         align = "left",
     }: {
         sort?: string;

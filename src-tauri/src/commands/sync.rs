@@ -22,7 +22,9 @@ pub async fn wipe_local_data(app: tauri::AppHandle) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
     sqlx::query("DELETE FROM tasks").execute(&*pool).await?;
     sqlx::query("DELETE FROM events").execute(&*pool).await?;
-    sqlx::query("DELETE FROM sync_queue").execute(&*pool).await?;
+    sqlx::query("DELETE FROM sync_queue")
+        .execute(&*pool)
+        .await?;
     Ok(())
 }
 
@@ -31,7 +33,9 @@ pub async fn wipe_local_data(app: tauri::AppHandle) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn clear_sync_queue(app: tauri::AppHandle) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sqlx::query("DELETE FROM sync_queue").execute(&*pool).await?;
+    sqlx::query("DELETE FROM sync_queue")
+        .execute(&*pool)
+        .await?;
     Ok(())
 }
 
@@ -43,7 +47,7 @@ pub async fn get_sync_queue(app: tauri::AppHandle) -> Result<Vec<serde_json::Val
     let rows = sqlx::query("SELECT payload FROM sync_queue ORDER BY id ASC")
         .fetch_all(&*pool)
         .await?;
-        
+
     let mut items = Vec::new();
     for row in rows {
         let payload: String = sqlx::Row::try_get(&row, "payload").map_err(AppError::Db)?;

@@ -46,7 +46,10 @@ pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppEr
     let pool = crate::db_pool(&app)?;
 
     if let Ok(Some(event)) = db::get_event(&pool, &id).await {
-        sync::push::push_delete_or_enqueue(&pool, &event).await;
+        let pool_clone = (*pool).clone();
+        tokio::spawn(async move {
+            sync::push::push_delete_or_enqueue(&pool_clone, &event).await;
+        });
     }
 
     Ok(db::delete_event(&pool, id).await?)

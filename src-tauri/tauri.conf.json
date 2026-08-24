@@ -37,10 +37,24 @@
         "height": 100,
         "transparent": true,
         "decorations": false,
+        "closable": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
         "url": "/minitracker"
+      },
+      {
+        "label": "sidebar",
+        "title": "Sidebar",
+        "width": 350,
+        "height": 1000,
+        "transparent": true,
+        "decorations": false,
+        "closable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "url": "/sidebar"
       }
     ],
     "security": {

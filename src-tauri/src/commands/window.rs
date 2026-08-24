@@ -25,3 +25,19 @@ pub fn show_minitracker(app: tauri::AppHandle) {
         let _ = main_win.hide();
     }
 }
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn hide_launcher(app: tauri::AppHandle) {
+    if let Some(launcher_win) = app.get_webview_window("launcher") {
+        let _ = launcher_win.hide();
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn resize_launcher(app: tauri::AppHandle, width: f64, height: f64) {
+    if let Some(launcher_win) = app.get_webview_window("launcher") {
+        let _ = launcher_win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(width, height)));
+    }
+}

@@ -21,6 +21,12 @@ pub enum AppTaskStatus {
     Done,
 }
 
+impl AppTaskStatus {
+    pub fn all_values() -> Vec<String> {
+        vec!["todo".into(), "next-up".into(), "doing".into(), "done".into()]
+    }
+}
+
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS, sqlx::Type)]
@@ -53,18 +59,25 @@ pub struct Tag {
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
+use taskroot_macros::Filterable;
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Filterable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
+    #[filter(sortable, db_col = "t.id", label = "Created")]
     pub id: String,
+    #[filter(sortable, db_col = "LOWER(t.title)")]
     pub title: String,
     #[ts(optional)]
+    #[filter(db_col = "t.status", filter_type = "enum:AppTaskStatus")]
     pub status: Option<AppTaskStatus>,
     #[ts(optional)]
+    #[filter(sortable, db_col = "COALESCE(t.priority, 0)", filter_type = "number")]
     pub priority: Option<TaskPriority>,
     #[ts(optional)]
     #[sqlx(json)]
+    #[filter(db_col = "", filter_type = "relation:task_tags")]
     pub tags: Option<Vec<Tag>>,
     #[ts(optional)]
     #[sqlx(json)]
@@ -91,6 +104,7 @@ pub struct AppTask {
     #[ts(optional)]
     pub tabs: Option<String>,
     #[ts(optional)]
+    #[filter(sortable, db_col = "COALESCE(t.due, '9999')", filter_type = "text")]
     pub due: Option<String>,
     #[serde(rename = "_deleted")]
     #[ts(optional)]
@@ -103,7 +117,7 @@ pub struct AppTask {
     pub dirty: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Filterable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
@@ -111,9 +125,11 @@ pub struct AppEvent {
     #[ts(optional)]
     pub remote_id: Option<String>,
     #[ts(optional)]
+    #[filter(db_col = "remote_collection_id", label = "Calendar")]
     pub remote_collection_id: Option<String>,
     #[ts(optional)]
     pub task_id: Option<String>,
+    #[filter(db_col = "LOWER(title)")]
     pub title: String,
     #[ts(optional)]
     pub description: Option<String>,

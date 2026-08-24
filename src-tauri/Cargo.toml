@@ -21,6 +21,7 @@ serde_yaml = "0.9.34"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+taskroot-macros = { path = "./taskroot-macros" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }

@@ -14,6 +14,7 @@
     import InspectorPane from '../../components/inspector-pane/InspectorPane.svelte';
     import DateGrid from './date-grid/DateGrid.svelte';
     import DayTimeline from './day-timeline/DayTimeline.svelte';
+    import RecurringActionModal, { type RecurringMode } from '../../components/RecurringActionModal.svelte';
     import { DateGridView } from './date-grid/constants';
     import type { DragState } from './day-timeline/types';
 
@@ -100,6 +101,17 @@
 
     let dragState = $state<DragState | undefined>(undefined);
     let inspectorState = $state<{ type: 'event' | 'task', id: string } | undefined>(undefined);
+    let recurringModalOpen = $state(false);
+    let recurringActionType = $state<"edit" | "delete">("edit");
+    
+    function handleRecurringConfirm(mode: RecurringMode) {
+        recurringModalOpen = false;
+        console.log("Confirmed recurring action:", mode);
+    }
+
+    function handleRecurringCancel() {
+        recurringModalOpen = false;
+    }
 
     function mutateOrReport(operation: string, mutation: () => Promise<Result<void, AppError>>): Promise<void> {
         return mutation().then((result) => {
@@ -307,6 +319,12 @@
                 void mutateOrReport('Failed to delete event', () => store.deleteEvent(id));
                 inspectorState = undefined;
             }}
+        />
+        <RecurringActionModal
+            isOpen={recurringModalOpen}
+            actionType={recurringActionType}
+            onConfirm={handleRecurringConfirm}
+            onCancel={handleRecurringCancel}
         />
     {/if}
 </main>

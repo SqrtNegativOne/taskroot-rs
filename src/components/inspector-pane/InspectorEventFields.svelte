@@ -1,6 +1,8 @@
 <script lang="ts">
     import type { AppEvent, AppTask } from '../../lib/domain';
     import { getFormattedDate, getFormattedTime } from './format';
+    import SelectInput from '../inputs/SelectInput.svelte';
+    import TimeInput from '../inputs/TimeInput.svelte';
 
     interface Props {
         event: AppEvent;
@@ -33,16 +35,14 @@
 
 <div class="inspector-field">
     <label for={`attach-${event.id}`}>Task Attachment</label>
-    <select
-        id={`attach-${event.id}`}
+    <SelectInput
         value={event.taskId ?? ''}
-        onchange={(e) => handleAttachmentChange(e.currentTarget.value)}
-    >
-        <option value="">-- No task attached --</option>
-        {#each tasks as t (t.id)}
-            <option value={t.id}>{t.title}</option>
-        {/each}
-    </select>
+        onchange={handleAttachmentChange}
+        options={[
+            { label: '-- No task attached --', value: '' },
+            ...tasks.map(t => ({ label: t.title, value: t.id }))
+        ]}
+    />
 </div>
 
 <div class="inspector-field inspector-field-group">
@@ -67,11 +67,10 @@
             onchange={(e) => updateEventDate('startTime', e.currentTarget.value)}
         />
         {#if event.startTime.includes('T')}
-            <input
-                type="time"
+            <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.startTime)}
-                onchange={(e) => updateEventTime('startTime', e.currentTarget.value)}
+                onchange={(val) => updateEventTime('startTime', val)}
             />
         {/if}
     </div>
@@ -88,11 +87,10 @@
             onchange={(e) => updateEventDate('endTime', e.currentTarget.value)}
         />
         {#if event.endTime.includes('T')}
-            <input
-                type="time"
+            <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.endTime)}
-                onchange={(e) => updateEventTime('endTime', e.currentTarget.value)}
+                onchange={(val) => updateEventTime('endTime', val)}
             />
         {/if}
     </div>

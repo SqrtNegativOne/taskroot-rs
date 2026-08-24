@@ -10,10 +10,15 @@
     import { Routes } from '$lib/routes';
     import TitleBar from '../components/TitleBar.svelte';
 
+    import { listen, emit } from '@tauri-apps/api/event';
+    import { LAUNCHER_DATA_UPDATE } from '$lib/events';
+
     let { children }: { children: Snippet } = $props();
     let isLauncher = $state(false);
     let isMinitracker = $state(false);
+    let isSidebar = $state(false);
     let isCheckingAuth = $state(true);
+    let launcherValue = $state('');
 
     async function redirectToInitialRoute(isLoggedIn: boolean): Promise<void> {
         if (!isLoggedIn && window.location.pathname !== Routes.LOGIN) {
@@ -23,35 +28,96 @@
         }
     }
 
-    onMount(async () => {
+    onMount(() => {
         const appWindow = getCurrentWindow();
         isLauncher = appWindow.label === 'launcher';
         isMinitracker = appWindow.label === 'minitracker';
+        isSidebar = appWindow.label === 'sidebar';
 
-        if (!isLauncher && !isMinitracker) {
-            const authResult = await safeInvoke<boolean>('is_logged_in');
-            if (authResult.isOk()) {
-                await redirectToInitialRoute(authResult.value);
+        let unlistenData = () => {};
+        let unlistenNav = () => {};
+
+        const initialize = async () => {
+            if (!isLauncher && !isMinitracker && !isSidebar) {
+                const authResult = await safeInvoke<boolean>('is_logged_in');
+                if (authResult.isOk()) {
+                    await redirectToInitialRoute(authResult.value);
+                } else {
+                    console.error('Failed to check auth state:', authResult.error);
+                }
+            }
+
+            isCheckingAuth = false;
+
+            const initResult = await store.init();
+            if (initResult.isErr()) {
+                store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
+            }
+
+            if (isLauncher) {
+                unlistenData = await listen(LAUNCHER_DATA_UPDATE, (event) => {
+                    console.log('launcher data update', event.payload);
+                });
+            } else if (!isMinitracker && !isSidebar) {
+                unlistenNav = await listen('launcher-navigate', async (event) => {
+                    const route = event.payload as string;
+                    const validRoutes = Object.values(Routes) as string[];
+                    if (validRoutes.includes(route)) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        await goto(resolve(route as any));
+                        await safeInvoke('window_restore_main');
+                    }
+                });
+            }
+        };
+
+        void initialize();
+
+        return () => {
+            unlistenData();
+            unlistenNav();
+        };
+    });
+
+    async function handleLauncherKeydown(e: KeyboardEvent) {
+        if (e.key === 'Escape') {
+            await safeInvoke('hide_launcher');
+        } else if (e.key === 'Enter') {
+            const cmd = launcherValue.trim().toLowerCase();
+            const routeMap: Record<string, string> = {
+                'home': Routes.HOME,
+                'plan': Routes.HOME,
+                'do': Routes.DO,
+                'settings': Routes.SETTINGS,
+            };
+            
+            if (routeMap[cmd]) {
+                await emit('launcher-navigate', routeMap[cmd]);
+                await safeInvoke('hide_launcher');
+                launcherValue = '';
             } else {
-                console.error('Failed to check auth state:', authResult.error);
+                console.log('Unknown command:', cmd);
             }
         }
-
-        isCheckingAuth = false;
-
-        const initResult = await store.init();
-        if (initResult.isErr()) {
-            store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
-        }
-    });
+    }
 </script>
 
 {#if isLauncher}
     <div class="launcher-shell">
         <div class="launcher-panel">
             <span class="launcher-prefix">Cmd</span>
-            <input type="text" class="launcher-input" placeholder="Type a command..." />
+            <input 
+                type="text" 
+                class="launcher-input" 
+                placeholder="Type a command..." 
+                bind:value={launcherValue}
+                onkeydown={handleLauncherKeydown}
+            />
         </div>
+    </div>
+{:else if isSidebar}
+    <div class="sidebar-shell">
+        {@render children()}
     </div>
 {:else if isCheckingAuth}
     <div class="boot-screen">
@@ -65,6 +131,13 @@
 {/if}
 
 <style>
+    .sidebar-shell {
+        height: 100vh;
+        width: 100vw;
+        background: transparent;
+        overflow: hidden;
+    }
+
     .launcher-shell {
         height: 100vh;
         width: 100vw;

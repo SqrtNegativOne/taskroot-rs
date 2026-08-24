@@ -2,6 +2,9 @@
     import type { AppTask, AppTaskStatus } from '../../lib/domain';
     import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
     import { getFormattedDate } from './format';
+    import SelectInput from '../inputs/SelectInput.svelte';
+    import NumberInput from '../inputs/NumberInput.svelte';
+    import TagsInput from '../inputs/TagsInput.svelte';
 
     interface Props {
         task: AppTask;
@@ -25,8 +28,7 @@
         updateTask(task.id, (t) => ({ ...t, status: value }));
     }
 
-    function handlePriorityChange(raw: string): void {
-        const val = parseInt(raw) || 0;
+    function handlePriorityChange(val: number): void {
         const clamped = Math.max(0, Math.min(4, val));
         if (!isTaskPriority(clamped)) return;
         updateTask(task.id, (t) => ({ ...t, priority: clamped }));
@@ -36,34 +38,32 @@
         updateTask(task.id, (t) => ({ ...t, due: value || undefined }));
     }
 
-    function handleDurationChange(value: string): void {
-        updateTask(task.id, (t) => ({ ...t, est: value ? parseInt(value) : undefined }));
+    function handleDurationChange(val: number): void {
+        updateTask(task.id, (t) => ({ ...t, est: val || undefined }));
     }
 </script>
 
 <div class="inspector-row">
     <div class="inspector-field">
         <label for={`status-${task.id}`}>Status</label>
-        <select
-            id={`status-${task.id}`}
+        <SelectInput
             value={task.status ?? 'todo'}
-            onchange={(e) => handleStatusChange(e.currentTarget.value)}
-        >
-            <option value="todo">Todo</option>
-            <option value="doing">Doing</option>
-            <option value="next-up">Next Up</option>
-            <option value="done">Done</option>
-        </select>
+            onchange={handleStatusChange}
+            options={[
+                { label: 'Todo', value: 'todo' },
+                { label: 'Doing', value: 'doing' },
+                { label: 'Next Up', value: 'next-up' },
+                { label: 'Done', value: 'done' }
+            ]}
+        />
     </div>
     <div class="inspector-field">
         <label for={`priority-${task.id}`}>Priority</label>
-        <input
-            id={`priority-${task.id}`}
-            type="number"
-            min="0"
-            max="4"
+        <NumberInput
+            min={0}
+            max={4}
             value={task.priority ?? 2}
-            onchange={(e) => handlePriorityChange(e.currentTarget.value)}
+            onchange={handlePriorityChange}
         />
     </div>
 </div>
@@ -81,11 +81,18 @@
 
 <div class="inspector-field">
     <label for={`duration-${task.id}`}>Duration (min)</label>
-    <input
-        id={`duration-${task.id}`}
-        type="number"
-        placeholder="Unset"
+    <NumberInput
         value={task.est ?? ''}
-        onchange={(e) => handleDurationChange(e.currentTarget.value)}
+        onchange={handleDurationChange}
+    />
+</div>
+
+<div class="inspector-field">
+    <label>Tags</label>
+    <TagsInput
+        tags={task.tags ? task.tags.map(t => t.name) : []}
+        onchange={(newTags) => {
+            updateTask(task.id, (t) => ({ ...t, tags: newTags.map(name => ({ id: crypto.randomUUID(), name })) }));
+        }}
     />
 </div>

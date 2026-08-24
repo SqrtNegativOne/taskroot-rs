@@ -173,42 +173,39 @@ pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Err
     Ok(())
 }
 
-use super::FilterColumnExt;
+fn apply_sql(
+    builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    col_id: &crate::domain::AppEventFilterColumn,
+    op: &str,
+    val: &serde_json::Value,
+    schema: &[crate::domain::AppEventColumnDef],
+) {
+    let Some(def) = schema.iter().find(|c| &c.id == col_id) else {
+        return;
+    };
 
-impl FilterColumnExt for crate::domain::EventFilterColumn {
-    fn apply_sql(
-        &self,
-        builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
-        op: &str,
-        val: &serde_json::Value,
-    ) {
-        let is_not = op == "is not";
-        let values = val
-            .as_array()
-            .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
-        if values.is_empty() {
-            return;
-        }
+    let is_not = op == "is not";
+    let values = val
+        .as_array()
+        .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
+    if values.is_empty() {
+        return;
+    }
 
-        match self {
-            Self::Calendar => {
-                builder.push(if is_not {
-                    " AND remote_collection_id NOT IN ("
-                } else {
-                    " AND remote_collection_id IN ("
-                });
-                let mut separated = builder.separated(", ");
-                for v in &values {
-                    if let Some(s) = v.as_str() {
-                        separated.push_bind(s.to_string());
-                    } else {
-                        separated.push_bind(v.to_string());
-                    }
-                }
-                builder.push(")");
-            }
+    builder.push(if is_not {
+        format!(" AND {} NOT IN (", def.db_col)
+    } else {
+        format!(" AND {} IN (", def.db_col)
+    });
+    let mut separated = builder.separated(", ");
+    for v in &values {
+        if let Some(s) = v.as_str() {
+            separated.push_bind(s);
+        } else {
+            separated.push_bind(v.to_string());
         }
     }
+    builder.push(")");
 }
 
 pub async fn get_filtered_events(
@@ -219,10 +216,12 @@ pub async fn get_filtered_events(
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
         sqlx::QueryBuilder::new(event_select_sql!(" WHERE 1=1"));
 
+    let schema = AppEvent::get_schema();
+
     for f in &filters {
-        if let (Some(col), Some(val)) = (&f.column, &f.value) {
+        if let (Some(col_id), Some(val)) = (&f.column, &f.value) {
             let op = f.operator.as_deref().unwrap_or("is");
-            col.apply_sql(&mut query_builder, op, val);
+            apply_sql(&mut query_builder, col_id, op, val, &schema);
         }
     }
 
