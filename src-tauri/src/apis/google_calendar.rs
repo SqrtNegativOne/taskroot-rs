@@ -123,8 +123,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                     || chrono::Utc::now().timestamp_millis(),
                     |upd| {
                         chrono::DateTime::parse_from_rfc3339(upd)
-                            .map(|dt| dt.timestamp_millis())
-                            .unwrap_or(0)
+                            .map_or(0, |dt| dt.timestamp_millis())
                     },
                 );
 

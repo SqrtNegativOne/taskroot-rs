@@ -16,6 +16,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run lint
+      - run: bun run coverage:frontend
 
   rust:
     name: Rust
@@ -35,8 +36,10 @@ jobs:
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
       - name: Test (generates ts-rs bindings)
         working-directory: src-tauri
-        run: cargo test
+        run: cargo llvm-cov --all-targets --workspace --lcov --output-path lcov.info
       - name: Fail on generated bindings drift
         run: git diff --exit-code src/lib/bindings

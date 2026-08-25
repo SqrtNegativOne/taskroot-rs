@@ -17,7 +17,7 @@ export function createPointerGestureRecognizer(): PointerGestureRecognizer {
 
     $effect(() => {
         return () => {
-            for (const teardown of [...activeTeardowns]) teardown();
+            for (const teardown of activeTeardowns) teardown();
         };
     });
 

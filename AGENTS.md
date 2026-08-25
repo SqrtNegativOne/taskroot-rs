@@ -13,7 +13,10 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.
 - **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`, with the `migrate` feature). Schema is applied via inline CREATE statements in `db::init_db`. Data is queried via Tauri IPC commands.
 - **Type Sharing**: `ts-rs` generates `src/lib/bindings/*.generated.ts` from Rust structs; `cargo test` is the regeneration trigger (see Key Concepts).
-- **Testing**: Playwright E2E (`playwright.config.ts`, specs in `tests/e2e/`, run via `bun run test`; the config boots `bun run dev` on port 1420 with chromium) and Rust unit tests (`cargo test` in `src-tauri`, currently 32 passing, including migration assertions and `AppError` shape checks).
+- **Testing**: 
+  - **Frontend E2E**: Playwright (`playwright.config.ts`, specs in `tests/e2e/`, run via `bun run test`; the config boots `bun run dev` on port 1420 with chromium).
+  - **Frontend Unit**: Vitest with jsdom (`bun run test:unit`). Coverage is collected via `@vitest/coverage-v8` (`bun run coverage:frontend`).
+  - **Backend**: Rust unit tests (`cargo test` in `src-tauri`, including migration assertions and `AppError` shape checks). Coverage is collected via `cargo-llvm-cov` (`bun run coverage:backend`, requires `cargo install cargo-llvm-cov`).
 - **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo test`. **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
 
 ## Project Structure

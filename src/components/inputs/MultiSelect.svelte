@@ -50,7 +50,7 @@
     >
         {#if values.length > 0}
             <div style="display: flex; gap: 4px; flex-wrap: wrap; flex: 1; overflow: hidden; max-height: 48px;">
-                {#each values as v}
+                {#each values as v (v)}
                     {@const opt = options.find(o => o.value === v)}
                     <span style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 0.9em; white-space: nowrap;">
                         {opt ? opt.label : v}

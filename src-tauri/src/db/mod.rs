@@ -70,6 +70,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             original_start_time TEXT,
             cancelled BOOLEAN,
             updated_at INTEGER,
+            color TEXT,
             deleted BOOLEAN,
             etag TEXT,
             dirty BOOLEAN DEFAULT 0
