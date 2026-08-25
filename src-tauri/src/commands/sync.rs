@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::sync;
-use chrono::Utc;
+
 
 /// # Errors
 ///
@@ -9,8 +9,8 @@ use chrono::Utc;
 #[tauri::command]
 pub async fn force_sync(app: tauri::AppHandle) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    let next_sync = Utc::now() + chrono::Duration::seconds(sync::SYNC_INTERVAL_SECS);
-    sync::run_tracked_sync(&app, &pool, next_sync)
+    let next_sync = chrono::Utc::now() + chrono::Duration::seconds(sync::SYNC_INTERVAL_SECS);
+    sync::run_tracked_sync(&app, &pool, Some(next_sync))
         .await
         .map_err(AppError::Sync)
 }

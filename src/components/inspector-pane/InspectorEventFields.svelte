@@ -70,7 +70,7 @@
             <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.startTime)}
-                onchange={(val) => updateEventTime('startTime', val)}
+                onchange={(val: string) => updateEventTime('startTime', val)}
             />
         {/if}
     </div>
@@ -90,7 +90,7 @@
             <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.endTime)}
-                onchange={(val) => updateEventTime('endTime', val)}
+                onchange={(val: string) => updateEventTime('endTime', val)}
             />
         {/if}
     </div>

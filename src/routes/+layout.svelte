@@ -34,8 +34,8 @@
         isMinitracker = appWindow.label === 'minitracker';
         isSidebar = appWindow.label === 'sidebar';
 
-        let unlistenData = () => {};
-        let unlistenNav = () => {};
+        let unlistenData = () => { /* noop */ };
+        let unlistenNav = () => { /* noop */ };
 
         const initialize = async () => {
             if (!isLauncher && !isMinitracker && !isSidebar) {
@@ -59,13 +59,15 @@
                     console.log('launcher data update', event.payload);
                 });
             } else if (!isMinitracker && !isSidebar) {
-                unlistenNav = await listen('launcher-navigate', async (event) => {
+                unlistenNav = await listen('launcher-navigate', (event) => {
                     const route = event.payload as string;
                     const validRoutes = Object.values(Routes) as string[];
                     if (validRoutes.includes(route)) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        await goto(resolve(route as any));
-                        await safeInvoke('window_restore_main');
+                        void (async () => {
+                            // @ts-expect-error resolving dynamic string route
+                            await goto(resolve(route));
+                            await safeInvoke('window_restore_main');
+                        })();
                     }
                 });
             }

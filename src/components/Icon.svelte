@@ -13,7 +13,7 @@
         style = ''
     }: Props = $props();
 
-    let computedStyle = $derived(`font-size: ${typeof size === 'number' ? size + 'px' : size}; ${style}`);
+    let computedStyle = $derived(`font-size: ${typeof size === 'number' ? size.toString() + 'px' : size}; ${style}`);
 </script>
 
 <span

@@ -4,9 +4,10 @@
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import type { AppTask } from '../../lib/domain';
+    import type { AppTask, AppTaskStatus } from '../../lib/domain';
+    import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
     import './tasklist.css';
-    import { useTauriQuery, safeInvoke, queryDependency } from '../../lib/safeInvoke.svelte';
+    import { useTauriQuery, queryDependency } from '../../lib/safeInvoke.svelte';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
@@ -55,7 +56,6 @@
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
     import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
-    import type { AppTaskFilterColumn } from '../../lib/bindings/AppTaskFilterColumn.generated';
 
     let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
     let schemaQuery = useTauriQuery<AppTaskColumnDef[]>('get_task_schema');
@@ -82,13 +82,13 @@
 
     function handleAddTask() {
         const safeDefaults: Partial<AppTask> = {};
-        for (const f of filters ?? []) {
+        for (const f of filters) {
             if (f.operator === 'is' && f.value != null) {
                 const vals = Array.isArray(f.value) ? f.value : [f.value];
                 if (vals.length === 1) {
-                    if (f.column === 'status') safeDefaults.status = vals[0] as any;
-                    if (f.column === 'priority') safeDefaults.priority = Number(vals[0]) as any;
-                    if (f.column === 'tags') safeDefaults.tags = [{ id: crypto.randomUUID(), name: vals[0] as string }];
+                    if (f.column === 'status') safeDefaults.status = vals[0] as AppTaskStatus;
+                    if (f.column === 'priority') safeDefaults.priority = Number(vals[0]) as TaskPriority;
+                    if (f.column === 'tags') safeDefaults.tags = [{ id: crypto.randomUUID(), name: String(vals[0]) }];
                 }
             }
         }
@@ -124,7 +124,7 @@
         ondblclick={(e) => {
             if (!(e.target instanceof Element)) return;
             if (!e.target.closest('.task-row') && !e.target.closest('button')) {
-                void handleAddTask();
+                handleAddTask();
             }
         }}
     >

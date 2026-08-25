@@ -49,7 +49,7 @@
     
     {#if dropdownOpen}
         <div class="dropdown-menu" style="position: absolute; top: 100%; left: 0; z-index: 1000; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 0; min-width: 120px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
-            {#each SCREENS as screen}
+            {#each SCREENS as screen (screen)}
                 <button
                     class="dd-item"
                     onclick={() => navigate(screen)}

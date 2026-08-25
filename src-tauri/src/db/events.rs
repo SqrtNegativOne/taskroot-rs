@@ -6,7 +6,7 @@ macro_rules! event_select_sql {
         concat!(
             "SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, ",
             "rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, ",
-            "updated_at, deleted, etag, dirty FROM events",
+            "updated_at, color, deleted, etag, dirty FROM events",
             $suffix
         )
     };
@@ -50,8 +50,8 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, cancelled, updated_at, deleted, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            original_start_time, cancelled, updated_at, color, deleted, etag, dirty
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -67,6 +67,7 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.original_start_time)
     .bind(event.cancelled)
     .bind(event.updated_at)
+    .bind(event.color)
     .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)
@@ -85,7 +86,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             remote_id = ?, remote_collection_id = ?, task_id = ?, title = ?, 
             description = ?, start_time = ?, end_time = ?, 
             rrule = ?, exdates = ?, recurring_event_id = ?, original_start_time = ?, 
-            cancelled = ?, updated_at = ?, deleted = ?, etag = ?, dirty = ?
+            cancelled = ?, updated_at = ?, color = ?, deleted = ?, etag = ?, dirty = ?
         WHERE id = ?",
     )
     .bind(event.remote_id)
@@ -101,6 +102,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.original_start_time)
     .bind(event.cancelled)
     .bind(event.updated_at)
+    .bind(event.color)
     .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)
@@ -119,8 +121,8 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, cancelled, updated_at, deleted, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            original_start_time, cancelled, updated_at, color, deleted, etag, dirty
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             remote_id = excluded.remote_id, 
             remote_collection_id = excluded.remote_collection_id, 
@@ -135,6 +137,7 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             original_start_time = excluded.original_start_time, 
             cancelled = excluded.cancelled, 
             updated_at = excluded.updated_at, 
+            color = excluded.color,
             deleted = excluded.deleted, 
             etag = excluded.etag,
             dirty = excluded.dirty",
@@ -153,6 +156,7 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.original_start_time)
     .bind(event.cancelled)
     .bind(event.updated_at)
+    .bind(event.color)
     .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)

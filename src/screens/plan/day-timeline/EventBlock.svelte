@@ -145,6 +145,7 @@
             height: {Math.max(height, MIN_EVENT_HEIGHT_PX)}px;
             left: calc({labelOffset}px + ((100% - {labelOffset}px) / {lanes}) * {lane});
             width: calc(((100% - {labelOffset}px) / {lanes}) - 2px);
+            {event.color ? `--ev-color: ${event.color}; --ev-bg: ${event.color}40;` : ''}
         "
         onpointerdown={isGhost ? undefined : onBodyDown}
     >

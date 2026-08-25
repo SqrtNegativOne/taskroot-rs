@@ -1,4 +1,4 @@
-use crate::auth;
+
 use crate::domain::{AppEvent, AppTask};
 use crate::sync::queue::SyncQueue;
 use crate::sync::types::{SyncAction, SyncItemData, SyncQueueItem, SyncType};
@@ -89,7 +89,7 @@ impl GoogleSyncEntity for AppEvent {
     }
 
     async fn delete_remote(&self, remote_id: &str, access_token: &str) -> anyhow::Result<()> {
-        crate::apis::google_calendar::delete(remote_id, access_token).await
+        crate::apis::google_calendar::delete(remote_id, self.remote_collection_id.as_deref(), access_token).await
     }
 }
 
@@ -114,41 +114,24 @@ async fn enqueue(item: SyncQueueItem, pool: &SqlitePool) {
     let _ = queue.push(item).await;
 }
 
-/// Publishes the entity to Google, falling back to enqueueing for offline retry.
-/// On success the entity gains its remote id and is marked clean.
 pub async fn push_or_enqueue<T: GoogleSyncEntity>(
-    pool: &SqlitePool,
+    app: &tauri::AppHandle,
     entity: &mut T,
     action: SyncAction,
 ) {
-    entity.mark_updated();
-
-    if let Ok(access_token) = auth::get_valid_access_token(pool).await {
-        if let Ok(remote_id) = entity.publish_remote(&access_token).await {
-            entity.set_remote_id(remote_id);
-            entity.mark_clean();
-            return;
-        }
+    if let Ok(pool) = crate::db_pool(app) {
+        entity.mark_updated();
+        let remote_id = entity.remote_id().cloned();
+        enqueue(queue_item(entity, action, remote_id), &pool).await;
+        crate::sync::trigger_sync(app);
     }
-
-    enqueue(queue_item(entity, action, None), pool).await;
 }
 
-/// Deletes the entity remotely when it has a remote id, otherwise treats it as
-/// done locally. Falls back to enqueueing the delete for offline retry.
-pub async fn push_delete_or_enqueue<T: GoogleSyncEntity>(pool: &SqlitePool, entity: &T) {
-    let deleted_remotely = match entity.remote_id() {
-        Some(remote_id) => {
-            matches!(
-                auth::get_valid_access_token(pool).await,
-                Ok(access_token) if entity.delete_remote(remote_id, &access_token).await.is_ok()
-            )
-        }
-        None => true,
-    };
-
-    if !deleted_remotely {
+/// Enqueues a delete action for offline retry.
+pub async fn push_delete_or_enqueue<T: GoogleSyncEntity>(app: &tauri::AppHandle, entity: &T) {
+    if let Ok(pool) = crate::db_pool(app) {
         let remote_id = entity.remote_id().cloned();
-        enqueue(queue_item(entity, SyncAction::Delete, remote_id), pool).await;
+        enqueue(queue_item(entity, SyncAction::Delete, remote_id), &pool).await;
+        crate::sync::trigger_sync(app);
     }
 }

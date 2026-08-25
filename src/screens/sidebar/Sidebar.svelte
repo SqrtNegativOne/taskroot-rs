@@ -7,11 +7,17 @@
     import { ymd, addDays } from '../../lib/time';
     import type { AppEvent } from '../../lib/domain';
 
-    let open = $state(true);
+    let open = $state(false);
+    let windowIsSmall = $state(true);
     let showNotes = $state(false);
     let notesText = $state('');
     let today = $state(new Date());
     let timelineDate = $state(new Date());
+    
+    let tabTop = $state(0);
+    let isDragging = $state(false);
+    let dragStartScreenY = 0;
+    let dragStartTabTop = 0;
 
     let hydratedEvents = $derived.by(() => {
         return store.events.map(ev => {
@@ -41,7 +47,7 @@
             const widthPhysical = Math.round(26 * sf); // 22 + 4px buffer
             const heightPhysical = Math.round(64 * sf);
             const posX = screenX + screenW - widthPhysical;
-            const posY = Math.round(screenY + (screenH - heightPhysical) / 2);
+            const posY = Math.round(screenY + (tabTop * sf));
             await appWindow.setPosition(new PhysicalPosition(posX, posY));
             await appWindow.setSize(new PhysicalSize(widthPhysical, heightPhysical));
         }
@@ -49,6 +55,7 @@
 
     async function toggleSidebar() {
         if (!open) {
+            windowIsSmall = false;
             // Expand OS window first, then CSS animate
             await updateWindowBounds(true);
             open = true;
@@ -56,6 +63,7 @@
             // CSS animate first, then shrink OS window
             open = false;
             setTimeout(() => {
+                windowIsSmall = true;
                 void updateWindowBounds(false);
             }, 250); // wait for 250ms CSS transition
         }
@@ -63,6 +71,49 @@
 
     function toggleNotes() {
         showNotes = !showNotes;
+    }
+
+    function onPointerDown(e: PointerEvent) {
+        if (e.button !== 0) return; // only left click
+        const target = e.currentTarget as HTMLElement;
+        target.setPointerCapture(e.pointerId);
+        isDragging = true;
+        dragStartScreenY = e.screenY;
+        dragStartTabTop = tabTop;
+        e.preventDefault(); // prevent text selection
+    }
+
+    function onPointerMove(e: PointerEvent) {
+        if (!isDragging) return;
+        const delta = e.screenY - dragStartScreenY;
+        let newTabTop = dragStartTabTop + delta;
+        
+        const maxTop = (screenH / sf) - 64;
+        if (newTabTop < 0) newTabTop = 0;
+        if (newTabTop > maxTop) newTabTop = maxTop;
+        
+        tabTop = newTabTop;
+
+        if (windowIsSmall) {
+            // update OS window position live
+            const widthPhysical = Math.round(26 * sf);
+            const posX = screenX + screenW - widthPhysical;
+            const posY = Math.round(screenY + (tabTop * sf));
+            void getCurrentWindow().setPosition(new PhysicalPosition(posX, posY));
+        }
+    }
+
+    function onPointerUp(e: PointerEvent) {
+        if (!isDragging) return;
+        const target = e.currentTarget as HTMLElement;
+        target.releasePointerCapture(e.pointerId);
+        isDragging = false;
+        
+        localStorage.setItem('sidebar_tab_top', tabTop.toString());
+        
+        if (Math.abs(e.screenY - dragStartScreenY) < 3) {
+            void toggleSidebar();
+        }
     }
 
     onMount(async () => {
@@ -76,7 +127,7 @@
 
         try {
             let monitor = await currentMonitor();
-            if (!monitor) monitor = await primaryMonitor();
+            monitor ??= await primaryMonitor();
             
             if (monitor) {
                 sf = monitor.scaleFactor;
@@ -84,6 +135,13 @@
                 screenH = monitor.size.height;
                 screenX = monitor.position.x;
                 screenY = monitor.position.y;
+                
+                const savedTabTop = localStorage.getItem('sidebar_tab_top');
+                if (savedTabTop !== null) {
+                    tabTop = parseFloat(savedTabTop);
+                } else {
+                    tabTop = (screenH / sf - 64) / 2;
+                }
                 
                 await updateWindowBounds(open);
             }
@@ -132,7 +190,15 @@
 </script>
 
 <div class="widget" class:open>
-    <button class="tab" onclick={toggleSidebar} aria-label="Toggle day column">
+    <button 
+        class="tab"
+        style="margin-top: {windowIsSmall ? 0 : tabTop}px;"
+        onpointerdown={onPointerDown}
+        onpointermove={onPointerMove}
+        onpointerup={onPointerUp}
+        onpointercancel={onPointerUp}
+        aria-label="Toggle day column"
+    >
         <span class="arrow">{open ? '›' : '‹'}</span>
     </button>
     <div class="panel">
@@ -184,7 +250,7 @@
     }
 
     .tab {
-        align-self: center;
+        align-self: flex-start;
         width: 22px;
         height: 64px;
         background: rgba(12, 12, 10, 0.75);

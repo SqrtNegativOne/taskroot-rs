@@ -39,8 +39,22 @@ pub fn get_sync_state(app: tauri::AppHandle) -> Result<SyncState, AppError> {
         .map_or_else(|_| SyncState::default(), |guard| guard.clone()))
 }
 
+pub struct SyncTrigger(pub tokio::sync::mpsc::Sender<()>);
+
+pub fn trigger_sync(app: &AppHandle) {
+    if let Some(trigger) = app.try_state::<SyncTrigger>() {
+        let _ = trigger.0.try_send(());
+    }
+}
+
 pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(100);
+    app.manage(SyncTrigger(tx));
+
     let pool = Arc::new(pool);
+    let app_clone = app.clone();
+    let pool_clone = pool.clone();
+
     tauri::async_runtime::spawn(async move {
         let mut interval = interval(Duration::from_secs(SYNC_INTERVAL_SECS as u64));
 
@@ -49,8 +63,33 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
 
             let next_sync = Utc::now() + chrono::Duration::seconds(SYNC_INTERVAL_SECS);
 
-            if let Err(e) = run_tracked_sync(&app, &pool, next_sync).await {
+            if let Err(e) = run_tracked_sync(&app_clone, &pool_clone, Some(next_sync)).await {
                 eprintln!("Sync Engine Error: {e}");
+            }
+        }
+    });
+
+    tauri::async_runtime::spawn(async move {
+        loop {
+            if rx.recv().await.is_none() {
+                break;
+            }
+
+            loop {
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_secs(10)) => {
+                        break;
+                    }
+                    opt = rx.recv() => {
+                        if opt.is_none() {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if let Err(e) = run_tracked_sync(&app, &pool, None).await {
+                eprintln!("Debounced Sync Error: {e}");
             }
         }
     });
@@ -59,12 +98,14 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
 pub(crate) async fn run_tracked_sync(
     app: &AppHandle,
     pool: &SqlitePool,
-    next_sync_at: DateTime<Utc>,
+    next_sync_at: Option<DateTime<Utc>>,
 ) -> Result<(), String> {
     if let Ok(mut guard) = app.state::<SyncStateManager>().0.lock() {
         guard.is_syncing = true;
         guard.error = None;
-        guard.next_sync_at = Some(next_sync_at);
+        if let Some(time) = next_sync_at {
+            guard.next_sync_at = Some(time);
+        }
     }
     let _ = app.emit(crate::events::SYNC_STARTED, ());
 
@@ -122,7 +163,7 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
             crate::sync::types::SyncItemData::Event(mut event) => {
                 if item.action == crate::sync::types::SyncAction::Delete {
                     if let Some(remote_id) = &event.remote_id {
-                        if crate::apis::google_calendar::delete(remote_id, &access_token)
+                        if crate::apis::google_calendar::delete(remote_id, event.remote_collection_id.as_deref(), &access_token)
                             .await
                             .is_err()
                         {

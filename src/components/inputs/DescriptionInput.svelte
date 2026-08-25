@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-
     interface Props {
         value: string | undefined | null;
         onchange: (val: string) => void;
@@ -36,7 +34,7 @@
 
     function handleBlur() {
         editing = false;
-        if (localValue !== value) onchange(localValue || "");
+        if (localValue !== value) onchange(localValue ?? "");
     }
     
     function focusAction(node: HTMLTextAreaElement) {
@@ -53,12 +51,12 @@
         class={className}
         style={`min-height: 24px; cursor: ${disabled ? "not-allowed" : "text"}; padding: 0; color: ${value ? "var(--fg)" : "var(--fg-dim)"}; border-radius: 4px; background: none; border: none; font: inherit; text-align: left; width: 100%; ${style}`}
     >
-        {value || "Add description..."}
+        {value ?? "Add description..."}
     </button>
 {:else}
     <textarea
         use:focusAction
-        value={localValue || ""}
+        value={localValue ?? ""}
         oninput={handleTextareaChange}
         onblur={handleBlur}
         rows="5"

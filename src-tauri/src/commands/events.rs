@@ -21,7 +21,7 @@ pub async fn create_event(
     mut event: domain::AppEvent,
 ) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sync::push::push_or_enqueue(&pool, &mut event, sync::types::SyncAction::Create).await;
+    sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Create).await;
     Ok(db::create_event(&pool, event).await?)
 }
 
@@ -34,7 +34,7 @@ pub async fn update_event(
     mut event: domain::AppEvent,
 ) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sync::push::push_or_enqueue(&pool, &mut event, sync::types::SyncAction::Update).await;
+    sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Update).await;
     Ok(db::update_event(&pool, event).await?)
 }
 
@@ -46,9 +46,9 @@ pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppEr
     let pool = crate::db_pool(&app)?;
 
     if let Ok(Some(event)) = db::get_event(&pool, &id).await {
-        let pool_clone = (*pool).clone();
+        let app_clone = app.clone();
         tokio::spawn(async move {
-            sync::push::push_delete_or_enqueue(&pool_clone, &event).await;
+            sync::push::push_delete_or_enqueue(&app_clone, &event).await;
         });
     }
 

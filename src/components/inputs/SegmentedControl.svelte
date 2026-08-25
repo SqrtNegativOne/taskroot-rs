@@ -12,11 +12,11 @@
         style?: string;
     }
 
-    let { options = [], selected, onchange, class: className = '', style = '' }: Props = $props();
+    let { options, selected, onchange, class: className = '', style = '' }: Props = $props();
 </script>
 
 <div class={className} style={`display: flex; background: var(--bg-input, #eee); border-radius: 6px; padding: 2px; width: fit-content; ${style}`}>
-    {#each options as opt}
+    {#each options as opt (opt.value)}
         <button
             type="button"
             onclick={() => onchange(opt.value)}

@@ -50,7 +50,7 @@ export class AppStore {
         const result = await ResultAsync.combine([
             safeInvoke<AppTask[]>('get_tasks'),
             safeInvoke<AppEvent[]>('get_events'),
-            safeInvoke<any>('get_settings')
+            safeInvoke<AppSettings>('get_settings')
         ]);
 
         if (result.isErr()) {
@@ -99,7 +99,7 @@ export class AppStore {
         if (result.isErr()) return err(result.error);
         const refreshResult = await this.refresh();
         if (refreshResult.isOk()) {
-            import('@tauri-apps/api/event').then(({ emit }) => {
+            void import('@tauri-apps/api/event').then(({ emit }) => {
                 void emit('store-updated');
             });
         }
@@ -110,7 +110,7 @@ export class AppStore {
 export const store = new AppStore();
 
 if (typeof window !== 'undefined') {
-    import('@tauri-apps/api/event').then(({ listen }) => {
+    void import('@tauri-apps/api/event').then(({ listen }) => {
         void listen('store-updated', () => {
             void store.refresh();
         });

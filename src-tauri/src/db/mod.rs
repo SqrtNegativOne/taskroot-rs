@@ -20,18 +20,90 @@ pub trait FilterColumnExt {
     );
 }
 
-static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
-
 /// # Errors
 ///
-/// Returns an error if connecting or running migrations fails.
+/// Returns an error if connecting or running schema creation fails.
 pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(db_path)?
         .create_if_missing(true)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
     let pool = SqlitePool::connect_with(options).await?;
-    MIGRATOR.run(&pool).await?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            status TEXT,
+            priority INTEGER,
+            tags TEXT,
+            subtasks TEXT,
+            parent_task TEXT,
+            dependencies TEXT,
+            est INTEGER,
+            added TEXT,
+            canvas_x REAL,
+            canvas_y REAL,
+            on_canvas BOOLEAN,
+            remote_id TEXT,
+            notes TEXT,
+            tabs TEXT,
+            due TEXT,
+            deleted BOOLEAN,
+            updated_at INTEGER,
+            etag TEXT,
+            dirty BOOLEAN DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            remote_id TEXT,
+            remote_collection_id TEXT,
+            task_id TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            rrule TEXT,
+            exdates TEXT,
+            recurring_event_id TEXT,
+            original_start_time TEXT,
+            cancelled BOOLEAN,
+            updated_at INTEGER,
+            deleted BOOLEAN,
+            etag TEXT,
+            dirty BOOLEAN DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_type TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            payload TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS tags (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            color TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS task_tags (
+            task_id TEXT NOT NULL,
+            tag_id TEXT NOT NULL,
+            PRIMARY KEY (task_id, tag_id),
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        );"
+    )
+    .execute(&pool)
+    .await?;
 
     Ok(pool)
 }
@@ -64,15 +136,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_migrations_create_all_tables() {
+    async fn test_schema_creates_all_tables() {
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
-
-        let applied: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 1")
-                .fetch_one(&pool)
-                .await
-                .expect("Failed to query migrations table");
-        assert_eq!(applied.0, 1);
 
         for table in [
             "tasks",
@@ -89,7 +154,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .expect("Failed to query sqlite_master");
-            assert_eq!(row.0, 1, "table {table} should exist after migrations");
+            assert_eq!(row.0, 1, "table {table} should exist after init_db");
         }
     }
 

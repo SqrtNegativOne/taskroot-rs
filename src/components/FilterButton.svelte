@@ -1,8 +1,9 @@
 <script lang="ts" generics="F extends { column?: string | null, operator?: string | null, value?: unknown }">
+    import MultiSelect from './inputs/MultiSelect.svelte';
     let {
         filters = $bindable([]),
         columns = [],
-        getValuesForColumn = (col: string): string[] => [],
+        getValuesForColumn = (_col: string): string[] => [],
         align = "left",
     }: {
         filters?: F[];
@@ -82,20 +83,12 @@
 
                     <div style="flex: 1; display: flex;">
                         {#if availableValues.length > 0}
-                            <select
-                                multiple
-                                value={Array.isArray(f.value) ? f.value : (f.value != null ? [f.value] : [])}
-                                onchange={(e) => {
-                                    const opts = Array.from(e.currentTarget.selectedOptions).map(o => o.value);
-                                    updateFilter(i, { value: opts });
-                                }}
-                                style="flex: 1; height: auto; min-height: 2em; padding: 2px;"
-                                class="form-select"
-                            >
-                                {#each availableValues as val (val)}
-                                    <option value={val}>{val}</option>
-                                {/each}
-                            </select>
+                            <MultiSelect
+                                options={availableValues.map(v => ({ label: v, value: v }))}
+                                values={Array.isArray(f.value) ? f.value as string[] : (f.value != null ? [f.value as string] : [])}
+                                onchange={(val) => updateFilter(i, { value: val })}
+                                style="flex: 1;"
+                            />
                         {:else}
                             <input
                                 type="text"

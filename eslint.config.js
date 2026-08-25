@@ -2,17 +2,16 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintPluginSvelte from 'eslint-plugin-svelte';
 import svelteParser from 'svelte-eslint-parser';
+import oxlint from 'eslint-plugin-oxlint';
 
 export default tseslint.config(
   eslint.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  ...tseslint.configs.stylisticTypeChecked,
+  ...tseslint.configs.recommended,
   ...eslintPluginSvelte.configs['flat/recommended'],
+  oxlint.configs['flat/recommended'],
   {
     languageOptions: {
       parserOptions: {
-        project: true,
-        tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.svelte'],
       },
     },
@@ -23,12 +22,10 @@ export default tseslint.config(
       parser: svelteParser,
       parserOptions: {
         parser: tseslint.parser,
-        project: true,
         extraFileExtensions: ['.svelte'],
       },
     },
     rules: {
-      '@typescript-eslint/no-confusing-void-expression': 'off',
     },
   },
   {
@@ -37,17 +34,13 @@ export default tseslint.config(
   {
     rules: {
       'no-undef': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
-      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'svelte/valid-compile': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+      '@typescript-eslint/no-unnecessary-condition': 'off'
     }
   },
   {

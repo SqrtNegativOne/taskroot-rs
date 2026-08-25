@@ -55,7 +55,6 @@ export class StopwatchState {
     get isCountdown() {
         if (!store.loaded || !store.settings) return false;
         const style = store.settings.clock_style;
-        if (style === undefined) throw new Error("CRITICAL: clock_style is undefined! Settings not loaded or schema mismatched.");
         if (style === 'guzey') return true;
         if (style === 'flowtime' && this.isBreak) return true;
         return false;
@@ -64,15 +63,15 @@ export class StopwatchState {
     get activePhase(): 'work' | 'break' {
         if (!store.loaded || !store.settings) return this.isBreak ? 'break' : 'work';
         const style = store.settings.clock_style;
-        if (style === undefined) throw new Error("CRITICAL: clock_style is undefined! Settings not loaded or schema mismatched.");
         
         if (style === 'guzey') {
+            // eslint-disable-next-line svelte/prefer-svelte-reactivity
             const date = new Date();
             const hour = date.getHours();
             const min = date.getMinutes();
             if (hour % 3 === 0 && min < 35) return 'break';
-            if (min >= 25 && min < 30) return 'break';
-            if (min >= 55) return 'break';
+            if (min >= 0 && min < 5) return 'break';
+            if (min >= 30 && min < 35) return 'break';
             return 'work';
         }
         return this.isBreak ? 'break' : 'work';
@@ -81,10 +80,10 @@ export class StopwatchState {
     get currentMs() {
         if (!store.loaded || !store.settings) return 0;
         const style = store.settings.clock_style;
-        if (style === undefined) throw new Error("CRITICAL: clock_style is undefined! Settings not loaded or schema mismatched.");
         
         const nowMs = Date.now();
         if (style === 'guzey') {
+            // eslint-disable-next-line svelte/prefer-svelte-reactivity
             const date = new Date(nowMs);
             const hour = date.getHours();
             const min = date.getMinutes();
@@ -93,9 +92,9 @@ export class StopwatchState {
             
             let targetMin = 60;
             if (hour % 3 === 0 && min < 35) targetMin = 35;
-            else if (min < 25) targetMin = 25;
+            else if (min < 5) targetMin = 5;
             else if (min < 30) targetMin = 30;
-            else if (min < 55) targetMin = 55;
+            else if (min < 35) targetMin = 35;
             
             const msLeft = (targetMin * 60 * 1000) - ((min * 60 * 1000) + (sec * 1000) + ms);
             return Math.max(0, msLeft);
@@ -105,7 +104,7 @@ export class StopwatchState {
             const breakTaken = this.breakElapsed + (this.breakRunningSince !== undefined ? nowMs - this.breakRunningSince : 0);
             if (style === 'flowtime') {
                 const totalWork = this.elapsed; // For simplicity, only completed work chunks count. If you want ongoing work to count, it requires more complex math.
-                const breakDivisor = store.settings?.flowtime_break_divisor || 5;
+                const breakDivisor = store.settings.flowtime_break_divisor || 5;
                 const breakEarned = totalWork / breakDivisor;
                 return Math.max(0, breakEarned - breakTaken); 
             }
@@ -153,7 +152,7 @@ function playBeep() {
     import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
         if (getCurrentWindow().label !== 'main') return;
         try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const ctx = new window.AudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -178,7 +177,7 @@ function playBeep() {
         } catch (e) {
             console.error('Failed to play beep', e);
         }
-    }).catch(() => {});
+    }).catch(() => { /* ignore */ });
 }
 
 if (typeof window !== 'undefined') {

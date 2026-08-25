@@ -11,7 +11,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Desktop Wrapper**: Tauri v2 (Rust backend, configured in `src-tauri/tauri.conf.json`).
 - **Language**: TypeScript (`.ts`, `.svelte`) on the frontend, Rust (`.rs`) on the backend.
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.
-- **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`, with the `migrate` feature). Schema is applied via `sqlx::migrate!` from `src-tauri/migrations/0001_init.sql`. Data is queried via Tauri IPC commands.
+- **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`, with the `migrate` feature). Schema is applied via inline CREATE statements in `db::init_db`. Data is queried via Tauri IPC commands.
 - **Type Sharing**: `ts-rs` generates `src/lib/bindings/*.generated.ts` from Rust structs; `cargo test` is the regeneration trigger (see Key Concepts).
 - **Testing**: Playwright E2E (`playwright.config.ts`, specs in `tests/e2e/`, run via `bun run test`; the config boots `bun run dev` on port 1420 with chromium) and Rust unit tests (`cargo test` in `src-tauri`, currently 32 passing, including migration assertions and `AppError` shape checks).
 - **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo test`. **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
@@ -37,7 +37,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/commands/`: IPC command handlers split by domain (`tasks.rs`, `events.rs`, `window.rs`, `sync.rs`).
   - `src-tauri/src/error.rs`: `AppError` enum (`thiserror`) returned by ALL IPC commands; serialized as `{code, message}`.
   - `src-tauri/src/events.rs`: Centralized event-name constants (`STOPWATCH_UPDATED`, `SYNC_STARTED/FINISHED/ERROR`, `OAUTH_URL`).
-  - `src-tauri/src/db/`: Modularized SQLite operations using `sqlx` (`tasks.rs`, `events.rs`, `settings.rs`, plus `task_filters.rs` for the dynamic `QueryBuilder` filtering path). `init_db` runs `sqlx::migrate!` against `src-tauri/migrations/`.
+  - `src-tauri/src/db/`: Modularized SQLite operations using `sqlx` (`tasks.rs`, `events.rs`, `settings.rs`, plus `task_filters.rs` for the dynamic `QueryBuilder` filtering path). `init_db` creates tables using inline SQL.
   - `src-tauri/src/domain/`: Core data structures (`mod.rs`, `sigil.rs` for sigil parsing, `filters.rs` for filter columns/types).
   - `src-tauri/src/sync/`: Global sync engine: `mod.rs` (5-minute poller, `SyncState`), `push.rs` (Google push logic), `types.rs`, and the offline queue (`queue.rs`, `queue_store.rs`).
   - `src-tauri/src/stopwatch.rs`: Stopwatch backend (`StopwatchState` struct plus `get/toggle/reset_stopwatch` commands).
@@ -46,7 +46,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/apis/`: 3rd party API integrations (Google Calendar, Google Tasks).
   - `src-tauri/src/auth.rs`: OAuth authentication and token management.
   - `src-tauri/src/screens/`: Screen-specific backend commands and logic (e.g., `plan/`).
-  - `src-tauri/migrations/0001_init.sql`: Baseline schema applied via `sqlx::migrate!`.
+
 
 ## Key Concepts
 - **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `db`, `not-found`, `auth`, `sync`, `invalid-input`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.
@@ -54,7 +54,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **State Management**: Frontend state is managed using Svelte 5 Runes (`$state`, `$effect`). The primary store is located in `src/lib/store.svelte.ts`, which syncs with the Rust backend via Tauri IPC (`invoke` wrapped in `safeInvoke`). **Crucially, the frontend relies strictly on the SQLite backend as the source of truth.** It avoids complex optimistic patching arrays locally; instead, mutations return `neverthrow` `Result`s, `await` the backend command, and then instantly re-fetch the raw state from the database. This prevents race conditions and UI pop-backs, as local SQLite queries return in ~1-3ms.
 - **Generated Bindings Flow**: `cargo test` in `src-tauri` regenerates `src/lib/bindings/*.generated.ts` via `ts-rs` (`export_bindings_*` tests). After changing any `#[derive(TS)]` struct, run `cargo test` and commit the regenerated files. CI fails on binding drift (`git diff --exit-code src/lib/bindings`). The `#[ts(type = "number")]` convention keeps timestamps as JS `number` — never `bigint`.
 - **Local-Date Rule**: All day bucketing/comparison must go through `src/lib/time.ts` (`ymd`, `addDays`, `dayDiff`, `sameDay`), which operate on local date parts. `Date.toISOString()` is UTC-shifted and must not be used to derive a calendar day.
-- **Database & Migrations**: All tasks and events are stored locally in an SQLite database (`taskroot.db`) located in the app data directory. The schema lives in `src-tauri/migrations/0001_init.sql`, applied by `init_db` via `sqlx::migrate!`. Its `CREATE TABLE IF NOT EXISTS` guards are deliberate: databases created before the migration system existed have no `_sqlx_migrations` table, so `0001` runs against them once and must no-op instead of failing.
+- **Database & Migrations**: All tasks and events are stored locally in an SQLite database (`taskroot.db`) located in the app data directory. The schema is created in `db::init_db` using inline SQL queries with `CREATE TABLE IF NOT EXISTS` guards.
 - **Deliberate Dead Code**: `get_dirty_tasks`/`get_dirty_events` and some `SyncQueue` methods carry `#[allow(dead_code)]`; they are reserved for the offline-enqueue roadmap (see `TODO.md`). Do not delete them.
 - **Multi-Window Architecture**: Three windows are declared in `tauri.conf.json`:
   - **Main Window** (`main`): The primary Svelte app; hides to tray on close.

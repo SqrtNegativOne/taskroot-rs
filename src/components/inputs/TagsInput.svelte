@@ -1,5 +1,6 @@
 <script lang="ts">
     interface Props {
+        id?: string;
         tags: string[];
         onchange: (tags: string[]) => void;
         placeholder?: string;
@@ -7,7 +8,7 @@
         style?: string;
     }
 
-    let { tags = [], onchange, placeholder = 'Add tag...', class: className = '', style = '' }: Props = $props();
+    let { id, tags, onchange, placeholder = 'Add tag...', class: className = '', style = '' }: Props = $props();
     let inputValue = $state('');
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -29,7 +30,7 @@
 </script>
 
 <div class={className} style={`display: flex; flex-wrap: wrap; gap: 4px; background: var(--bg-input, transparent); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 4px; min-height: 32px; box-sizing: border-box; width: 100%; ${style}`}>
-    {#each tags as tag}
+    {#each tags as tag (tag)}
         <span style="background: var(--accent, #007bff); color: var(--bg, #fff); padding: 2px 8px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 4px; user-select: none;">
             {tag}
             <button 
@@ -43,6 +44,7 @@
         </span>
     {/each}
     <input
+        {id}
         type="text"
         {placeholder}
         bind:value={inputValue}

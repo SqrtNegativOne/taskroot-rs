@@ -37,7 +37,7 @@
         {:else if item.type === 'checkbox'}
             <ToggleSwitch
                 checked={Boolean(selectValue())}
-                onchange={(checked) => onchange(checked)}
+                onchange={(checked: boolean) => onchange(checked)}
                 ariaLabel={item.label}
             />
         {:else if item.type === 'number'}
@@ -104,8 +104,8 @@
         justify-content: flex-end;
     }
 
-    input[type='text'],
-    input[type='number'],
+    :global(input[type='text']),
+    :global(input[type='number']),
     select {
         padding: 6px 10px;
         border: 1px solid var(--border-color);
@@ -117,7 +117,7 @@
         max-width: 200px;
     }
 
-    input[type='checkbox'] {
+    :global(input[type='checkbox']) {
         width: 18px;
         height: 18px;
     }

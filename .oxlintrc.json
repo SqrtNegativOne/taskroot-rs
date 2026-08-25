@@ -1,0 +1,27 @@
+{
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "ignorePatterns": [
+    ".svelte-kit/",
+    "dist/",
+    "src-tauri/",
+    "node_modules/",
+    "*.config.js",
+    "build/",
+    "legacy-src/",
+    "playwright.config.ts"
+  ],
+  "rules": {
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ]
+  }
+}

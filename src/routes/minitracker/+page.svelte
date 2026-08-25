@@ -113,7 +113,6 @@
             currentMonitor()
         ]);
         
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!isDragging) return;
 
         initialWinX = pos.x / factor;
@@ -143,7 +142,6 @@
             await getCurrentWindow().setPosition(new LogicalPosition(pendingX, pendingY));
         } finally {
             isSettingPosition = false;
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (wantsToSetPosition) {
                 requestAnimationFrame(() => { void updatePosition(); });
             }

@@ -88,11 +88,12 @@
 </div>
 
 <div class="inspector-field">
-    <label>Tags</label>
+    <label for={`tags-${task.id}`}>Tags</label>
     <TagsInput
+        id={`tags-${task.id}`}
         tags={task.tags ? task.tags.map(t => t.name) : []}
-        onchange={(newTags) => {
-            updateTask(task.id, (t) => ({ ...t, tags: newTags.map(name => ({ id: crypto.randomUUID(), name })) }));
+        onchange={(newTags: string[]) => {
+            updateTask(task.id, (t) => ({ ...t, tags: newTags.map((name: string) => ({ id: crypto.randomUUID(), name })) }));
         }}
     />
 </div>

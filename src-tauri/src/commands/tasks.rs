@@ -24,7 +24,7 @@ pub async fn get_tasks(app: tauri::AppHandle) -> Result<Vec<domain::AppTask>, Ap
 #[tauri::command]
 pub async fn create_task(app: tauri::AppHandle, mut task: domain::AppTask) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sync::push::push_or_enqueue(&pool, &mut task, sync::types::SyncAction::Create).await;
+    sync::push::push_or_enqueue(&app, &mut task, sync::types::SyncAction::Create).await;
     Ok(db::create_task(&pool, task).await?)
 }
 
@@ -34,7 +34,7 @@ pub async fn create_task(app: tauri::AppHandle, mut task: domain::AppTask) -> Re
 #[tauri::command]
 pub async fn update_task(app: tauri::AppHandle, mut task: domain::AppTask) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sync::push::push_or_enqueue(&pool, &mut task, sync::types::SyncAction::Update).await;
+    sync::push::push_or_enqueue(&app, &mut task, sync::types::SyncAction::Update).await;
     Ok(db::update_task(&pool, task).await?)
 }
 
@@ -46,9 +46,9 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
     let pool = crate::db_pool(&app)?;
 
     if let Ok(Some(task)) = db::get_task(&pool, &id).await {
-        let pool_clone = (*pool).clone();
+        let app_clone = app.clone();
         tokio::spawn(async move {
-            sync::push::push_delete_or_enqueue(&pool_clone, &task).await;
+            sync::push::push_delete_or_enqueue(&app_clone, &task).await;
         });
     }
 

@@ -66,9 +66,9 @@
 
   .day-event {
     position: absolute;
-    background: var(--bg-surface);
+    background: var(--ev-bg, var(--bg-surface));
     border: 1px solid var(--border-strong);
-    border-left: 3px solid var(--fg-dimmer);
+    border-left: 3px solid var(--ev-color, var(--fg-dimmer));
     padding: 4px 8px 0 8px;
     overflow: hidden;
     cursor: grab;
