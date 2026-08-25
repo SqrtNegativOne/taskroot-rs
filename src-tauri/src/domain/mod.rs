@@ -22,6 +22,7 @@ pub enum AppTaskStatus {
 }
 
 impl AppTaskStatus {
+    #[must_use]
     pub fn all_values() -> Vec<String> {
         vec!["todo".into(), "next-up".into(), "doing".into(), "done".into()]
     }

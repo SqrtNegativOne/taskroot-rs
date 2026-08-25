@@ -45,6 +45,8 @@
             saveError = `Could not save "${id}". The change was discarded.`;
             return;
         }
+        const { emit } = await import('@tauri-apps/api/event');
+        void emit('store-updated');
         await loadSettings();
     }
 </script>

@@ -136,6 +136,7 @@ pub fn run() {
             auth::reset_auth,
             stopwatch::get_stopwatch_state,
             stopwatch::toggle_stopwatch,
+            stopwatch::toggle_break,
             stopwatch::reset_stopwatch,
             settings::get_settings_schema,
             settings::get_settings,

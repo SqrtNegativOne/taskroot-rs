@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(
     export,
@@ -21,23 +21,9 @@ pub struct StopwatchState {
     pub running_since: Option<u64>,
     pub is_break: bool,
     #[ts(type = "number")]
-    pub break_allowed_ms: u64,
+    pub break_elapsed: u64,
     #[ts(type = "number | null")]
-    pub break_started_at: Option<u64>,
-    pub break_sound_played: bool,
-}
-
-impl Default for StopwatchState {
-    fn default() -> Self {
-        Self {
-            elapsed: 0,
-            running_since: None,
-            is_break: false,
-            break_allowed_ms: 5 * 60 * 1000,
-            break_started_at: None,
-            break_sound_played: false,
-        }
-    }
+    pub break_running_since: Option<u64>,
 }
 
 pub struct StopwatchManager(pub Mutex<StopwatchState>);
@@ -72,6 +58,14 @@ pub fn get_stopwatch_state(app: tauri::AppHandle) -> Result<StopwatchState, AppE
 pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let now = current_epoch_millis()?;
     let updated = with_locked_state(&app, |s| {
+        if s.is_break {
+            if let Some(since) = s.break_running_since {
+                s.break_elapsed += now.saturating_sub(since);
+                s.break_running_since = None;
+            }
+            s.is_break = false;
+        }
+
         if let Some(since) = s.running_since {
             s.elapsed += now.saturating_sub(since);
             s.running_since = None;
@@ -86,10 +80,38 @@ pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppErro
 }
 
 #[tauri::command]
+pub fn toggle_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
+    let now = current_epoch_millis()?;
+    let updated = with_locked_state(&app, |s| {
+        if s.is_break {
+            if let Some(since) = s.break_running_since {
+                s.break_elapsed += now.saturating_sub(since);
+                s.break_running_since = None;
+            }
+            s.is_break = false;
+        } else {
+            if let Some(since) = s.running_since {
+                s.elapsed += now.saturating_sub(since);
+                s.running_since = None;
+            }
+            s.is_break = true;
+            s.break_running_since = Some(now);
+        }
+
+        s.clone()
+    })?;
+    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    Ok(updated)
+}
+
+#[tauri::command]
 pub fn reset_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_locked_state(&app, |s| {
         s.elapsed = 0;
         s.running_since = None;
+        s.is_break = false;
+        s.break_elapsed = 0;
+        s.break_running_since = None;
         s.clone()
     })?;
     let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);

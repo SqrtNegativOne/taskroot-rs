@@ -50,47 +50,44 @@ fn apply_sql(
         return;
     }
 
-    match &def.filter_type {
-        crate::domain::FilterType::Relation(rel) => {
-            if rel == "task_tags" {
-                builder.push(" AND (");
-                for (i, v) in values.iter().enumerate() {
-                    if i > 0 {
-                        builder.push(if is_not { " AND " } else { " OR " });
-                    }
-                    let vs = v.as_str().unwrap_or("");
-                    let quantifier = if is_not { "NOT IN" } else { "IN" };
-                    builder.push(format!(
-                        "t.id {quantifier} (SELECT task_id FROM task_tags tt \
-                         JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name LIKE "
-                    ));
-                    builder.push_bind(format!("%{vs}%"));
-                    builder.push(")");
+    if let crate::domain::FilterType::Relation(rel) = &def.filter_type {
+        if rel == "task_tags" {
+            builder.push(" AND (");
+            for (i, v) in values.iter().enumerate() {
+                if i > 0 {
+                    builder.push(if is_not { " AND " } else { " OR " });
                 }
+                let vs = v.as_str().unwrap_or("");
+                let quantifier = if is_not { "NOT IN" } else { "IN" };
+                builder.push(format!(
+                    "t.id {quantifier} (SELECT task_id FROM task_tags tt \
+                     JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name LIKE "
+                ));
+                builder.push_bind(format!("%{vs}%"));
                 builder.push(")");
-            }
-        }
-        _ => {
-            // Text, Number, Enum
-            builder.push(if is_not {
-                format!(" AND {} NOT IN (", def.db_col)
-            } else {
-                format!(" AND {} IN (", def.db_col)
-            });
-            let mut separated = builder.separated(", ");
-            for v in &values {
-                if let Some(n) = v.as_i64() {
-                    separated.push_bind(i32::try_from(n).unwrap_or(0));
-                } else if let Some(s) = v.as_str() {
-                    if let crate::domain::FilterType::Number = &def.filter_type {
-                        separated.push_bind(s.parse::<i32>().unwrap_or(-1));
-                    } else {
-                        separated.push_bind(s);
-                    }
-                }
             }
             builder.push(")");
         }
+    } else {
+        // Text, Number, Enum
+        builder.push(if is_not {
+            format!(" AND {} NOT IN (", def.db_col)
+        } else {
+            format!(" AND {} IN (", def.db_col)
+        });
+        let mut separated = builder.separated(", ");
+        for v in &values {
+            if let Some(n) = v.as_i64() {
+                separated.push_bind(i32::try_from(n).unwrap_or(0));
+            } else if let Some(s) = v.as_str() {
+                if matches!(&def.filter_type, crate::domain::FilterType::Number) {
+                    separated.push_bind(s.parse::<i32>().unwrap_or(-1));
+                } else {
+                    separated.push_bind(s);
+                }
+            }
+        }
+        builder.push(")");
     }
 }
 

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields, Meta};
+use syn::{parse_macro_input, DeriveInput, Data, Fields};
 
 #[proc_macro_derive(Filterable, attributes(filter))]
 pub fn filterable_derive(input: TokenStream) -> TokenStream {

@@ -13,20 +13,6 @@
 
     const now = useNow();
 
-    let tooltipText = $derived.by(() => {
-        const parts: string[] = [];
-        if (syncError) {
-            parts.push(`Error: ${syncError}`);
-        }
-        if (nextSyncAt) {
-            const timeStr = nextSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            parts.push(`Next sync: ${timeStr}`);
-        } else {
-            parts.push('Next sync: Unknown');
-        }
-        return parts.join('\n');
-    });
-
     let countdownText = $derived.by(() => {
         if (!nextSyncAt) return '';
         const diffMs = nextSyncAt.getTime() - now.ms;
@@ -35,6 +21,22 @@
         const m = Math.floor(diffMs / 60000);
         const s = Math.floor((diffMs % 60000) / 1000);
         return `${m.toString()}m ${s.toString()}s`;
+    });
+
+    let tooltipText = $derived.by(() => {
+        const parts: string[] = [];
+        if (syncError) {
+            parts.push(`Error: ${syncError}`);
+        }
+        if (countdownText && !isSyncing) {
+            parts.push(`Next sync in ${countdownText}`);
+        } else if (nextSyncAt) {
+            const timeStr = nextSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            parts.push(`Next sync: ${timeStr}`);
+        } else {
+            parts.push('Next sync: Unknown');
+        }
+        return parts.join('\n');
     });
 
     onMount(() => {
@@ -81,8 +83,5 @@
 </script>
 
 <button class="stage" onclick={handleSync} disabled={isSyncing} style="padding: 0 4px; display: flex; background: transparent; border: none; cursor: pointer; color: {syncError ? 'var(--tag-red)' : 'inherit'}; align-items: center; gap: 4px;" aria-label="Sync" title={tooltipText}>
-    {#if countdownText && !isSyncing}
-        <span style="font-size: 11px; opacity: 0.7; font-family: monospace;">{countdownText}</span>
-    {/if}
     <span class="material-symbols-outlined {isSyncing ? 'spinning' : ''}" style="font-size: 18px;">sync</span>
 </button>

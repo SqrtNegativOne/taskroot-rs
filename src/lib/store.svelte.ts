@@ -2,6 +2,7 @@ import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import type { AppTask, AppEvent } from './domain';
+import type { AppSettings } from './bindings/AppSettings.generated';
 
 const MAX_INIT_ATTEMPTS = 50;
 const INIT_RETRY_DELAY_MS = 100;
@@ -21,6 +22,7 @@ function delay(ms: number): Promise<void> {
 export class AppStore {
     tasks = $state<AppTask[]>([]);
     events = $state<AppEvent[]>([]);
+    settings = $state<AppSettings | null>(null);
     loaded = $state(false);
     error = $state<string | null>(null);
 
@@ -47,7 +49,8 @@ export class AppStore {
     async refresh(): Promise<Result<void, AppError>> {
         const result = await ResultAsync.combine([
             safeInvoke<AppTask[]>('get_tasks'),
-            safeInvoke<AppEvent[]>('get_events')
+            safeInvoke<AppEvent[]>('get_events'),
+            safeInvoke<any>('get_settings')
         ]);
 
         if (result.isErr()) {
@@ -55,9 +58,10 @@ export class AppStore {
             return err(normalizeAppError(result.error));
         }
 
-        const [fetchedTasks, fetchedEvents] = result.value;
+        const [fetchedTasks, fetchedEvents, fetchedSettings] = result.value;
         this.tasks = fetchedTasks;
         this.events = fetchedEvents;
+        this.settings = fetchedSettings;
         this.error = null;
         return ok(undefined);
     }
@@ -93,8 +97,22 @@ export class AppStore {
     private async commit(command: ResultAsync<unknown, AppError>): Promise<Result<void, AppError>> {
         const result = await command;
         if (result.isErr()) return err(result.error);
-        return this.refresh();
+        const refreshResult = await this.refresh();
+        if (refreshResult.isOk()) {
+            import('@tauri-apps/api/event').then(({ emit }) => {
+                void emit('store-updated');
+            });
+        }
+        return refreshResult;
     }
 }
 
 export const store = new AppStore();
+
+if (typeof window !== 'undefined') {
+    import('@tauri-apps/api/event').then(({ listen }) => {
+        void listen('store-updated', () => {
+            void store.refresh();
+        });
+    });
+}

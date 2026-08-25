@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getCurrentWindow } from '@tauri-apps/api/window';
+    import { getCurrentWindow, currentMonitor, LogicalPosition } from '@tauri-apps/api/window';
     import { store } from '../../lib/store.svelte';
     import { safeInvoke } from '../../lib/safeInvoke.svelte';
     import { useNow } from '../../lib/useNow.svelte';
@@ -62,6 +62,7 @@
     }
 
     onMount(() => {
+        void getCurrentWindow().setAlwaysOnTop(true);
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = KEYBOARD_SHORTCUTS.find((s) => matchesShortcut(e, s));
             if (!shortcut) return;
@@ -76,10 +77,111 @@
         };
     });
 
+    let isDragging = false;
+    let readyToDrag = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let initialWinX = 0;
+    let initialWinY = 0;
+    
+    let monitorRect: { left: number, right: number, top: number, bottom: number } | null = null;
+    let winSize: { width: number, height: number } | null = null;
+
+    let pendingX = 0;
+    let pendingY = 0;
+    let isSettingPosition = false;
+    let wantsToSetPosition = false;
+
+    const SNAP_THRESHOLD = 24;
+
     const handlePointerDown = async (e: PointerEvent) => {
         if (e.button !== 0) return;
+        const target = e.currentTarget as HTMLElement;
+        target.setPointerCapture(e.pointerId);
+
+        isDragging = true;
+        readyToDrag = false;
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+
         const appWindow = getCurrentWindow();
-        await appWindow.startDragging();
+        
+        const [pos, factor, size, monitor] = await Promise.all([
+            appWindow.outerPosition(),
+            appWindow.scaleFactor(),
+            appWindow.outerSize(),
+            currentMonitor()
+        ]);
+        
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (!isDragging) return;
+
+        initialWinX = pos.x / factor;
+        initialWinY = pos.y / factor;
+        winSize = { width: size.width / factor, height: size.height / factor };
+        
+        if (monitor) {
+            const mFactor = monitor.scaleFactor;
+            monitorRect = {
+                left: monitor.workArea.position.x / mFactor,
+                top: monitor.workArea.position.y / mFactor,
+                right: (monitor.workArea.position.x + monitor.workArea.size.width) / mFactor,
+                bottom: (monitor.workArea.position.y + monitor.workArea.size.height) / mFactor,
+            };
+        } else {
+            monitorRect = null;
+        }
+
+        readyToDrag = true;
+    };
+
+    async function updatePosition() {
+        if (isSettingPosition || !wantsToSetPosition) return;
+        isSettingPosition = true;
+        wantsToSetPosition = false;
+        try {
+            await getCurrentWindow().setPosition(new LogicalPosition(pendingX, pendingY));
+        } finally {
+            isSettingPosition = false;
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            if (wantsToSetPosition) {
+                requestAnimationFrame(() => { void updatePosition(); });
+            }
+        }
+    }
+
+    const handlePointerMove = (e: PointerEvent) => {
+        if (!isDragging || !readyToDrag) return;
+        
+        let newX = initialWinX + (e.screenX - dragStartX);
+        let newY = initialWinY + (e.screenY - dragStartY);
+
+        if (monitorRect && winSize) {
+            if (Math.abs(newX - monitorRect.left) < SNAP_THRESHOLD) {
+                newX = monitorRect.left;
+            } else if (Math.abs((newX + winSize.width) - monitorRect.right) < SNAP_THRESHOLD) {
+                newX = monitorRect.right - winSize.width;
+            }
+
+            if (Math.abs(newY - monitorRect.top) < SNAP_THRESHOLD) {
+                newY = monitorRect.top;
+            } else if (Math.abs((newY + winSize.height) - monitorRect.bottom) < SNAP_THRESHOLD) {
+                newY = monitorRect.bottom - winSize.height;
+            }
+        }
+
+        pendingX = newX;
+        pendingY = newY;
+        wantsToSetPosition = true;
+        void updatePosition();
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+        if (!isDragging) return;
+        isDragging = false;
+        readyToDrag = false;
+        const target = e.currentTarget as HTMLElement;
+        target.releasePointerCapture(e.pointerId);
     };
 
     const handleDoubleClick = async () => {
@@ -94,15 +196,28 @@
     class:is-dimmed={isDimmed}
     ondblclick={handleDoubleClick}
     onpointerdown={handlePointerDown}
+    onpointermove={handlePointerMove}
+    onpointerup={handlePointerUp}
+    onpointercancel={handlePointerUp}
     title="Double-click to restore main window"
 >
     <div class="clock" style="color: {textColor}">
-        <span class="font-normal">{timeParts.m}m</span>
-        {#if stopwatchState.isBreak}
-            left in break
-        {:else}
-            left for {activeTask ? activeTask.title : 'Work session'}
-        {/if}
+        <div class="time">{timeParts.m}:{timeParts.s}</div>
+        <div class="byline">
+            {#if stopwatchState.activePhase === 'break'}
+                {#if stopwatchState.isCountdown}
+                    left in break
+                {:else}
+                    in break
+                {/if}
+            {:else}
+                {#if stopwatchState.isCountdown}
+                    left {activeTask ? `for ${activeTask.title}` : 'for Work session'}
+                {:else}
+                    elapsed {activeTask ? `for ${activeTask.title}` : 'for Work session'}
+                {/if}
+            {/if}
+        </div>
     </div>
 </div>
 
@@ -142,12 +257,27 @@
     }
 
     .clock {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        gap: 4px;
+    }
+
+    .time {
+        font-size: min(55cqh, 28cqw);
+        font-family: monospace;
+        line-height: 1;
+        font-weight: normal;
+    }
+
+    .byline {
+        font-size: min(20cqh, 10cqw, 15px);
+        opacity: 0.8;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 100%;
-        /* dynamic sizing */
-        font-size: min(70cqh, calc(130cqw / 20));
-        font-family: monospace;
+        max-width: 95%;
     }
 </style>

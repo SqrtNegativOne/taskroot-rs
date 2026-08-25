@@ -11,7 +11,7 @@
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
 
     let selectorOpen = $state(false);
-    let allowNoTask = $state<boolean>(true);
+    let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
 
     let activeTask = $derived(store.tasks.find((task) => task.status === 'doing'));
 
@@ -116,10 +116,15 @@
             engine={stopwatchState}
             onToggle={() => { void toggleStopwatch(); }}
         />
-        <div style="position: absolute; right: 0; top: 0;">
-            <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin: 8px;" title="Open Mini Tracker">
+        <div style="position: absolute; right: 0; top: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-top: 8px; margin-right: 8px;" title="Open Mini Tracker">
                 Mini Tracker
             </button>
+            {#if store.settings?.clock_style === 'flowtime'}
+                <button onclick={() => { void stopwatchState.toggleBreak(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-right: 8px;" title="Toggle Break">
+                    {stopwatchState.isBreak ? 'End Break' : 'Take Break'}
+                </button>
+            {/if}
         </div>
 
         {#if (stopwatchState.running || stopwatchState.isBreak) && (activeTask ?? allowNoTask)}

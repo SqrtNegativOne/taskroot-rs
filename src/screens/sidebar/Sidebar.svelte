@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
-    import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
+    import { getCurrentWindow, currentMonitor, primaryMonitor } from '@tauri-apps/api/window';
+    import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
     import { store, describeError } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
     import { ymd, addDays } from '../../lib/time';
@@ -23,8 +23,42 @@
         });
     });
 
-    function toggleSidebar() {
-        open = !open;
+    let sf = 1;
+    let screenW = 0;
+    let screenH = 0;
+    let screenX = 0;
+    let screenY = 0;
+
+    async function updateWindowBounds(isOpen: boolean) {
+        if (screenW === 0 || screenH === 0) return;
+        const appWindow = getCurrentWindow();
+        if (isOpen) {
+            const widthPhysical = Math.round(354 * sf); // 350 + 4px buffer
+            const posX = screenX + screenW - widthPhysical;
+            await appWindow.setPosition(new PhysicalPosition(posX, screenY));
+            await appWindow.setSize(new PhysicalSize(widthPhysical, screenH));
+        } else {
+            const widthPhysical = Math.round(26 * sf); // 22 + 4px buffer
+            const heightPhysical = Math.round(64 * sf);
+            const posX = screenX + screenW - widthPhysical;
+            const posY = Math.round(screenY + (screenH - heightPhysical) / 2);
+            await appWindow.setPosition(new PhysicalPosition(posX, posY));
+            await appWindow.setSize(new PhysicalSize(widthPhysical, heightPhysical));
+        }
+    }
+
+    async function toggleSidebar() {
+        if (!open) {
+            // Expand OS window first, then CSS animate
+            await updateWindowBounds(true);
+            open = true;
+        } else {
+            // CSS animate first, then shrink OS window
+            open = false;
+            setTimeout(() => {
+                void updateWindowBounds(false);
+            }, 250); // wait for 250ms CSS transition
+        }
     }
 
     function toggleNotes() {
@@ -35,21 +69,26 @@
         notesText = localStorage.getItem('sidebar_notes') ?? '';
         showNotes = localStorage.getItem('sidebar_show_notes') === 'true';
 
-        // Auto position to right edge
         const appWindow = getCurrentWindow();
-        const monitor = await currentMonitor();
-        if (monitor) {
-            const sf = monitor.scaleFactor;
-            const screenW = monitor.size.width;
-            const screenH = monitor.size.height;
-            const widthPhysical = Math.round(350 * sf);
+        await appWindow.show();
+        await appWindow.unminimize();
+        await appWindow.setFocus();
+
+        try {
+            let monitor = await currentMonitor();
+            if (!monitor) monitor = await primaryMonitor();
             
-            const posX = monitor.position.x + screenW - widthPhysical;
-            const posY = monitor.position.y;
-            
-            await appWindow.setPosition(new LogicalPosition(posX / sf, posY / sf));
-            await appWindow.setSize(new LogicalSize(350, screenH / sf));
-            await appWindow.show();
+            if (monitor) {
+                sf = monitor.scaleFactor;
+                screenW = monitor.size.width;
+                screenH = monitor.size.height;
+                screenX = monitor.position.x;
+                screenY = monitor.position.y;
+                
+                await updateWindowBounds(open);
+            }
+        } catch (err) {
+            console.error("Failed to get monitor:", err);
         }
     });
 
@@ -141,13 +180,14 @@
         overflow: hidden;
         width: 100%;
         justify-content: flex-end;
+        padding-right: 4px;
     }
 
     .tab {
         align-self: center;
         width: 22px;
         height: 64px;
-        background: var(--bg-surface);
+        background: rgba(12, 12, 10, 0.75);
         border: 1px solid var(--border);
         border-right: none;
         border-radius: 6px 0 0 6px;
@@ -163,7 +203,7 @@
     }
     .tab:hover {
         color: var(--fg);
-        background: var(--bg);
+        background: rgba(12, 12, 10, 0.85);
     }
     .tab .arrow {
         transition: transform 200ms ease;
@@ -173,7 +213,7 @@
         width: 0;
         min-width: 0;
         overflow: hidden;
-        background: rgba(12, 12, 10, 0.88);
+        background: rgba(12, 12, 10, 0.75);
         border-left: none;
         transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1);
         pointer-events: none;
@@ -217,9 +257,11 @@
         flex: 1;
         height: 100%;
         border-radius: 0;
+        background: transparent !important;
     }
     :global(.calendar-wrap .timeline-header) {
         border-radius: 0 !important;
+        background: transparent !important;
     }
 
     .notes-wrap {
@@ -227,7 +269,7 @@
         border-top: 1px solid var(--border);
         display: flex;
         flex-direction: column;
-        background: rgba(18, 18, 16, 0.95);
+        background: rgba(0, 0, 0, 0.2);
         min-height: 0;
     }
 
@@ -254,7 +296,7 @@
         right: 0;
         width: 32px;
         height: 32px;
-        background: var(--bg-surface);
+        background: rgba(12, 12, 10, 0.75);
         border-top: 1px solid var(--border);
         border-left: 1px solid var(--border);
         border-bottom: none;
@@ -270,6 +312,6 @@
     }
     .notes-toggle-btn:hover {
         color: var(--fg);
-        background: var(--bg);
+        background: rgba(12, 12, 10, 0.85);
     }
 </style>

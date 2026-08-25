@@ -47,12 +47,12 @@
                 }
             }
 
-            isCheckingAuth = false;
-
             const initResult = await store.init();
             if (initResult.isErr()) {
                 store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
             }
+
+            isCheckingAuth = false;
 
             if (isLauncher) {
                 unlistenData = await listen(LAUNCHER_DATA_UPDATE, (event) => {
@@ -125,7 +125,9 @@
     </div>
 {:else}
     <div class="app">
-        <TitleBar />
+        {#if !isMinitracker}
+            <TitleBar />
+        {/if}
         {@render children()}
     </div>
 {/if}
