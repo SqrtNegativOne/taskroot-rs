@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use reqwest::Client;
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -31,7 +31,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Google Tasks API error: {err}"));
+        return Err(color_eyre::eyre::eyre!("Google Tasks API error: {err}"));
     }
 
     let task_list: GoogleTaskList = response.json().await?;
@@ -139,7 +139,7 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to publish Google Task: {err}"));
+        return Err(color_eyre::eyre::eyre!("Failed to publish Google Task: {err}"));
     }
 
     let created: GoogleTask = response.json().await?;
@@ -160,7 +160,7 @@ pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to delete Google Task: {err}"));
+        return Err(color_eyre::eyre::eyre!("Failed to delete Google Task: {err}"));
     }
     Ok(())
 }

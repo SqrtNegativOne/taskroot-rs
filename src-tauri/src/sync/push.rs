@@ -18,13 +18,13 @@ pub trait GoogleSyncEntity: Clone + Send + Sync {
     fn publish_remote(
         &self,
         access_token: &str,
-    ) -> impl Future<Output = anyhow::Result<String>> + Send;
+    ) -> impl Future<Output = color_eyre::Result<String>> + Send;
 
     fn delete_remote(
         &self,
         remote_id: &str,
         access_token: &str,
-    ) -> impl Future<Output = anyhow::Result<()>> + Send;
+    ) -> impl Future<Output = color_eyre::Result<()>> + Send;
 }
 
 impl GoogleSyncEntity for AppTask {
@@ -51,11 +51,11 @@ impl GoogleSyncEntity for AppTask {
         self.remote_id = Some(crate::domain::RemoteId(remote_id));
     }
 
-    async fn publish_remote(&self, access_token: &str) -> anyhow::Result<String> {
+    async fn publish_remote(&self, access_token: &str) -> color_eyre::Result<String> {
         crate::apis::google_tasks::publish(self, access_token).await
     }
 
-    async fn delete_remote(&self, remote_id: &str, access_token: &str) -> anyhow::Result<()> {
+    async fn delete_remote(&self, remote_id: &str, access_token: &str) -> color_eyre::Result<()> {
         crate::apis::google_tasks::delete(remote_id, access_token).await
     }
 }
@@ -84,11 +84,11 @@ impl GoogleSyncEntity for AppEvent {
         self.remote_id = Some(crate::domain::RemoteId(remote_id));
     }
 
-    async fn publish_remote(&self, access_token: &str) -> anyhow::Result<String> {
+    async fn publish_remote(&self, access_token: &str) -> color_eyre::Result<String> {
         crate::apis::google_calendar::publish(self, access_token).await
     }
 
-    async fn delete_remote(&self, remote_id: &str, access_token: &str) -> anyhow::Result<()> {
+    async fn delete_remote(&self, remote_id: &str, access_token: &str) -> color_eyre::Result<()> {
         crate::apis::google_calendar::delete(remote_id, self.remote_collection_id.as_deref().map(std::string::String::as_str), access_token).await
     }
 }

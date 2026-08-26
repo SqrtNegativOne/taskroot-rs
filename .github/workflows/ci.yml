@@ -36,10 +36,12 @@ jobs:
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Test (generates ts-rs bindings)
         working-directory: src-tauri
-        run: cargo llvm-cov --all-targets --workspace --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --all-targets --workspace --lcov --output-path lcov.info
       - name: Fail on generated bindings drift
         run: git diff --exit-code src/lib/bindings

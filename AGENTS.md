@@ -14,12 +14,12 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Language**: TypeScript (`.ts`, `.svelte`) on the frontend, Rust (`.rs`) on the backend.
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.
 - **Backend / Storage**: Local SQLite database managed by Rust (`sqlx`, with the `migrate` feature). Schema is applied via inline CREATE statements in `db::init_db`. Data is queried via Tauri IPC commands.
-- **Type Sharing**: `ts-rs` generates `src/lib/bindings/*.generated.ts` from Rust structs; `cargo test` is the regeneration trigger (see Key Concepts).
+- **Type Sharing**: `ts-rs` generates `src/lib/bindings/*.generated.ts` from Rust structs; `cargo nextest run` is the regeneration trigger (see Key Concepts).
 - **Testing**: 
   - **Frontend E2E**: Playwright (`playwright.config.ts`, specs in `tests/e2e/`, run via `bun run test`; the config boots `bun run dev` on port 1420 with chromium).
   - **Frontend Unit**: Vitest with jsdom (`bun run test:unit`). Coverage is collected via `@vitest/coverage-v8` (`bun run coverage:frontend`).
-  - **Backend**: Rust unit tests (`cargo test` in `src-tauri`, including migration assertions and `AppError` shape checks). Coverage is collected via `cargo-llvm-cov` (`bun run coverage:backend`, requires `cargo install cargo-llvm-cov`).
-- **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo test`. **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
+  - **Backend**: Rust unit tests (`cargo nextest run` in `src-tauri`, including migration assertions and `AppError` shape checks). Coverage is collected via `cargo-llvm-cov` (`bun run coverage:backend`, requires `cargo install cargo-llvm-cov`).
+- **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo nextest run`. **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
 
 ## Project Structure
 - `src/`: SvelteKit frontend codebase.
@@ -34,7 +34,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
     - `routes.ts`: Centralized route-path constants.
     - `domain.ts`: Barrel re-exporting the generated types from `src/lib/bindings/` (including `StopwatchState`, `SyncState`).
-  - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo test` in `src-tauri`). Never hand-edit.
+  - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo nextest run` in `src-tauri`). Never hand-edit.
   - `src/screens/`: Major UI views. `plan/` (with `day-timeline/`, including `hooks/pointerGesture.svelte.ts` — a window-pointer gesture registry with `pointercancel` and teardown safety — and `date-grid/`) and `do/` (with `stopwatch/`, whose `engine.svelte.ts` consumes the generated `StopwatchState`).
   - `src/components/`: Reusable UI components. `ComingSoon.svelte` consolidates the seven stub route pages; `inspector-pane/` is split into `InspectorPane`, `InspectorTaskFields`/`InspectorEventFields`, and `format.ts`.
 - `src-tauri/`: Tauri Rust backend.
@@ -52,7 +52,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 ### Key Concepts
 - **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `db`, `not-found`, `auth`, `sync`, `invalid-input`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.
 - **Event Name Constants**: Backend event names are constants in `src-tauri/src/events.rs`, mirrored in `src/lib/events.ts` (`stopwatch-updated`, `sync-started`, `sync-finished`, `sync-error`, `oauth-url`). Never inline raw event strings on either side.
-- **Generated Bindings Flow**: `cargo test` in `src-tauri` regenerates `src/lib/bindings/*.generated.ts` via `ts-rs` (`export_bindings_*` tests). After changing any `#[derive(TS)]` struct, run `cargo test` and commit the regenerated files. CI fails on binding drift (`git diff --exit-code src/lib/bindings`). The `#[ts(type = "number")]` convention keeps timestamps as JS `number` — never `bigint`.
+- **Generated Bindings Flow**: `cargo nextest run` in `src-tauri` regenerates `src/lib/bindings/*.generated.ts` via `ts-rs` (`export_bindings_*` tests). After changing any `#[derive(TS)]` struct, run `cargo nextest run` and commit the regenerated files. CI fails on binding drift (`git diff --exit-code src/lib/bindings`). The `#[ts(type = "number")]` convention keeps timestamps as JS `number` — never `bigint`.
 - **Multi-Window Architecture**: Three windows are declared in `tauri.conf.json`:
   - **Main Window** (`main`): The primary Svelte app; hides to tray on close.
   - **Launcher Window** (`launcher`): A spotlight-like command palette triggered via the global-shortcut plugin.
@@ -61,7 +61,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Cross-Window State**: There is no dedicated inter-window wiring module. Window-specific state (stopwatch, sync status) lives in Rust and is synced across windows through Tauri commands (`get_stopwatch_state`, `toggle_stopwatch`, `reset_stopwatch`, `get_sync_state`) plus backend-emitted events consumed via `listen` with the `src/lib/events.ts` constants.
 
 ## Style (Important)
-- **Generated Code**: Never hand-edit anything in `src/lib/bindings/` — regenerate via `cargo test`.
+- **Generated Code**: Never hand-edit anything in `src/lib/bindings/` — regenerate via `cargo nextest run`.
 - **Test-Driven Development**: Write tests first as a contract. Do not modify them unless there is something truly wrong.
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.

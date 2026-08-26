@@ -8,4 +8,4 @@ This file contains rules specific to the Tauri v2 Rust backend of Taskroot. It s
 
 ## Style & Idioms
 - **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.
-- **Testing**: Backend tests should cover migration assertions and `AppError` shape checks. Coverage is collected via `cargo-llvm-cov`. Run `cargo clippy --all-targets -- -D warnings` and `cargo test` after changes.
+- **Testing**: Backend tests should cover migration assertions and `AppError` shape checks. Coverage is collected via `cargo-llvm-cov`. Run `cargo clippy --all-targets -- -D warnings` and `cargo nextest run` after changes.

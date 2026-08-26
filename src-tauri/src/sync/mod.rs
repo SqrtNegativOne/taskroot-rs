@@ -5,7 +5,7 @@ pub mod types;
 
 use crate::auth;
 use crate::error::AppError;
-use anyhow::Result;
+use color_eyre::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;

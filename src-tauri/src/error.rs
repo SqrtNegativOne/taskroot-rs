@@ -33,8 +33,8 @@ impl AppError {
     }
 }
 
-impl From<anyhow::Error> for AppError {
-    fn from(err: anyhow::Error) -> Self {
+impl From<color_eyre::eyre::Error> for AppError {
+    fn from(err: color_eyre::eyre::Error) -> Self {
         Self::Internal(err.to_string())
     }
 }
@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(AppError::Sync("x".into()).code(), "sync");
         assert_eq!(AppError::InvalidInput("x".into()).code(), "invalid-input");
         assert_eq!(AppError::NotReady("x".into()).code(), "not-ready");
-        assert_eq!(AppError::from(anyhow::anyhow!("boom")).code(), "internal");
+        assert_eq!(AppError::from(color_eyre::eyre::eyre!("boom")).code(), "internal");
     }
 
     #[test]

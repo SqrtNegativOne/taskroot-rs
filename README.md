@@ -12,7 +12,7 @@ taskroot is a local-first desktop task manager built around a simple cycle: **pl
 
 ## Prerequisites
 - [Bun](https://bun.sh)
-- [Rust toolchain](https://rustup.rs) (stable) plus the [Tauri v2 system dependencies](https://tauri.app/start/prerequisites/) for your platform
+- [Rust toolchain](https://rustup.rs) (stable) plus the [Tauri v2 system dependencies](https://tauri.app/start/prerequisites/) for your platform, and [cargo-nextest](https://nexte.st) (`cargo install cargo-nextest --locked`)
 - For Google login/sync: copy `src-tauri/.env.example` to `src-tauri/.env` and fill in your OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
 
 ## Getting Started
@@ -22,4 +22,4 @@ bun run dev          # frontend only at http://localhost:1420
 bun run tauri dev    # full desktop app (or just run.bat on Windows)
 ```
 
-After changing any Rust struct that derives `ts_rs::TS`, run `cargo test` inside `src-tauri/` to regenerate the TypeScript bindings under `src/lib/bindings/`, then commit them alongside your change.
+After changing any Rust struct that derives `ts_rs::TS`, run `cargo nextest run` inside `src-tauri/` to regenerate the TypeScript bindings under `src/lib/bindings/`, then commit them alongside your change.

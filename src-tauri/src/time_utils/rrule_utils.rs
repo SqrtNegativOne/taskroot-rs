@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use chrono::{DateTime, Utc};
 use rrule::RRuleSet;
 use std::str::FromStr;
@@ -13,7 +13,7 @@ pub fn get_occurrences(
     end_date: &DateTime<Utc>,
 ) -> Result<Vec<DateTime<rrule::Tz>>> {
     let rrule_set = RRuleSet::from_str(rrule_str)
-        .map_err(|e| anyhow::anyhow!("Failed to parse rrule: {e:?}"))?;
+        .map_err(|e| color_eyre::eyre::eyre!("Failed to parse rrule: {e:?}"))?;
 
     let dt_start_tz = dt_start.with_timezone(&rrule::Tz::UTC);
     let end_date_tz = end_date.with_timezone(&rrule::Tz::UTC);

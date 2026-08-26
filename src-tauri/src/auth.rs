@@ -1,7 +1,7 @@
 use crate::db;
 use crate::error::AppError;
 use crate::events;
-use anyhow::{anyhow, Result};
+use color_eyre::eyre::{eyre, Result};
 use chrono::{Duration, Utc};
 use oauth2::basic::BasicClient;
 use oauth2::{
@@ -167,7 +167,7 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), AppError> {
 
 /// # Errors
 /// Returns an error if the operation fails.
-pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, anyhow::Error> {
+pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_eyre::eyre::Error> {
     let access_token = db::get_setting(pool, "google_access_token").await?;
     let expires_at_str = db::get_setting(pool, "google_token_expires_at").await?;
 
@@ -185,9 +185,9 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, anyhow:
 
     let refresh_token_str = db::get_setting(pool, "google_refresh_token")
         .await?
-        .ok_or_else(|| anyhow!("No refresh token found. User needs to log in again."))?;
+        .ok_or_else(|| eyre!("No refresh token found. User needs to log in again."))?;
 
-    let client = get_client!("http://localhost", |e: String| anyhow!(e));
+    let client = get_client!("http://localhost", |e: String| eyre!(e));
 
     let token_result = client
         .exchange_refresh_token(&RefreshToken::new(refresh_token_str))

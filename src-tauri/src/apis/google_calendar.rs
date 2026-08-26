@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use reqwest::Client;
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -73,7 +73,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 
     if !list_response.status().is_success() {
         let err = list_response.text().await?;
-        return Err(anyhow::anyhow!("Google Calendar API error (calendarList): {err}"));
+        return Err(color_eyre::eyre::eyre!("Google Calendar API error (calendarList): {err}"));
     }
 
     let calendar_list: GoogleCalendarList = list_response.json().await?;
@@ -267,7 +267,7 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to publish Google Event: {err}"));
+        return Err(color_eyre::eyre::eyre!("Failed to publish Google Event: {err}"));
     }
 
     let created: GoogleEvent = response.json().await?;
@@ -291,7 +291,7 @@ pub async fn delete(remote_id: &str, remote_collection_id: Option<&str>, access_
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(anyhow::anyhow!("Failed to delete Google Event: {err}"));
+        return Err(color_eyre::eyre::eyre!("Failed to delete Google Event: {err}"));
     }
     Ok(())
 }
