@@ -3,6 +3,8 @@
     import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
     import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
 
+    import { safeInvoke } from '$lib/safeInvoke.svelte';
+
     interface Props {
         item: SettingsSchemaItem;
         value: SettingValue | undefined;
@@ -13,6 +15,22 @@
 
     function selectValue(): SettingValue | undefined {
         return value ?? item.defaultValue;
+    }
+
+    async function handleCustomAction(id: string) {
+        if (id === 'logout') {
+            if (confirm("Are you sure you want to sign out?")) {
+                await safeInvoke('reset_auth');
+                window.location.reload();
+            }
+        } else if (id === 'clear_all_data') {
+            if (confirm("Are you sure you want to wipe all local data? This cannot be undone.")) {
+                await safeInvoke('wipe_local_data');
+                window.location.reload();
+            }
+        } else {
+            console.log(`Custom action clicked: ${id}`);
+        }
     }
 </script>
 
@@ -62,7 +80,7 @@
                 onchange={(val: string) => onchange(val)}
             />
         {:else if item.type === 'custom' || item.type === 'action'}
-            <button onclick={() => console.log(`Custom action clicked: ${item.id}`)}>
+            <button onclick={() => handleCustomAction(item.id)}>
                 {item.label}
             </button>
         {/if}

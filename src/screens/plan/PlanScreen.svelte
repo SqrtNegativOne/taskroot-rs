@@ -48,7 +48,27 @@
     let filters = $state<AppTaskFilter[]>(
         getStored(TASK_FILTERS_KEY, [{ column: 'status', operator: 'is not', value: ['done'] }])
     );
-    let sort = $state(localStorage.getItem(TASK_SORT_KEY) ?? 'priority');
+    let sort = $state<import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]>(
+        (() => {
+            const raw = localStorage.getItem(TASK_SORT_KEY);
+            if (!raw) return [{ column: 'priority', direction: 'desc' }];
+            try {
+                if (raw.startsWith('[')) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.length > 0 && typeof parsed[0] === 'string') {
+                        return parsed.map((col: string) => ({
+                            column: col,
+                            direction: col === 'priority' ? 'desc' : 'asc'
+                        }));
+                    }
+                    return parsed as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
+                }
+                return [{ column: raw as any, direction: raw === 'priority' ? 'desc' : 'asc' }];
+            } catch {
+                return [{ column: 'priority', direction: 'desc' }];
+            }
+        })()
+    );
 
     // UI state — events
     let dateGridQuery = $state('');
@@ -60,15 +80,15 @@
     $effect(() => {
         localStorage.setItem(VIEW_STORAGE_KEY, view);
         localStorage.setItem(TASK_FILTERS_KEY, JSON.stringify(filters));
-        localStorage.setItem(TASK_SORT_KEY, sort);
+        localStorage.setItem(TASK_SORT_KEY, JSON.stringify(sort));
         localStorage.setItem(DATEGRID_FILTERS_KEY, JSON.stringify(dateGridFilters));
         localStorage.setItem(TIMELINE_FILTERS_KEY, JSON.stringify(timelineFilters));
     });
 
-    let dateGridEventsQuery = useTauriQuery<AppEvent[]>('get_filtered_events');
+    let dateGridEventsQuery = useTauriQuery<AppEvent[]>('query_events');
     let dateGridEvents = $derived(dateGridEventsQuery.data ?? store.events);
 
-    let timelineEventsQuery = useTauriQuery<AppEvent[]>('get_filtered_events');
+    let timelineEventsQuery = useTauriQuery<AppEvent[]>('query_events');
     let timelineEvents = $derived(timelineEventsQuery.data ?? store.events);
 
     $effect(() => {

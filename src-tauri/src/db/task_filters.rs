@@ -1,12 +1,13 @@
-use crate::domain::{AppTask, AppTaskFilter};
+use crate::domain::{AppTask, AppTaskFilter, AppTaskSort};
 use sqlx::SqlitePool;
+
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub async fn get_filtered_tasks(
+pub async fn query_tasks(
     pool: &SqlitePool,
     filters: Vec<AppTaskFilter>,
-    sort: String,
+    sorts: Vec<AppTaskSort>,
     query_text: String,
 ) -> Result<Vec<AppTask>, sqlx::Error> {
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> =
@@ -16,13 +17,13 @@ pub async fn get_filtered_tasks(
 
     for f in &filters {
         if let (Some(col_id), Some(val)) = (&f.column, &f.value) {
-            let op = f.operator.as_deref().unwrap_or("is");
+            let op = f.operator.as_ref().unwrap_or(&crate::domain::FilterOperator::Is);
             apply_sql(&mut query_builder, col_id, op, val, &schema);
         }
     }
 
     push_search_clause(&mut query_builder, &query_text);
-    push_sort_clause(&mut query_builder, &sort, &schema);
+    push_sort_clause(&mut query_builder, &sorts, &schema);
 
     let tasks = query_builder
         .build_query_as::<AppTask>()
@@ -34,7 +35,7 @@ pub async fn get_filtered_tasks(
 fn apply_sql(
     builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     col_id: &crate::domain::AppTaskFilterColumn,
-    op: &str,
+    op: &crate::domain::FilterOperator,
     val: &serde_json::Value,
     schema: &[crate::domain::AppTaskColumnDef],
 ) {
@@ -42,7 +43,7 @@ fn apply_sql(
         return;
     };
 
-    let is_not = op == "is not";
+    let is_not = matches!(op, crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain);
     let values = val
         .as_array()
         .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
@@ -102,14 +103,29 @@ fn push_search_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, quer
     }
 }
 
-fn push_sort_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, sort: &str, schema: &[crate::domain::AppTaskColumnDef]) {
+fn push_sort_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, sorts: &[AppTaskSort], schema: &[crate::domain::AppTaskColumnDef]) {
     query_builder.push(" ORDER BY ");
-    let sort_enum = serde_json::from_value::<crate::domain::AppTaskFilterColumn>(serde_json::json!(sort)).ok();
-    if let Some(sort_enum) = sort_enum {
-        if let Some(def) = schema.iter().find(|c| c.id == sort_enum && c.sortable) {
-            query_builder.push(&def.db_col);
-            return;
+    let mut pushed = false;
+    for sort in sorts {
+        if let Some(sort_enum) = &sort.column {
+            if let Some(def) = schema.iter().find(|c| &c.id == sort_enum && c.sortable) {
+                if pushed {
+                    query_builder.push(", ");
+                }
+                query_builder.push(&def.db_col);
+                let dir = sort.direction.as_ref().unwrap_or(&crate::domain::SortDirection::Asc);
+                if matches!(dir, crate::domain::SortDirection::Desc) {
+                    query_builder.push(" DESC");
+                } else {
+                    query_builder.push(" ASC");
+                }
+                pushed = true;
+            }
         }
     }
-    query_builder.push("t.id ASC");
+    if pushed {
+        query_builder.push(", t.id ASC");
+    } else {
+        query_builder.push("t.id ASC");
+    }
 }

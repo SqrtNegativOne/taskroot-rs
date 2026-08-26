@@ -41,17 +41,13 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_task_id = format!("google_{}", task.id);
             let is_deleted = task.deleted.unwrap_or(false);
 
-            let remote_updated_at = task.updated.as_ref().map_or_else(
-                || chrono::Utc::now().timestamp_millis(),
-                |upd| {
-                    chrono::DateTime::parse_from_rfc3339(upd)
-                        .map_or(0, |dt| dt.timestamp_millis())
-                },
+            let remote_updated_at = task.updated.clone().unwrap_or_else(
+                || chrono::Utc::now().to_rfc3339()
             );
 
             if let Ok(Some(local_task)) = crate::db::get_task(pool, &app_task_id).await {
-                if let Some(local_updated) = local_task.updated_at {
-                    if local_updated > remote_updated_at {
+                if let Some(local_updated) = &local_task.updated_at {
+                    if local_updated > &remote_updated_at {
                         continue;
                     }
                 }
@@ -87,7 +83,6 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                 notes: task.notes,
                 tabs: None,
                 due: task.due,
-                deleted: None,
                 updated_at: Some(remote_updated_at),
                 etag: None,
                 dirty: Some(false),

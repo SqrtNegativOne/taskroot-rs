@@ -69,25 +69,25 @@ pub struct Tag {
     pub color: Option<String>,
 }
 
-use taskroot_macros::Filterable;
+use taskroot_macros::Queryable;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Filterable)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
-    #[filter(sortable, db_col = "t.id", label = "Created")]
+    #[query(sortable, db_col = "t.id", label = "Created")]
     pub id: String,
-    #[filter(sortable, db_col = "LOWER(t.title)")]
+    #[query(sortable, db_col = "LOWER(t.title)")]
     pub title: String,
     #[ts(optional)]
-    #[filter(db_col = "t.status", filter_type = "enum:AppTaskStatus")]
+    #[query(db_col = "t.status", filter_type = "enum:AppTaskStatus")]
     pub status: Option<AppTaskStatus>,
     #[ts(optional)]
-    #[filter(sortable, db_col = "COALESCE(t.priority, 0)", filter_type = "number")]
+    #[query(sortable, db_col = "COALESCE(t.priority, 0)", filter_type = "number")]
     pub priority: Option<TaskPriority>,
     #[ts(optional)]
     #[sqlx(json)]
-    #[filter(db_col = "", filter_type = "relation:task_tags")]
+    #[query(db_col = "", filter_type = "relation:task_tags")]
     pub tags: Option<Vec<Tag>>,
     #[ts(optional)]
     #[sqlx(json)]
@@ -114,20 +114,34 @@ pub struct AppTask {
     #[ts(optional)]
     pub tabs: Option<String>,
     #[ts(optional)]
-    #[filter(sortable, db_col = "COALESCE(t.due, '9999')", filter_type = "text")]
+    #[query(sortable, db_col = "COALESCE(t.due, '9999')", filter_type = "text")]
     pub due: Option<String>,
-    #[serde(rename = "_deleted")]
     #[ts(optional)]
-    pub deleted: Option<bool>,
-    #[ts(optional, type = "number")]
-    pub updated_at: Option<i64>,
+    pub updated_at: Option<String>,
     #[ts(optional)]
     pub etag: Option<String>,
     #[ts(optional)]
     pub dirty: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Filterable)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
+#[ts(export, export_to = "../../src/lib/bindings/EventStatus.generated.ts")]
+#[serde(rename_all = "camelCase")]
+#[sqlx(type_name = "TEXT", rename_all = "camelCase")]
+pub enum EventStatus {
+    Confirmed,
+    Tentative,
+    Cancelled,
+}
+
+impl EventStatus {
+    #[must_use]
+    pub fn all_values() -> Vec<String> {
+        vec!["confirmed".into(), "tentative".into(), "cancelled".into()]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
@@ -135,11 +149,11 @@ pub struct AppEvent {
     #[ts(optional)]
     pub remote_id: Option<String>,
     #[ts(optional)]
-    #[filter(db_col = "remote_collection_id", label = "Calendar")]
+    #[query(db_col = "remote_collection_id", label = "Calendar")]
     pub remote_collection_id: Option<String>,
     #[ts(optional)]
     pub task_id: Option<String>,
-    #[filter(db_col = "LOWER(title)")]
+    #[query(db_col = "LOWER(title)")]
     pub title: String,
     #[ts(optional)]
     pub description: Option<String>,
@@ -155,19 +169,34 @@ pub struct AppEvent {
     #[ts(optional)]
     pub original_start_time: Option<String>,
     #[ts(optional)]
-    pub cancelled: Option<bool>,
-    #[ts(optional, type = "number")]
-    pub updated_at: Option<i64>,
+    #[query(db_col = "status", filter_type = "enum:EventStatus")]
+    pub status: Option<EventStatus>,
+    #[ts(optional)]
+    pub updated_at: Option<String>,
     #[ts(optional)]
     #[sqlx(default)]
     pub color: Option<String>,
-    #[serde(rename = "_deleted")]
     #[ts(optional)]
-    pub deleted: Option<bool>,
+    #[sqlx(default)]
+    pub bg_color: Option<String>,
     #[ts(optional)]
     pub etag: Option<String>,
     #[ts(optional)]
     pub dirty: Option<bool>,
+    #[ts(optional)]
+    pub is_all_day: Option<bool>,
+}
+
+impl AppEvent {
+    pub fn preprocess_colors(&mut self) {
+        if let Some(c) = &self.color {
+            if c.len() == 7 && c.starts_with('#') {
+                self.bg_color = Some(format!("{c}40"));
+            } else {
+                self.bg_color = Some(c.clone());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -199,7 +228,6 @@ mod tests {
             notes: None,
             tabs: None,
             due: None,
-            deleted: None,
             updated_at: None,
             etag: None,
             dirty: None,
@@ -228,22 +256,25 @@ mod tests {
             exdates: None,
             recurring_event_id: None,
             original_start_time: None,
-            cancelled: None,
-            updated_at: None,
+            status: Some(EventStatus::Confirmed),
+            updated_at: Some("2026-08-26T07:31:42Z".into()),
             color: None,
-            deleted: None,
+            bg_color: None,
             etag: None,
             dirty: None,
+            is_all_day: None,
         };
 
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains(r#""id":"event-1""#));
         assert!(json.contains(r#""startTime":"2026-08-12T10:00:00""#));
         assert!(json.contains(r#""endTime":"2026-08-12T11:00:00""#));
+        assert!(json.contains(r#""status":"confirmed""#));
 
         let deserialized: AppEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.title, event.title);
         assert_eq!(deserialized.start_time, event.start_time);
         assert_eq!(deserialized.end_time, event.end_time);
+        assert_eq!(deserialized.status, Some(EventStatus::Confirmed));
     }
 }

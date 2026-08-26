@@ -4,4 +4,4 @@ import type { ChecklistItem } from "./ChecklistItem.generated";
 import type { Tag } from "./Tag.generated";
 import type { TaskPriority } from "./TaskPriority.generated";
 
-export type AppTask = { id: string, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, checklist?: Array<ChecklistItem>, parentTask?: string, dependencies?: Array<string>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: string, notes?: string, tabs?: string, due?: string, _deleted?: boolean, updatedAt?: number, etag?: string, dirty?: boolean, };
+export type AppTask = { id: string, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, checklist?: Array<ChecklistItem>, parentTask?: string, dependencies?: Array<string>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: string, notes?: string, tabs?: string, due?: string, updatedAt?: string, etag?: string, dirty?: boolean, };

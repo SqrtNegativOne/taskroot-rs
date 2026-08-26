@@ -47,7 +47,7 @@
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
-    let layoutQuery = useTauriQuery<PlanDayLayout[]>('get_plan_layout');
+    let layoutQuery = useTauriQuery<PlanDayLayout[]>('query_plan_layout');
 
     let planLayout = $derived.by(() => {
         const layoutMap: Record<string, LaidEvent[]> = {};

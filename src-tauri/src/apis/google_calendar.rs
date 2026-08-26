@@ -42,6 +42,11 @@ struct GoogleEvent {
     status: Option<String>,
     #[serde(rename = "colorId")]
     color_id: Option<String>,
+    recurrence: Option<Vec<String>>,
+    #[serde(rename = "recurringEventId")]
+    recurring_event_id: Option<String>,
+    #[serde(rename = "originalStartTime")]
+    original_start_time: Option<GoogleEventTime>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -96,9 +101,8 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
         let mut url = url::Url::parse(&format!("https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events"))?;
         url.query_pairs_mut()
             .append_pair("timeMin", &now)
-            .append_pair("maxResults", "50")
-            .append_pair("singleEvents", "true")
-            .append_pair("orderBy", "startTime");
+            .append_pair("maxResults", "500")
+            .append_pair("orderBy", "updated");
 
         let response = client
             .get(url.as_str())
@@ -117,30 +121,28 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
         if let Some(events) = event_list.items {
             for event in events {
                 let app_event_id = format!("google_{}", event.id);
-                let is_deleted = event.status.as_deref() == Some("cancelled");
 
-                let remote_updated_at = event.updated.as_ref().map_or_else(
-                    || chrono::Utc::now().timestamp_millis(),
-                    |upd| {
-                        chrono::DateTime::parse_from_rfc3339(upd)
-                            .map_or(0, |dt| dt.timestamp_millis())
-                    },
+                let remote_updated_at = event.updated.clone().unwrap_or_else(
+                    || chrono::Utc::now().to_rfc3339()
                 );
 
                 if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
-                    if let Some(local_updated) = local_event.updated_at {
-                        if local_updated > remote_updated_at {
+                    if let Some(local_updated) = &local_event.updated_at {
+                        if local_updated > &remote_updated_at {
                             continue;
                         }
                     }
                 }
 
-                if is_deleted {
-                    let _ = crate::db::delete_event(pool, app_event_id).await;
-                    continue;
-                }
-
                 let title = event.summary.unwrap_or_else(|| "No Title".to_string());
+
+                let status = match event.status.as_deref() {
+                    Some("cancelled") => Some(crate::domain::EventStatus::Cancelled),
+                    Some("tentative") => Some(crate::domain::EventStatus::Tentative),
+                    _ => Some(crate::domain::EventStatus::Confirmed),
+                };
+
+                let is_all_day = event.start.as_ref().is_some_and(|st| st.date.is_some() && st.date_time.is_none());
 
                 let start_time = if let Some(st) = event.start {
                     st.date_time.unwrap_or_else(|| st.date.unwrap_or_default())
@@ -153,6 +155,12 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                 } else {
                     start_time.clone()
                 };
+
+                let original_start_time = event.original_start_time.map(|st| {
+                    st.date_time.unwrap_or_else(|| st.date.unwrap_or_default())
+                });
+
+                let rrule = event.recurrence.map(|r| r.join("\n"));
 
                 let mut color = calendar.background_color.clone();
                 if let Some(color_id) = &event.color_id {
@@ -172,17 +180,17 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                     description: event.description,
                     start_time,
                     end_time,
-
-                    rrule: None,
+                    rrule,
                     exdates: None,
-                    recurring_event_id: None,
-                    original_start_time: None,
-                    cancelled: Some(false),
+                    recurring_event_id: event.recurring_event_id,
+                    original_start_time,
+                    status,
                     updated_at: Some(remote_updated_at),
                     color,
-                    deleted: Some(false),
+                    bg_color: None,
                     etag: None,
                     dirty: Some(false),
+                    is_all_day: Some(is_all_day),
                 };
 
                 if let Err(e) = crate::db::upsert_event(pool, app_event).await {
@@ -201,13 +209,33 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Result<String> {
     let client = Client::new();
 
-    // We only send the fields we care about.
-    let google_event = serde_json::json!({
-        "summary": event.title,
-        "description": event.description,
-        "start": { "dateTime": event.start_time },
-        "end": { "dateTime": event.end_time }
-    });
+    let is_all_day = event.is_all_day.unwrap_or(false);
+    
+    let status_str = match &event.status {
+        Some(crate::domain::EventStatus::Cancelled) => "cancelled",
+        Some(crate::domain::EventStatus::Tentative) => "tentative",
+        _ => "confirmed",
+    };
+
+    let google_event = if is_all_day {
+        let start_date = event.start_time.split('T').next().unwrap_or(&event.start_time);
+        let end_date = event.end_time.split('T').next().unwrap_or(&event.end_time);
+        serde_json::json!({
+            "summary": event.title,
+            "description": event.description,
+            "start": { "date": start_date },
+            "end": { "date": end_date },
+            "status": status_str
+        })
+    } else {
+        serde_json::json!({
+            "summary": event.title,
+            "description": event.description,
+            "start": { "dateTime": event.start_time },
+            "end": { "dateTime": event.end_time },
+            "status": status_str
+        })
+    };
 
     let cal_id = event.remote_collection_id.as_deref().unwrap_or("primary");
     let cal_id = urlencoding::encode(cal_id);

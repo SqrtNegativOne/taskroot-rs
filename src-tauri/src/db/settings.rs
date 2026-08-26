@@ -25,3 +25,14 @@ pub async fn set_setting(pool: &SqlitePool, key: &str, value: &str) -> Result<()
     .await?;
     Ok(())
 }
+
+/// # Errors
+///
+/// Returns an error if the operation fails.
+pub async fn delete_setting(pool: &SqlitePool, key: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM settings WHERE key = ?")
+        .bind(key)
+        .execute(pool)
+        .await?;
+    Ok(())
+}

@@ -85,7 +85,7 @@
                 style="
                     cursor: grab;
                     opacity: {dragState?.event?.id === ev.id ? OPACITY_FADED : 1};
-                    {ev.color ? `background-color: ${ev.color}; border-left-color: ${ev.color};` : ''}
+                    {ev.color ? `background-color: ${ev.bgColor ?? ev.color}; border-left-color: ${ev.color};` : ''}
                 "
                 onpointerdown={(e) => onEventDragStart?.(e, ev)}
                 onclick={(e) => {

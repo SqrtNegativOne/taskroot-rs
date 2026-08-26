@@ -9,14 +9,7 @@ pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
     domain::parse_sigils(&task_name)
 }
 
-/// # Errors
-///
-/// Returns an error if the database is unavailable or the query fails.
-#[tauri::command]
-pub async fn get_tasks(app: tauri::AppHandle) -> Result<Vec<domain::AppTask>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::get_tasks(&pool).await?)
-}
+
 
 /// # Errors
 ///

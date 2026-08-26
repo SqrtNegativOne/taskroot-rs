@@ -81,6 +81,9 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), AppError> {
             "https://www.googleapis.com/auth/calendar.events".to_string(),
         ))
         .add_scope(Scope::new(
+            "https://www.googleapis.com/auth/calendar.readonly".to_string(),
+        ))
+        .add_scope(Scope::new(
             "https://www.googleapis.com/auth/tasks".to_string(),
         ))
         .add_extra_param("access_type", "offline")
@@ -221,8 +224,8 @@ pub async fn is_logged_in(app: tauri::AppHandle) -> Result<bool, AppError> {
 #[tauri::command]
 pub async fn reset_auth(app: tauri::AppHandle) -> Result<(), AppError> {
     let pool = db_pool(&app)?;
-    db::set_setting(&pool, "google_access_token", "").await?;
-    db::set_setting(&pool, "google_refresh_token", "").await?;
-    db::set_setting(&pool, "google_token_expires_at", "").await?;
+    db::delete_setting(&pool, "google_access_token").await?;
+    db::delete_setting(&pool, "google_refresh_token").await?;
+    db::delete_setting(&pool, "google_token_expires_at").await?;
     Ok(())
 }

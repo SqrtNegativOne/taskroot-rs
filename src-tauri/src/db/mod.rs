@@ -49,8 +49,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             notes TEXT,
             tabs TEXT,
             due TEXT,
-            deleted BOOLEAN,
-            updated_at INTEGER,
+            updated_at TEXT,
             etag TEXT,
             dirty BOOLEAN DEFAULT 0
         );
@@ -68,12 +67,12 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             exdates TEXT,
             recurring_event_id TEXT,
             original_start_time TEXT,
-            cancelled BOOLEAN,
-            updated_at INTEGER,
+            status TEXT,
+            updated_at TEXT,
             color TEXT,
-            deleted BOOLEAN,
             etag TEXT,
-            dirty BOOLEAN DEFAULT 0
+            dirty BOOLEAN DEFAULT 0,
+            is_all_day BOOLEAN DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS settings (
@@ -129,12 +128,7 @@ mod tests {
         assert_eq!(row.0, 0);
     }
 
-    #[tokio::test]
-    async fn test_get_empty_tasks() {
-        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
-        let tasks = get_tasks(&pool).await.expect("Failed to get tasks");
-        assert!(tasks.is_empty());
-    }
+
 
     #[tokio::test]
     async fn test_schema_creates_all_tables() {
@@ -184,8 +178,7 @@ mod tests {
             notes: Some("notes".into()),
             tabs: None,
             due: Some("2026-08-25".into()),
-            deleted: None,
-            updated_at: Some(7),
+            updated_at: Some("2026-08-26T12:00:00Z".into()),
             etag: Some("etag-1".into()),
             dirty: Some(true),
         };
@@ -241,6 +234,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_crud_roundtrip() {
+        use crate::domain::EventStatus;
+        
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
         let event = AppEvent {
             id: "event-1".into(),
@@ -255,12 +250,13 @@ mod tests {
             exdates: Some(vec!["2026-08-25".into()]),
             recurring_event_id: None,
             original_start_time: None,
-            cancelled: Some(false),
-            updated_at: Some(7),
+            status: Some(EventStatus::Confirmed),
+            updated_at: Some("2026-08-26T12:00:00Z".into()),
             color: None,
-            deleted: None,
+            bg_color: None,
             etag: None,
             dirty: Some(true),
+            is_all_day: Some(false),
         };
 
         create_event(&pool, event.clone())
@@ -278,7 +274,7 @@ mod tests {
 
         let mut updated = fetched;
         updated.title = "Standup moved".into();
-        updated.cancelled = Some(true);
+        updated.status = Some(EventStatus::Cancelled);
         update_event(&pool, updated).await.expect("update failed");
 
         let refetched = get_event(&pool, "event-1")
@@ -286,7 +282,7 @@ mod tests {
             .expect("refetch failed")
             .expect("event missing after update");
         assert_eq!(refetched.title, "Standup moved");
-        assert_eq!(refetched.cancelled, Some(true));
+        assert_eq!(refetched.status, Some(EventStatus::Cancelled));
 
         delete_event(&pool, "event-1".to_string())
             .await

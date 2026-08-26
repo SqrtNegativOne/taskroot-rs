@@ -3,14 +3,7 @@ use crate::domain;
 use crate::error::AppError;
 use crate::sync;
 
-/// # Errors
-///
-/// Returns an error if the database is unavailable or the query fails.
-#[tauri::command]
-pub async fn get_events(app: tauri::AppHandle) -> Result<Vec<domain::AppEvent>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::get_events(&pool).await?)
-}
+
 
 /// # Errors
 ///

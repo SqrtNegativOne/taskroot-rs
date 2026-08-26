@@ -15,7 +15,7 @@
         tasks,
         onUpdateTask,
         filters = $bindable([]),
-        sort = $bindable('priority'),
+        sort = $bindable([] as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]),
         query,
         setQuery,
         onDragStart,
@@ -28,7 +28,7 @@
         tasks: AppTask[];
         onUpdateTask?: (id: string, transform: (t: AppTask) => AppTask) => void;
         filters?: AppTaskFilter[];
-        sort?: string;
+        sort?: import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
         query: string;
         setQuery: (q: string) => void;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
@@ -57,7 +57,7 @@
 
     import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
 
-    let tasksQuery = useTauriQuery<AppTask[]>('get_filtered_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
+    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
     let schemaQuery = useTauriQuery<AppTaskColumnDef[]>('get_task_schema');
     let schema = $derived(schemaQuery.data ?? []);
     

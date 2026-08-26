@@ -48,8 +48,8 @@ export class AppStore {
 
     async refresh(): Promise<Result<void, AppError>> {
         const result = await ResultAsync.combine([
-            safeInvoke<AppTask[]>('get_tasks'),
-            safeInvoke<AppEvent[]>('get_events'),
+            safeInvoke<AppTask[]>('query_tasks', { filters: [], sort: [], query: "" }),
+            safeInvoke<AppEvent[]>('query_events', { filters: [], query: "" }),
             safeInvoke<AppSettings>('get_settings')
         ]);
 

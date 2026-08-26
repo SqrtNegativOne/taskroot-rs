@@ -2,39 +2,36 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields};
 
-#[proc_macro_derive(Filterable, attributes(filter))]
-pub fn filterable_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Queryable, attributes(query))]
+pub fn queryable_derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
     let enum_name = syn::Ident::new(&format!("{}FilterColumn", name), name.span());
     let col_def_name = syn::Ident::new(&format!("{}ColumnDef", name), name.span());
+    let filter_name = syn::Ident::new(&format!("{}Filter", name), name.span());
+    let sort_name = syn::Ident::new(&format!("{}Sort", name), name.span());
 
     let mut schema_entries = Vec::new();
     let mut enum_variants = Vec::new();
 
-
     let Data::Struct(data_struct) = ast.data else {
-        return quote! { compile_error!("Filterable can only be derived for structs"); }.into();
+        return quote! { compile_error!("Queryable can only be derived for structs"); }.into();
     };
 
     let Fields::Named(fields_named) = data_struct.fields else {
-        return quote! { compile_error!("Filterable requires named fields"); }.into();
+        return quote! { compile_error!("Queryable requires named fields"); }.into();
     };
 
     for field in fields_named.named {
         let field_name = field.ident.unwrap();
         let field_name_str = field_name.to_string();
         
-        // Convert to PascalCase for enum variant
         let mut chars = field_name_str.chars();
         let pascal_name = match chars.next() {
             None => String::new(),
             Some(f) => f.to_uppercase().chain(chars).collect(),
         };
-        // Special case: `parent_task` -> `ParentTask` (just basic case mapping for simple toy struct, 
-        // wait, we can just use syn::Ident)
-        // Actually, let's just use heck crate or simple capitalized:
-        let pascal_name = pascal_name.replace("_", ""); // simplified
+        let pascal_name = pascal_name.replace("_", "");
         let variant_ident = syn::Ident::new(&pascal_name, field_name.span());
 
         let mut is_sortable = false;
@@ -47,7 +44,7 @@ pub fn filterable_derive(input: TokenStream) -> TokenStream {
         }
 
         for attr in field.attrs {
-            if attr.path().is_ident("filter") {
+            if attr.path().is_ident("query") {
                 is_filterable = true;
                 
                 let _ = attr.parse_nested_meta(|meta| {
@@ -99,6 +96,8 @@ pub fn filterable_derive(input: TokenStream) -> TokenStream {
 
     let file_name = format!("../../src/lib/bindings/{}.generated.ts", enum_name);
     let col_def_file = format!("../../src/lib/bindings/{}.generated.ts", col_def_name);
+    let filter_file = format!("../../src/lib/bindings/{}.generated.ts", filter_name);
+    let sort_file = format!("../../src/lib/bindings/{}.generated.ts", sort_name);
     
     let gen = quote! {
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, ts_rs::TS)]
@@ -116,6 +115,22 @@ pub fn filterable_derive(input: TokenStream) -> TokenStream {
             pub db_col: String,
             pub filter_type: crate::domain::FilterType,
             pub sortable: bool,
+        }
+
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+        #[ts(export, export_to = #filter_file)]
+        pub struct #filter_name {
+            pub column: Option<#enum_name>,
+            pub operator: Option<crate::domain::FilterOperator>,
+            #[ts(type = "unknown")]
+            pub value: Option<serde_json::Value>,
+        }
+
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+        #[ts(export, export_to = #sort_file)]
+        pub struct #sort_name {
+            pub column: Option<#enum_name>,
+            pub direction: Option<crate::domain::SortDirection>,
         }
 
         impl #name {

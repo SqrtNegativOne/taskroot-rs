@@ -1,35 +1,12 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+
 use ts_rs::TS;
 
 
 
 
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AppTaskFilter.generated.ts"
-)]
-// Rebuild me please
-pub struct AppTaskFilter {
-    pub column: Option<super::AppTaskFilterColumn>,
-    pub operator: Option<String>,
-    #[ts(type = "unknown")]
-    pub value: Option<Value>,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AppEventFilter.generated.ts"
-)]
-pub struct AppEventFilter {
-    pub column: Option<super::AppEventFilterColumn>,
-    pub operator: Option<String>,
-    #[ts(type = "unknown")]
-    pub value: Option<Value>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(
@@ -43,3 +20,24 @@ pub enum FilterType {
     Relation(String),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../src/lib/bindings/SortDirection.generated.ts")]
+pub enum SortDirection {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../src/lib/bindings/FilterOperator.generated.ts")]
+pub enum FilterOperator {
+    #[serde(rename = "is")]
+    Is,
+    #[serde(rename = "is not")]
+    IsNot,
+    #[serde(rename = "contains")]
+    Contains,
+    #[serde(rename = "does not contain")]
+    DoesNotContain,
+}

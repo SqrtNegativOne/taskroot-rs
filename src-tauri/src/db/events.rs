@@ -5,8 +5,8 @@ macro_rules! event_select_sql {
     ($suffix:literal) => {
         concat!(
             "SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, ",
-            "rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, cancelled, ",
-            "updated_at, color, deleted, etag, dirty FROM events",
+            "rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, status, ",
+            "updated_at, color, etag, dirty, is_all_day FROM events",
             $suffix
         )
     };
@@ -15,20 +15,15 @@ macro_rules! event_select_sql {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub async fn get_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
-    sqlx::query_as::<_, AppEvent>(event_select_sql!(""))
-        .fetch_all(pool)
-        .await
-}
-
-/// # Errors
-///
-/// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
-    sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE id = ?"))
+    let mut event = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE id = ?"))
         .bind(id)
         .fetch_optional(pool)
-        .await
+        .await?;
+    if let Some(e) = &mut event {
+        e.preprocess_colors();
+    }
+    Ok(event)
 }
 
 /// Dirty-event feed for the offline-enqueue roadmap (see TODO.md).
@@ -37,8 +32,12 @@ pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, 
 ///
 /// Returns an error if the operation fails.
 pub async fn get_dirty_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
-    let mut events = get_events(pool).await?;
-    events.retain(|e| e.dirty == Some(true));
+    let mut events = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE dirty = 1"))
+        .fetch_all(pool)
+        .await?;
+    for event in &mut events {
+        event.preprocess_colors();
+    }
     Ok(events)
 }
 
@@ -50,7 +49,7 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, cancelled, updated_at, color, deleted, etag, dirty
+            original_start_time, status, updated_at, color, etag, dirty, is_all_day
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event.id)
@@ -65,12 +64,12 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
-    .bind(event.cancelled)
+    .bind(event.status)
     .bind(event.updated_at)
     .bind(event.color)
-    .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)
+    .bind(event.is_all_day)
     .execute(pool)
     .await?;
 
@@ -86,7 +85,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             remote_id = ?, remote_collection_id = ?, task_id = ?, title = ?, 
             description = ?, start_time = ?, end_time = ?, 
             rrule = ?, exdates = ?, recurring_event_id = ?, original_start_time = ?, 
-            cancelled = ?, updated_at = ?, color = ?, deleted = ?, etag = ?, dirty = ?
+            status = ?, updated_at = ?, color = ?, etag = ?, dirty = ?, is_all_day = ?
         WHERE id = ?",
     )
     .bind(event.remote_id)
@@ -100,12 +99,12 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
-    .bind(event.cancelled)
+    .bind(event.status)
     .bind(event.updated_at)
     .bind(event.color)
-    .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)
+    .bind(event.is_all_day)
     .bind(event.id)
     .execute(pool)
     .await?;
@@ -121,7 +120,7 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, cancelled, updated_at, color, deleted, etag, dirty
+            original_start_time, status, updated_at, color, etag, dirty, is_all_day
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             remote_id = excluded.remote_id, 
@@ -135,12 +134,12 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             exdates = excluded.exdates, 
             recurring_event_id = excluded.recurring_event_id, 
             original_start_time = excluded.original_start_time, 
-            cancelled = excluded.cancelled, 
+            status = excluded.status, 
             updated_at = excluded.updated_at, 
             color = excluded.color,
-            deleted = excluded.deleted, 
             etag = excluded.etag,
-            dirty = excluded.dirty",
+            dirty = excluded.dirty,
+            is_all_day = excluded.is_all_day",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -154,12 +153,12 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.exdates.map(sqlx::types::Json))
     .bind(event.recurring_event_id)
     .bind(event.original_start_time)
-    .bind(event.cancelled)
+    .bind(event.status)
     .bind(event.updated_at)
     .bind(event.color)
-    .bind(event.deleted)
     .bind(event.etag)
     .bind(event.dirty)
+    .bind(event.is_all_day)
     .execute(pool)
     .await?;
 
@@ -180,7 +179,7 @@ pub async fn delete_event(pool: &SqlitePool, id: String) -> Result<(), sqlx::Err
 fn apply_sql(
     builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     col_id: &crate::domain::AppEventFilterColumn,
-    op: &str,
+    op: &crate::domain::FilterOperator,
     val: &serde_json::Value,
     schema: &[crate::domain::AppEventColumnDef],
 ) {
@@ -188,7 +187,7 @@ fn apply_sql(
         return;
     };
 
-    let is_not = op == "is not";
+    let is_not = matches!(op, crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain);
     let values = val
         .as_array()
         .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
@@ -212,7 +211,7 @@ fn apply_sql(
     builder.push(")");
 }
 
-pub async fn get_filtered_events(
+pub async fn query_events(
     pool: &SqlitePool,
     filters: Vec<crate::domain::AppEventFilter>,
     query_text: String,
@@ -224,7 +223,7 @@ pub async fn get_filtered_events(
 
     for f in &filters {
         if let (Some(col_id), Some(val)) = (&f.column, &f.value) {
-            let op = f.operator.as_deref().unwrap_or("is");
+            let op = f.operator.as_ref().unwrap_or(&crate::domain::FilterOperator::Is);
             apply_sql(&mut query_builder, col_id, op, val, &schema);
         }
     }
@@ -238,10 +237,14 @@ pub async fn get_filtered_events(
         query_builder.push(")");
     }
 
-    let events = query_builder
+    let mut events = query_builder
         .build_query_as::<AppEvent>()
         .fetch_all(pool)
         .await?;
+
+    for event in &mut events {
+        event.preprocess_colors();
+    }
 
     Ok(events)
 }

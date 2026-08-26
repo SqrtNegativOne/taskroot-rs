@@ -47,9 +47,9 @@ fn clamp_to_day(date_str: &str, day_start_prefix: &str) -> Option<f64> {
 
 fn parse_iso_parts(iso: &str) -> Option<(String, Option<NaiveTime>)> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(iso) {
-        let local = dt.naive_local();
+        let local = dt.with_timezone(&chrono::Local);
         return Some((
-            local.date().format("%Y-%m-%d").to_string(),
+            local.date_naive().format("%Y-%m-%d").to_string(),
             Some(local.time()),
         ));
     }
@@ -72,31 +72,94 @@ fn parse_iso_to_mins(iso: &str, day_start_prefix: &str) -> Option<f64> {
 }
 
 fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
-    let mut mapped: Vec<LaidEvent> = events
-        .iter()
-        .filter_map(|e| {
-            let start_iso = &e.start_time;
-            let end_iso = &e.end_time;
+    let mut mapped: Vec<LaidEvent> = Vec::new();
 
-            let start_mins = parse_iso_to_mins(start_iso, date_str)?;
-            let end_mins = parse_iso_to_mins(end_iso, date_str)?;
-
-            // Filter out if not in this day
-            if end_iso < &format!("{date_str}T00:00:00")
-                || start_iso > &format!("{date_str}T23:59:59")
-            {
-                return None;
+    let mut exceptions = std::collections::HashSet::new();
+    for e in events {
+        if let Some(recurring_id) = &e.recurring_event_id {
+            if let Some(orig_start) = &e.original_start_time {
+                exceptions.insert((recurring_id.clone(), orig_start.clone()));
             }
+        }
+    }
 
-            Some(LaidEvent {
-                event: e.clone(),
-                start_mins,
-                end_mins,
-                lane: 0,
-                lanes: 1,
-            })
-        })
-        .collect();
+    // Helper to process a concrete event instance
+    let mut process_instance = |e: AppEvent, start_iso: String, end_iso: String| {
+        if e.is_all_day == Some(true) {
+            return;
+        }
+        if e.status == Some(crate::domain::EventStatus::Cancelled) {
+            return;
+        }
+
+        let Some(start_mins) = parse_iso_to_mins(&start_iso, date_str) else { return; };
+        let Some(end_mins) = parse_iso_to_mins(&end_iso, date_str) else { return; };
+
+        // Filter out if not in this day (in local time string comparison)
+        // Wait, start_iso and end_iso are UTC RFC3339 strings, but they get parsed to local strings inside parse_iso_to_mins
+        // So we can just check if start_mins == 1440 and end_mins == 0
+        if start_mins >= MINUTES_PER_DAY && end_mins >= MINUTES_PER_DAY {
+            return;
+        }
+        if start_mins <= 0.0 && end_mins <= 0.0 {
+            return;
+        }
+
+        mapped.push(LaidEvent {
+            event: e,
+            start_mins,
+            end_mins,
+            lane: 0,
+            lanes: 1,
+        });
+    };
+
+    for e in events {
+        if let Some(rrule) = &e.rrule {
+            // Expand rrule
+            if let Ok(dt_start) = chrono::DateTime::parse_from_rfc3339(&e.start_time) {
+                let dt_start_utc = dt_start.with_timezone(&chrono::Utc);
+                
+                // Get end of the day in UTC to bound the rrule search
+                if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                    if let Some(day_end) = naive_date.and_hms_opt(23, 59, 59) {
+                        if let Some(day_end_local) = day_end.and_local_timezone(chrono::Local).single() {
+                            let day_end_utc = day_end_local.with_timezone(&chrono::Utc);
+                            // Add some buffer for long events
+                            let search_end = day_end_utc.checked_add_signed(chrono::Duration::days(1)).unwrap_or(day_end_utc);
+
+                            if let Ok(occurrences) = crate::time_utils::rrule_utils::get_occurrences(rrule, &dt_start_utc, &search_end) {
+                                let duration = chrono::DateTime::parse_from_rfc3339(&e.end_time).map_or_else(
+                                    |_| chrono::Duration::zero(),
+                                    |dt_end| dt_end.with_timezone(&chrono::Utc).signed_duration_since(dt_start_utc)
+                                );
+
+                                for occ in occurrences {
+                                    let occ_utc = occ.with_timezone(&chrono::Utc);
+                                    let occ_iso = occ_utc.to_rfc3339();
+                                    
+                                    // Check if this occurrence is an exception
+                                    if exceptions.contains(&(e.id.clone(), occ_iso.clone())) {
+                                        continue;
+                                    }
+
+                                    let occ_end_utc = occ_utc.checked_add_signed(duration).unwrap_or(occ_utc);
+                                    
+                                    process_instance(e.clone(), occ_iso, occ_end_utc.to_rfc3339());
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Non-recurring or failed to parse recurring
+        if e.recurring_event_id.is_none() || e.status != Some(crate::domain::EventStatus::Cancelled) {
+            process_instance(e.clone(), e.start_time.clone(), e.end_time.clone());
+        }
+    }
 
     let mut placed: Vec<(f64, f64, i32)> = Vec::new();
 
@@ -137,23 +200,19 @@ fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, sqlx::SqlitePool>,
 ///
 /// Returns an error if the operation fails.
 #[tauri::command]
-pub async fn get_plan_layout(
+pub async fn query_plan_layout(
     app: tauri::AppHandle,
     dates: Vec<String>,
     filters: Option<Vec<AppEventFilter>>,
     query: Option<String>,
 ) -> Result<Vec<PlanDayLayout>, AppError> {
     let pool = db_pool(&app)?;
-    let all_events = if filters.is_some() || query.is_some() {
-        db::get_filtered_events(
-            &pool,
-            filters.unwrap_or_default(),
-            query.unwrap_or_default(),
-        )
-        .await?
-    } else {
-        db::get_events(&pool).await?
-    };
+    let all_events = db::query_events(
+        &pool,
+        filters.unwrap_or_default(),
+        query.unwrap_or_default(),
+    )
+    .await?;
 
     let mut result = Vec::new();
     for date in dates {
@@ -171,26 +230,26 @@ pub async fn get_plan_layout(
 ///
 /// Returns an error if the operation fails.
 #[tauri::command]
-pub async fn get_filtered_tasks(
+pub async fn query_tasks(
     app: tauri::AppHandle,
     filters: Vec<AppTaskFilter>,
-    sort: String,
+    sort: Vec<crate::domain::AppTaskSort>,
     query: String,
 ) -> Result<Vec<AppTask>, AppError> {
     let pool = db_pool(&app)?;
-    Ok(db::get_filtered_tasks(&pool, filters, sort, query).await?)
+    Ok(db::query_tasks(&pool, filters, sort, query).await?)
 }
 
 
 
 #[tauri::command]
-pub async fn get_filtered_events(
+pub async fn query_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
     query: String,
 ) -> Result<Vec<AppEvent>, AppError> {
     let pool = db_pool(&app)?;
-    Ok(db::get_filtered_events(&pool, filters, query).await?)
+    Ok(db::query_events(&pool, filters, query).await?)
 }
 
 #[tauri::command]

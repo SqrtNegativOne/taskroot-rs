@@ -40,7 +40,7 @@ impl GoogleSyncEntity for AppTask {
 
     fn mark_updated(&mut self) {
         self.dirty = Some(true);
-        self.updated_at = Some(chrono::Utc::now().timestamp_millis());
+        self.updated_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
     fn mark_clean(&mut self) {
@@ -73,7 +73,7 @@ impl GoogleSyncEntity for AppEvent {
 
     fn mark_updated(&mut self) {
         self.dirty = Some(true);
-        self.updated_at = Some(chrono::Utc::now().timestamp_millis());
+        self.updated_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
     fn mark_clean(&mut self) {
