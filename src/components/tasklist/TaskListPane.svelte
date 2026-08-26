@@ -74,6 +74,45 @@
 
     let filtered = $derived(tasksQuery.data ?? []);
 
+    interface FlatTaskTreeItem {
+        task: AppTask;
+        depth: number;
+    }
+
+    let flatNestedFiltered = $derived.by(() => {
+        interface TaskTreeItem {
+            task: AppTask;
+            children: TaskTreeItem[];
+        }
+
+        const map = new Map<string, TaskTreeItem>();
+        for (const t of filtered) {
+            map.set(t.id, { task: t, children: [] });
+        }
+        
+        const rootItems: TaskTreeItem[] = [];
+        
+        for (const t of filtered) {
+            const item = map.get(t.id)!;
+            if (t.parentTask && map.has(t.parentTask)) {
+                map.get(t.parentTask)!.children.push(item);
+            } else {
+                rootItems.push(item);
+            }
+        }
+
+        const result: FlatTaskTreeItem[] = [];
+        function traverse(item: TaskTreeItem, depth: number) {
+            result.push({ task: item.task, depth });
+            for (const child of item.children) {
+                traverse(child, depth + 1);
+            }
+        }
+        for (const rootItem of rootItems) {
+            traverse(rootItem, 0);
+        }
+        return result;
+    });
     $effect(() => {
         queryDependency(tasks);
         void tasksQuery.execute({ filters, sort, query });
@@ -133,15 +172,15 @@
                 <span class="dim">{tasks.length === 0 ? "no tasks exist." : "no tasks match."}</span>
             </div>
         {:else}
-            {#each filtered as t (t.id)}
-                <div animate:flip={{ duration: 300 }} transition:slide={{ duration: 250 }}>
+            {#each flatNestedFiltered as item (item.task.id)}
+                <div animate:flip={{ duration: 300 }} transition:slide={{ duration: 250 }} style="margin-left: {item.depth * 20}px">
                     <TaskRow
-                        task={t}
+                        task={item.task}
                         {onDragStart}
-                        dragging={activeDragId === t.id}
+                        dragging={activeDragId === item.task.id}
                         {updateTask}
                         {deleteTask}
-                        isPastDue={pastDueTaskIds.has(t.id)}
+                        isPastDue={pastDueTaskIds.has(item.task.id)}
                         {onTaskClick}
                     />
                 </div>

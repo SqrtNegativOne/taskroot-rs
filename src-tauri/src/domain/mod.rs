@@ -42,13 +42,22 @@ pub enum TaskPriority {
     Urgent = 4,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/Subtask.generated.ts")]
-pub struct Subtask {
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../src/lib/bindings/ChecklistItem.generated.ts")]
+pub struct ChecklistItem {
+    #[serde(default = "default_checklist_id")]
+    pub id: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
     pub done: bool,
     #[serde(flatten)]
     #[ts(skip)]
     pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+fn default_checklist_id() -> String {
+    uuid::Uuid::new_v4().to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq, Eq)]
@@ -82,7 +91,7 @@ pub struct AppTask {
     pub tags: Option<Vec<Tag>>,
     #[ts(optional)]
     #[sqlx(json)]
-    pub subtasks: Option<Vec<Subtask>>,
+    pub checklist: Option<Vec<ChecklistItem>>,
     #[ts(optional)]
     pub parent_task: Option<String>,
     #[ts(optional)]
@@ -178,7 +187,7 @@ mod tests {
                 name: "work".into(),
                 color: None,
             }]),
-            subtasks: None,
+            checklist: None,
             parent_task: None,
             dependencies: None,
             est: None,

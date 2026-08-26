@@ -75,7 +75,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                 status,
                 priority: None,
                 tags: None,
-                subtasks: None,
+                checklist: None,
                 parent_task: task.parent,
                 dependencies: None,
                 est: None,

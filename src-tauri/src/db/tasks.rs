@@ -7,7 +7,7 @@ macro_rules! task_select_sql {
             "SELECT t.id, t.title, t.status, t.priority, ",
             "(SELECT CASE WHEN COUNT(tg.id) > 0 THEN json_group_array(json_object('id', tg.id, 'name', tg.name, 'color', tg.color)) ELSE 'null' END ",
             "FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id) as tags, ",
-            "COALESCE(t.subtasks, 'null') as subtasks, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, ",
+            "COALESCE(t.subtasks, 'null') as checklist, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, ",
             "t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.deleted, t.updated_at, t.etag, t.dirty",
             " FROM tasks t",
             $suffix
@@ -90,7 +90,7 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
     .bind(&task.parent_task)
     .bind(
         task.dependencies
@@ -134,7 +134,7 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
     .bind(&task.parent_task)
     .bind(
         task.dependencies
@@ -199,7 +199,7 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.subtasks.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
     .bind(&task.parent_task)
     .bind(
         task.dependencies

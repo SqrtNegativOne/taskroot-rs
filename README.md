@@ -5,10 +5,9 @@ taskroot is a local-first desktop task manager built around a simple cycle: **pl
 ## Tech Stack
 - **Frontend**: Svelte 5 (runes) + SvelteKit in SPA mode (Vite, static adapter)
 - **Backend**: Tauri v2 (Rust) exposing typed IPC commands (`Result<T, AppError>`)
-- **Storage**: SQLite via `sqlx` with SQL migrations (`src-tauri/migrations/`)
+- **Storage**: SQLite via `sqlx`.
 - **Type Sharing**: `ts-rs` generates TypeScript bindings from Rust structs into `src/lib/bindings/`
 - **Sync**: Google Calendar / Tasks via OAuth 2.0 (optional)
-- **Testing**: Playwright E2E + Rust unit tests; ESLint, svelte-check, and clippy for linting
 - **Package Manager**: Bun
 
 ## Prerequisites
@@ -24,23 +23,3 @@ bun run tauri dev    # full desktop app (or just run.bat on Windows)
 ```
 
 After changing any Rust struct that derives `ts_rs::TS`, run `cargo test` inside `src-tauri/` to regenerate the TypeScript bindings under `src/lib/bindings/`, then commit them alongside your change.
-
-## Scripts
-| Script | Description |
-| --- | --- |
-| `bun run dev` | Start the Vite dev server on port 1420 |
-| `bun run build` | Production frontend build |
-| `bun run preview` | Preview the production build |
-| `bun run check` | Type-check the frontend (`svelte-check`) |
-| `bun run check:watch` | Type-check in watch mode |
-| `bun run lint` | Lint with ESLint |
-| `bun run test` | Run Playwright E2E tests (boots `bun run dev` on port 1420 automatically) |
-| `bun run tauri` | Invoke the Tauri CLI (e.g., `bun run tauri dev`, `bun run tauri build`) |
-
-For the backend, run `cargo clippy --all-targets -- -D warnings` and `cargo test` from `src-tauri/`.
-
-## Architecture
-The three windows declared in `src-tauri/tauri.conf.json` all render the same SPA, which branches by Tauri window label. The SQLite database is the single source of truth: frontend mutations await the corresponding IPC command and then re-fetch state from the database. Cross-window concerns like the stopwatch and sync status live in the Rust backend and are pushed to every window through Tauri events. See [AGENTS.md](./AGENTS.md) for the full architecture guide, coding conventions, and project structure.
-
-## Windows Helper Scripts
-`run.bat` wraps `bun run tauri dev` and `build.bat` wraps `bun run tauri build` as one-line conveniences on Windows.

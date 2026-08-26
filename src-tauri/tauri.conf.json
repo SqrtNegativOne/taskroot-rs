@@ -33,8 +33,8 @@
       {
         "label": "minitracker",
         "title": "Mini Tracker",
-        "width": 300,
-        "height": 100,
+        "width": 320,
+        "height": 75,
         "transparent": true,
         "decorations": false,
         "closable": false,

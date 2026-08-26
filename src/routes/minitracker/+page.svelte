@@ -202,7 +202,15 @@
     <div class="clock" style="color: {textColor}">
         <div class="time">{timeParts.m}:{timeParts.s}</div>
         <div class="byline">
-            {#if stopwatchState.activePhase === 'break'}
+            {#if store.settings?.clock_style === 'guzey'}
+                {#if stopwatchState.activePhase === 'long break'}
+                    long break
+                {:else if stopwatchState.activePhase === 'break'}
+                    break
+                {:else}
+                    {activeTask ? activeTask.title : 'work'}
+                {/if}
+            {:else if stopwatchState.activePhase === 'break'}
                 {#if stopwatchState.isCountdown}
                     left in break
                 {:else}

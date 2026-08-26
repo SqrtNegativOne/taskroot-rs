@@ -60,7 +60,7 @@ export class StopwatchState {
         return false;
     }
 
-    get activePhase(): 'work' | 'break' {
+    get activePhase(): 'work' | 'break' | 'long break' {
         if (!store.loaded || !store.settings) return this.isBreak ? 'break' : 'work';
         const style = store.settings.clock_style;
         
@@ -69,7 +69,7 @@ export class StopwatchState {
             const date = new Date();
             const hour = date.getHours();
             const min = date.getMinutes();
-            if (hour % 3 === 0 && min < 35) return 'break';
+            if (hour % 3 === 0 && min < 35) return 'long break';
             if (min >= 0 && min < 5) return 'break';
             if (min >= 30 && min < 35) return 'break';
             return 'work';
@@ -146,7 +146,7 @@ export function splitTime(ms: number) {
     };
 }
 
-let lastPhase: 'work' | 'break' | undefined;
+let lastPhase: 'work' | 'break' | 'long break' | undefined;
 
 function playBeep() {
     import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {

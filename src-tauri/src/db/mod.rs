@@ -172,7 +172,7 @@ mod tests {
                 name: "work".into(),
                 color: None,
             }]),
-            subtasks: None,
+            checklist: None,
             parent_task: None,
             dependencies: Some(vec!["task-0".into()]),
             est: Some(45),
