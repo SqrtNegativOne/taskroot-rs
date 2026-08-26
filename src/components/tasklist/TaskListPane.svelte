@@ -85,17 +85,17 @@
             children: TaskTreeItem[];
         }
 
-        const map = new Map<string, TaskTreeItem>();
+        const map: Record<string, TaskTreeItem> = {};
         for (const t of filtered) {
-            map.set(t.id, { task: t, children: [] });
+            map[t.id] = { task: t, children: [] };
         }
         
         const rootItems: TaskTreeItem[] = [];
         
         for (const t of filtered) {
-            const item = map.get(t.id)!;
-            if (t.parentTask && map.has(t.parentTask)) {
-                map.get(t.parentTask)!.children.push(item);
+            const item = map[t.id]!;
+            if (t.parentTask && map[t.parentTask]) {
+                map[t.parentTask]!.children.push(item);
             } else {
                 rootItems.push(item);
             }

@@ -1,13 +1,13 @@
-<script lang="ts">
-    type SortItem = any;
+<script lang="ts" generics="T">
+    type SortItem<T> = { column: T | null; direction: 'asc' | 'desc' | null };
 
     let {
         sort = $bindable([]),
         sortOptions = [],
         align = "left",
     }: {
-        sort?: SortItem[];
-        sortOptions?: {id: string, label: string}[];
+        sort?: SortItem<T>[];
+        sortOptions?: {id: T, label: string}[];
         align?: "left" | "right";
     } = $props();
 
@@ -25,8 +25,10 @@
     });
 
     function addSort() {
-        const id = sortOptions[0]?.id ?? 'priority';
-        sort = [...(sort ?? []), { column: id, direction: 'asc' }];
+        const id = sortOptions[0]?.id;
+        if (id !== undefined) {
+            sort = [...(sort ?? []), { column: id, direction: 'asc' }];
+        }
     }
 
     function removeSort(index: number) {
@@ -36,13 +38,13 @@
 
     function updateSortCol(index: number, val: string) {
         if (!sort || index >= sort.length) return;
-        sort[index].column = val;
+        sort[index].column = val as T;
         sort = [...sort];
     }
 
     function updateSortDir(index: number, val: string) {
         if (!sort || index >= sort.length) return;
-        sort[index].direction = val;
+        sort[index].direction = val as 'asc' | 'desc';
         sort = [...sort];
     }
 
@@ -56,7 +58,7 @@
         }
     }
 
-    function handleDragOver(e: DragEvent, index: number) {
+    function handleDragOver(e: DragEvent, _index: number) {
         e.preventDefault();
         if (e.dataTransfer) {
             e.dataTransfer.dropEffect = 'move';
@@ -94,7 +96,7 @@
         <div class="shared-floating-menu align-{align}" style="min-width: 280px;">
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 {#if sort}
-                    {#each sort as s, i}
+                    {#each sort as s, i (i)}
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div 
                             class="sort-row" 

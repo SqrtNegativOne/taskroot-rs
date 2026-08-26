@@ -57,13 +57,13 @@
                     const parsed = JSON.parse(raw);
                     if (parsed.length > 0 && typeof parsed[0] === 'string') {
                         return parsed.map((col: string) => ({
-                            column: col,
+                            column: col as import('../../lib/bindings/AppTaskFilterColumn.generated').AppTaskFilterColumn,
                             direction: col === 'priority' ? 'desc' : 'asc'
                         }));
                     }
                     return parsed as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
                 }
-                return [{ column: raw as any, direction: raw === 'priority' ? 'desc' : 'asc' }];
+                return [{ column: raw as import('../../lib/bindings/AppTaskFilterColumn.generated').AppTaskFilterColumn, direction: raw === 'priority' ? 'desc' : 'asc' }];
             } catch {
                 return [{ column: 'priority', direction: 'desc' }];
             }

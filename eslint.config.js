@@ -29,7 +29,7 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', 'build/', 'legacy-src/'],
+    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', 'build/', 'legacy-src/', 'coverage/'],
   },
   {
     rules: {
