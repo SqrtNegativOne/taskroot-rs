@@ -162,19 +162,21 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 
                 let rrule = event.recurrence.map(|r| r.join("\n"));
 
-                let mut color = calendar.background_color.clone();
+                let mut color_str = calendar.background_color.clone();
                 if let Some(color_id) = &event.color_id {
                     if let Some(color_def) = event_colors.get(color_id) {
                         if let Some(bg) = &color_def.background {
-                            color = Some(bg.clone());
+                            color_str = Some(bg.clone());
                         }
                     }
                 }
 
+                let color = color_str.and_then(|c| crate::domain::Color::try_from(c).ok());
+
                 let app_event = crate::domain::AppEvent {
-                    id: app_event_id,
-                    remote_id: Some(event.id),
-                    remote_collection_id: Some(calendar.id.clone()),
+                    id: crate::domain::EventId(app_event_id),
+                    remote_id: Some(crate::domain::RemoteId(event.id)),
+                    remote_collection_id: Some(crate::domain::CollectionId(calendar.id.clone())),
                     task_id: None,
                     title,
                     description: event.description,
@@ -182,7 +184,7 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                     end_time,
                     rrule,
                     exdates: None,
-                    recurring_event_id: event.recurring_event_id,
+                    recurring_event_id: event.recurring_event_id.map(crate::domain::EventId),
                     original_start_time,
                     status,
                     updated_at: Some(remote_updated_at),
@@ -237,7 +239,7 @@ pub async fn publish(event: &crate::domain::AppEvent, access_token: &str) -> Res
         })
     };
 
-    let cal_id = event.remote_collection_id.as_deref().unwrap_or("primary");
+    let cal_id = event.remote_collection_id.as_deref().map_or("primary", std::string::String::as_str);
     let cal_id = urlencoding::encode(cal_id);
 
     let (url, method) =
@@ -293,3 +295,4 @@ pub async fn delete(remote_id: &str, remote_collection_id: Option<&str>, access_
     }
     Ok(())
 }
+

@@ -12,6 +12,7 @@
 
     import { listen, emit } from '@tauri-apps/api/event';
     import { LAUNCHER_DATA_UPDATE } from '$lib/events';
+    import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
 
     let { children }: { children: Snippet } = $props();
     let isLauncher = $state(false);
@@ -30,9 +31,10 @@
 
     onMount(() => {
         const appWindow = getCurrentWindow();
-        isLauncher = appWindow.label === 'launcher';
-        isMinitracker = appWindow.label === 'minitracker';
-        isSidebar = appWindow.label === 'sidebar';
+        const label = appWindow.label as WindowLabel;
+        isLauncher = label === 'launcher';
+        isMinitracker = label === 'minitracker';
+        isSidebar = label === 'sidebar';
 
         let unlistenData = () => { /* noop */ };
         let unlistenNav = () => { /* noop */ };

@@ -1,9 +1,10 @@
 use tauri::Manager;
+use crate::domain::WindowLabel;
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn window_restore_main(app: tauri::AppHandle) {
-    if let Some(main_win) = app.get_webview_window("main") {
+    if let Some(main_win) = app.get_webview_window(WindowLabel::Main.as_str()) {
         let _ = main_win.show();
         let _ = main_win.unminimize();
         let _ = main_win.set_focus();
@@ -13,7 +14,7 @@ pub fn window_restore_main(app: tauri::AppHandle) {
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn show_minitracker(app: tauri::AppHandle) {
-    if let Some(mini_win) = app.get_webview_window("minitracker") {
+    if let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) {
         let _ = mini_win.show();
         let _ = mini_win.unminimize();
         let _ = mini_win.set_focus();
@@ -24,7 +25,7 @@ pub fn show_minitracker(app: tauri::AppHandle) {
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn hide_launcher(app: tauri::AppHandle) {
-    if let Some(launcher_win) = app.get_webview_window("launcher") {
+    if let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) {
         let _ = launcher_win.hide();
     }
 }
@@ -32,7 +33,7 @@ pub fn hide_launcher(app: tauri::AppHandle) {
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn resize_launcher(app: tauri::AppHandle, width: f64, height: f64) {
-    if let Some(launcher_win) = app.get_webview_window("launcher") {
+    if let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) {
         let _ = launcher_win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(width, height)));
     }
 }

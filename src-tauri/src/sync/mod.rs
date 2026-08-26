@@ -150,7 +150,7 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
                 } else {
                     match crate::apis::google_tasks::publish(&task, &access_token).await {
                         Ok(remote_id) => {
-                            task.remote_id = Some(remote_id);
+                            task.remote_id = Some(crate::domain::RemoteId(remote_id));
                             task.dirty = Some(false);
                             let _ = crate::db::upsert_task(pool, task).await;
                         }
@@ -163,7 +163,7 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
             crate::sync::types::SyncItemData::Event(mut event) => {
                 if item.action == crate::sync::types::SyncAction::Delete {
                     if let Some(remote_id) = &event.remote_id {
-                        if crate::apis::google_calendar::delete(remote_id, event.remote_collection_id.as_deref(), &access_token)
+                        if crate::apis::google_calendar::delete(remote_id, event.remote_collection_id.as_deref().map(String::as_str), &access_token)
                             .await
                             .is_err()
                         {
@@ -173,7 +173,7 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
                 } else {
                     match crate::apis::google_calendar::publish(&event, &access_token).await {
                         Ok(remote_id) => {
-                            event.remote_id = Some(remote_id);
+                            event.remote_id = Some(crate::domain::RemoteId(remote_id));
                             event.dirty = Some(false);
                             let _ = crate::db::upsert_event(pool, event).await;
                         }
@@ -205,3 +205,4 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
 
     Ok(())
 }
+

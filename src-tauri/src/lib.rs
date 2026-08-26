@@ -36,7 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
                 let _ = window.set_focus();
             }
         }))
@@ -67,7 +67,7 @@ pub fn run() {
             let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
-                        if let Some(main_win) = app.get_webview_window("main") {
+                        if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
                             let _ = main_win.show();
                             let _ = main_win.unminimize();
                             let _ = main_win.set_focus();
@@ -86,7 +86,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(main_win) = app.get_webview_window("main") {
+                        if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
                             let _ = main_win.show();
                             let _ = main_win.unminimize();
                             let _ = main_win.set_focus();
@@ -102,7 +102,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" {
+                if window.label() == domain::WindowLabel::Main.as_str() {
                     let _ = window.hide();
                     api.prevent_close();
                 }

@@ -66,20 +66,20 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             };
 
             let app_task = crate::domain::AppTask {
-                id: app_task_id,
+                id: crate::domain::TaskId(app_task_id),
                 title,
                 status,
                 priority: None,
                 tags: None,
                 checklist: None,
-                parent_task: task.parent,
+                parent_task: task.parent.map(crate::domain::TaskId),
                 dependencies: None,
                 est: None,
                 added: Some(chrono::Utc::now().to_rfc3339()),
                 canvas_x: None,
                 canvas_y: None,
                 on_canvas: None,
-                remote_id: Some(task.id),
+                remote_id: Some(crate::domain::RemoteId(task.id)),
                 notes: task.notes,
                 tabs: None,
                 due: task.due,
@@ -164,3 +164,4 @@ pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
     }
     Ok(())
 }
+

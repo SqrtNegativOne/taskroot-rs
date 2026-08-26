@@ -31,7 +31,7 @@ impl GoogleSyncEntity for AppTask {
     const SYNC_TYPE: SyncType = SyncType::Task;
 
     fn remote_id(&self) -> Option<&String> {
-        self.remote_id.as_ref()
+        self.remote_id.as_deref()
     }
 
     fn to_item_data(&self) -> SyncItemData {
@@ -48,7 +48,7 @@ impl GoogleSyncEntity for AppTask {
     }
 
     fn set_remote_id(&mut self, remote_id: String) {
-        self.remote_id = Some(remote_id);
+        self.remote_id = Some(crate::domain::RemoteId(remote_id));
     }
 
     async fn publish_remote(&self, access_token: &str) -> anyhow::Result<String> {
@@ -64,7 +64,7 @@ impl GoogleSyncEntity for AppEvent {
     const SYNC_TYPE: SyncType = SyncType::Event;
 
     fn remote_id(&self) -> Option<&String> {
-        self.remote_id.as_ref()
+        self.remote_id.as_deref()
     }
 
     fn to_item_data(&self) -> SyncItemData {
@@ -81,7 +81,7 @@ impl GoogleSyncEntity for AppEvent {
     }
 
     fn set_remote_id(&mut self, remote_id: String) {
-        self.remote_id = Some(remote_id);
+        self.remote_id = Some(crate::domain::RemoteId(remote_id));
     }
 
     async fn publish_remote(&self, access_token: &str) -> anyhow::Result<String> {
@@ -89,7 +89,7 @@ impl GoogleSyncEntity for AppEvent {
     }
 
     async fn delete_remote(&self, remote_id: &str, access_token: &str) -> anyhow::Result<()> {
-        crate::apis::google_calendar::delete(remote_id, self.remote_collection_id.as_deref(), access_token).await
+        crate::apis::google_calendar::delete(remote_id, self.remote_collection_id.as_deref().map(std::string::String::as_str), access_token).await
     }
 }
 

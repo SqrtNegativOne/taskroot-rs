@@ -8,9 +8,11 @@
     import StageIndicator from './shell/StageIndicator.svelte';
     import MoreScreensDropdown from './shell/MoreScreensDropdown.svelte';
     import WindowControls from './shell/WindowControls.svelte';
+    import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
 
     const appWindow = getCurrentWindow();
-    const isMinitracker = appWindow.label === 'minitracker';
+    const label = appWindow.label as WindowLabel;
+    const isMinitracker = label === 'minitracker';
 
     function navigate(stage: 'settings' | 'home'): void {
         void goto(resolve(stage === 'home' ? Routes.HOME : Routes.SETTINGS));

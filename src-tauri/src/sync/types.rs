@@ -51,8 +51,8 @@ impl SyncItemData {
     #[must_use]
     pub fn id(&self) -> String {
         match self {
-            Self::Task(t) => t.id.clone(),
-            Self::Event(e) => e.id.clone(),
+            Self::Task(t) => t.id.to_string(),
+            Self::Event(e) => e.id.to_string(),
         }
     }
 }
