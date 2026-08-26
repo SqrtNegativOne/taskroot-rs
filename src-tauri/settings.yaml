@@ -42,7 +42,7 @@ tabs:
             label: Clock Style
             keywords: [stopwatch, timer, guzey, counter, flowtime]
             type: select
-            defaultValue: counter
+            defaultValue: guzey
             options:
               - value: counter
                 label: Counter
