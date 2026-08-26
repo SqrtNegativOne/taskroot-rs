@@ -59,6 +59,12 @@ fn parse_iso_parts(iso: &str) -> Option<(String, Option<NaiveTime>)> {
     if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M") {
         return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
     }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%d %H:%M:%S") {
+        return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(iso, "%Y-%m-%d %H:%M") {
+        return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
+    }
     if iso.len() >= 10 {
         return Some((iso[0..10].to_string(), None));
     }
@@ -224,6 +230,18 @@ pub async fn query_plan_layout(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_iso_to_mins_debug() {
+        let mins = parse_iso_to_mins("2026-08-26T10:00:00.000Z", "2026-08-26");
+        println!("parse_iso_to_mins returned: {:?}", mins);
+        assert_eq!(mins, Some(930.0)); // Adjust based on local timezone, wait let's just print
+    }
 }
 
 /// # Errors

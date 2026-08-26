@@ -12,7 +12,13 @@ pub fn get_occurrences(
     dt_start: &DateTime<Utc>,
     end_date: &DateTime<Utc>,
 ) -> Result<Vec<DateTime<rrule::Tz>>> {
-    let rrule_set = RRuleSet::from_str(rrule_str)
+    let mut full_rrule = rrule_str.to_string();
+    if !full_rrule.contains("DTSTART") {
+        let dt_start_str = dt_start.format("%Y%m%dT%H%M%SZ");
+        full_rrule = format!("DTSTART:{dt_start_str}\n{full_rrule}");
+    }
+
+    let rrule_set = RRuleSet::from_str(&full_rrule)
         .map_err(|e| color_eyre::eyre::eyre!("Failed to parse rrule: {e:?}"))?;
 
     let dt_start_tz = dt_start.with_timezone(&rrule::Tz::UTC);

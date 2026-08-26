@@ -150,8 +150,8 @@
                     cell={c}
                     {today}
                     events={displayEvents.filter(e => {
-                        const eStart = new Date(e.startTime).getTime();
-                        const eEnd = new Date(e.endTime).getTime();
+                        const eStart = new Date(e.startTime.replace(' ', 'T')).getTime();
+                        const eEnd = new Date(e.endTime.replace(' ', 'T')).getTime();
                         return eStart < cellEnd && eEnd > cellStart;
                     })}
                     {isWeek}

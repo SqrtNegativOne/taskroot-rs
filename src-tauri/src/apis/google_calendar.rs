@@ -29,6 +29,8 @@ struct GoogleColorDefinition {
 #[derive(Deserialize, Debug)]
 struct GoogleEventList {
     items: Option<Vec<GoogleEvent>>,
+    #[serde(rename = "nextPageToken")]
+    next_page_token: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -62,7 +64,7 @@ struct GoogleEventTime {
 #[allow(clippy::too_many_lines)]
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
-    let now = chrono::Utc::now().to_rfc3339();
+    let time_min = (chrono::Utc::now() - chrono::Duration::days(90)).to_rfc3339();
 
     // 1. Fetch calendar list
     let list_response = client
@@ -98,33 +100,41 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     // 3. Fetch events for each calendar
     for calendar in calendars {
         let cal_id = urlencoding::encode(&calendar.id);
-        let mut url = url::Url::parse(&format!("https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events"))?;
-        url.query_pairs_mut()
-            .append_pair("timeMin", &now)
-            .append_pair("maxResults", "500")
-            .append_pair("orderBy", "updated");
+        let mut page_token: Option<String> = None;
 
-        let response = client
-            .get(url.as_str())
-            .bearer_auth(access_token)
-            .send()
-            .await?;
+        loop {
+            let mut url = url::Url::parse(&format!("https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events"))?;
+            {
+                let mut q = url.query_pairs_mut();
+                q.append_pair("timeMin", &time_min);
+                q.append_pair("maxResults", "500");
+                q.append_pair("orderBy", "updated");
+                if let Some(token) = &page_token {
+                    q.append_pair("pageToken", token);
+                }
+            }
 
-        if !response.status().is_success() {
-            let err = response.text().await?;
-            eprintln!("Google Calendar API error for calendar {}: {}", calendar.id, err);
-            continue;
-        }
+            let response = client
+                .get(url.as_str())
+                .bearer_auth(access_token)
+                .send()
+                .await?;
 
-        let event_list: GoogleEventList = response.json().await?;
+            if !response.status().is_success() {
+                let err = response.text().await?;
+                eprintln!("Google Calendar API error for calendar {}: {}", calendar.id, err);
+                break;
+            }
 
-        if let Some(events) = event_list.items {
-            for event in events {
-                let app_event_id = format!("google_{}", event.id);
+            let mut event_list: GoogleEventList = response.json().await?;
 
-                let remote_updated_at = event.updated.clone().unwrap_or_else(
-                    || chrono::Utc::now().to_rfc3339()
-                );
+            if let Some(events) = event_list.items.take() {
+                for event in events {
+                    let app_event_id = format!("google_{}", event.id);
+
+                    let remote_updated_at = event.updated.clone().unwrap_or_else(
+                        || chrono::Utc::now().to_rfc3339()
+                    );
 
                 if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
                     if let Some(local_updated) = &local_event.updated_at {
@@ -199,8 +209,15 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                     eprintln!("Failed to upsert Google event: {e}");
                 }
             }
+        } // Ends if let Some(events)
+
+        if let Some(next_token) = event_list.next_page_token {
+            page_token = Some(next_token);
+        } else {
+            break;
         }
-    }
+    } // Ends loop
+} // Ends for calendar
 
     Ok(())
 }

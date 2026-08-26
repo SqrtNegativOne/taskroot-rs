@@ -185,6 +185,7 @@
             remoteId: undefined, remoteCollectionId: undefined, taskId: undefined, description: undefined, rrule: undefined,
             exdates: undefined, recurringEventId: undefined, originalStartTime: undefined, cancelled: undefined,
             updatedAt: undefined, color: undefined, _deleted: undefined, etag: undefined,
+            isAllDay: startMins === undefined,
         } as AppEvent;
         void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
         inspectorState = { type: 'event', id: newEvent.id };
@@ -204,6 +205,7 @@
 </script>
 
 <main class="main" style="position: relative; height: 100vh; display: flex; flex-direction: column;">
+
     {#if store.error}
         <div style="padding: 20px; color: var(--danger); font-family: monospace;">
             Error loading data from backend: {store.error}

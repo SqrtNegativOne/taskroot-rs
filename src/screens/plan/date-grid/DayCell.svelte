@@ -25,7 +25,7 @@
     } = $props();
 
     function extractHourMinuteFromISO(iso: string) {
-        const d = new Date(iso);
+        const d = new Date(iso.replace(' ', 'T'));
         return `${d.getHours().toString()}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
 
@@ -39,7 +39,8 @@
     let displayEvents = $derived(events);
 
     function isEventAllDay(e: AppEvent): boolean {
-        return !e.startTime.includes('T');
+        if (e.isAllDay !== undefined && e.isAllDay !== null) return e.isAllDay;
+        return !e.startTime.includes('T') && !e.startTime.includes(' ');
     }
     
     function checkPastDue(ev: AppEvent): boolean {

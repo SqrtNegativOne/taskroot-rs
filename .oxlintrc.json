@@ -13,7 +13,15 @@
     "legacy-src/",
     "playwright.config.ts"
   ],
+  "jsPlugins": ["oxlint-plugin-complexity"],
   "rules": {
+    "complexity/complexity": [
+      "error",
+      {
+        "cyclomatic": 20,
+        "cognitive": 15
+      }
+    ],
     "typescript/no-unsafe-assignment": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-call": "error",
