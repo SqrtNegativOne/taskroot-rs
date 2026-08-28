@@ -260,14 +260,95 @@ pub async fn query_tasks(
 
 
 
+pub fn expand_events_for_range(
+    events: &[AppEvent],
+    range_start_iso: &str,
+    range_end_iso: &str,
+) -> Vec<AppEvent> {
+    let mut expanded = Vec::new();
+    let mut exceptions = std::collections::HashSet::new();
+    
+    for e in events {
+        if let Some(recurring_id) = &e.recurring_event_id {
+            if let Some(orig_start) = &e.original_start_time {
+                exceptions.insert((recurring_id.clone(), orig_start.clone()));
+            }
+        }
+    }
+
+    let Ok(range_start_dt) = chrono::DateTime::parse_from_rfc3339(range_start_iso).map(|d| d.with_timezone(&chrono::Utc)) else {
+        return events.to_vec();
+    };
+    let Ok(range_end_dt) = chrono::DateTime::parse_from_rfc3339(range_end_iso).map(|d| d.with_timezone(&chrono::Utc)) else {
+        return events.to_vec();
+    };
+
+    for e in events {
+        if let Some(rrule) = &e.rrule {
+            if let Ok(dt_start) = chrono::DateTime::parse_from_rfc3339(&e.start_time) {
+                let dt_start_utc = dt_start.with_timezone(&chrono::Utc);
+                if let Ok(occurrences) = crate::time_utils::rrule_utils::get_occurrences(rrule, &dt_start_utc, &range_end_dt) {
+                    let duration = chrono::DateTime::parse_from_rfc3339(&e.end_time).map_or_else(
+                        |_| chrono::Duration::zero(),
+                        |dt_end| dt_end.with_timezone(&chrono::Utc).signed_duration_since(dt_start_utc)
+                    );
+                    
+                    for occ in occurrences {
+                        let occ_utc = occ.with_timezone(&chrono::Utc);
+                        let occ_iso = occ_utc.to_rfc3339();
+                        
+                        if exceptions.contains(&(e.id.clone(), occ_iso.clone())) {
+                            continue;
+                        }
+                        
+                        let occ_end_utc = occ_utc.checked_add_signed(duration).unwrap_or(occ_utc);
+                        
+                        if occ_end_utc > range_start_dt && occ_utc < range_end_dt {
+                            let mut instance = e.clone();
+                            instance.start_time = occ_iso;
+                            instance.end_time = occ_end_utc.to_rfc3339();
+                            expanded.push(instance);
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+        
+        if e.recurring_event_id.is_none() || e.status != Some(crate::domain::EventStatus::Cancelled) {
+            // Check if non-recurring event overlaps with range
+            if let (Ok(s), Ok(e_dt)) = (chrono::DateTime::parse_from_rfc3339(&e.start_time), chrono::DateTime::parse_from_rfc3339(&e.end_time)) {
+                let s_utc = s.with_timezone(&chrono::Utc);
+                let e_utc = e_dt.with_timezone(&chrono::Utc);
+                if e_utc > range_start_dt && s_utc < range_end_dt {
+                    expanded.push(e.clone());
+                }
+            } else {
+                // If it can't parse, just include it to be safe
+                expanded.push(e.clone());
+            }
+        }
+    }
+    
+    expanded
+}
+
 #[tauri::command]
 pub async fn query_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
     query: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
 ) -> Result<Vec<AppEvent>, AppError> {
     let pool = db_pool(&app)?;
-    Ok(db::query_events(&pool, filters, query).await?)
+    let mut events = db::query_events(&pool, filters, query).await?;
+
+    if let (Some(start), Some(end)) = (start_date, end_date) {
+        events = expand_events_for_range(&events, &start, &end);
+    }
+
+    Ok(events)
 }
 
 #[tauri::command]

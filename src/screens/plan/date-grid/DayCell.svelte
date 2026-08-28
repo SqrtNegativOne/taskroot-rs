@@ -72,7 +72,7 @@
         </span>
     </div>
     <div class="day-cell-events">
-        {#each displayEvents as ev (ev.id)}
+        {#each displayEvents as ev (ev.id + ev.startTime)}
             {@const title = ev.title}
             {@const isDone = false /* TODO: pull done from task */}
             {@const isPastDue = checkPastDue(ev)}

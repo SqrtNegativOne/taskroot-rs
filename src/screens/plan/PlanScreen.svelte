@@ -91,10 +91,43 @@
     let timelineEventsQuery = useTauriQuery<AppEvent[]>('query_events');
     let timelineEvents = $derived(timelineEventsQuery.data ?? store.events);
 
+    let dateGridRange = $derived.by(() => {
+        const d = new Date(anchor);
+        let start: Date;
+        let end: Date;
+        if (view === DateGridView.OneWeek || view === DateGridView.Week) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(d);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 7);
+        } else if (view === DateGridView.ThreeWeeks) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(d);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 21);
+        } else {
+            const first = new Date(d.getFullYear(), d.getMonth(), 1);
+            const day = first.getDay();
+            const diff = first.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(first);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 42);
+        }
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+    });
+
     $effect(() => {
         queryDependency(store.events);
         if (!store.loaded) return;
-        void dateGridEventsQuery.execute({ filters: dateGridFilters, query: dateGridQuery });
+        void dateGridEventsQuery.execute({ filters: dateGridFilters, query: dateGridQuery, startDate: dateGridRange.startDate, endDate: dateGridRange.endDate });
         void timelineEventsQuery.execute({ filters: timelineFilters, query: timelineQuery });
     });
 
