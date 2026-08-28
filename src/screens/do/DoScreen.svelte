@@ -1,10 +1,19 @@
 <script lang="ts">
     import Collapsible from '../../components/Collapsible.svelte';
-    import { store } from '../../lib/store.svelte'; // Assuming store structure
     import Stopwatch from './stopwatch/Stopwatch.svelte';
+
+    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import type { AppTask } from '../../lib/domain';
 
     let isBreak = $state(false);
     let showRestOverride = $state(false);
+
+    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let tasks = $derived(tasksQuery.data ?? []);
+
+    $effect(() => {
+        void tasksQuery.execute({ filters: [], sort: [], query: "" });
+    });
 
     function handleBreakStatusChange(status: boolean) {
         isBreak = status;
@@ -53,7 +62,7 @@
 
             <Collapsible title="current tasks" defaultOpen={false}>
                 {#snippet badge()}
-                    <span class="badge-count">{store.tasks.length} tasks</span>
+                    <span class="badge-count">{tasks.length} tasks</span>
                 {/snippet}
                 <div class="stub-content">Kanban Stub</div>
             </Collapsible>

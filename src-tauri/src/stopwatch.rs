@@ -43,10 +43,11 @@ fn with_locked_state<T>(
 }
 
 fn current_epoch_millis() -> Result<u64, AppError> {
-    Ok(std::time::SystemTime::now()
+    let millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| AppError::Internal(format!("System clock error: {e}")))?
-        .as_millis() as u64)
+        .as_millis();
+    u64::try_from(millis).map_err(|_| AppError::Internal("Timestamp too large".to_string()))
 }
 
 #[tauri::command]
@@ -60,14 +61,14 @@ pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppErro
     let updated = with_locked_state(&app, |s| {
         if s.is_break {
             if let Some(since) = s.break_running_since {
-                s.break_elapsed += now.saturating_sub(since);
+                s.break_elapsed = s.break_elapsed.saturating_add(now.saturating_sub(since));
                 s.break_running_since = None;
             }
             s.is_break = false;
         }
 
         if let Some(since) = s.running_since {
-            s.elapsed += now.saturating_sub(since);
+            s.elapsed = s.elapsed.saturating_add(now.saturating_sub(since));
             s.running_since = None;
         } else {
             s.running_since = Some(now);
@@ -85,13 +86,13 @@ pub fn toggle_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_locked_state(&app, |s| {
         if s.is_break {
             if let Some(since) = s.break_running_since {
-                s.break_elapsed += now.saturating_sub(since);
+                s.break_elapsed = s.break_elapsed.saturating_add(now.saturating_sub(since));
                 s.break_running_since = None;
             }
             s.is_break = false;
         } else {
             if let Some(since) = s.running_since {
-                s.elapsed += now.saturating_sub(since);
+                s.elapsed = s.elapsed.saturating_add(now.saturating_sub(since));
                 s.running_since = None;
             }
             s.is_break = true;

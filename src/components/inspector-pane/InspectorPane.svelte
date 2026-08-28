@@ -7,25 +7,40 @@
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
     import TitleInput from '../inputs/TitleInput.svelte';
 
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { store } from '../../lib/store.svelte';
+
     let {
         inspectorState,
         onClose,
-        tasks,
-        events,
-        updateTask,
-        updateEvent,
-        deleteTask,
-        deleteEvent
     }: {
         inspectorState?: { type: 'task' | 'event'; id: string };
         onClose: () => void;
-        tasks: AppTask[];
-        events: AppEvent[];
-        updateTask: (id: string, t: (t: AppTask) => AppTask) => void;
-        updateEvent: (id: string, e: (e: AppEvent) => AppEvent) => void;
-        deleteTask: (id: string) => void;
-        deleteEvent: (id: string) => void;
     } = $props();
+
+    const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters: [], sort: [], query: "" }));
+    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({ filters: [], query: "" }));
+
+    let tasks = $derived(tasksQuery.data ?? []);
+    let events = $derived(eventsQuery.data ?? []);
+
+    function updateTask(id: string, t: (t: AppTask) => AppTask) {
+        const current = tasks.find(x => x.id === id);
+        if (current) void store.updateTask(t(current));
+    }
+
+    function updateEvent(id: string, e: (e: AppEvent) => AppEvent) {
+        const current = events.find(x => x.id === id);
+        if (current) void store.updateEvent(e(current));
+    }
+
+    function deleteTask(id: string) {
+        void store.deleteTask(id);
+    }
+
+    function deleteEvent(id: string) {
+        void store.deleteEvent(id);
+    }
 
     let paneRef = $state<HTMLElement | null>(null);
 
@@ -90,7 +105,7 @@
             </div>
 
             {#if currentTask}
-                <InspectorTaskFields task={currentTask} {updateTask} />
+                <InspectorTaskFields task={currentTask} {tasks} {updateTask} />
             {:else if currentEvent}
                 <InspectorEventFields event={currentEvent} {tasks} {updateEvent} />
             {/if}

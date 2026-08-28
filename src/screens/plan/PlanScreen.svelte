@@ -1,157 +1,17 @@
 <script lang="ts">
     import { store, describeError } from '../../lib/store.svelte';
     import type { AppEvent, AppTask } from '../../lib/domain';
-    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter.generated';
-    import type { AppEventFilter } from '../../lib/bindings/AppEventFilter.generated';
-    import { useTauriQuery, queryDependency } from '../../lib/safeInvoke.svelte';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
     import { addDays, ymd } from '../../lib/time';
 
     import SplitPane from '../../components/SplitPane.svelte';
     import TaskListPane from '../../components/tasklist/TaskListPane.svelte';
-    import FilterButton from '../../components/FilterButton.svelte';
     import InspectorPane from '../../components/inspector-pane/InspectorPane.svelte';
     import DateGrid from './date-grid/DateGrid.svelte';
     import DayTimeline from './day-timeline/DayTimeline.svelte';
     import RecurringActionModal, { type RecurringMode } from '../../components/RecurringActionModal.svelte';
-    import { DateGridView } from './date-grid/constants';
     import type { DragState } from './day-timeline/types';
-
-    const DATE_GRID_VIEWS: readonly DateGridView[] = Object.values(DateGridView);
-    const VIEW_STORAGE_KEY = 'taskroot_dategrid_view';
-    const TASK_FILTERS_KEY = 'taskroot_task_filters';
-    const TASK_SORT_KEY = 'taskroot_task_sort';
-    const DATEGRID_FILTERS_KEY = 'taskroot_dategrid_filters';
-    const TIMELINE_FILTERS_KEY = 'taskroot_timeline_filters';
-
-    function getStored<T>(key: string, def: T): T {
-        try {
-            const val = localStorage.getItem(key);
-            return val ? JSON.parse(val) as T : def;
-        } catch {
-            return def;
-        }
-    }
-
-    function storedView(): DateGridView {
-        const raw = localStorage.getItem(VIEW_STORAGE_KEY);
-        return DATE_GRID_VIEWS.find((candidate) => candidate === raw) ?? DateGridView.ThreeWeeks;
-    }
-
-    let view = $state<DateGridView>(storedView());
-    let anchor = $state(new Date());
-    let timelineDate = $state(new Date());
-
-    // UI state — task list
-    let query = $state('');
-    let filters = $state<AppTaskFilter[]>(
-        getStored(TASK_FILTERS_KEY, [{ column: 'status', operator: 'is not', value: ['done'] }])
-    );
-    let sort = $state<import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]>(
-        (() => {
-            const raw = localStorage.getItem(TASK_SORT_KEY);
-            if (!raw) return [{ column: 'priority', direction: 'desc' }];
-            try {
-                if (raw.startsWith('[')) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed.length > 0 && typeof parsed[0] === 'string') {
-                        return parsed.map((col: string) => ({
-                            column: col as import('../../lib/bindings/AppTaskFilterColumn.generated').AppTaskFilterColumn,
-                            direction: col === 'priority' ? 'desc' : 'asc'
-                        }));
-                    }
-                    return parsed as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
-                }
-                return [{ column: raw as import('../../lib/bindings/AppTaskFilterColumn.generated').AppTaskFilterColumn, direction: raw === 'priority' ? 'desc' : 'asc' }];
-            } catch {
-                return [{ column: 'priority', direction: 'desc' }];
-            }
-        })()
-    );
-
-    // UI state — events
-    let dateGridQuery = $state('');
-    let dateGridFilters = $state<AppEventFilter[]>(getStored(DATEGRID_FILTERS_KEY, []));
-
-    let timelineQuery = $state('');
-    let timelineFilters = $state<AppEventFilter[]>(getStored(TIMELINE_FILTERS_KEY, []));
-
-    $effect(() => {
-        localStorage.setItem(VIEW_STORAGE_KEY, view);
-        localStorage.setItem(TASK_FILTERS_KEY, JSON.stringify(filters));
-        localStorage.setItem(TASK_SORT_KEY, JSON.stringify(sort));
-        localStorage.setItem(DATEGRID_FILTERS_KEY, JSON.stringify(dateGridFilters));
-        localStorage.setItem(TIMELINE_FILTERS_KEY, JSON.stringify(timelineFilters));
-    });
-
-    let dateGridEventsQuery = useTauriQuery<AppEvent[]>('query_events');
-    let dateGridEvents = $derived(dateGridEventsQuery.data ?? store.events);
-
-    let timelineEventsQuery = useTauriQuery<AppEvent[]>('query_events');
-    let timelineEvents = $derived(timelineEventsQuery.data ?? store.events);
-
-    let dateGridRange = $derived.by(() => {
-        const d = new Date(anchor);
-        let start: Date;
-        let end: Date;
-        if (view === DateGridView.OneWeek || view === DateGridView.Week) {
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(d);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 7);
-        } else if (view === DateGridView.ThreeWeeks) {
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(d);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 21);
-        } else {
-            const first = new Date(d.getFullYear(), d.getMonth(), 1);
-            const day = first.getDay();
-            const diff = first.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(first);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 42);
-        }
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    });
-
-    $effect(() => {
-        queryDependency(store.events);
-        if (!store.loaded) return;
-        void dateGridEventsQuery.execute({ filters: dateGridFilters, query: dateGridQuery, startDate: dateGridRange.startDate, endDate: dateGridRange.endDate });
-        void timelineEventsQuery.execute({ filters: timelineFilters, query: timelineQuery });
-    });
-
-    // Hydrate events with tasks
-    let hydratedDateGridEvents = $derived.by(() => {
-        return dateGridEvents.map(ev => {
-            if (ev.taskId) {
-                const task = store.tasks.find(t => t.id === ev.taskId);
-                return { ...ev, task };
-            }
-            return ev;
-        });
-    });
-
-    let hydratedTimelineEvents = $derived.by(() => {
-        return timelineEvents.map(ev => {
-            if (ev.taskId) {
-                const task = store.tasks.find(t => t.id === ev.taskId);
-                return { ...ev, task };
-            }
-            return ev;
-        });
-    });
-
     let dragState = $state<DragState | undefined>(undefined);
     let inspectorState = $state<{ type: 'event' | 'task', id: string } | undefined>(undefined);
     let recurringModalOpen = $state(false);
@@ -224,14 +84,6 @@
         inspectorState = { type: 'event', id: newEvent.id };
     }
 
-    function onResizeEvent(id: string, startTime: string, endTime: string) {
-        void mutateOrReport('Failed to update event', () => store.updateEvent(id, ev => ({ ...ev, startTime, endTime })));
-    }
-
-    function onMoveEvent(id: string, startTime: string, endTime: string) {
-        void mutateOrReport('Failed to update event', () => store.updateEvent(id, ev => ({ ...ev, startTime, endTime })));
-    }
-
     function onEventClick(ev: AppEvent) {
         inspectorState = { type: 'event', id: ev.id };
     }
@@ -263,14 +115,6 @@
                     }}
                 >
                     <TaskListPane
-                        tasks={store.tasks}
-                        onUpdateTask={(id: string, transform: (task: AppTask) => AppTask) => {
-                            void mutateOrReport('Failed to update task', () => store.updateTask(id, transform));
-                        }}
-                        bind:filters
-                        bind:sort
-                        {query}
-                        setQuery={(q: string) => { query = q; }}
                         onDragStart={onTaskDragStart}
                         {onAddTask}
                         {onDeleteTask}
@@ -283,40 +127,6 @@
 
             {#snippet pane2()}
                 <div class="right-pane" style="height: 100%; display: flex; flex-direction: column;">
-                    {#snippet dateGridFilterMenu()}
-                        <FilterButton
-                            bind:filters={dateGridFilters}
-                            columns={[
-                                { id: 'calendar', label: 'Calendar' }
-                            ]}
-                            getValuesForColumn={(col) => {
-                                if (col === 'calendar') {
-                                    const cals = new Set(store.events.map(e => e.remoteCollectionId).filter(Boolean));
-                                    return Array.from(cals) as string[];
-                                }
-                                return [];
-                            }}
-                            align="right"
-                        />
-                    {/snippet}
-
-                    {#snippet timelineFilterMenu()}
-                        <FilterButton
-                            bind:filters={timelineFilters}
-                            columns={[
-                                { id: 'calendar', label: 'Calendar' }
-                            ]}
-                            getValuesForColumn={(col) => {
-                                if (col === 'calendar') {
-                                    const cals = new Set(store.events.map(e => e.remoteCollectionId).filter(Boolean));
-                                    return Array.from(cals) as string[];
-                                }
-                                return [];
-                            }}
-                            align="right"
-                        />
-                    {/snippet}
-
                     <SplitPane
                         direction="vertical"
                         defaultSize={450}
@@ -325,35 +135,19 @@
                     >
                         {#snippet pane1()}
                             <DateGrid
-                                {view}
-                                setView={(v: DateGridView) => { view = v; }}
-                                {anchor}
-                                setAnchor={(a: Date) => { anchor = a; }}
-                                events={hydratedDateGridEvents}
-                                filterMenu={dateGridFilterMenu}
-                                today={new Date()}
                                 {dragState}
                                 {onEventDragStart}
-                                onAddEvent={(d: Date) => { onAddEvent(d); }}
+                                {onAddEvent}
                                 {onEventClick}
                             />
                         {/snippet}
 
                         {#snippet pane2()}
                             <DayTimeline
-                                events={hydratedTimelineEvents}
-                                filterMenu={timelineFilterMenu}
-                                eventFilters={timelineFilters}
-                                eventQuery={timelineQuery}
-                                today={new Date()}
-                                {timelineDate}
-                                setTimelineDate={(d: Date) => { timelineDate = d; }}
                                 {dragState}
-                                setDragState={(ds: DragState | undefined) => { dragState = ds; }}
-                                {onResizeEvent}
-                                {onMoveEvent}
+                                setDragState={(ds: import('./day-timeline/types').DragState | undefined) => { dragState = ds; }}
                                 {onEventClick}
-                                onAddEvent={(d: Date, s: number, e: number) => { onAddEvent(d, s, e); }}
+                                {onAddEvent}
                             />
                         {/snippet}
                     </SplitPane>
@@ -363,17 +157,6 @@
         <InspectorPane
             {inspectorState}
             onClose={() => { inspectorState = undefined; }}
-            tasks={store.tasks}
-            events={store.events}
-            updateTask={(id: string, t: (task: AppTask) => AppTask) => { void mutateOrReport('Failed to update task', () => store.updateTask(id, t)); }}
-            updateEvent={(id: string, e: (ev: AppEvent) => AppEvent) => { void mutateOrReport('Failed to update event', () => store.updateEvent(id, e)); }}
-            deleteTask={(id: string) => {
-                void mutateOrReport('Failed to delete task', () => store.deleteTask(id));
-            }}
-            deleteEvent={(id: string) => {
-                void mutateOrReport('Failed to delete event', () => store.deleteEvent(id));
-                inspectorState = undefined;
-            }}
         />
         <RecurringActionModal
             isOpen={recurringModalOpen}

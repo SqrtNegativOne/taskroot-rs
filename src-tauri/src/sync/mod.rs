@@ -56,12 +56,12 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
     let pool_clone = pool.clone();
 
     tauri::async_runtime::spawn(async move {
-        let mut interval = interval(Duration::from_secs(SYNC_INTERVAL_SECS as u64));
+        let mut interval = interval(Duration::from_secs(u64::try_from(SYNC_INTERVAL_SECS).unwrap_or(300)));
 
         loop {
             interval.tick().await;
 
-            let next_sync = Utc::now() + chrono::Duration::seconds(SYNC_INTERVAL_SECS);
+            let next_sync = Utc::now().checked_add_signed(chrono::Duration::seconds(SYNC_INTERVAL_SECS)).unwrap_or_else(Utc::now);
 
             if let Err(e) = run_tracked_sync(&app_clone, &pool_clone, Some(next_sync)).await {
                 eprintln!("Sync Engine Error: {e}");

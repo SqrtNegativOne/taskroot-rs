@@ -1,7 +1,9 @@
 #![warn(clippy::pedantic, clippy::nursery)]
+#![warn(unreachable_pub)]
 #![allow(clippy::missing_errors_doc)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+#![allow(clippy::exit, clippy::panic)]
 
 use sqlx::SqlitePool;
 use tauri::Manager;

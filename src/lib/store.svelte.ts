@@ -20,8 +20,6 @@ function delay(ms: number): Promise<void> {
 }
 
 export class AppStore {
-    tasks = $state<AppTask[]>([]);
-    events = $state<AppEvent[]>([]);
     settings = $state<AppSettings | null>(null);
     loaded = $state(false);
     error = $state<string | null>(null);
@@ -47,21 +45,14 @@ export class AppStore {
     }
 
     async refresh(): Promise<Result<void, AppError>> {
-        const result = await ResultAsync.combine([
-            safeInvoke<AppTask[]>('query_tasks', { filters: [], sort: [], query: "" }),
-            safeInvoke<AppEvent[]>('query_events', { filters: [], query: "" }),
-            safeInvoke<AppSettings>('get_settings')
-        ]);
+        const result = await safeInvoke<AppSettings>('get_settings');
 
         if (result.isErr()) {
-            console.error('Failed to refresh store:', result.error);
+            console.error('Failed to refresh settings:', result.error);
             return err(normalizeAppError(result.error));
         }
 
-        const [fetchedTasks, fetchedEvents, fetchedSettings] = result.value;
-        this.tasks = fetchedTasks;
-        this.events = fetchedEvents;
-        this.settings = fetchedSettings;
+        this.settings = result.value;
         this.error = null;
         return ok(undefined);
     }
@@ -70,10 +61,8 @@ export class AppStore {
         return this.commit(safeInvoke('create_task', { task }));
     }
 
-    updateTask(id: string, updater: (task: AppTask) => AppTask): Promise<Result<void, AppError>> {
-        const current = this.tasks.find((task) => task.id === id);
-        if (!current) return Promise.resolve(ok(undefined));
-        return this.commit(safeInvoke('update_task', { task: updater(current) }));
+    updateTask(task: AppTask): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('update_task', { task }));
     }
 
     deleteTask(id: string): Promise<Result<void, AppError>> {
@@ -84,10 +73,8 @@ export class AppStore {
         return this.commit(safeInvoke('create_event', { event }));
     }
 
-    updateEvent(id: string, updater: (event: AppEvent) => AppEvent): Promise<Result<void, AppError>> {
-        const current = this.events.find((event) => event.id === id);
-        if (!current) return Promise.resolve(ok(undefined));
-        return this.commit(safeInvoke('update_event', { event: updater(current) }));
+    updateEvent(event: AppEvent): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('update_event', { event }));
     }
 
     deleteEvent(id: string): Promise<Result<void, AppError>> {
@@ -97,13 +84,10 @@ export class AppStore {
     private async commit(command: ResultAsync<unknown, AppError>): Promise<Result<void, AppError>> {
         const result = await command;
         if (result.isErr()) return err(result.error);
-        const refreshResult = await this.refresh();
-        if (refreshResult.isOk()) {
-            void import('@tauri-apps/api/event').then(({ emit }) => {
-                void emit('store-updated');
-            });
-        }
-        return refreshResult;
+        void import('@tauri-apps/api/event').then(({ emit }) => {
+            void emit('store-updated');
+        });
+        return ok(undefined);
     }
 }
 

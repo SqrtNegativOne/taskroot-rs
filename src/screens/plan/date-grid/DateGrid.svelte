@@ -7,31 +7,71 @@
     import { SvelteDate } from 'svelte/reactivity';
     import { ymd } from '../../../lib/time';
     
+    import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import FilterButton from '../../../components/FilterButton.svelte';
+
     let {
-        view,
-        setView,
-        anchor,
-        setAnchor,
-        events,
-        filterMenu,
-        today,
         dragState,
         onEventDragStart,
         onAddEvent,
         onEventClick,
     }: {
-        view: DateGridView;
-        setView: (v: DateGridView) => void;
-        anchor: Date;
-        setAnchor: (d: Date) => void;
-        events: AppEvent[];
-        filterMenu?: import('svelte').Snippet;
-        today: Date;
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: AppEvent) => void;
     } = $props();
+
+    let view = $state<DateGridView>(DateGridView.Month);
+    let anchor = $state(new Date());
+    let filters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
+    let query = $state('');
+    let today = $state(new Date());
+
+    let dateGridRange = $derived.by(() => {
+        const d = new Date(anchor);
+        let start: Date;
+        let end: Date;
+        if (view === DateGridView.OneWeek || view === DateGridView.Week) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(d);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 7);
+        } else if (view === DateGridView.ThreeWeeks) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(d);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 21);
+        } else {
+            const first = new Date(d.getFullYear(), d.getMonth(), 1);
+            const day = first.getDay();
+            const diff = first.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(first);
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            end = new Date(start);
+            end.setDate(start.getDate() + 42);
+        }
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+    });
+
+    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({
+        filters,
+        query,
+        startDate: dateGridRange.startDate,
+        endDate: dateGridRange.endDate
+    }), { debounceMs: 150 });
+    
+    const calendarsQuery = useAutoQuery<string[]>('get_active_calendars', () => ({}));
+
+    let events = $derived(eventsQuery.data ?? []);
+    let activeCalendars = $derived(calendarsQuery.data ?? []);
 
     const DAYS_IN_CALENDAR_GRID = 42;
     const DAYS_IN_THREE_WEEKS = 21;
@@ -119,17 +159,26 @@
         if (isWeek) d.setDate(d.getDate() + DAYS_IN_WEEK * n);
         else if (is3Weeks) d.setDate(d.getDate() + DAYS_IN_THREE_WEEKS * n);
         else d.setMonth(d.getMonth() + n);
-        setAnchor(d);
+        anchor = d;
     }
 </script>
 
 <section class="date-grid-pane">
+    {#snippet filterMenu()}
+        <FilterButton
+            bind:filters
+            columns={[{ id: 'calendar', label: 'Calendar' }]}
+            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars : []}
+            align="right"
+        />
+    {/snippet}
+
     <CalendarHeader
         {titleLabel}
         {today}
         {view}
-        {setView}
-        {setAnchor}
+        setView={(v: DateGridView) => { view = v; }}
+        setAnchor={(d: Date) => { anchor = d; }}
         {shift}
         {filterMenu}
     />
@@ -150,8 +199,10 @@
                     cell={c}
                     {today}
                     events={displayEvents.filter(e => {
-                        const eStart = new Date(e.startTime.replace(' ', 'T')).getTime();
-                        const eEnd = new Date(e.endTime.replace(' ', 'T')).getTime();
+                        const sStr = e.startTime.includes('T') || e.startTime.includes(' ') ? e.startTime.replace(' ', 'T') : e.startTime + 'T00:00:00';
+                        const eStr = e.endTime.includes('T') || e.endTime.includes(' ') ? e.endTime.replace(' ', 'T') : e.endTime + 'T00:00:00';
+                        const eStart = new Date(sStr).getTime();
+                        const eEnd = new Date(eStr).getTime();
                         return eStart < cellEnd && eEnd > cellStart;
                     })}
                     {isWeek}

@@ -25,7 +25,8 @@
     } = $props();
 
     function extractHourMinuteFromISO(iso: string) {
-        const d = new Date(iso.replace(' ', 'T'));
+        const sStr = iso.includes('T') || iso.includes(' ') ? iso.replace(' ', 'T') : iso + 'T00:00:00';
+        const d = new Date(sStr);
         return `${d.getHours().toString()}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
 

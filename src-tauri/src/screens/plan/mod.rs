@@ -15,8 +15,8 @@ pub struct LaidEvent {
     pub start_mins: f64,
     #[serde(rename = "endMins")]
     pub end_mins: f64,
-    pub lane: i32,
-    pub lanes: i32,
+    pub lane: u16,
+    pub lanes: u16,
 }
 
 #[derive(Serialize, Deserialize, TS)]
@@ -66,7 +66,7 @@ fn parse_iso_parts(iso: &str) -> Option<(String, Option<NaiveTime>)> {
         return Some((dt.date().format("%Y-%m-%d").to_string(), Some(dt.time())));
     }
     if iso.len() >= 10 {
-        return Some((iso[0..10].to_string(), None));
+        return iso.get(0..10).map(|s| (s.to_string(), None));
     }
     None
 }
@@ -167,10 +167,10 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
         }
     }
 
-    let mut placed: Vec<(f64, f64, i32)> = Vec::new();
+    let mut placed: Vec<(f64, f64, u16)> = Vec::new();
 
     for ev in &mut mapped {
-        let mut lane = 0;
+        let mut lane: u16 = 0;
         loop {
             let conflict = placed
                 .iter()
@@ -178,7 +178,7 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
             if !conflict {
                 break;
             }
-            lane += 1;
+            lane = lane.saturating_add(1);
         }
         ev.lane = lane;
         placed.push((ev.start_mins, ev.end_mins, lane));
@@ -191,7 +191,7 @@ fn layout_day_events(date_str: &str, events: &[AppEvent]) -> Vec<LaidEvent> {
                 max_lane = p.2;
             }
         }
-        ev.lanes = max_lane + 1;
+        ev.lanes = max_lane.saturating_add(1);
     }
 
     mapped
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn test_parse_iso_to_mins_debug() {
         let mins = parse_iso_to_mins("2026-08-26T10:00:00.000Z", "2026-08-26");
-        println!("parse_iso_to_mins returned: {:?}", mins);
+        println!("parse_iso_to_mins returned: {mins:?}");
         assert_eq!(mins, Some(930.0)); // Adjust based on local timezone, wait let's just print
     }
 }
@@ -260,6 +260,7 @@ pub async fn query_tasks(
 
 
 
+#[must_use]
 pub fn expand_events_for_range(
     events: &[AppEvent],
     range_start_iso: &str,

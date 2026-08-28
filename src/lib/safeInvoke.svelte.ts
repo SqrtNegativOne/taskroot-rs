@@ -55,7 +55,33 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
     let inflight: Promise<void> | undefined;
     let debounceHandle: ReturnType<typeof setTimeout> | undefined;
 
+    let lastArgs: InvokeArgs | undefined;
+    let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
+
+    $effect(() => {
+        let isCleanedUp = false;
+        
+        import('@tauri-apps/api/event').then(({ listen }) => {
+            listen('store-updated', () => {
+                if (isCleanedUp) return;
+                const argsToUse = lastArgs ?? options.args;
+                if (argsToUse !== undefined || latestRequestId > 0) {
+                    void dispatch(argsToUse);
+                }
+            }).then((un) => {
+                unlisten = un;
+                if (isCleanedUp) unlisten();
+            });
+        });
+
+        return () => {
+            isCleanedUp = true;
+            if (unlisten) unlisten();
+        };
+    });
+
     async function dispatch(args: InvokeArgs | undefined): Promise<void> {
+        lastArgs = args;
         const requestId = ++latestRequestId;
         isLoading = true;
         error = undefined;
@@ -97,6 +123,7 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
      * @param newArgs Optional overriding arguments
      */
     async function execute(newArgs?: InvokeArgs): Promise<void> {
+        lastArgs = newArgs;
         if (options.debounceMs === undefined) return dispatch(newArgs);
         return scheduleDispatch(newArgs);
     }
@@ -106,5 +133,33 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         get error() { return error; },
         get isLoading() { return isLoading; },
         execute
+    };
+}
+
+/**
+ * A wrapper around `useTauriQuery` that automatically executes the query
+ * whenever its arguments change. `getArgs` is evaluated inside an `$effect`,
+ * meaning Svelte automatically tracks any `$state` variables used inside it.
+ *
+ * @param cmd The Tauri command name
+ * @param getArgs A function returning the arguments for the command
+ * @param options Query options
+ * @returns An object with reactive state properties
+ */
+export function useAutoQuery<T, Args extends InvokeArgs = InvokeArgs>(
+    cmd: string,
+    getArgs: () => Args,
+    options: Omit<UseTauriQueryOptions<T, AppError>, 'args'> = {}
+) {
+    const query = useTauriQuery<T>(cmd, options);
+
+    $effect(() => {
+        void query.execute(getArgs());
+    });
+
+    return {
+        get data() { return query.data; },
+        get error() { return query.error; },
+        get isLoading() { return query.isLoading; }
     };
 }

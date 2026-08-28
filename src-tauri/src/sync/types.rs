@@ -43,8 +43,8 @@ impl fmt::Display for SyncAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SyncItemData {
-    Task(AppTask),
     Event(AppEvent),
+    Task(AppTask),
 }
 
 impl SyncItemData {

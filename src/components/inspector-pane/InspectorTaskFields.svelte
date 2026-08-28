@@ -7,14 +7,14 @@
     import TagsInput from '../inputs/TagsInput.svelte';
     import ChecklistInput from '../inputs/ChecklistInput.svelte';
     import type { ChecklistItem } from '../../lib/domain';
-    import { store } from '../../lib/store.svelte';
 
     interface Props {
         task: AppTask;
+        tasks: AppTask[];
         updateTask: (id: string, t: (t: AppTask) => AppTask) => void;
     }
 
-    let { task, updateTask }: Props = $props();
+    let { task, tasks, updateTask }: Props = $props();
 
     function isTaskPriority(value: number): value is TaskPriority {
         return Number.isInteger(value) && value >= 0 && value <= 4;
@@ -51,7 +51,7 @@
 
     let parentOptions = $derived([
         { label: 'None', value: '' },
-        ...store.tasks.filter(t => t.id !== task.id).map(t => ({ label: t.title, value: t.id }))
+        ...tasks.filter(t => t.id !== task.id).map(t => ({ label: t.title, value: t.id }))
     ]);
 </script>
 

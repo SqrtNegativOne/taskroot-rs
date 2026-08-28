@@ -34,10 +34,20 @@
         );
     }
 
+    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import type { AppTask } from '../../lib/domain';
+
     let isDimmed = $state(false);
 
+    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let tasks = $derived(tasksQuery.data ?? []);
+
+    $effect(() => {
+        void tasksQuery.execute({ filters: [], sort: [], query: "" });
+    });
+
     let activeTask = $derived.by(() => {
-        return store.tasks.find(t => t.status === 'doing');
+        return tasks.find(t => t.status === 'doing');
     });
 
     const now = useNow();

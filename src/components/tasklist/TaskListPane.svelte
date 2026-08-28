@@ -7,17 +7,14 @@
     import type { AppTask, AppTaskStatus } from '../../lib/domain';
     import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
     import './tasklist.css';
-    import { useTauriQuery, queryDependency } from '../../lib/safeInvoke.svelte';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
     let {
-        tasks,
         onUpdateTask,
         filters = $bindable([]),
         sort = $bindable([] as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]),
-        query,
-        setQuery,
         onDragStart,
         activeDragId,
         onAddTask,
@@ -25,12 +22,9 @@
         onTaskClick,
         footer,
     }: {
-        tasks: AppTask[];
         onUpdateTask?: (id: string, transform: (t: AppTask) => AppTask) => void;
         filters?: AppTaskFilter[];
         sort?: import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
-        query: string;
-        setQuery: (q: string) => void;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
         activeDragId?: string;
         onAddTask: (defaults?: Partial<AppTask>) => void;
@@ -38,6 +32,8 @@
         onTaskClick?: (task: AppTask) => void;
         footer?: import('svelte').Snippet;
     } = $props();
+
+    let query = $state('');
 
     function updateTask(id: string, transform: (t: AppTask) => AppTask) {
         if (onUpdateTask) {
@@ -57,8 +53,9 @@
 
     import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
 
-    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks', { debounceMs: TASK_QUERY_DEBOUNCE_MS });
-    let schemaQuery = useTauriQuery<AppTaskColumnDef[]>('get_task_schema');
+    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters, sort, query }), { debounceMs: TASK_QUERY_DEBOUNCE_MS });
+    let schemaQuery = useAutoQuery<AppTaskColumnDef[]>('get_task_schema', () => ({}));
+    
     let schema = $derived(schemaQuery.data ?? []);
     
     let filterColumns = $derived(schema.map(c => ({ id: c.id, label: c.label })));
@@ -113,11 +110,6 @@
         }
         return result;
     });
-    $effect(() => {
-        queryDependency(tasks);
-        void tasksQuery.execute({ filters, sort, query });
-        void schemaQuery.execute();
-    });
 
     function handleAddTask() {
         const safeDefaults: Partial<AppTask> = {};
@@ -141,7 +133,7 @@
             <SearchBar 
                 placeholder="Search tasks..." 
                 value={query}
-                onchange={setQuery}
+                onchange={(q) => query = q}
             />
         </div>
         <div class="task-pane-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
@@ -169,7 +161,7 @@
     >
         {#if filtered.length === 0}
             <div class="task-empty">
-                <span class="dim">{tasks.length === 0 ? "no tasks exist." : "no tasks match."}</span>
+                <span class="dim">no tasks match.</span>
             </div>
         {:else}
             {#each flatNestedFiltered as item (item.task.id)}

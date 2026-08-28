@@ -9,3 +9,4 @@ This file contains rules specific to the Tauri v2 Rust backend of Taskroot. It s
 ## Style & Idioms
 - **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.
 - **Testing**: Backend tests should cover migration assertions and `AppError` shape checks. Coverage is collected via `cargo-llvm-cov`. Run `cargo clippy --all-targets -- -D warnings` and `cargo nextest run` after changes.
+- **Serde Serialization**: Never use `#[serde(untagged)]` on enums, especially those with struct variants containing `Option<T>` fields. Untagged enums rely on structural "duck typing" which can cause silent parsing failures where an object parses as the wrong variant simply because it shares a few required fields (e.g. `id` and `title`). Use internally tagged enums (`#[serde(tag = "...")]`) or externally tagged enums instead.

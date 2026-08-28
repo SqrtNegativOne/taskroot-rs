@@ -34,7 +34,7 @@
         const label = appWindow.label as WindowLabel;
         isLauncher = label === 'launcher';
         isMinitracker = label === 'minitracker';
-        isSidebar = label === 'sidebar';
+        isSidebar = (label as string) === 'sidebar';
 
         let unlistenData = () => { /* noop */ };
         let unlistenNav = () => { /* noop */ };

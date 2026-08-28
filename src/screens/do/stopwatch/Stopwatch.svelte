@@ -8,12 +8,23 @@
     import type { AppTaskStatus } from '../../../lib/domain';
     import './stopwatch.css';
 
+    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import type { AppTask } from '../../../lib/domain';
+
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
 
     let selectorOpen = $state(false);
     let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
 
-    let activeTask = $derived(store.tasks.find((task) => task.status === 'doing'));
+    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let tasks = $derived(tasksQuery.data ?? []);
+
+    $effect(() => {
+        if (!store.loaded) return;
+        void tasksQuery.execute({ filters: [], sort: [], query: "" });
+    });
+
+    let activeTask = $derived(tasks.find((task) => task.status === 'doing'));
 
     // If no active task and we require one, open the selector
     $effect(() => {
@@ -28,14 +39,16 @@
     });
 
     async function updateTaskStatus(taskId: string, status: AppTaskStatus): Promise<void> {
-        const result = await store.updateTask(taskId, (task) => ({ ...task, status }));
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+        const result = await store.updateTask({ ...task, status });
         if (result.isErr()) {
             store.error = `Failed to update task status: ${describeError(result.error)}`;
         }
     }
 
     async function setActiveTask(taskId: string): Promise<void> {
-        for (const task of store.tasks) {
+        for (const task of tasks) {
             if (task.id === taskId) {
                 await updateTaskStatus(task.id, 'doing');
             } else if (task.status === 'doing') {
@@ -137,7 +150,7 @@
         <TaskSelector
             selectorOpen={selectorOpen}
             onCloseSelector={() => selectorOpen = false}
-            tasks={store.tasks}
+            {tasks}
             activeTask={activeTask}
             onStartWithTask={(taskId: string) => { void setActiveTask(taskId); }}
         />

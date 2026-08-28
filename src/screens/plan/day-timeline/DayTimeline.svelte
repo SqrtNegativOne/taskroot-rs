@@ -4,41 +4,48 @@
     import type { DragState, LaidEvent, PlanDayLayout } from './types';
     import { PX_PER_MIN } from './constants';
     import type { AppEvent } from '../../../lib/domain';
-    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
-
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
+    import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import FilterButton from '../../../components/FilterButton.svelte';
+    import { store } from '../../../lib/store.svelte';
 
     let {
-        events,
-        filterMenu,
-        eventFilters = [],
-        eventQuery = '',
-        today,
-        timelineDate,
-        setTimelineDate,
         dragState,
         setDragState,
-        onResizeEvent,
-        onMoveEvent,
         onEventClick,
         onAddEvent,
     }: {
-        events: AppEvent[];
-        filterMenu?: import('svelte').Snippet;
-        eventFilters?: import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[];
-        eventQuery?: string;
-        today: Date;
-        timelineDate: Date;
-        setTimelineDate: (d: Date) => void;
         dragState?: DragState;
         setDragState?: (ds: DragState | undefined) => void;
-        onResizeEvent?: (id: string, startTime: string, endTime: string) => void;
-        onMoveEvent?: (id: string, startTime: string, endTime: string) => void;
         onEventClick?: (ev: AppEvent) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
     } = $props();
+
+    function onResizeEvent(id: string, startTime: string, endTime: string) {
+        // Find the event inside planLayout
+        let ev: AppEvent | undefined;
+        for (const dayEvents of Object.values(planLayout)) {
+            const found = dayEvents.find(e => e.event.id === id);
+            if (found) { ev = found.event; break; }
+        }
+        if (ev) void store.updateEvent({ ...ev, startTime, endTime });
+    }
+
+    function onMoveEvent(id: string, startTime: string, endTime: string) {
+        let ev: AppEvent | undefined;
+        for (const dayEvents of Object.values(planLayout)) {
+            const found = dayEvents.find(e => e.event.id === id);
+            if (found) { ev = found.event; break; }
+        }
+        if (ev) void store.updateEvent({ ...ev, startTime, endTime });
+    }
+
+    let eventFilters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
+    let eventQuery = $state('');
+    let timelineDate = $state(new Date());
+    let today = $state(new Date());
 
     let viewDate = $derived(timelineDate);
     let isToday = $derived(sameDay(viewDate, today));
@@ -47,7 +54,15 @@
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
-    let layoutQuery = useTauriQuery<PlanDayLayout[]>('query_plan_layout');
+    const layoutQuery = useAutoQuery<PlanDayLayout[]>('query_plan_layout', () => ({
+        dates: dates.map(ymd),
+        filters: eventFilters,
+        query: eventQuery
+    }), { debounceMs: 150 });
+    
+    const calendarsQuery = useAutoQuery<string[]>('get_active_calendars', () => ({}));
+
+    let activeCalendars = $derived(calendarsQuery.data ?? []);
 
     let planLayout = $derived.by(() => {
         const layoutMap: Record<string, LaidEvent[]> = {};
@@ -55,11 +70,6 @@
             layoutMap[day.date] = day.events;
         }
         return layoutMap;
-    });
-
-    $effect(() => {
-        void events; // Trigger re-run when events change
-        void layoutQuery.execute({ dates: dates.map(ymd), filters: eventFilters, query: eventQuery });
     });
     
     // Auto scroll logic
@@ -74,11 +84,20 @@
 </script>
 
 <section class="day-pane">
+    {#snippet filterMenu()}
+        <FilterButton
+            bind:filters={eventFilters}
+            columns={[{ id: 'calendar', label: 'Calendar' }]}
+            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars : []}
+            align="right"
+        />
+    {/snippet}
+
     <TimelineHeader
         {viewDate}
         {isToday}
         {today}
-        {setTimelineDate}
+        setTimelineDate={(d: Date) => { timelineDate = d; }}
         {filterMenu}
         {numDays}
         setNumDays={(n: number) => { numDays = n; }}

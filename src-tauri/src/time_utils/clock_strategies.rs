@@ -22,8 +22,8 @@ impl PomodoroTimer {
     pub fn new(work_mins: u64, break_mins: u64) -> Self {
         Self {
             state: TimerState::Idle,
-            work_duration: Duration::from_secs(work_mins * 60),
-            break_duration: Duration::from_secs(break_mins * 60),
+            work_duration: Duration::from_secs(work_mins.saturating_mul(60)),
+            break_duration: Duration::from_secs(break_mins.saturating_mul(60)),
             is_break: false,
         }
     }
@@ -47,7 +47,7 @@ impl PomodoroTimer {
             elapsed_ms,
         } = self.state
         {
-            let current_elapsed = elapsed_ms + now_ms.saturating_sub(start_time_ms);
+            let current_elapsed = elapsed_ms.saturating_add(now_ms.saturating_sub(start_time_ms));
             self.state = TimerState::Paused {
                 elapsed_ms: current_elapsed,
             };
@@ -65,7 +65,7 @@ impl PomodoroTimer {
             elapsed_ms,
         } = self.state
         {
-            let total_elapsed = elapsed_ms + now_ms.saturating_sub(start_time_ms);
+            let total_elapsed = elapsed_ms.saturating_add(now_ms.saturating_sub(start_time_ms));
             let current_duration = if self.is_break {
                 u64::try_from(self.break_duration.as_millis()).unwrap_or(u64::MAX)
             } else {

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+use crate::domain::TaskPriority;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(
@@ -20,7 +21,7 @@ pub struct ParsedSigils {
 #[serde(rename_all = "camelCase")]
 pub struct SigilProperties {
     #[ts(optional)]
-    pub priority: Option<i32>,
+    pub priority: Option<TaskPriority>,
     pub tags: Vec<String>,
     #[ts(optional)]
     pub duration: Option<i32>,
@@ -42,8 +43,29 @@ pub fn parse_sigils(input: &str) -> ParsedSigils {
         }
         if let Some(pri) = word.strip_prefix('!') {
             if let Ok(p) = pri.parse::<i32>() {
-                properties.priority = Some(p);
-                continue;
+                match p {
+                    0 => {
+                        properties.priority = Some(TaskPriority::None);
+                        continue;
+                    }
+                    1 => {
+                        properties.priority = Some(TaskPriority::Low);
+                        continue;
+                    }
+                    2 => {
+                        properties.priority = Some(TaskPriority::Medium);
+                        continue;
+                    }
+                    3 => {
+                        properties.priority = Some(TaskPriority::High);
+                        continue;
+                    }
+                    4 => {
+                        properties.priority = Some(TaskPriority::Urgent);
+                        continue;
+                    }
+                    _ => {}
+                }
             }
         }
         if let Some(est) = word.strip_prefix('^') {
@@ -75,7 +97,7 @@ fn parse_duration(s: &str) -> Option<i32> {
         return val.parse::<i32>().ok();
     }
     if let Some(val) = s.strip_suffix('h') {
-        return val.parse::<i32>().ok().map(|h| h * 60);
+        return val.parse::<i32>().ok().map(|h| h.saturating_mul(60));
     }
     s.parse::<i32>().ok()
 }
@@ -90,7 +112,7 @@ mod tests {
         let input = "Buy milk !1 #groceries ^30m @today";
         let parsed = parse_sigils(input);
         assert_eq!(parsed.clean_title, "Buy milk");
-        assert_eq!(parsed.properties.priority, Some(1));
+        assert_eq!(parsed.properties.priority, Some(TaskPriority::Low));
         assert_eq!(parsed.properties.tags, vec!["groceries"]);
         assert_eq!(parsed.properties.duration, Some(30));
         assert_eq!(parsed.properties.day, Some("today".to_string()));
@@ -107,5 +129,56 @@ mod tests {
         let parsed3 = parse_sigils(input3);
         assert_eq!(parsed3.clean_title, "!notanumber # @");
         assert_eq!(parsed3.properties.duration, Some(120));
+        
+        let input4 = "Too high !5";
+        let parsed4 = parse_sigils(input4);
+        assert_eq!(parsed4.clean_title, "Too high !5");
+        assert_eq!(parsed4.properties.priority, None);
+    }
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn doesnt_panic_on_random_garbage(ref s in "\\PC*") {
+            let _ = parse_sigils(s);
+        }
+
+        #[test]
+        fn doesnt_panic_on_any_string(ref s in ".*") {
+            let _ = parse_sigils(s);
+        }
+
+        #[test]
+        fn priority_parsing_is_stable(
+            title in "[a-zA-Z]+", 
+            priority in 0i32..=4i32
+        ) {
+            let input = format!("{title} !{priority}");
+            let parsed = parse_sigils(&input);
+            let expected_enum = match priority {
+                1 => TaskPriority::Low,
+                2 => TaskPriority::Medium,
+                3 => TaskPriority::High,
+                4 => TaskPriority::Urgent,
+                _ => TaskPriority::None,
+            };
+            assert_eq!(parsed.properties.priority, Some(expected_enum));
+            assert_eq!(parsed.clean_title, title);
+        }
+
+        #[test]
+        fn invalid_priorities_are_ignored(
+            title in "[a-zA-Z]+",
+            invalid_priority in proptest::prop_oneof![
+                -1000i32..0i32,
+                5i32..1000i32
+            ]
+        ) {
+            let input = format!("{title} !{invalid_priority}");
+            let parsed = parse_sigils(&input);
+            assert_eq!(parsed.properties.priority, None);
+            assert_eq!(parsed.clean_title, format!("{title} !{invalid_priority}"));
+        }
     }
 }

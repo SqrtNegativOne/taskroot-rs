@@ -63,3 +63,6 @@ panic_in_result_fn = "deny"
 panic = "deny"
 exit = "deny"
 as_conversions = "deny"
+
+[dev-dependencies]
+proptest = "1.6.0"

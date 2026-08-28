@@ -64,7 +64,7 @@ struct GoogleEventTime {
 #[allow(clippy::too_many_lines)]
 pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
     let client = Client::new();
-    let time_min = (chrono::Utc::now() - chrono::Duration::days(90)).to_rfc3339();
+    let time_min = chrono::Utc::now().checked_sub_signed(chrono::Duration::days(90)).unwrap_or_else(chrono::Utc::now).to_rfc3339();
 
     // 1. Fetch calendar list
     let list_response = client

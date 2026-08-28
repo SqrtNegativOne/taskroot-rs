@@ -2,6 +2,7 @@ use serde::Deserialize;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::fmt::Write;
 
 #[derive(Deserialize, Debug)]
 struct SettingsSchemaYaml {
@@ -60,22 +61,22 @@ fn main() {
                     _ => "String",
                 };
 
-                let default_val_str = if let Some(val) = &setting.default_value {
-                    match val {
-                        serde_yaml::Value::String(s) => format!("\"{}\".to_string()", s),
+                let default_val_str = setting.default_value.as_ref().map_or_else(
+                    || "Default::default()".to_string(),
+                    |val| match val {
+                        serde_yaml::Value::String(s) => format!("\"{s}\".to_string()"),
                         serde_yaml::Value::Bool(b) => b.to_string(),
                         serde_yaml::Value::Number(n) => n.to_string(),
                         _ => "Default::default()".to_string(),
                     }
-                } else {
-                    "Default::default()".to_string()
-                };
+                );
 
-                struct_fields.push_str(&format!("    pub {}: {},\n", setting.id, rust_type));
-                default_impls.push_str(&format!(
-                    "            {}: {},\n",
-                    setting.id, default_val_str
-                ));
+                let _ = writeln!(struct_fields, "    pub {}: {rust_type},", setting.id);
+                let _ = writeln!(
+                    default_impls,
+                    "            {}: {default_val_str},",
+                    setting.id
+                );
             }
         }
     }
@@ -88,27 +89,26 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/AppSettings.generated.ts")]
 pub struct AppSettings {{
-{}
+{struct_fields}
 }}
 
 impl Default for AppSettings {{
     fn default() -> Self {{
         Self {{
-{}
+{default_impls}
         }}
     }}
 }}
-"#,
-        struct_fields, default_impls
+"#
     );
 
-    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR not set");
     let dest_path = Path::new(&out_dir).join("settings_generated.rs");
-    fs::write(&dest_path, generated_code).unwrap();
+    fs::write(&dest_path, generated_code).expect("Failed to write settings_generated.rs");
 
     // Convert YAML directly to JSON without the intermediate restrictive struct
-    let original_yaml: serde_yaml::Value = serde_yaml::from_str(&yaml_str).unwrap();
-    let final_json = serde_json::to_string(&original_yaml).unwrap();
+    let original_yaml: serde_yaml::Value = serde_yaml::from_str(&yaml_str).expect("Failed to parse original yaml");
+    let final_json = serde_json::to_string(&original_yaml).expect("Failed to serialize final json");
     let json_dest_path = Path::new(&out_dir).join("settings_schema.json");
-    fs::write(&json_dest_path, final_json).unwrap();
+    fs::write(&json_dest_path, final_json).expect("Failed to write json");
 }

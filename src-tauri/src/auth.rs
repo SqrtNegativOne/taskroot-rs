@@ -158,7 +158,7 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), AppError> {
 
     if let Some(expires_in) = token_result.expires_in() {
         let expires_at =
-            Utc::now() + Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600));
+            Utc::now().checked_add_signed(Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600))).unwrap_or_else(Utc::now);
         db::set_setting(&pool, "google_token_expires_at", &expires_at.to_rfc3339()).await?;
     }
 
@@ -173,7 +173,7 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_e
 
     let needs_refresh = expires_at_str.is_none_or(|exp_str| {
         chrono::DateTime::parse_from_rfc3339(&exp_str).map_or(true, |expires_at| {
-            Utc::now() + Duration::minutes(5) > expires_at.with_timezone(&Utc)
+            Utc::now().checked_add_signed(Duration::minutes(5)).unwrap_or_else(Utc::now) > expires_at.with_timezone(&Utc)
         })
     });
 
@@ -199,7 +199,7 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_e
 
     if let Some(expires_in) = token_result.expires_in() {
         let expires_at =
-            Utc::now() + Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600));
+            Utc::now().checked_add_signed(Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600))).unwrap_or_else(Utc::now);
         db::set_setting(pool, "google_token_expires_at", &expires_at.to_rfc3339()).await?;
     }
 

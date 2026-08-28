@@ -66,3 +66,4 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
 - **Store Assets Offline**: Store assets offline.
+- Tautological tests are considered harmful.

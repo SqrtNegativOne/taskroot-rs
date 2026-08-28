@@ -3,11 +3,16 @@ import tseslint from 'typescript-eslint';
 import eslintPluginSvelte from 'eslint-plugin-svelte';
 import svelteParser from 'svelte-eslint-parser';
 import oxlint from 'eslint-plugin-oxlint';
+import sonarjs from 'eslint-plugin-sonarjs';
 
 export default tseslint.config(
+  {
+    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', '**/*.cjs', 'script.js', 'build/', 'legacy-src/', 'coverage/'],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   ...eslintPluginSvelte.configs['flat/recommended'],
+  sonarjs.configs.recommended,
   oxlint.configs['flat/recommended'],
   {
     languageOptions: {
@@ -27,9 +32,6 @@ export default tseslint.config(
     },
     rules: {
     },
-  },
-  {
-    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', 'build/', 'legacy-src/', 'coverage/'],
   },
   {
     rules: {

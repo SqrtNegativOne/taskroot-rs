@@ -11,22 +11,14 @@
     let windowIsSmall = $state(true);
     let showNotes = $state(false);
     let notesText = $state('');
-    let today = $state(new Date());
-    let timelineDate = $state(new Date());
     
     let tabTop = $state(0);
     let isDragging = $state(false);
     let dragStartScreenY = 0;
     let dragStartTabTop = 0;
 
-    let hydratedEvents = $derived.by(() => {
-        return store.events.map(ev => {
-            if (ev.taskId) {
-                const task = store.tasks.find(t => t.id === ev.taskId);
-                return { ...ev, task };
-            }
-            return ev;
-        });
+    $effect(() => {
+        if (!store.loaded) return;
     });
 
     let sf = 1;
@@ -179,14 +171,6 @@
         } as AppEvent;
         void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
     }
-
-    function onResizeEvent(id: string, startTime: string, endTime: string) {
-        void mutateOrReport('Failed to update event', () => store.updateEvent(id, ev => ({ ...ev, startTime, endTime })));
-    }
-
-    function onMoveEvent(id: string, startTime: string, endTime: string) {
-        void mutateOrReport('Failed to update event', () => store.updateEvent(id, ev => ({ ...ev, startTime, endTime })));
-    }
 </script>
 
 <div class="widget" class:open>
@@ -209,13 +193,7 @@
         {:else}
             <div class="calendar-wrap" class:half={showNotes}>
                 <DayTimeline
-                    events={hydratedEvents}
-                    {today}
-                    {timelineDate}
-                    setTimelineDate={(d: Date) => { timelineDate = d; }}
                     {onAddEvent}
-                    {onResizeEvent}
-                    {onMoveEvent}
                 />
             </div>
             {#if showNotes}

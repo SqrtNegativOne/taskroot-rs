@@ -9,7 +9,7 @@ use crate::sync;
 #[tauri::command]
 pub async fn force_sync(app: tauri::AppHandle) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    let next_sync = chrono::Utc::now() + chrono::Duration::seconds(sync::SYNC_INTERVAL_SECS);
+    let next_sync = chrono::Utc::now().checked_add_signed(chrono::Duration::seconds(sync::SYNC_INTERVAL_SECS)).unwrap_or_else(chrono::Utc::now);
     sync::run_tracked_sync(&app, &pool, Some(next_sync))
         .await
         .map_err(AppError::Sync)
