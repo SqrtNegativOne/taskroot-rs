@@ -284,26 +284,11 @@ pub struct AppEvent {
     #[sqlx(default)]
     pub color: Option<Color>,
     #[ts(optional)]
-    #[sqlx(default)]
-    pub bg_color: Option<Color>,
-    #[ts(optional)]
     pub etag: Option<String>,
     #[ts(optional)]
     pub dirty: Option<bool>,
     #[ts(optional)]
     pub is_all_day: Option<bool>,
-}
-
-impl AppEvent {
-    pub fn preprocess_colors(&mut self) {
-        if let Some(c) = &self.color {
-            if c.0.len() == 7 && c.0.starts_with('#') {
-                self.bg_color = Some(Color(format!("{}40", c.0)));
-            } else {
-                self.bg_color = Some(c.clone());
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -366,7 +351,6 @@ mod tests {
             status: Some(EventStatus::Confirmed),
             updated_at: Some("2026-08-26T07:31:42Z".into()),
             color: None,
-            bg_color: None,
             etag: None,
             dirty: None,
             is_all_day: None,

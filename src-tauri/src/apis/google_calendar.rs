@@ -199,7 +199,6 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
                     status,
                     updated_at: Some(remote_updated_at),
                     color,
-                    bg_color: None,
                     etag: None,
                     dirty: Some(false),
                     is_all_day: Some(is_all_day),

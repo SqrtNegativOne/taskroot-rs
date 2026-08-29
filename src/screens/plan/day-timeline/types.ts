@@ -1,4 +1,12 @@
-export type { LaidEvent, PlanDayLayout } from '../../../lib/domain';
+import type { AppEvent } from '../../../lib/domain';
+
+export interface LaidEvent {
+    event: AppEvent;
+    startMins: number;
+    endMins: number;
+    lane: number;
+    lanes: number;
+}
 
 export {
     MINUTES_IN_HOUR,

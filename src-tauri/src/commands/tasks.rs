@@ -47,3 +47,25 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
 
     Ok(db::delete_task(&pool, id).await?)
 }
+
+#[tauri::command]
+pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    let now_iso = chrono::Utc::now().to_rfc3339();
+    let ids = sqlx::query_scalar::<_, String>(
+        r"
+        SELECT DISTINCT t.id 
+        FROM tasks t 
+        JOIN events e ON e.task_id = t.id 
+        WHERE t.status NOT IN ('done', 'cancelled')
+        AND e.end_time < ?
+        "
+    )
+    .bind(now_iso)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| AppError::Internal(format!("Database error: {e}")))?;
+    
+    Ok(ids)
+}
+

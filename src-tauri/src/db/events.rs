@@ -16,13 +16,10 @@ macro_rules! event_select_sql {
 ///
 /// Returns an error if the operation fails.
 pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
-    let mut event = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE id = ?"))
+    let event = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE id = ?"))
         .bind(id)
         .fetch_optional(pool)
         .await?;
-    if let Some(e) = &mut event {
-        e.preprocess_colors();
-    }
     Ok(event)
 }
 
@@ -32,12 +29,9 @@ pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, 
 ///
 /// Returns an error if the operation fails.
 pub async fn get_dirty_events(pool: &SqlitePool) -> Result<Vec<AppEvent>, sqlx::Error> {
-    let mut events = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE dirty = 1"))
+    let events = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE dirty = 1"))
         .fetch_all(pool)
         .await?;
-    for event in &mut events {
-        event.preprocess_colors();
-    }
     Ok(events)
 }
 
@@ -237,14 +231,10 @@ pub async fn query_events(
         query_builder.push(")");
     }
 
-    let mut events = query_builder
+    let events = query_builder
         .build_query_as::<AppEvent>()
         .fetch_all(pool)
         .await?;
-
-    for event in &mut events {
-        event.preprocess_colors();
-    }
 
     Ok(events)
 }

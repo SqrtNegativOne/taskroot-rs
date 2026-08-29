@@ -253,7 +253,6 @@ mod tests {
             status: Some(EventStatus::Confirmed),
             updated_at: Some("2026-08-26T12:00:00Z".into()),
             color: None,
-            bg_color: None,
             etag: None,
             dirty: Some(true),
             is_all_day: Some(false),

@@ -58,7 +58,7 @@
             end = new Date(start);
             end.setDate(start.getDate() + 42);
         }
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
+        return { startDate: ymd(start), endDate: ymd(end) };
     });
 
     const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({

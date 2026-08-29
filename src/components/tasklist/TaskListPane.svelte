@@ -45,9 +45,8 @@
         if (onDeleteTask) onDeleteTask(id);
     }
     
-    // Note: event-based past due calculation is deferred since we don't have global events accessible easily here without context
-    // We can assume empty for now.
-    const pastDueTaskIds = new Set<string>();
+    let pastDueQuery = useAutoQuery<string[]>('get_past_due_task_ids', () => ({}));
+    let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 

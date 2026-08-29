@@ -1,7 +1,7 @@
 <script lang="ts">
     import './day-timeline.css';
     import { onMount } from 'svelte';
-    import type { DragState, LaidEvent, PlanDayLayout } from './types';
+    import type { DragState } from './types';
     import { PX_PER_MIN } from './constants';
     import type { AppEvent } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
@@ -54,10 +54,18 @@
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
-    const layoutQuery = useAutoQuery<PlanDayLayout[]>('query_plan_layout', () => ({
-        dates: dates.map(ymd),
+    import { layoutEvents, type DayLayoutEvent } from './layout';
+
+    let dateRange = $derived.by(() => {
+        if (dates.length === 0) return { start: '', end: '' };
+        return { start: ymd(dates[0]), end: ymd(dates[dates.length - 1]) };
+    });
+
+    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({
         filters: eventFilters,
-        query: eventQuery
+        query: eventQuery,
+        startDate: dateRange.start,
+        endDate: dateRange.end
     }), { debounceMs: 150 });
     
     const calendarsQuery = useAutoQuery<string[]>('get_active_calendars', () => ({}));
@@ -65,10 +73,37 @@
     let activeCalendars = $derived(calendarsQuery.data ?? []);
 
     let planLayout = $derived.by(() => {
-        const layoutMap: Record<string, LaidEvent[]> = {};
-        for (const day of layoutQuery.data ?? []) {
-            layoutMap[day.date] = day.events;
+        const layoutMap: Record<string, import('./types').LaidEvent[]> = {};
+        for (const date of dates) {
+            layoutMap[ymd(date)] = [];
         }
+        
+        const events = eventsQuery.data ?? [];
+        const bucketed: Record<string, DayLayoutEvent[]> = {};
+        
+        for (const ev of events) {
+            const startStr = ev.startTime;
+            const endStr = ev.endTime;
+            // Simple string prefix matching for days
+            for (const date of dates) {
+                const dateStr = ymd(date);
+                if (startStr.startsWith(dateStr) || endStr.startsWith(dateStr) || (startStr < dateStr && endStr > dateStr)) {
+                    // Extract HH:MM
+                    const s = new Date(startStr);
+                    const e = new Date(endStr);
+                    const startMins = s.getHours() * 60 + s.getMinutes();
+                    const endMins = e.getHours() * 60 + e.getMinutes();
+                    
+                    if (!bucketed[dateStr]) bucketed[dateStr] = [];
+                    bucketed[dateStr].push({ event: ev, startMins, endMins });
+                }
+            }
+        }
+
+        for (const [dateStr, bucketEvents] of Object.entries(bucketed)) {
+            layoutMap[dateStr] = layoutEvents(bucketEvents);
+        }
+        
         return layoutMap;
     });
     
