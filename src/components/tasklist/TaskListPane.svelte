@@ -13,7 +13,7 @@
 
     let {
         onUpdateTask,
-        filters = $bindable([]),
+        filters = $bindable([{ column: 'status', operator: 'is not', value: ['done'] }]),
         sort = $bindable([] as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]),
         onDragStart,
         activeDragId,

@@ -22,7 +22,7 @@
         onEventClick?: (ev: AppEvent) => void;
     } = $props();
 
-    let view = $state<DateGridView>(DateGridView.Month);
+    let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let anchor = $state(new Date());
     let filters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
     let query = $state('');

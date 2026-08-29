@@ -3,6 +3,12 @@ import { safeInvoke } from '../../../lib/safeInvoke.svelte';
 import { STOPWATCH_UPDATED } from '../../../lib/events';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
+import { useNow } from '../../../lib/useNow.svelte';
+
+let now: { get value(): Date; get ms(): number };
+$effect.root(() => {
+    now = useNow();
+});
 
 export class StopwatchState {
     elapsed = $state(0);
@@ -65,8 +71,7 @@ export class StopwatchState {
         const style = store.settings.clock_style;
         
         if (style === 'guzey') {
-            // eslint-disable-next-line svelte/prefer-svelte-reactivity
-            const date = new Date();
+            const date = now.value;
             const hour = date.getHours();
             const min = date.getMinutes();
             if (hour % 3 === 0 && min < 35) return 'long break';
@@ -77,27 +82,29 @@ export class StopwatchState {
         return this.isBreak ? 'break' : 'work';
     }
 
+    private getGuzeyRemainingMs(date: Date, min: number, sec: number, ms: number): number {
+        const hour = date.getHours();
+        let targetMin = 60;
+        if (hour % 3 === 0 && min < 35) targetMin = 35;
+        else if (min < 5) targetMin = 5;
+        else if (min < 30) targetMin = 30;
+        else if (min < 35) targetMin = 35;
+        
+        const msLeft = (targetMin * 60 * 1000) - ((min * 60 * 1000) + (sec * 1000) + ms);
+        return Math.max(0, msLeft);
+    }
+
     get currentMs() {
         if (!store.loaded || !store.settings) return 0;
         const style = store.settings.clock_style;
         
-        const nowMs = Date.now();
+        const nowMs = now.ms;
         if (style === 'guzey') {
-            // eslint-disable-next-line svelte/prefer-svelte-reactivity
-            const date = new Date(nowMs);
-            const hour = date.getHours();
+            const date = now.value;
             const min = date.getMinutes();
             const sec = date.getSeconds();
             const ms = date.getMilliseconds();
-            
-            let targetMin = 60;
-            if (hour % 3 === 0 && min < 35) targetMin = 35;
-            else if (min < 5) targetMin = 5;
-            else if (min < 30) targetMin = 30;
-            else if (min < 35) targetMin = 35;
-            
-            const msLeft = (targetMin * 60 * 1000) - ((min * 60 * 1000) + (sec * 1000) + ms);
-            return Math.max(0, msLeft);
+            return this.getGuzeyRemainingMs(date, min, sec, ms);
         }
         
         if (this.isBreak) {
@@ -181,11 +188,13 @@ function playBeep() {
 }
 
 if (typeof window !== 'undefined') {
-    setInterval(() => {
-        const currentPhase = stopwatchState.activePhase;
-        if (lastPhase !== undefined && lastPhase !== currentPhase) {
-            playBeep();
-        }
-        lastPhase = currentPhase;
-    }, 1000);
+    $effect.root(() => {
+        $effect(() => {
+            const currentPhase = stopwatchState.activePhase;
+            if (lastPhase !== undefined && lastPhase !== currentPhase) {
+                playBeep();
+            }
+            lastPhase = currentPhase;
+        });
+    });
 }
