@@ -3,7 +3,7 @@
     import { onMount } from 'svelte';
     import type { DragState } from './types';
     import { PX_PER_MIN } from './constants';
-    import type { AppEvent } from '../../../lib/domain';
+    import type { AppEvent, AppCalendar } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
@@ -68,7 +68,7 @@
         endDate: dateRange.end
     }), { debounceMs: 150 });
     
-    const calendarsQuery = useAutoQuery<string[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
 
     let activeCalendars = $derived(calendarsQuery.data ?? []);
 
@@ -123,7 +123,7 @@
         <FilterButton
             bind:filters={eventFilters}
             columns={[{ id: 'calendar', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars : []}
+            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars.map((c) => c.id) : []}
             align="right"
         />
     {/snippet}

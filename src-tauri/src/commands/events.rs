@@ -47,3 +47,12 @@ pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppEr
 
     Ok(db::delete_event(&pool, id).await?)
 }
+
+/// # Errors
+///
+/// Returns an error if the database is unavailable.
+#[tauri::command]
+pub async fn get_active_calendars(app: tauri::AppHandle) -> Result<Vec<domain::AppCalendar>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    Ok(db::get_calendars(&pool).await?)
+}

@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { AppEvent, AppTask } from '../../lib/domain';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
     import { getFormattedDate, getFormattedTime } from './format';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TimeInput from '../inputs/TimeInput.svelte';
@@ -11,6 +12,9 @@
     }
 
     let { event, tasks, updateEvent }: Props = $props();
+
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    let activeCalendars = $derived(calendarsQuery.data ?? []);
 
     function updateEventDate(field: 'startTime' | 'endTime', dateStr: string): void {
         if (!event[field]) return;
@@ -28,10 +32,26 @@
         updateEvent(event.id, (e) => ({ ...e, taskId: value || undefined }));
     }
 
+    function handleCalendarChange(value: string): void {
+        updateEvent(event.id, (e) => ({ ...e, remoteCollectionId: value || undefined }));
+    }
+
     function handleRruleChange(value: string): void {
         updateEvent(event.id, (e) => ({ ...e, rrule: value || undefined }));
     }
 </script>
+
+<div class="inspector-field">
+    <label for={`cal-${event.id}`}>Calendar</label>
+    <SelectInput
+        value={event.remoteCollectionId ?? ''}
+        onchange={handleCalendarChange}
+        options={[
+            { label: '-- No calendar --', value: '' },
+            ...activeCalendars.map(c => ({ label: c.summary || c.id, value: c.id }))
+        ]}
+    />
+</div>
 
 <div class="inspector-field">
     <label for={`attach-${event.id}`}>Task Attachment</label>

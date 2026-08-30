@@ -9,6 +9,7 @@
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
     import TitleBar from '../components/TitleBar.svelte';
+    import Notifications from '../components/Notifications.svelte';
 
     import { listen, emit } from '@tauri-apps/api/event';
     import { LAUNCHER_DATA_UPDATE } from '$lib/events';
@@ -135,6 +136,8 @@
         {@render children()}
     </div>
 {/if}
+
+<Notifications />
 
 <style>
     .sidebar-shell {

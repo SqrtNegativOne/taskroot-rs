@@ -23,6 +23,17 @@ pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, 
     Ok(event)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
+pub async fn get_event_by_remote_id(pool: &SqlitePool, remote_id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
+    let event = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE remote_id = ?"))
+        .bind(remote_id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(event)
+}
+
 /// Dirty-event feed for the offline-enqueue roadmap (see TODO.md).
 #[allow(dead_code)]
 /// # Errors
@@ -237,4 +248,44 @@ pub async fn query_events(
         .await?;
 
     Ok(events)
+}
+
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn upsert_calendar(pool: &SqlitePool, calendar: crate::domain::AppCalendar) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO calendars (id, summary, color, is_primary) VALUES (?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET 
+            summary = excluded.summary, 
+            color = excluded.color,
+            is_primary = excluded.is_primary",
+    )
+    .bind(calendar.id)
+    .bind(calendar.summary)
+    .bind(calendar.color)
+    .bind(calendar.is_primary)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn delete_calendar(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM calendars WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn get_calendars(pool: &SqlitePool) -> Result<Vec<crate::domain::AppCalendar>, sqlx::Error> {
+    let calendars = sqlx::query_as::<_, crate::domain::AppCalendar>(
+        "SELECT id, summary, color, is_primary FROM calendars"
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(calendars)
 }

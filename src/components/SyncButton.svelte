@@ -6,6 +6,7 @@
     import type { SyncState } from '$lib/domain';
     import { SYNC_ERROR, SYNC_FINISHED, SYNC_STARTED } from '$lib/events';
     import { useNow } from '$lib/useNow.svelte';
+    import { notify } from '$lib/notifications.svelte';
 
     let isSyncing = $state(false);
     let syncError = $state<string | null>(null);
@@ -61,6 +62,9 @@
             listen(SYNC_ERROR, (err) => {
                 void updateState();
                 console.error('Background sync error:', err);
+                const payload = err.payload as string | { message?: string };
+                const msg = typeof payload === 'string' ? payload : (payload?.message ?? 'Unknown sync error');
+                notify(`Sync error: ${msg}`, 'error');
             })
         ];
 

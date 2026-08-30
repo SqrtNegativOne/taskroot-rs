@@ -12,8 +12,10 @@ struct GoogleCalendarList {
 #[derive(Deserialize, Debug)]
 struct GoogleCalendarListEntry {
     id: String,
+    summary: Option<String>,
     #[serde(rename = "backgroundColor")]
     background_color: Option<String>,
+    primary: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -97,7 +99,35 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
         }
     }
 
-    // 3. Fetch events for each calendar
+    // 3. Sync Calendars to DB and compute which ones to delete
+    let mut fetched_cal_ids = Vec::new();
+    for cal in &calendars {
+        fetched_cal_ids.push(cal.id.clone());
+        let color = cal.background_color.clone().and_then(|c| crate::domain::Color::try_from(c).ok());
+        
+        let app_calendar = crate::domain::AppCalendar {
+            id: crate::domain::CollectionId(cal.id.clone()),
+            summary: cal.summary.clone().unwrap_or_else(|| cal.id.clone()),
+            color,
+            is_primary: cal.primary,
+        };
+        let _ = crate::db::upsert_calendar(pool, app_calendar).await;
+    }
+
+    if let Ok(existing_cals) = crate::db::get_calendars(pool).await {
+        for local_cal in existing_cals {
+            if !fetched_cal_ids.contains(&local_cal.id.0) {
+                // Delete missing calendars and their events
+                let _ = sqlx::query("DELETE FROM events WHERE remote_collection_id = ?")
+                    .bind(&local_cal.id.0)
+                    .execute(pool)
+                    .await;
+                let _ = crate::db::delete_calendar(pool, &local_cal.id.0).await;
+            }
+        }
+    }
+
+    // 4. Fetch events for each calendar
     for calendar in calendars {
         let cal_id = urlencoding::encode(&calendar.id);
         let mut page_token: Option<String> = None;
@@ -130,19 +160,23 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
 
             if let Some(events) = event_list.items.take() {
                 for event in events {
-                    let app_event_id = format!("google_{}", event.id);
+                    let app_event_id = if let Ok(Some(existing_local)) = crate::db::get_event_by_remote_id(pool, &event.id).await {
+                        existing_local.id.0
+                    } else {
+                        format!("google_{}", event.id)
+                    };
 
                     let remote_updated_at = event.updated.clone().unwrap_or_else(
                         || chrono::Utc::now().to_rfc3339()
                     );
 
-                if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
-                    if let Some(local_updated) = &local_event.updated_at {
-                        if local_updated > &remote_updated_at {
-                            continue;
+                    if let Ok(Some(local_event)) = crate::db::get_event(pool, &app_event_id).await {
+                        if let Some(local_updated) = &local_event.updated_at {
+                            if local_updated > &remote_updated_at {
+                                continue;
+                            }
                         }
                     }
-                }
 
                 let title = event.summary.unwrap_or_else(|| "No Title".to_string());
 

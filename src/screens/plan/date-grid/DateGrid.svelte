@@ -3,7 +3,7 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { AppEvent } from '../../../lib/domain';
+    import type { AppEvent, AppCalendar } from '../../../lib/domain';
     import { SvelteDate } from 'svelte/reactivity';
     import { ymd } from '../../../lib/time';
     
@@ -68,7 +68,7 @@
         endDate: dateGridRange.endDate
     }), { debounceMs: 150 });
     
-    const calendarsQuery = useAutoQuery<string[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
 
     let events = $derived(eventsQuery.data ?? []);
     let activeCalendars = $derived(calendarsQuery.data ?? []);
@@ -168,7 +168,7 @@
         <FilterButton
             bind:filters
             columns={[{ id: 'calendar', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars : []}
+            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars.map(c => c.id) : []}
             align="right"
         />
     {/snippet}

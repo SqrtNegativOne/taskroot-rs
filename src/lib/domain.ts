@@ -1,4 +1,5 @@
 export type { AppEvent } from './bindings/AppEvent.generated';
+export type { AppCalendar } from './bindings/AppCalendar.generated';
 
 export type { AppTask } from './bindings/AppTask.generated';
 export type { AppTaskStatus } from './bindings/AppTaskStatus.generated';
@@ -12,4 +13,3 @@ export type * from './bindings/TaskId.generated';
 export type * from './bindings/EventId.generated';
 export type * from './bindings/RemoteId.generated';
 export type * from './bindings/CollectionId.generated';
-

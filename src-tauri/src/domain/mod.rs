@@ -248,6 +248,18 @@ impl EventStatus {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq, Eq)]
+#[ts(export, export_to = "../../src/lib/bindings/AppCalendar.generated.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct AppCalendar {
+    pub id: CollectionId,
+    pub summary: String,
+    #[ts(optional)]
+    pub color: Option<Color>,
+    #[ts(optional)]
+    pub is_primary: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
 #[serde(rename_all = "camelCase")]

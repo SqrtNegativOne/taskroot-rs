@@ -119,6 +119,7 @@ pub fn run() {
             commands::events::create_event,
             commands::events::update_event,
             commands::events::delete_event,
+            commands::events::get_active_calendars,
             commands::sync::force_sync,
             commands::sync::wipe_local_data,
             commands::sync::clear_sync_queue,

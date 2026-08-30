@@ -1,8 +1,9 @@
 <script lang="ts">
     import { store, describeError } from '../../lib/store.svelte';
-    import type { AppEvent, AppTask } from '../../lib/domain';
+    import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { addDays, ymd } from '../../lib/time';
 
     import SplitPane from '../../components/SplitPane.svelte';
@@ -64,8 +65,15 @@
 
     const MS_PER_MINUTE = 60_000;
 
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+
     function onAddEvent(date: Date, startMins?: number, endMins?: number) {
         const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        
+        const activeCalendars = calendarsQuery.data ?? [];
+        const primaryCalendar = activeCalendars.find(c => c.isPrimary);
+        const defaultCalendarId = primaryCalendar ? primaryCalendar.id : (activeCalendars.length > 0 ? activeCalendars[0].id : undefined);
+
         const newEvent = {
             id: crypto.randomUUID(),
             title: 'New Event',
@@ -75,7 +83,7 @@
             endTime: endMins !== undefined
                 ? new Date(dayStart.getTime() + endMins * MS_PER_MINUTE).toISOString()
                 : ymd(addDays(date, 1)),
-            remoteId: undefined, remoteCollectionId: undefined, taskId: undefined, description: undefined, rrule: undefined,
+            remoteId: undefined, remoteCollectionId: defaultCalendarId, taskId: undefined, description: undefined, rrule: undefined,
             exdates: undefined, recurringEventId: undefined, originalStartTime: undefined, cancelled: undefined,
             updatedAt: undefined, color: undefined, _deleted: undefined, etag: undefined,
             isAllDay: startMins === undefined,

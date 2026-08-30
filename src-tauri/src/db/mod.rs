@@ -100,6 +100,13 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             PRIMARY KEY (task_id, tag_id),
             FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
             FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS calendars (
+            id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            color TEXT,
+            is_primary BOOLEAN DEFAULT 0
         );"
     )
     .execute(&pool)
