@@ -6,6 +6,7 @@
     import InspectorEventFields from './InspectorEventFields.svelte';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
     import TitleInput from '../inputs/TitleInput.svelte';
+    import RecurringActionModal, { type RecurringMode } from '../RecurringActionModal.svelte';
 
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { store } from '../../lib/store.svelte';
@@ -23,6 +24,63 @@
 
     let tasks = $derived(tasksQuery.data ?? []);
     let events = $derived(eventsQuery.data ?? []);
+
+    let recurringModalOpen = $state(false);
+    let eventPendingAction = $state<AppEvent | undefined>(undefined);
+
+    function formatUntilDate(dateStr: string): string {
+        const d = new Date(dateStr);
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    }
+
+    function handleRecurringConfirm(mode: RecurringMode) {
+        recurringModalOpen = false;
+        if (!eventPendingAction) {
+            onClose();
+            return;
+        }
+
+        const ev = eventPendingAction;
+        const masterId = ev.recurringEventId || ev.id;
+        const masterEvent = events.find(e => e.id === masterId);
+
+        if (mode === "all") {
+            deleteEvent(masterId);
+            const overrides = events.filter(e => e.recurringEventId === masterId);
+            for (const override of overrides) {
+                deleteEvent(override.id);
+            }
+        } else if (mode === "instance") {
+            if (masterEvent) {
+                const exdates = [...(masterEvent.exdates || [])];
+                const targetDate = ev.originalStartTime || ev.startTime;
+                if (!exdates.includes(targetDate)) {
+                    exdates.push(targetDate);
+                }
+                void store.updateEvent({ ...masterEvent, exdates });
+            }
+            if (ev.recurringEventId) {
+                deleteEvent(ev.id);
+            }
+        } else if (mode === "following") {
+            if (masterEvent && masterEvent.rrule) {
+                let rrule = masterEvent.rrule.replace(/;?(UNTIL|COUNT)=[^;]+/g, '');
+                const targetDate = ev.originalStartTime || ev.startTime;
+                rrule += `;UNTIL=${formatUntilDate(targetDate)}`;
+                void store.updateEvent({ ...masterEvent, rrule });
+            }
+            if (ev.recurringEventId) {
+                deleteEvent(ev.id);
+            }
+        }
+        eventPendingAction = undefined;
+        onClose();
+    }
+
+    function handleRecurringCancel() {
+        recurringModalOpen = false;
+        eventPendingAction = undefined;
+    }
 
     function updateTask(id: string, t: (t: AppTask) => AppTask) {
         const current = tasks.find(x => x.id === id);
@@ -55,6 +113,7 @@
 
     onMount(() => {
         function handleClickOutside(e: PointerEvent) {
+            if (recurringModalOpen) return;
             if (inspectorState && paneRef && e.target instanceof Node && !paneRef.contains(e.target)) {
                 onClose();
             }
@@ -74,9 +133,18 @@
     }
 
     function handleDelete(): void {
-        if (currentTask) deleteTask(currentTask.id);
-        else if (currentEvent) deleteEvent(currentEvent.id);
-        onClose();
+        if (currentTask) {
+            deleteTask(currentTask.id);
+            onClose();
+        } else if (currentEvent) {
+            if (currentEvent.rrule || currentEvent.recurringEventId) {
+                eventPendingAction = currentEvent;
+                recurringModalOpen = true;
+            } else {
+                deleteEvent(currentEvent.id);
+                onClose();
+            }
+        }
     }
 </script>
 
@@ -118,3 +186,10 @@
         </div>
     {/if}
 </div>
+
+<RecurringActionModal
+    isOpen={recurringModalOpen}
+    actionType="delete"
+    onConfirm={handleRecurringConfirm}
+    onCancel={handleRecurringCancel}
+/>
