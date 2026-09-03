@@ -30,7 +30,7 @@
     oninput={handleInput}
     {autofocus}
     class={className}
-    style={`background: var(--bg-input, transparent); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 8px 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s; ${style}`}
+    style={`background: var(--bg-surface); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 8px 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s; ${style}`}
 />
 
 <style>

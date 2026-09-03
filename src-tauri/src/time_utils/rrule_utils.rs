@@ -1,5 +1,5 @@
-use color_eyre::Result;
 use chrono::{DateTime, Utc};
+use color_eyre::Result;
 use rrule::RRuleSet;
 use std::str::FromStr;
 

@@ -2,17 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use ts_rs::TS;
 
-
-
-
-
-
-
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/FilterType.generated.ts"
-)]
+#[ts(export, export_to = "../../src/lib/bindings/FilterType.generated.ts")]
 pub enum FilterType {
     Text,
     Number,
@@ -21,7 +12,10 @@ pub enum FilterType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/SortDirection.generated.ts")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/SortDirection.generated.ts"
+)]
 pub enum SortDirection {
     #[serde(rename = "asc")]
     Asc,
@@ -30,7 +24,10 @@ pub enum SortDirection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/FilterOperator.generated.ts")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/FilterOperator.generated.ts"
+)]
 pub enum FilterOperator {
     #[serde(rename = "is")]
     Is,

@@ -81,7 +81,11 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(
+        task.checklist
+            .as_ref()
+            .map(|s| sqlx::types::Json(s.clone())),
+    )
     .bind(&task.parent_task)
     .bind(
         task.dependencies
@@ -124,7 +128,11 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(
+        task.checklist
+            .as_ref()
+            .map(|s| sqlx::types::Json(s.clone())),
+    )
     .bind(&task.parent_task)
     .bind(
         task.dependencies
@@ -187,7 +195,11 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.title)
     .bind(&task.status)
     .bind(&task.priority)
-    .bind(task.checklist.as_ref().map(|s| sqlx::types::Json(s.clone())))
+    .bind(
+        task.checklist
+            .as_ref()
+            .map(|s| sqlx::types::Json(s.clone())),
+    )
     .bind(&task.parent_task)
     .bind(
         task.dependencies

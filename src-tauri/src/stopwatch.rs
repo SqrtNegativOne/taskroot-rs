@@ -34,11 +34,11 @@ fn with_locked_state<T>(
 ) -> Result<T, AppError> {
     let manager = app
         .try_state::<StopwatchManager>()
-        .ok_or_else(|| AppError::NotReady("Stopwatch state not initialized yet".to_string()))?;
+        .ok_or_else(|| AppError::Internal("Stopwatch state not initialized yet".to_string()))?;
     let mut guard = manager
         .0
         .lock()
-        .map_err(|_| AppError::NotReady("Stopwatch state is unavailable".to_string()))?;
+        .map_err(|_| AppError::Internal("Stopwatch state is unavailable".to_string()))?;
     Ok(apply(&mut guard))
 }
 

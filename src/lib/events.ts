@@ -4,3 +4,4 @@ export const SYNC_FINISHED = 'sync-finished';
 export const SYNC_ERROR = 'sync-error';
 export const OAUTH_URL = 'oauth-url';
 export const LAUNCHER_DATA_UPDATE = 'launcher-data-update';
+export const DEEP_LINK = 'deep-link';

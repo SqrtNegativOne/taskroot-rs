@@ -61,7 +61,7 @@
         onblur={handleBlur}
         rows="5"
         class={className}
-        style={`width: 100%; resize: vertical; padding: 4px; font-family: inherit; border: 1px solid var(--border); background: var(--bg-input, var(--bg-surface)); color: var(--fg); border-radius: 4px; ${style}`}
+        style={`width: 100%; resize: vertical; padding: 4px; font-family: inherit; border: 1px solid var(--border); background: var(--bg-surface); color: var(--fg); border-radius: 4px; ${style}`}
         placeholder="Add a description..."
         spellcheck="false"
     ></textarea>

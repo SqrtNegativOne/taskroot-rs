@@ -64,19 +64,19 @@
         width: 100%;
         text-align: left;
         padding: 8px;
-        background: var(--bg-tertiary, #333);
+        background: var(--bg-surface);
         border: none;
         border-radius: 4px;
-        color: var(--text-primary, #fff);
+        color: var(--fg);
         cursor: pointer;
     }
     .task-list button:hover {
-        background: var(--bg-hover, #444);
+        background: var(--bg-surface-hover);
     }
     .close-btn {
         background: none;
-        border: 1px solid var(--border-color, #444);
-        color: var(--text-primary, #fff);
+        border: 1px solid var(--border);
+        color: var(--fg);
         padding: 8px 16px;
         border-radius: 4px;
         cursor: pointer;

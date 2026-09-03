@@ -23,7 +23,7 @@ macro_rules! impl_ts_string_newtype {
                 fn inline(_: &ts_rs::Config) -> String { "string".to_string() }
                 fn visit_dependencies(_: &mut impl ts_rs::TypeVisitor) {}
             }
-            
+
             impl std::ops::Deref for $name {
                 type Target = String;
                 fn deref(&self) -> &Self::Target {
@@ -49,33 +49,81 @@ macro_rules! impl_ts_string_newtype {
 #[serde(transparent)]
 #[sqlx(transparent)]
 pub struct TaskId(pub String);
-impl std::fmt::Display for TaskId { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) } }
-impl From<String> for TaskId { fn from(s: String) -> Self { Self(s) } }
-impl From<&str> for TaskId { fn from(s: &str) -> Self { Self(s.to_string()) } }
+impl std::fmt::Display for TaskId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl From<String> for TaskId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+impl From<&str> for TaskId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
 #[serde(transparent)]
 #[sqlx(transparent)]
 pub struct EventId(pub String);
-impl std::fmt::Display for EventId { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) } }
-impl From<String> for EventId { fn from(s: String) -> Self { Self(s) } }
-impl From<&str> for EventId { fn from(s: &str) -> Self { Self(s.to_string()) } }
+impl std::fmt::Display for EventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl From<String> for EventId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+impl From<&str> for EventId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
 #[serde(transparent)]
 #[sqlx(transparent)]
 pub struct RemoteId(pub String);
-impl std::fmt::Display for RemoteId { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) } }
-impl From<String> for RemoteId { fn from(s: String) -> Self { Self(s) } }
-impl From<&str> for RemoteId { fn from(s: &str) -> Self { Self(s.to_string()) } }
+impl std::fmt::Display for RemoteId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl From<String> for RemoteId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+impl From<&str> for RemoteId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
 #[serde(transparent)]
 #[sqlx(transparent)]
 pub struct CollectionId(pub String);
-impl std::fmt::Display for CollectionId { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) } }
-impl From<String> for CollectionId { fn from(s: String) -> Self { Self(s) } }
-impl From<&str> for CollectionId { fn from(s: &str) -> Self { Self(s.to_string()) } }
+impl std::fmt::Display for CollectionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl From<String> for CollectionId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+impl From<&str> for CollectionId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
 #[serde(try_from = "String", into = "String")]
@@ -84,11 +132,23 @@ pub struct Color(pub String);
 impl TryFrom<String> for Color {
     type Error = String;
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        if s.starts_with('#') && (s.len() == 7 || s.len() == 9) { Ok(Self(s)) } else { Err(format!("Invalid color format: '{s}'")) }
+        if s.starts_with('#') && (s.len() == 7 || s.len() == 9) {
+            Ok(Self(s))
+        } else {
+            Err(format!("Invalid color format: '{s}'"))
+        }
     }
 }
-impl From<Color> for String { fn from(c: Color) -> Self { c.0 } }
-impl std::fmt::Display for Color { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) } }
+impl From<Color> for String {
+    fn from(c: Color) -> Self {
+        c.0
+    }
+}
+impl std::fmt::Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl_ts_string_newtype!(TaskId, EventId, RemoteId, CollectionId, Color);
 
@@ -113,7 +173,6 @@ impl WindowLabel {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
 #[ts(
     export,
@@ -131,7 +190,12 @@ pub enum AppTaskStatus {
 impl AppTaskStatus {
     #[must_use]
     pub fn all_values() -> Vec<String> {
-        vec!["todo".into(), "next-up".into(), "doing".into(), "done".into()]
+        vec![
+            "todo".into(),
+            "next-up".into(),
+            "doing".into(),
+            "done".into(),
+        ]
     }
 }
 
@@ -150,7 +214,10 @@ pub enum TaskPriority {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/ChecklistItem.generated.ts")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/ChecklistItem.generated.ts"
+)]
 pub struct ChecklistItem {
     #[serde(default = "default_checklist_id")]
     pub id: String,

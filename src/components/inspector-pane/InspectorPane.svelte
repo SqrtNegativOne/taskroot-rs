@@ -33,6 +33,40 @@
         return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     }
 
+    function applyRecurringAll(masterId: string) {
+        deleteEvent(masterId);
+        const overrides = events.filter(e => e.recurringEventId === masterId);
+        for (const override of overrides) {
+            deleteEvent(override.id);
+        }
+    }
+
+    function applyRecurringInstance(ev: AppEvent, masterEvent?: AppEvent) {
+        if (masterEvent) {
+            const exdates = [...(masterEvent.exdates || [])];
+            const targetDate = ev.originalStartTime || ev.startTime;
+            if (!exdates.includes(targetDate)) {
+                exdates.push(targetDate);
+            }
+            void store.updateEvent({ ...masterEvent, exdates });
+        }
+        if (ev.recurringEventId) {
+            deleteEvent(ev.id);
+        }
+    }
+
+    function applyRecurringFollowing(ev: AppEvent, masterEvent?: AppEvent) {
+        if (masterEvent && masterEvent.rrule) {
+            let rrule = masterEvent.rrule.replace(/;?(UNTIL|COUNT)=[^;]+/g, '');
+            const targetDate = ev.originalStartTime || ev.startTime;
+            rrule += `;UNTIL=${formatUntilDate(targetDate)}`;
+            void store.updateEvent({ ...masterEvent, rrule });
+        }
+        if (ev.recurringEventId) {
+            deleteEvent(ev.id);
+        }
+    }
+
     function handleRecurringConfirm(mode: RecurringMode) {
         recurringModalOpen = false;
         if (!eventPendingAction) {
@@ -45,33 +79,11 @@
         const masterEvent = events.find(e => e.id === masterId);
 
         if (mode === "all") {
-            deleteEvent(masterId);
-            const overrides = events.filter(e => e.recurringEventId === masterId);
-            for (const override of overrides) {
-                deleteEvent(override.id);
-            }
+            applyRecurringAll(masterId);
         } else if (mode === "instance") {
-            if (masterEvent) {
-                const exdates = [...(masterEvent.exdates || [])];
-                const targetDate = ev.originalStartTime || ev.startTime;
-                if (!exdates.includes(targetDate)) {
-                    exdates.push(targetDate);
-                }
-                void store.updateEvent({ ...masterEvent, exdates });
-            }
-            if (ev.recurringEventId) {
-                deleteEvent(ev.id);
-            }
+            applyRecurringInstance(ev, masterEvent);
         } else if (mode === "following") {
-            if (masterEvent && masterEvent.rrule) {
-                let rrule = masterEvent.rrule.replace(/;?(UNTIL|COUNT)=[^;]+/g, '');
-                const targetDate = ev.originalStartTime || ev.startTime;
-                rrule += `;UNTIL=${formatUntilDate(targetDate)}`;
-                void store.updateEvent({ ...masterEvent, rrule });
-            }
-            if (ev.recurringEventId) {
-                deleteEvent(ev.id);
-            }
+            applyRecurringFollowing(ev, masterEvent);
         }
         eventPendingAction = undefined;
         onClose();

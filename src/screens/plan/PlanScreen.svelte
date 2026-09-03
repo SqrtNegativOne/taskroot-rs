@@ -44,16 +44,12 @@
     }
 
     function onAddTask(defaults?: Partial<AppTask>) {
-        const newTask = {
+        const newTask: AppTask = {
             id: crypto.randomUUID(),
             title: 'New Task',
-            status: 'todo' as const,
-            priority: undefined, tags: undefined, subtasks: undefined, parentTask: undefined,
-            dependencies: undefined, est: undefined, added: undefined, canvasX: undefined, canvasY: undefined,
-            onCanvas: undefined, remoteId: undefined, notes: undefined, tabs: undefined, due: undefined,
-            _deleted: undefined, updatedAt: undefined, etag: undefined,
+            status: 'todo',
             ...defaults
-        } as AppTask;
+        };
         void mutateOrReport('Failed to create task', () => store.addTask(newTask));
         inspectorState = { type: 'task', id: newTask.id };
     }
@@ -74,7 +70,7 @@
         const primaryCalendar = activeCalendars.find(c => c.isPrimary);
         const defaultCalendarId = primaryCalendar ? primaryCalendar.id : (activeCalendars.length > 0 ? activeCalendars[0].id : undefined);
 
-        const newEvent = {
+        const newEvent: AppEvent = {
             id: crypto.randomUUID(),
             title: 'New Event',
             startTime: startMins !== undefined
@@ -83,11 +79,9 @@
             endTime: endMins !== undefined
                 ? new Date(dayStart.getTime() + endMins * MS_PER_MINUTE).toISOString()
                 : ymd(addDays(date, 1)),
-            remoteId: undefined, remoteCollectionId: defaultCalendarId, taskId: undefined, description: undefined, rrule: undefined,
-            exdates: undefined, recurringEventId: undefined, originalStartTime: undefined, cancelled: undefined,
-            updatedAt: undefined, color: undefined, _deleted: undefined, etag: undefined,
+            remoteCollectionId: defaultCalendarId,
             isAllDay: startMins === undefined,
-        } as AppEvent;
+        };
         void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
         inspectorState = { type: 'event', id: newEvent.id };
     }
@@ -100,7 +94,7 @@
 <main class="main" style="position: relative; height: 100vh; display: flex; flex-direction: column;">
 
     {#if store.error}
-        <div style="padding: 20px; color: var(--danger); font-family: monospace;">
+        <div style="padding: 20px; color: var(--tag-red); font-family: monospace;">
             Error loading data from backend: {store.error}
         </div>
     {:else if !store.loaded}

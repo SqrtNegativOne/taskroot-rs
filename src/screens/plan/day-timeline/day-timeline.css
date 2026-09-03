@@ -88,7 +88,7 @@
   .day-event.pri-bar-2 { border-left-color: #b59864; }
   .day-event.pri-bar-3 { border-left-color: #c47e68; }
   .day-event.pri-bar-4 { border-left-color: #c96b7f; }
-  .day-event.is-done { opacity: 0.75; border: 1px dashed var(--border); background: var(--bg-hover); border-left: 2px solid var(--border); }
+  .day-event.is-done { opacity: 0.75; border: 1px dashed var(--border); background: var(--bg-surface-hover); border-left: 2px solid var(--border); }
   .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
   .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-style: dashed; background: transparent !important; }
   .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-color: var(--accent); opacity: 0.95; cursor: grabbing; }

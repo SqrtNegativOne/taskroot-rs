@@ -4,8 +4,7 @@
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import type { AppTask, AppTaskStatus } from '../../lib/domain';
-    import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
+    import { computeFilterDefaults, type AppTask } from '../../lib/domain';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { slide } from 'svelte/transition';
@@ -111,17 +110,14 @@
     });
 
     function handleAddTask() {
-        const safeDefaults: Partial<AppTask> = {};
-        for (const f of filters) {
-            if (f.operator === 'is' && f.value != null) {
-                const vals = Array.isArray(f.value) ? f.value : [f.value];
-                if (vals.length === 1) {
-                    if (f.column === 'status') safeDefaults.status = vals[0] as AppTaskStatus;
-                    if (f.column === 'priority') safeDefaults.priority = Number(vals[0]) as TaskPriority;
-                    if (f.column === 'tags') safeDefaults.tags = [{ id: crypto.randomUUID(), name: String(vals[0]) }];
-                }
-            }
-        }
+        const rawDefaults = computeFilterDefaults(filters);
+        const safeDefaults: Partial<AppTask> = {
+            status: rawDefaults.status,
+            priority: rawDefaults.priority,
+            tags: Array.isArray(rawDefaults.tags)
+                ? rawDefaults.tags.map((t) => ({ id: crypto.randomUUID(), name: String(t) }))
+                : undefined,
+        };
         onAddTask(safeDefaults);
     }
 </script>

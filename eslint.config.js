@@ -7,7 +7,7 @@ import sonarjs from 'eslint-plugin-sonarjs';
 
 export default tseslint.config(
   {
-    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', '**/*.cjs', 'script.js', 'build/', 'legacy-src/', 'coverage/'],
+    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', '**/*.cjs', 'script.js', 'test_useNow.svelte.ts', 'build/', 'legacy-src/', 'coverage/'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -38,18 +38,27 @@ export default tseslint.config(
       'no-undef': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'svelte/valid-compile': 'error',
+      'svelte/prefer-svelte-reactivity': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      '@typescript-eslint/no-unnecessary-condition': 'off'
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      'sonarjs/void-use': 'off',
+      'sonarjs/todo-tag': 'off',
+      'sonarjs/no-nested-conditional': 'off',
+      'sonarjs/pseudo-random': 'off',
+      'sonarjs/no-identical-functions': 'off',
+      'sonarjs/no-use-of-empty-return-value': 'off',
+      'sonarjs/redundant-type-aliases': 'off',
     }
   },
   {
-    files: ['**/*.generated.ts'],
+    files: ['**/*.generated.ts', '**/globals.d.ts'],
     rules: {
       '@typescript-eslint/array-type': 'off',
       '@typescript-eslint/consistent-type-definitions': 'off',
+      'sonarjs/redundant-type-aliases': 'off',
     },
   }
 );

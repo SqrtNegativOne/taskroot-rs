@@ -109,7 +109,7 @@
         padding: 6px 8px;
         border: 1px solid var(--bg-2);
         border-radius: 4px;
-        background: var(--bg-input);
+        background: var(--bg-surface);
         color: var(--fg);
         font-size: 0.9em;
     }

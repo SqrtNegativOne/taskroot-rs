@@ -113,7 +113,7 @@
   .day-cell-event.pri-bar-2 { border-left-color: #b59864; }
   .day-cell-event.pri-bar-3 { border-left-color: #c47e68; }
   .day-cell-event.pri-bar-4 { border-left-color: #c96b7f; }
-  .day-cell-event.is-done { color: white; text-decoration: line-through; opacity: 0.75; border-left-color: var(--border); background: var(--bg-hover); }
+  .day-cell-event.is-done { color: white; text-decoration: line-through; opacity: 0.75; border-left-color: var(--border); background: var(--bg-surface-hover); }
   .day-cell-event-time { color: white; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
   .day-cell-more {

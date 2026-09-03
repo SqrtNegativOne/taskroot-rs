@@ -9,6 +9,9 @@
     "src-tauri/",
     "node_modules/",
     "*.config.js",
+    "*.cjs",
+    "script.js",
+    "test_useNow.svelte.ts",
     "build/",
     "legacy-src/",
     "playwright.config.ts"

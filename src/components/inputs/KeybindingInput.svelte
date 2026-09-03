@@ -38,6 +38,6 @@
     {placeholder}
     onkeydown={handleKeyDown}
     class={className}
-    style={`background: var(--bg-input, transparent); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 6px 10px; cursor: text; box-sizing: border-box; width: 100%; ${style}`}
+    style={`background: var(--bg-surface); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 6px 10px; cursor: text; box-sizing: border-box; width: 100%; ${style}`}
     readonly
 />

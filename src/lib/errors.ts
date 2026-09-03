@@ -4,7 +4,6 @@ export const BACKEND_ERROR_CODES = [
     'auth',
     'sync',
     'invalid-input',
-    'not-ready',
     'internal',
 ] as const;
 

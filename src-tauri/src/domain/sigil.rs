@@ -1,6 +1,6 @@
+use crate::domain::TaskPriority;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use crate::domain::TaskPriority;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(
@@ -129,7 +129,7 @@ mod tests {
         let parsed3 = parse_sigils(input3);
         assert_eq!(parsed3.clean_title, "!notanumber # @");
         assert_eq!(parsed3.properties.duration, Some(120));
-        
+
         let input4 = "Too high !5";
         let parsed4 = parse_sigils(input4);
         assert_eq!(parsed4.clean_title, "Too high !5");
@@ -151,7 +151,7 @@ mod tests {
 
         #[test]
         fn priority_parsing_is_stable(
-            title in "[a-zA-Z]+", 
+            title in "[a-zA-Z]+",
             priority in 0i32..=4i32
         ) {
             let input = format!("{title} !{priority}");

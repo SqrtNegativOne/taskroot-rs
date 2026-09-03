@@ -1,8 +1,8 @@
 use crate::db;
 use crate::error::AppError;
 use crate::events;
-use color_eyre::eyre::{eyre, Result};
 use chrono::{Duration, Utc};
+use color_eyre::eyre::{eyre, Result};
 use oauth2::basic::BasicClient;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
@@ -11,7 +11,7 @@ use oauth2::{
 use sqlx::SqlitePool;
 use std::io::{Read, Write};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -52,11 +52,6 @@ macro_rules! get_client {
                     .map_err(|e| $err_mapper(e.to_string()))?,
             )
     }};
-}
-
-fn db_pool(app: &AppHandle) -> Result<tauri::State<'_, SqlitePool>, AppError> {
-    app.try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::NotReady("Database not initialized yet".to_string()))
 }
 
 /// # Errors
@@ -147,7 +142,7 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), AppError> {
         .await
         .map_err(|e| AppError::Auth(format!("Token exchange failed: {e}")))?;
 
-    let pool = db_pool(&app)?;
+    let pool = crate::db_pool(&app)?;
 
     let access_token = token_result.access_token().secret();
     db::set_setting(&pool, "google_access_token", access_token).await?;
@@ -157,8 +152,11 @@ pub async fn login_with_google(app: AppHandle) -> Result<(), AppError> {
     }
 
     if let Some(expires_in) = token_result.expires_in() {
-        let expires_at =
-            Utc::now().checked_add_signed(Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600))).unwrap_or_else(Utc::now);
+        let expires_at = Utc::now()
+            .checked_add_signed(
+                Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600)),
+            )
+            .unwrap_or_else(Utc::now);
         db::set_setting(&pool, "google_token_expires_at", &expires_at.to_rfc3339()).await?;
     }
 
@@ -173,7 +171,10 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_e
 
     let needs_refresh = expires_at_str.is_none_or(|exp_str| {
         chrono::DateTime::parse_from_rfc3339(&exp_str).map_or(true, |expires_at| {
-            Utc::now().checked_add_signed(Duration::minutes(5)).unwrap_or_else(Utc::now) > expires_at.with_timezone(&Utc)
+            Utc::now()
+                .checked_add_signed(Duration::minutes(5))
+                .unwrap_or_else(Utc::now)
+                > expires_at.with_timezone(&Utc)
         })
     });
 
@@ -198,8 +199,11 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_e
     db::set_setting(pool, "google_access_token", new_access_token).await?;
 
     if let Some(expires_in) = token_result.expires_in() {
-        let expires_at =
-            Utc::now().checked_add_signed(Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600))).unwrap_or_else(Utc::now);
+        let expires_at = Utc::now()
+            .checked_add_signed(
+                Duration::from_std(expires_in).unwrap_or_else(|_| Duration::seconds(3600)),
+            )
+            .unwrap_or_else(Utc::now);
         db::set_setting(pool, "google_token_expires_at", &expires_at.to_rfc3339()).await?;
     }
 
@@ -214,7 +218,7 @@ pub async fn get_valid_access_token(pool: &SqlitePool) -> Result<String, color_e
 /// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn is_logged_in(app: tauri::AppHandle) -> Result<bool, AppError> {
-    let pool = db_pool(&app)?;
+    let pool = crate::db_pool(&app)?;
     let access_token = db::get_setting(&pool, "google_access_token").await?;
     Ok(access_token.is_some())
 }
@@ -223,7 +227,7 @@ pub async fn is_logged_in(app: tauri::AppHandle) -> Result<bool, AppError> {
 /// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn reset_auth(app: tauri::AppHandle) -> Result<(), AppError> {
-    let pool = db_pool(&app)?;
+    let pool = crate::db_pool(&app)?;
     db::delete_setting(&pool, "google_access_token").await?;
     db::delete_setting(&pool, "google_refresh_token").await?;
     db::delete_setting(&pool, "google_token_expires_at").await?;

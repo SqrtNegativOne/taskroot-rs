@@ -33,7 +33,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `time.ts`: Local-date helpers (`ymd`, `addDays`, `dayDiff`, `sameDay`). Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
     - `routes.ts`: Centralized route-path constants.
-    - `domain.ts`: Barrel re-exporting the generated types from `src/lib/bindings/` (including `StopwatchState`, `SyncState`).
+    - `domain.ts`: Centralized domain barrel re-exporting generated bindings from `src/lib/bindings/` and domain models/events/filters (modularized in `src/lib/domain/models.ts`, `events.ts`, `filters.ts`).
   - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo nextest run` in `src-tauri`). Never hand-edit.
   - `src/screens/`: Major UI views. `plan/` (with `day-timeline/`, including `hooks/pointerGesture.svelte.ts` — a window-pointer gesture registry with `pointercancel` and teardown safety — and `date-grid/`) and `do/` (with `stopwatch/`, whose `engine.svelte.ts` consumes the generated `StopwatchState`).
   - `src/components/`: Reusable UI components. `ComingSoon.svelte` consolidates the seven stub route pages; `inspector-pane/` is split into `InspectorPane`, `InspectorTaskFields`/`InspectorEventFields`, and `format.ts`.
@@ -46,8 +46,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/domain/`: Core data structures (`mod.rs`, `sigil.rs` for sigil parsing, `filters.rs` for filter columns/types).
   - `src-tauri/src/sync/`: Global sync engine: `mod.rs` (5-minute poller, `SyncState`), `push.rs` (Google push logic), `types.rs`, and the offline queue (`queue.rs`, `queue_store.rs`).
   - `src-tauri/src/stopwatch.rs`: Stopwatch backend (`StopwatchState` struct plus `get/toggle/reset_stopwatch` commands).
-  - `src-tauri/src/settings.rs` + `build.rs` + `settings.yaml`: Build-time settings pipeline. `build.rs` parses `settings.yaml` and generates an `AppSettings` struct (template embeds `#[derive(TS)]`) into `OUT_DIR`, which `settings.rs` `include!`s; `ts-rs` also emits `src/lib/bindings/AppSettings.generated.ts`.
-
+  - `src-tauri/src/settings.rs`: Settings backend (`AppSettings` struct with `#[derive(TS)]` and schema definition emitting `src/lib/bindings/AppSettings.generated.ts`).
 
 ### Key Concepts
 - **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `db`, `not-found`, `auth`, `sync`, `invalid-input`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.
@@ -67,3 +66,4 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
 - **Store Assets Offline**: Store assets offline.
 - Tautological tests are considered harmful.
+- Please use early returns. This will make code nicer for you too.

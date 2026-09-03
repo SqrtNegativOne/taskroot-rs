@@ -12,8 +12,7 @@ pub enum AppError {
     Sync(String),
     #[error("{0}")]
     InvalidInput(String),
-    #[error("{0}")]
-    NotReady(String),
+
     #[error("{0}")]
     Internal(String),
 }
@@ -27,7 +26,7 @@ impl AppError {
             Self::Auth(_) => "auth",
             Self::Sync(_) => "sync",
             Self::InvalidInput(_) => "invalid-input",
-            Self::NotReady(_) => "not-ready",
+
             Self::Internal(_) => "internal",
         }
     }
@@ -69,8 +68,11 @@ mod tests {
         assert_eq!(AppError::Auth("x".into()).code(), "auth");
         assert_eq!(AppError::Sync("x".into()).code(), "sync");
         assert_eq!(AppError::InvalidInput("x".into()).code(), "invalid-input");
-        assert_eq!(AppError::NotReady("x".into()).code(), "not-ready");
-        assert_eq!(AppError::from(color_eyre::eyre::eyre!("boom")).code(), "internal");
+
+        assert_eq!(
+            AppError::from(color_eyre::eyre::eyre!("boom")).code(),
+            "internal"
+        );
     }
 
     #[test]

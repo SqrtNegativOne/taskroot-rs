@@ -18,5 +18,5 @@
     {value}
     onchange={handleChange}
     class={className}
-    style={`background: var(--bg-input); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; ${style}`}
+    style={`background: var(--bg-surface); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; ${style}`}
 />

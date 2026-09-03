@@ -3,8 +3,6 @@ use crate::domain;
 use crate::error::AppError;
 use crate::sync;
 
-
-
 /// # Errors
 ///
 /// Returns an error if the database is unavailable or the write fails.
@@ -52,7 +50,9 @@ pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppEr
 ///
 /// Returns an error if the database is unavailable.
 #[tauri::command]
-pub async fn get_active_calendars(app: tauri::AppHandle) -> Result<Vec<domain::AppCalendar>, AppError> {
+pub async fn get_active_calendars(
+    app: tauri::AppHandle,
+) -> Result<Vec<domain::AppCalendar>, AppError> {
     let pool = crate::db_pool(&app)?;
     Ok(db::get_calendars(&pool).await?)
 }

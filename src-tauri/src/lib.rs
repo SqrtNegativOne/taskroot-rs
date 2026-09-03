@@ -6,7 +6,8 @@
 #![allow(clippy::exit, clippy::panic)]
 
 use sqlx::SqlitePool;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub mod apis;
 pub mod auth;
@@ -23,9 +24,21 @@ pub mod time_utils;
 
 use error::AppError;
 
+pub const LAUNCHER_SHORTCUT: &str = "CommandOrControl+Shift+Space";
+
+pub fn toggle_launcher(app: &tauri::AppHandle) {
+    commands::window::toggle_launcher_window(app);
+}
+
+#[must_use]
+pub fn extract_deep_link_route(arg: &str) -> Option<&str> {
+    let route = arg.strip_prefix("taskroot://")?;
+    Some(route.trim_end_matches('/'))
+}
+
 pub(crate) fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, SqlitePool>, AppError> {
     app.try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::NotReady("Database not initialized yet".to_string()))
+        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,14 +49,30 @@ pub(crate) fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, SqliteP
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        toggle_launcher(app);
+                    }
+                })
+                .build(),
+        )
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
+                let _ = window.show();
+                let _ = window.unminimize();
                 let _ = window.set_focus();
+            }
+            for arg in &args {
+                if let Some(route) = extract_deep_link_route(arg) {
+                    let _ = app.emit(events::DEEP_LINK, route);
+                }
             }
         }))
         .setup(|app| {
             dotenvy::dotenv().ok();
+            let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
             app.manage(auth::AuthState::default());
             app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
                 stopwatch::StopwatchState::default(),
@@ -69,7 +98,9 @@ pub fn run() {
             let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
-                        if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
+                        if let Some(main_win) =
+                            app.get_webview_window(domain::WindowLabel::Main.as_str())
+                        {
                             let _ = main_win.show();
                             let _ = main_win.unminimize();
                             let _ = main_win.set_focus();
@@ -88,7 +119,9 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
+                        if let Some(main_win) =
+                            app.get_webview_window(domain::WindowLabel::Main.as_str())
+                        {
                             let _ = main_win.show();
                             let _ = main_win.unminimize();
                             let _ = main_win.set_focus();
@@ -97,7 +130,16 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            spawn_db_init(handle);
+            let app_data_dir = handle.path().app_data_dir()?;
+            std::fs::create_dir_all(&app_data_dir)?;
+
+            let db_path = app_data_dir.join("taskroot.db");
+            let db_url = format!("sqlite:{}", db_path.to_str().ok_or("Invalid db path")?);
+
+            let pool = tauri::async_runtime::block_on(async { db::init_db(&db_url).await })?;
+            handle.manage(pool.clone());
+            sync::start_sync_engine(handle, pool);
+
             Ok(())
         })
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -131,6 +173,7 @@ pub fn run() {
             commands::window::window_restore_main,
             commands::window::show_minitracker,
             commands::window::hide_launcher,
+            commands::window::toggle_launcher,
             commands::window::resize_launcher,
             auth::login_with_google,
             auth::is_logged_in,
@@ -148,27 +191,21 @@ pub fn run() {
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));
 }
 
-fn spawn_db_init(handle: tauri::AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        let Ok(app_data_dir) = handle.path().app_data_dir() else {
-            return;
-        };
-        if std::fs::create_dir_all(&app_data_dir).is_err() {
-            eprintln!("Failed to create app data directory");
-            return;
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        let db_path = app_data_dir.join("taskroot.db");
-        let Some(db_url) = db_path.to_str().map(|p| format!("sqlite:{p}")) else {
-            return;
-        };
-
-        match db::init_db(&db_url).await {
-            Ok(pool) => {
-                handle.manage(pool.clone());
-                sync::start_sync_engine(handle, pool);
-            }
-            Err(e) => eprintln!("Failed to initialize DB: {e}"),
-        }
-    });
+    #[test]
+    fn test_extract_deep_link_route() {
+        assert_eq!(extract_deep_link_route("taskroot://day"), Some("day"));
+        assert_eq!(extract_deep_link_route("taskroot://day/"), Some("day"));
+        assert_eq!(
+            extract_deep_link_route("taskroot://settings"),
+            Some("settings")
+        );
+        assert_eq!(extract_deep_link_route("taskroot://"), Some(""));
+        assert_eq!(extract_deep_link_route("taskroot:///"), Some(""));
+        assert_eq!(extract_deep_link_route("https://example.com"), None);
+        assert_eq!(extract_deep_link_route("--other-arg"), None);
+    }
 }

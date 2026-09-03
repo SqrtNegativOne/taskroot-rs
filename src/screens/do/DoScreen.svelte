@@ -90,7 +90,7 @@
         flex-direction: column;
         overflow-y: auto;
         height: 100%;
-        color: var(--text-primary, #fff);
+        color: var(--fg);
     }
 
     .do-sections {
@@ -105,26 +105,26 @@
 
     .badge-count {
         font-size: 12px;
-        color: var(--text-muted, #888);
-        background: var(--bg-tertiary, #222);
+        color: var(--fg-dim);
+        background: var(--bg-surface);
         padding: 2px 8px;
         border-radius: 12px;
     }
 
     .sw-btn {
-        background: var(--bg-tertiary, #222);
-        color: var(--text-primary, #fff);
-        border: 1px solid var(--border-color, #333);
+        background: var(--bg-surface);
+        color: var(--fg);
+        border: 1px solid var(--border);
         border-radius: 4px;
         cursor: pointer;
     }
 
     .sw-btn:hover {
-        background: var(--bg-hover, #333);
+        background: var(--bg-surface-hover);
     }
 
     .stub-content {
-        color: var(--text-muted, #888);
+        color: var(--fg-dim);
         font-style: italic;
     }
 </style>

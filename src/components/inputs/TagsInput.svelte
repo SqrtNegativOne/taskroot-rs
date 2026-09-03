@@ -29,7 +29,7 @@
     }
 </script>
 
-<div class={className} style={`display: flex; flex-wrap: wrap; gap: 4px; background: var(--bg-input, transparent); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 4px; min-height: 32px; box-sizing: border-box; width: 100%; ${style}`}>
+<div class={className} style={`display: flex; flex-wrap: wrap; gap: 4px; background: var(--bg-surface); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 4px; min-height: 32px; box-sizing: border-box; width: 100%; ${style}`}>
     {#each tags as tag (tag)}
         <span style="background: var(--accent, #007bff); color: var(--bg, #fff); padding: 2px 8px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 4px; user-select: none;">
             {tag}

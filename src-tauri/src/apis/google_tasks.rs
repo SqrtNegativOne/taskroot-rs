@@ -41,9 +41,10 @@ pub async fn sync(pool: &SqlitePool, access_token: &str) -> Result<()> {
             let app_task_id = format!("google_{}", task.id);
             let is_deleted = task.deleted.unwrap_or(false);
 
-            let remote_updated_at = task.updated.clone().unwrap_or_else(
-                || chrono::Utc::now().to_rfc3339()
-            );
+            let remote_updated_at = task
+                .updated
+                .clone()
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
             if let Ok(Some(local_task)) = crate::db::get_task(pool, &app_task_id).await {
                 if let Some(local_updated) = &local_task.updated_at {
@@ -139,7 +140,9 @@ pub async fn publish(task: &crate::domain::AppTask, access_token: &str) -> Resul
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(color_eyre::eyre::eyre!("Failed to publish Google Task: {err}"));
+        return Err(color_eyre::eyre::eyre!(
+            "Failed to publish Google Task: {err}"
+        ));
     }
 
     let created: GoogleTask = response.json().await?;
@@ -160,8 +163,9 @@ pub async fn delete(remote_id: &str, access_token: &str) -> Result<()> {
 
     if !response.status().is_success() {
         let err = response.text().await?;
-        return Err(color_eyre::eyre::eyre!("Failed to delete Google Task: {err}"));
+        return Err(color_eyre::eyre::eyre!(
+            "Failed to delete Google Task: {err}"
+        ));
     }
     Ok(())
 }
-

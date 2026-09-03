@@ -1,4 +1,3 @@
-
 use crate::domain::{AppEvent, AppTask};
 use crate::sync::queue::SyncQueue;
 use crate::sync::types::{SyncAction, SyncItemData, SyncQueueItem, SyncType};
@@ -89,7 +88,14 @@ impl GoogleSyncEntity for AppEvent {
     }
 
     async fn delete_remote(&self, remote_id: &str, access_token: &str) -> color_eyre::Result<()> {
-        crate::apis::google_calendar::delete(remote_id, self.remote_collection_id.as_deref().map(std::string::String::as_str), access_token).await
+        crate::apis::google_calendar::delete(
+            remote_id,
+            self.remote_collection_id
+                .as_deref()
+                .map(std::string::String::as_str),
+            access_token,
+        )
+        .await
     }
 }
 

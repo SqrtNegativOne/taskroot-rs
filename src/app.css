@@ -1,24 +1,8 @@
 @import 'material-symbols/outlined.css';
 
 :root {
-    color-scheme: dark;
-
-    --bg-primary:        var(--bg);
-    --bg-secondary:      var(--bg-highlight);
-    --bg-tertiary:       var(--bg-surface);
-    --bg-hover:          var(--bg-surface-hover);
-    --bg-active:         oklch(26.87% 0.0189 76.15);
-    --bg-input:          var(--bg-surface);
-    --bg-button:         var(--bg-surface);
-    --bg-button-hover:   var(--bg-surface-hover);
-    --fg-primary:        var(--fg);
-    --fg-secondary:      var(--fg-muted);
-    --text-primary:      var(--fg);
-    --text-secondary:    var(--fg-muted);
-    --text-muted:        var(--fg-dim);
-    --border-color:      var(--border);
-    --color-danger:      var(--tag-red);
-    --danger:            var(--tag-red);
+    color-scheme: dark;
+    --bg-active:         oklch(26.87% 0.0189 76.15);
     --circle-border:     var(--border);
     --circle-fill:       transparent;
 

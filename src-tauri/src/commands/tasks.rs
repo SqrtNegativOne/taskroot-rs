@@ -9,8 +9,6 @@ pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
     domain::parse_sigils(&task_name)
 }
 
-
-
 /// # Errors
 ///
 /// Returns an error if the database is unavailable or the write fails.
@@ -59,13 +57,12 @@ pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>,
         JOIN events e ON e.task_id = t.id 
         WHERE t.status NOT IN ('done', 'cancelled')
         AND e.end_time < ?
-        "
+        ",
     )
     .bind(now_iso)
     .fetch_all(&*pool)
     .await
     .map_err(|e| AppError::Internal(format!("Database error: {e}")))?;
-    
+
     Ok(ids)
 }
-

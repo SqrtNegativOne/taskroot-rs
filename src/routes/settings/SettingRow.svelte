@@ -96,7 +96,7 @@
     }
 
     .setting-item.danger label {
-        color: var(--color-danger);
+        color: var(--tag-red);
     }
 
     .setting-info {
@@ -126,10 +126,10 @@
     :global(input[type='number']),
     select {
         padding: 6px 10px;
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--border);
         border-radius: 4px;
-        background-color: var(--bg-input);
-        color: var(--fg-primary);
+        background-color: var(--bg-surface);
+        color: var(--fg);
         font-size: 14px;
         width: 100%;
         max-width: 200px;
@@ -142,14 +142,14 @@
 
     button {
         padding: 6px 12px;
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--border);
         border-radius: 4px;
-        background-color: var(--bg-button);
+        background-color: var(--bg-surface);
         cursor: pointer;
         font-size: 14px;
     }
 
     button:hover {
-        background-color: var(--bg-button-hover);
+        background-color: var(--bg-surface-hover);
     }
 </style>

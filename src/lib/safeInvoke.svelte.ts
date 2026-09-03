@@ -61,8 +61,8 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
     $effect(() => {
         let isCleanedUp = false;
         
-        import('@tauri-apps/api/event').then(({ listen }) => {
-            listen('store-updated', () => {
+        void import('@tauri-apps/api/event').then(({ listen }) => {
+            void listen('store-updated', () => {
                 if (isCleanedUp) return;
                 const argsToUse = lastArgs ?? options.args;
                 if (argsToUse !== undefined || latestRequestId > 0) {

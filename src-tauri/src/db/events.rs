@@ -26,7 +26,10 @@ pub async fn get_event(pool: &SqlitePool, id: &str) -> Result<Option<AppEvent>, 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub async fn get_event_by_remote_id(pool: &SqlitePool, remote_id: &str) -> Result<Option<AppEvent>, sqlx::Error> {
+pub async fn get_event_by_remote_id(
+    pool: &SqlitePool,
+    remote_id: &str,
+) -> Result<Option<AppEvent>, sqlx::Error> {
     let event = sqlx::query_as::<_, AppEvent>(event_select_sql!(" WHERE remote_id = ?"))
         .bind(remote_id)
         .fetch_optional(pool)
@@ -192,7 +195,10 @@ fn apply_sql(
         return;
     };
 
-    let is_not = matches!(op, crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain);
+    let is_not = matches!(
+        op,
+        crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain
+    );
     let values = val
         .as_array()
         .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
@@ -228,7 +234,10 @@ pub async fn query_events(
 
     for f in &filters {
         if let (Some(col_id), Some(val)) = (&f.column, &f.value) {
-            let op = f.operator.as_ref().unwrap_or(&crate::domain::FilterOperator::Is);
+            let op = f
+                .operator
+                .as_ref()
+                .unwrap_or(&crate::domain::FilterOperator::Is);
             apply_sql(&mut query_builder, col_id, op, val, &schema);
         }
     }
@@ -252,7 +261,10 @@ pub async fn query_events(
 
 /// # Errors
 /// Returns an error if the operation fails.
-pub async fn upsert_calendar(pool: &SqlitePool, calendar: crate::domain::AppCalendar) -> Result<(), sqlx::Error> {
+pub async fn upsert_calendar(
+    pool: &SqlitePool,
+    calendar: crate::domain::AppCalendar,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO calendars (id, summary, color, is_primary) VALUES (?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
@@ -281,9 +293,11 @@ pub async fn delete_calendar(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Er
 
 /// # Errors
 /// Returns an error if the operation fails.
-pub async fn get_calendars(pool: &SqlitePool) -> Result<Vec<crate::domain::AppCalendar>, sqlx::Error> {
+pub async fn get_calendars(
+    pool: &SqlitePool,
+) -> Result<Vec<crate::domain::AppCalendar>, sqlx::Error> {
     let calendars = sqlx::query_as::<_, crate::domain::AppCalendar>(
-        "SELECT id, summary, color, is_primary FROM calendars"
+        "SELECT id, summary, color, is_primary FROM calendars",
     )
     .fetch_all(pool)
     .await?;

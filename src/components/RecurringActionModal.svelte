@@ -30,7 +30,7 @@
 
 {#if isOpen}
     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 99999;">
-        <div style="background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg-primary, #fff);">
+        <div style="background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg);">
             <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">{actionText} recurring event</h3>
             
             <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
@@ -51,7 +51,7 @@
             <div style="display: flex; justify-content: flex-end; gap: 12px;">
                 <button 
                     onclick={onCancel}
-                    style="background: transparent; border: none; color: var(--fg-secondary, #aaa); cursor: pointer; padding: 6px 12px; font-size: 14px;"
+                    style="background: transparent; border: none; color: var(--fg-muted); cursor: pointer; padding: 6px 12px; font-size: 14px;"
                 >
                     Cancel
                 </button>

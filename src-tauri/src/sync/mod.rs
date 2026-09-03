@@ -5,8 +5,8 @@ pub mod types;
 
 use crate::auth;
 use crate::error::AppError;
-use color_eyre::Result;
 use chrono::{DateTime, Utc};
+use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::{Arc, Mutex};
@@ -32,7 +32,7 @@ pub(crate) const SYNC_INTERVAL_SECS: i64 = 5 * 60;
 pub fn get_sync_state(app: tauri::AppHandle) -> Result<SyncState, AppError> {
     let state = app
         .try_state::<SyncStateManager>()
-        .ok_or_else(|| AppError::NotReady("Sync state not initialized yet".to_string()))?;
+        .ok_or_else(|| AppError::Internal("Sync state not initialized yet".to_string()))?;
     Ok(state
         .0
         .lock()
@@ -56,12 +56,16 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
     let pool_clone = pool.clone();
 
     tauri::async_runtime::spawn(async move {
-        let mut interval = interval(Duration::from_secs(u64::try_from(SYNC_INTERVAL_SECS).unwrap_or(300)));
+        let mut interval = interval(Duration::from_secs(
+            u64::try_from(SYNC_INTERVAL_SECS).unwrap_or(300),
+        ));
 
         loop {
             interval.tick().await;
 
-            let next_sync = Utc::now().checked_add_signed(chrono::Duration::seconds(SYNC_INTERVAL_SECS)).unwrap_or_else(Utc::now);
+            let next_sync = Utc::now()
+                .checked_add_signed(chrono::Duration::seconds(SYNC_INTERVAL_SECS))
+                .unwrap_or_else(Utc::now);
 
             if let Err(e) = run_tracked_sync(&app_clone, &pool_clone, Some(next_sync)).await {
                 eprintln!("Sync Engine Error: {e}");
@@ -163,9 +167,13 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
             crate::sync::types::SyncItemData::Event(mut event) => {
                 if item.action == crate::sync::types::SyncAction::Delete {
                     if let Some(remote_id) = &event.remote_id {
-                        if crate::apis::google_calendar::delete(remote_id, event.remote_collection_id.as_deref().map(String::as_str), &access_token)
-                            .await
-                            .is_err()
+                        if crate::apis::google_calendar::delete(
+                            remote_id,
+                            event.remote_collection_id.as_deref().map(String::as_str),
+                            &access_token,
+                        )
+                        .await
+                        .is_err()
                         {
                             success = false;
                         }
@@ -205,4 +213,3 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
 
     Ok(())
 }
-

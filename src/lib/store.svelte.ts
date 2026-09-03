@@ -1,22 +1,11 @@
 import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
-import { describeAppError, normalizeAppError, unknownAppError } from './errors';
+import { describeAppError, normalizeAppError } from './errors';
 import type { AppTask, AppEvent } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
 
-const MAX_INIT_ATTEMPTS = 50;
-const INIT_RETRY_DELAY_MS = 100;
-
 export function describeError(error: unknown): string {
     return describeAppError(error);
-}
-
-function isBackendNotReady(error: AppError): boolean {
-    return error.code === 'not-ready';
-}
-
-function delay(ms: number): Promise<void> {
-    return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 export class AppStore {
@@ -32,16 +21,11 @@ export class AppStore {
     }
 
     private async bootstrap(): Promise<Result<void, AppError>> {
-        for (let attempt = 0; attempt < MAX_INIT_ATTEMPTS; attempt++) {
-            const result = await this.refresh();
-            if (result.isOk()) {
-                this.loaded = true;
-                return ok(undefined);
-            }
-            if (!isBackendNotReady(result.error)) return result;
-            await delay(INIT_RETRY_DELAY_MS);
+        const result = await this.refresh();
+        if (result.isOk()) {
+            this.loaded = true;
         }
-        return err(unknownAppError('Database failed to initialize in time.'));
+        return result;
     }
 
     async refresh(): Promise<Result<void, AppError>> {

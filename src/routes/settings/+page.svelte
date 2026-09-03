@@ -102,25 +102,25 @@
     .settings-container {
         display: flex;
         height: 100%;
-        background-color: var(--bg-primary);
-        color: var(--fg-primary);
+        background-color: var(--bg);
+        color: var(--fg);
         overflow: hidden;
     }
 
     .save-error {
         margin-bottom: 20px;
         padding: 10px 14px;
-        border: 1px solid var(--color-danger);
+        border: 1px solid var(--tag-red);
         border-radius: 4px;
-        color: var(--color-danger);
+        color: var(--tag-red);
         font-size: 13px;
     }
 
     .sidebar {
         width: 200px;
-        border-right: 1px solid var(--border-color);
+        border-right: 1px solid var(--border);
         padding: 20px 0;
-        background-color: var(--bg-secondary);
+        background-color: var(--bg-highlight);
     }
 
     nav {
@@ -136,18 +136,18 @@
         border: none;
         cursor: pointer;
         font-size: 14px;
-        color: var(--fg-secondary);
+        color: var(--fg-muted);
         border-radius: 0;
     }
 
     nav button:hover {
-        background-color: var(--bg-hover);
+        background-color: var(--bg-surface-hover);
     }
 
     nav button.active {
         background-color: var(--bg-active);
         font-weight: bold;
-        color: var(--fg-primary);
+        color: var(--fg);
     }
 
     .content {
@@ -172,7 +172,7 @@
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-bottom: 15px;
-        border-bottom: 1px solid var(--border-color);
+        border-bottom: 1px solid var(--border);
         padding-bottom: 5px;
     }
 

@@ -107,7 +107,7 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             summary TEXT NOT NULL,
             color TEXT,
             is_primary BOOLEAN DEFAULT 0
-        );"
+        );",
     )
     .execute(&pool)
     .await?;
@@ -134,8 +134,6 @@ mod tests {
 
         assert_eq!(row.0, 0);
     }
-
-
 
     #[tokio::test]
     async fn test_schema_creates_all_tables() {
@@ -242,7 +240,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_crud_roundtrip() {
         use crate::domain::EventStatus;
-        
+
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
         let event = AppEvent {
             id: "event-1".into(),

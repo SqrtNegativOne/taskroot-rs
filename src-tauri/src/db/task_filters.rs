@@ -17,7 +17,10 @@ pub async fn query_tasks(
 
     for f in &filters {
         if let (Some(col_id), Some(val)) = (&f.column, &f.value) {
-            let op = f.operator.as_ref().unwrap_or(&crate::domain::FilterOperator::Is);
+            let op = f
+                .operator
+                .as_ref()
+                .unwrap_or(&crate::domain::FilterOperator::Is);
             apply_sql(&mut query_builder, col_id, op, val, &schema);
         }
     }
@@ -43,7 +46,10 @@ fn apply_sql(
         return;
     };
 
-    let is_not = matches!(op, crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain);
+    let is_not = matches!(
+        op,
+        crate::domain::FilterOperator::IsNot | crate::domain::FilterOperator::DoesNotContain
+    );
     let values = val
         .as_array()
         .map_or_else(|| vec![val.clone()], std::clone::Clone::clone);
@@ -103,7 +109,11 @@ fn push_search_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, quer
     }
 }
 
-fn push_sort_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, sorts: &[AppTaskSort], schema: &[crate::domain::AppTaskColumnDef]) {
+fn push_sort_clause(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    sorts: &[AppTaskSort],
+    schema: &[crate::domain::AppTaskColumnDef],
+) {
     query_builder.push(" ORDER BY ");
     let mut pushed = false;
     for sort in sorts {
@@ -113,7 +123,10 @@ fn push_sort_clause(query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>, sorts:
                     query_builder.push(", ");
                 }
                 query_builder.push(&def.db_col);
-                let dir = sort.direction.as_ref().unwrap_or(&crate::domain::SortDirection::Asc);
+                let dir = sort
+                    .direction
+                    .as_ref()
+                    .unwrap_or(&crate::domain::SortDirection::Asc);
                 if matches!(dir, crate::domain::SortDirection::Desc) {
                     query_builder.push(" DESC");
                 } else {

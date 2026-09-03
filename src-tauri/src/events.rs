@@ -4,3 +4,4 @@ pub const SYNC_FINISHED: &str = "sync-finished";
 pub const SYNC_ERROR: &str = "sync-error";
 pub const OAUTH_URL: &str = "oauth-url";
 pub const LAUNCHER_DATA_UPDATE: &str = "launcher-data-update";
+pub const DEEP_LINK: &str = "deep-link";
