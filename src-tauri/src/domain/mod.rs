@@ -36,10 +36,12 @@ macro_rules! impl_ts_string_newtype {
         #[test]
         fn export_bindings_newtypes() {
             let config = ts_rs::Config::default();
+            let bindings_dir =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/lib/bindings");
             $(
                 let decl = <$name as ts_rs::TS>::decl(&config);
-                let path = format!("../../src/lib/bindings/{}.generated.ts", stringify!($name));
-                std::fs::write(&path, format!("{decl}\n")).unwrap();
+                let path = bindings_dir.join(format!("{}.generated.ts", stringify!($name)));
+                std::fs::write(path, format!("{decl}\n")).unwrap();
             )+
         }
     };
