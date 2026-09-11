@@ -14,6 +14,8 @@ export type { AppTaskStatus } from './bindings/AppTaskStatus.generated';
 export type { ChecklistItem } from './bindings/ChecklistItem.generated';
 export type { Color } from './bindings/Color.generated';
 export type { EventStatus } from './bindings/EventStatus.generated';
+export type { EventInstance } from './bindings/EventInstance.generated';
+export type { EventTiming } from './bindings/EventTiming.generated';
 export type { FilterOperator } from './bindings/FilterOperator.generated';
 export type { FilterType } from './bindings/FilterType.generated';
 export type { LaidEvent } from './bindings/LaidEvent.generated';
@@ -32,4 +34,5 @@ export type * from './bindings/CollectionId.generated';
 
 export * from './domain/models';
 export * from './domain/events';
+export * from './domain/timing';
 export * from './domain/filters';

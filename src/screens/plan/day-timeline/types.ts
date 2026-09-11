@@ -1,7 +1,7 @@
-import type { AppEvent } from '../../../lib/domain';
+import type { EventInstance } from '../../../lib/domain';
 
 export interface LaidEvent {
-    event: AppEvent;
+    event: EventInstance;
     startMins: number;
     endMins: number;
     lane: number;

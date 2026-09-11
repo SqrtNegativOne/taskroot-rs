@@ -1,7 +1,7 @@
-import type { AppEvent } from '../../../lib/domain';
+import type { EventInstance } from '../../../lib/domain';
 
 export interface DayLayoutEvent {
-    event: AppEvent;
+    event: EventInstance;
     startMins: number;
     endMins: number;
 }
@@ -9,7 +9,7 @@ export interface DayLayoutEvent {
 // Simple overlap layout: assign each event to the earliest lane that's free.
 export function layoutEvents(events: DayLayoutEvent[]) {
     const placed: { start: number; end: number; lane: number }[] = [];
-    const result: { event: AppEvent; startMins: number; endMins: number; lane: number; lanes?: number }[] = [];
+    const result: { event: EventInstance; startMins: number; endMins: number; lane: number; lanes?: number }[] = [];
     
     for (const ev of events) {
         let lane = 0;

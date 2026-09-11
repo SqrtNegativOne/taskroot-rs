@@ -4,4 +4,8 @@ import type { ChecklistItem } from "./ChecklistItem.generated";
 import type { Tag } from "./Tag.generated";
 import type { TaskPriority } from "./TaskPriority.generated";
 
-export type AppTask = { id: TaskId, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, checklist?: Array<ChecklistItem>, parentTask?: TaskId, dependencies?: Array<TaskId>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: RemoteId, notes?: string, tabs?: string, due?: string, updatedAt?: string, etag?: string, dirty?: boolean, };
+export type AppTask = { id: TaskId, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, checklist?: Array<ChecklistItem>, parentTask?: TaskId, dependencies?: Array<TaskId>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: RemoteId, notes?: string, tabs?: string, due?: string, updatedAt?: string, etag?: string, dirty?: boolean, 
+/**
+ * Google Tasks list this row belongs to (`@default` for legacy rows).
+ */
+taskListId?: string, };

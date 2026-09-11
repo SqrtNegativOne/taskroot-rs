@@ -3,8 +3,9 @@
     import { onMount } from 'svelte';
     import type { DragState } from './types';
     import { PX_PER_MIN } from './constants';
-    import type { AppEvent, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
+    import { bucketEventsByDay } from './bucketing';
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
@@ -19,27 +20,16 @@
     }: {
         dragState?: DragState;
         setDragState?: (ds: DragState | undefined) => void;
-        onEventClick?: (ev: AppEvent) => void;
+        onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
     } = $props();
 
     function onResizeEvent(id: string, startTime: string, endTime: string) {
-        // Find the event inside planLayout
-        let ev: AppEvent | undefined;
-        for (const dayEvents of Object.values(planLayout)) {
-            const found = dayEvents.find(e => e.event.id === id);
-            if (found) { ev = found.event; break; }
-        }
-        if (ev) void store.updateEvent({ ...ev, startTime, endTime });
+        void store.rescheduleEvent(id, startTime, endTime);
     }
 
     function onMoveEvent(id: string, startTime: string, endTime: string) {
-        let ev: AppEvent | undefined;
-        for (const dayEvents of Object.values(planLayout)) {
-            const found = dayEvents.find(e => e.event.id === id);
-            if (found) { ev = found.event; break; }
-        }
-        if (ev) void store.updateEvent({ ...ev, startTime, endTime });
+        void store.rescheduleEvent(id, startTime, endTime);
     }
 
     let eventFilters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
@@ -54,14 +44,14 @@
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
-    import { layoutEvents, type DayLayoutEvent } from './layout';
+    import { layoutEvents } from './layout';
 
     let dateRange = $derived.by(() => {
         if (dates.length === 0) return { start: '', end: '' };
         return { start: ymd(dates[0]), end: ymd(dates[dates.length - 1]) };
     });
 
-    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({
+    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () => ({
         filters: eventFilters,
         query: eventQuery,
         startDate: dateRange.start,
@@ -77,28 +67,8 @@
         for (const date of dates) {
             layoutMap[ymd(date)] = [];
         }
-        
-        const events = eventsQuery.data ?? [];
-        const bucketed: Record<string, DayLayoutEvent[]> = {};
-        
-        for (const ev of events) {
-            const startStr = ev.startTime;
-            const endStr = ev.endTime;
-            // Simple string prefix matching for days
-            for (const date of dates) {
-                const dateStr = ymd(date);
-                if (startStr.startsWith(dateStr) || endStr.startsWith(dateStr) || (startStr < dateStr && endStr > dateStr)) {
-                    // Extract HH:MM
-                    const s = new Date(startStr);
-                    const e = new Date(endStr);
-                    const startMins = s.getHours() * 60 + s.getMinutes();
-                    const endMins = e.getHours() * 60 + e.getMinutes();
-                    
-                    if (!bucketed[dateStr]) bucketed[dateStr] = [];
-                    bucketed[dateStr].push({ event: ev, startMins, endMins });
-                }
-            }
-        }
+
+        const bucketed = bucketEventsByDay(eventsQuery.data ?? [], dates);
 
         for (const [dateStr, bucketEvents] of Object.entries(bucketed)) {
             layoutMap[dateStr] = layoutEvents(bucketEvents);
@@ -122,8 +92,8 @@
     {#snippet filterMenu()}
         <FilterButton
             bind:filters={eventFilters}
-            columns={[{ id: 'calendar', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars.map((c) => c.id) : []}
+            columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
+            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? activeCalendars.map((c) => ({ label: c.summary || c.id, value: c.id })) : []}
             align="right"
         />
     {/snippet}

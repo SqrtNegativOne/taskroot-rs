@@ -20,6 +20,26 @@ pub trait FilterColumnExt {
     );
 }
 
+/// Add a column to a pre-existing table when it is missing.
+///
+/// Table/column names are literals so the SQL stays `'static` (sqlx 0.9
+/// rejects dynamically built query strings).
+macro_rules! ensure_column {
+    ($pool:expr, $table:literal, $column:literal, $alter:literal) => {{
+        let existing: Vec<(String,)> =
+            sqlx::query_as::<_, (String,)>(concat!(
+                "SELECT name FROM pragma_table_info('",
+                $table,
+                "')"
+            ))
+            .fetch_all(&$pool)
+            .await?;
+        if !existing.iter().any(|(name,)| name == $column) {
+            sqlx::query($alter).execute(&$pool).await?;
+        }
+    }};
+}
+
 /// # Errors
 ///
 /// Returns an error if connecting or running schema creation fails.
@@ -51,7 +71,8 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             due TEXT,
             updated_at TEXT,
             etag TEXT,
-            dirty BOOLEAN DEFAULT 0
+            dirty BOOLEAN DEFAULT 0,
+            task_list_id TEXT
         );
 
         CREATE TABLE IF NOT EXISTS events (
@@ -72,7 +93,8 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             color TEXT,
             etag TEXT,
             dirty BOOLEAN DEFAULT 0,
-            is_all_day BOOLEAN DEFAULT 0
+            is_all_day BOOLEAN DEFAULT 0,
+            timezone TEXT
         );
 
         CREATE TABLE IF NOT EXISTS settings (
@@ -106,11 +128,18 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             id TEXT PRIMARY KEY,
             summary TEXT NOT NULL,
             color TEXT,
-            is_primary BOOLEAN DEFAULT 0
+            is_primary BOOLEAN DEFAULT 0,
+            sync_token TEXT
         );",
     )
     .execute(&pool)
     .await?;
+
+    // Additive migration for databases created before these columns existed.
+    // `CREATE TABLE IF NOT EXISTS` never alters an existing table.
+    ensure_column!(pool, "events", "timezone", "ALTER TABLE events ADD COLUMN timezone TEXT");
+    ensure_column!(pool, "calendars", "sync_token", "ALTER TABLE calendars ADD COLUMN sync_token TEXT");
+    ensure_column!(pool, "tasks", "task_list_id", "ALTER TABLE tasks ADD COLUMN task_list_id TEXT");
 
     Ok(pool)
 }
@@ -186,6 +215,7 @@ mod tests {
             updated_at: Some("2026-08-26T12:00:00Z".into()),
             etag: Some("etag-1".into()),
             dirty: Some(true),
+            task_list_id: None,
         };
 
         create_task(&pool, task.clone())
@@ -261,6 +291,7 @@ mod tests {
             etag: None,
             dirty: Some(true),
             is_all_day: Some(false),
+            timezone: None,
         };
 
         create_event(&pool, event.clone())

@@ -3,7 +3,8 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { AppEvent, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import { instanceOccursOnDay } from '../../../lib/domain';
     import { SvelteDate } from 'svelte/reactivity';
     import { ymd } from '../../../lib/time';
     
@@ -17,9 +18,9 @@
         onEventClick,
     }: {
         dragState?: import('../day-timeline/types').DragState;
-        onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
+        onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
-        onEventClick?: (ev: AppEvent) => void;
+        onEventClick?: (ev: EventInstance) => void;
     } = $props();
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
@@ -61,7 +62,7 @@
         return { startDate: ymd(start), endDate: ymd(end) };
     });
 
-    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({
+    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () => ({
         filters,
         query,
         startDate: dateGridRange.startDate,
@@ -167,8 +168,8 @@
     {#snippet filterMenu()}
         <FilterButton
             bind:filters
-            columns={[{ id: 'calendar', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'calendar' ? activeCalendars.map(c => c.id) : []}
+            columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
+            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? activeCalendars.map(c => ({ label: c.summary || c.id, value: c.id })) : []}
             align="right"
         />
     {/snippet}
@@ -191,20 +192,10 @@
         </div>
         <div class="cal-cells" class:is-grid={!isStrip} class:is-strip-3={isStrip && is3Weeks} class:is-strip-1={isStrip && !is3Weeks}>
             {#each cells as c (ymd(c.date))}
-                {@const cellDateStr = ymd(c.date)}
-                {@const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime()}
-                {@const cellEnd = cellStart + 86400000}
-                
                 <DayCell
                     cell={c}
                     {today}
-                    events={displayEvents.filter(e => {
-                        const sStr = e.startTime.includes('T') || e.startTime.includes(' ') ? e.startTime.replace(' ', 'T') : e.startTime + 'T00:00:00';
-                        const eStr = e.endTime.includes('T') || e.endTime.includes(' ') ? e.endTime.replace(' ', 'T') : e.endTime + 'T00:00:00';
-                        const eStart = new Date(sStr).getTime();
-                        const eEnd = new Date(eStr).getTime();
-                        return eStart < cellEnd && eEnd > cellStart;
-                    })}
+                    events={displayEvents.filter(e => instanceOccursOnDay(e, c.date))}
                     {isWeek}
                     {dragState}
                     {onEventDragStart}

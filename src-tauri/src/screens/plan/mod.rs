@@ -1,6 +1,11 @@
+mod expand;
+
+pub use expand::{expand_event_instances, single_instance};
+
 use crate::db;
 use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter};
 use crate::error::AppError;
+use crate::sync;
 
 /// # Errors
 ///
@@ -16,129 +21,87 @@ pub async fn query_tasks(
     Ok(db::query_tasks(&pool, filters, sort, query).await?)
 }
 
-#[must_use]
-pub fn expand_events_for_range(
-    events: &[AppEvent],
-    range_start_iso: &str,
-    range_end_iso: &str,
-) -> Vec<AppEvent> {
-    let mut expanded = Vec::new();
-    let mut exceptions = std::collections::HashSet::new();
-
-    for e in events {
-        if let Some(recurring_id) = &e.recurring_event_id {
-            if let Some(orig_start) = &e.original_start_time {
-                exceptions.insert((recurring_id.clone(), orig_start.clone()));
-            }
-        }
-    }
-
-    let parse_date = |iso: &str, end_of_day: bool| -> Option<chrono::DateTime<chrono::Utc>> {
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(iso) {
-            return Some(dt.with_timezone(&chrono::Utc));
-        }
-        if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(iso, "%Y-%m-%d") {
-            let time = if end_of_day {
-                chrono::NaiveTime::from_hms_opt(23, 59, 59)?
-            } else {
-                chrono::NaiveTime::from_hms_opt(0, 0, 0)?
-            };
-            if let Some(local_dt) = naive_date
-                .and_time(time)
-                .and_local_timezone(chrono::Local)
-                .single()
-            {
-                return Some(local_dt.with_timezone(&chrono::Utc));
-            }
-        }
-        None
-    };
-
-    let Some(range_start_dt) = parse_date(range_start_iso, false) else {
-        return events.to_vec();
-    };
-    let Some(range_end_dt) = parse_date(range_end_iso, true) else {
-        return events.to_vec();
-    };
-
-    for e in events {
-        if let Some(rrule) = &e.rrule {
-            if let Ok(dt_start) = chrono::DateTime::parse_from_rfc3339(&e.start_time) {
-                let dt_start_utc = dt_start.with_timezone(&chrono::Utc);
-                if let Ok(occurrences) = crate::time_utils::rrule_utils::get_occurrences(
-                    rrule,
-                    &dt_start_utc,
-                    &range_end_dt,
-                ) {
-                    let duration = chrono::DateTime::parse_from_rfc3339(&e.end_time).map_or_else(
-                        |_| chrono::Duration::zero(),
-                        |dt_end| {
-                            dt_end
-                                .with_timezone(&chrono::Utc)
-                                .signed_duration_since(dt_start_utc)
-                        },
-                    );
-
-                    for occ in occurrences {
-                        let occ_utc = occ.with_timezone(&chrono::Utc);
-                        let occ_iso = occ_utc.to_rfc3339();
-
-                        if exceptions.contains(&(e.id.clone(), occ_iso.clone())) {
-                            continue;
-                        }
-
-                        let occ_end_utc = occ_utc.checked_add_signed(duration).unwrap_or(occ_utc);
-
-                        if occ_end_utc > range_start_dt && occ_utc < range_end_dt {
-                            let mut instance = e.clone();
-                            instance.start_time = occ_iso;
-                            instance.end_time = occ_end_utc.to_rfc3339();
-                            expanded.push(instance);
-                        }
-                    }
-                    continue;
-                }
-            }
-        }
-
-        if e.recurring_event_id.is_none() || e.status != Some(crate::domain::EventStatus::Cancelled)
-        {
-            // Check if non-recurring event overlaps with range
-            if let (Ok(s), Ok(e_dt)) = (
-                chrono::DateTime::parse_from_rfc3339(&e.start_time),
-                chrono::DateTime::parse_from_rfc3339(&e.end_time),
-            ) {
-                let s_utc = s.with_timezone(&chrono::Utc);
-                let e_utc = e_dt.with_timezone(&chrono::Utc);
-                if e_utc > range_start_dt && s_utc < range_end_dt {
-                    expanded.push(e.clone());
-                }
-            } else {
-                // If it can't parse, just include it to be safe
-                expanded.push(e.clone());
-            }
-        }
-    }
-
-    expanded
-}
-
+/// Return raw mirrored events (wire format preserved for the push path).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[tauri::command]
 pub async fn query_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
     query: String,
-    start_date: Option<String>,
-    end_date: Option<String>,
 ) -> Result<Vec<AppEvent>, AppError> {
     let pool = crate::db_pool(&app)?;
-    let mut events = db::query_events(&pool, filters, query).await?;
+    Ok(db::query_events(&pool, filters, query).await?)
+}
 
-    if let (Some(start), Some(end)) = (start_date, end_date) {
-        events = expand_events_for_range(&events, &start, &end);
+/// Return render-ready instances so callers never parse wire timestamps.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+#[tauri::command]
+pub async fn query_event_instances(
+    app: tauri::AppHandle,
+    filters: Vec<AppEventFilter>,
+    query: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<Vec<crate::domain::EventInstance>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    let events = db::query_events(&pool, filters, query).await?;
+
+    match (start_date, end_date) {
+        (Some(start), Some(end)) => Ok(expand_event_instances(&events, &start, &end)),
+        _ => Ok(events.iter().filter_map(single_instance).collect()),
     }
+}
 
-    Ok(events)
+/// Fetch one raw event by id (used to reschedule instances back onto the master).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+#[tauri::command]
+pub async fn get_event(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<AppEvent>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    Ok(db::get_event(&pool, &id).await?)
+}
+
+/// Update a master event's start/end timestamps after a timeline drag.
+///
+/// # Errors
+///
+/// Returns an error if the event is missing or the update fails.
+#[tauri::command]
+pub async fn reschedule_event(
+    app: tauri::AppHandle,
+    id: String,
+    start_time: String,
+    end_time: String,
+) -> Result<(), AppError> {
+    let pool = crate::db_pool(&app)?;
+    let Some(mut event) = db::get_event(&pool, &id).await? else {
+        return Err(AppError::NotFound(format!("event {id}")));
+    };
+    event.start_time = start_time;
+    event.end_time = end_time;
+    event.is_all_day = Some(false);
+    // A drag/resize must reach Google, not just SQLite. `push_or_enqueue`
+    // mirrors `commands::events::update_event`: it marks the row dirty and
+    // queues an Update (or triggers an immediate sync).
+    //
+    // Note: this moves the row it was given. For a rule-expanded occurrence the
+    // frontend passes the master's id, so the whole series shifts; per-occurrence
+    // moves are part of the exception-instance follow-up (see
+    // `docs/google-calendar-write.md`).
+    sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Update).await;
+    db::update_event(&pool, event).await?;
+    Ok(())
 }
 
 #[tauri::command]

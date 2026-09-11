@@ -8,7 +8,7 @@
         PX_PER_MIN,
         SNAP_MIN,
     } from './constants';
-    import type { AppEvent } from '../../../lib/domain';
+    import type { EventInstance } from '../../../lib/domain';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
@@ -26,22 +26,21 @@
         onEventClick,
         labelOffset = DEFAULT_LABEL_OFFSET_PX,
     }: {
-        event: AppEvent;
+        event: EventInstance;
         startMins: number;
         endMins: number;
         lane: number;
         lanes: number;
         onResize?: (id: string, start: number, end: number) => void;
         onMove?: (id: string, start: number, end: number) => void;
-        onEventClick?: (e: AppEvent) => void;
+        onEventClick?: (e: EventInstance) => void;
         labelOffset?: number;
     } = $props();
 
     let dragOffset = $state<number | undefined>(undefined);
 
     const title = $derived(event.title);
-    // Since task data is minimal in AppEvent in the new domain, we can mock or extend it later.
-    const isRecurring = $derived(!!event.rrule || !!event.recurringEventId);
+    const isRecurring = $derived(event.recurring);
 
     const trackPointerGesture = createPointerGestureRecognizer();
 

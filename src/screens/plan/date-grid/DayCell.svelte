@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { AppEvent } from '../../../lib/domain';
+    import type { EventInstance } from '../../../lib/domain';
     import { sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
@@ -16,17 +16,17 @@
     }: {
         cell: { date: Date; outOfMonth: boolean };
         today: Date;
-        events: AppEvent[];
+        events: EventInstance[];
         isWeek: boolean;
         dragState?: import('../day-timeline/types').DragState;
-        onEventDragStart?: (e: PointerEvent, ev: AppEvent) => void;
+        onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
-        onEventClick?: (ev: AppEvent) => void;
+        onEventClick?: (ev: EventInstance) => void;
     } = $props();
 
-    function extractHourMinuteFromISO(iso: string) {
-        const sStr = iso.includes('T') || iso.includes(' ') ? iso.replace(' ', 'T') : iso + 'T00:00:00';
-        const d = new Date(sStr);
+    function formatStartTime(ev: EventInstance) {
+        if (ev.timing.kind !== 'timed') return 'All Day';
+        const d = new Date(ev.timing.start);
         return `${d.getHours().toString()}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
 
@@ -39,14 +39,9 @@
     // Animation logic
     let displayEvents = $derived(events);
 
-    function isEventAllDay(e: AppEvent): boolean {
-        if (e.isAllDay !== undefined && e.isAllDay !== null) return e.isAllDay;
-        return !e.startTime.includes('T') && !e.startTime.includes(' ');
-    }
-    
-    function checkPastDue(ev: AppEvent): boolean {
-        if (!ev.taskId) return false;
-        return new Date(ev.endTime).getTime() < Date.now();
+    function checkPastDue(ev: EventInstance): boolean {
+        if (!ev.taskId || ev.timing.kind !== 'timed') return false;
+        return new Date(ev.timing.end).getTime() < Date.now();
     }
 </script>
 
@@ -73,17 +68,17 @@
         </span>
     </div>
     <div class="day-cell-events">
-        {#each displayEvents as ev (ev.id + ev.startTime)}
+        {#each displayEvents as ev (ev.occurrenceKey)}
             {@const title = ev.title}
             {@const isDone = false /* TODO: pull done from task */}
             {@const isPastDue = checkPastDue(ev)}
-            {@const isAllDay = isEventAllDay(ev)}
+            {@const isAllDay = ev.timing.kind === 'allDay'}
             
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
                 class="day-cell-event"
                 class:is-done={isDone}
-                title="{isAllDay ? 'All Day' : extractHourMinuteFromISO(ev.startTime)} — {title}"
+                title="{isAllDay ? 'All Day' : formatStartTime(ev)} — {title}"
                 style="
                     cursor: grab;
                     opacity: {dragState?.event?.id === ev.id ? OPACITY_FADED : 1};
@@ -97,7 +92,7 @@
             >
                 {#if !isAllDay}
                     <span class="day-cell-event-time">
-                        {extractHourMinuteFromISO(ev.startTime)}
+                        {formatStartTime(ev)}
                     </span>
                 {/if}
                 <span class="day-cell-event-title" style="display: flex; align-items: center; gap: 2px;">

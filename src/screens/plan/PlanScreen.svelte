@@ -1,6 +1,6 @@
 <script lang="ts">
     import { store, describeError } from '../../lib/store.svelte';
-    import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
+    import type { AppEvent, AppTask, AppCalendar, EventInstance } from '../../lib/domain';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -86,7 +86,7 @@
         inspectorState = { type: 'event', id: newEvent.id };
     }
 
-    function onEventClick(ev: AppEvent) {
+    function onEventClick(ev: EventInstance) {
         inspectorState = { type: 'event', id: ev.id };
     }
 </script>

@@ -1,5 +1,6 @@
 pub mod push;
 pub mod queue;
+mod drain;
 mod queue_store;
 pub mod types;
 
@@ -137,69 +138,7 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
     };
 
     // --- PUSH: Publish local queued items ---
-    let queue = crate::sync::queue::SyncQueue::new(Arc::new(pool.clone()));
-    while let Ok(Some((queue_id, item))) = queue.peek().await {
-        let mut success = true;
-        match item.item {
-            crate::sync::types::SyncItemData::Task(mut task) => {
-                if item.action == crate::sync::types::SyncAction::Delete {
-                    if let Some(remote_id) = &task.remote_id {
-                        if crate::apis::google_tasks::delete(remote_id, &access_token)
-                            .await
-                            .is_err()
-                        {
-                            success = false;
-                        }
-                    }
-                } else {
-                    match crate::apis::google_tasks::publish(&task, &access_token).await {
-                        Ok(remote_id) => {
-                            task.remote_id = Some(crate::domain::RemoteId(remote_id));
-                            task.dirty = Some(false);
-                            let _ = crate::db::upsert_task(pool, task).await;
-                        }
-                        Err(_) => {
-                            success = false;
-                        }
-                    }
-                }
-            }
-            crate::sync::types::SyncItemData::Event(mut event) => {
-                if item.action == crate::sync::types::SyncAction::Delete {
-                    if let Some(remote_id) = &event.remote_id {
-                        if crate::apis::google_calendar::delete(
-                            remote_id,
-                            event.remote_collection_id.as_deref().map(String::as_str),
-                            &access_token,
-                        )
-                        .await
-                        .is_err()
-                        {
-                            success = false;
-                        }
-                    }
-                } else {
-                    match crate::apis::google_calendar::publish(&event, &access_token).await {
-                        Ok(remote_id) => {
-                            event.remote_id = Some(crate::domain::RemoteId(remote_id));
-                            event.dirty = Some(false);
-                            let _ = crate::db::upsert_event(pool, event).await;
-                        }
-                        Err(_) => {
-                            success = false;
-                        }
-                    }
-                }
-            }
-        }
-
-        if success {
-            let _ = queue.remove(queue_id).await;
-        } else {
-            // Stop pushing if we encounter an error, to avoid out-of-order execution and infinite loops
-            break;
-        }
-    }
+    let push_error = drain::flush_queue(pool, &access_token).await;
 
     // --- PULL: Fetch remote items ---
 
@@ -211,5 +150,5 @@ pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
         eprintln!("Google Tasks Sync Error: {e}");
     }
 
-    Ok(())
+    push_error.map_or_else(|| Ok(()), |message| Err(color_eyre::eyre::eyre!("{message}")))
 }

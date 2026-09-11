@@ -8,7 +8,7 @@ macro_rules! task_select_sql {
             "(SELECT CASE WHEN COUNT(tg.id) > 0 THEN json_group_array(json_object('id', tg.id, 'name', tg.name, 'color', tg.color)) ELSE 'null' END ",
             "FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = t.id) as tags, ",
             "COALESCE(t.subtasks, 'null') as checklist, t.parent_task, COALESCE(t.dependencies, 'null') as dependencies, ",
-            "t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.updated_at, t.etag, t.dirty",
+            "t.est, t.added, t.canvas_x, t.canvas_y, t.on_canvas, t.remote_id, t.notes, t.tabs, t.due, t.updated_at, t.etag, t.dirty, t.task_list_id",
             " FROM tasks t",
             $suffix
         )
@@ -74,8 +74,8 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
         "INSERT INTO tasks (
             id, title, status, priority, subtasks, parent_task, dependencies,
             est, added, canvas_x, canvas_y, on_canvas, remote_id, notes, tabs,
-            due, updated_at, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            due, updated_at, etag, dirty, task_list_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&task.id)
     .bind(&task.title)
@@ -104,6 +104,7 @@ pub async fn create_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.updated_at)
     .bind(&task.etag)
     .bind(task.dirty)
+    .bind(&task.task_list_id)
     .execute(&mut *tx)
     .await?;
 
@@ -122,7 +123,7 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
             title = ?, status = ?, priority = ?, subtasks = ?,
             parent_task = ?, dependencies = ?, est = ?, added = ?, canvas_x = ?,
             canvas_y = ?, on_canvas = ?, remote_id = ?, notes = ?, tabs = ?,
-            due = ?, updated_at = ?, etag = ?, dirty = ?
+            due = ?, updated_at = ?, etag = ?, dirty = ?, task_list_id = ?
         WHERE id = ?",
     )
     .bind(&task.title)
@@ -151,6 +152,7 @@ pub async fn update_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.updated_at)
     .bind(&task.etag)
     .bind(task.dirty)
+    .bind(&task.task_list_id)
     .bind(&task.id)
     .execute(&mut *tx)
     .await?;
@@ -169,8 +171,8 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
         "INSERT INTO tasks (
             id, title, status, priority, subtasks, parent_task, dependencies,
             est, added, canvas_x, canvas_y, on_canvas, remote_id, notes, tabs,
-            due, updated_at, etag, dirty
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            due, updated_at, etag, dirty, task_list_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             status = excluded.status,
@@ -189,7 +191,8 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
             due = excluded.due,
             updated_at = excluded.updated_at,
             etag = excluded.etag,
-            dirty = excluded.dirty",
+            dirty = excluded.dirty,
+            task_list_id = excluded.task_list_id",
     )
     .bind(&task.id)
     .bind(&task.title)
@@ -218,6 +221,7 @@ pub async fn upsert_task(pool: &SqlitePool, task: AppTask) -> Result<(), sqlx::E
     .bind(&task.updated_at)
     .bind(&task.etag)
     .bind(task.dirty)
+    .bind(&task.task_list_id)
     .execute(&mut *tx)
     .await?;
 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { HOURS_PER_DAY, MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
     import type { DragState, LaidEvent } from '../types';
-    import type { AppEvent } from '../../../../lib/domain';
+    import type { EventInstance } from '../../../../lib/domain';
     import { sameDay, ymd } from '../../../../lib/time';
 
     import EventBlock from '../EventBlock.svelte';
@@ -30,7 +30,7 @@
         setDragState?: (ds: DragState | undefined) => void;
         onResizeEvent?: (id: string, startTime: string, endTime: string) => void;
         onMoveEvent?: (id: string, startTime: string, endTime: string) => void;
-        onEventClick?: (ev: AppEvent) => void;
+        onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
         showTimeLabels?: boolean;
     } = $props();
@@ -144,7 +144,7 @@
         <CurrentTimeLine showLabels={showTimeLabels} />
     {/if}
 
-    {#each laid as { event, startMins, endMins, lane, lanes } (event.id)}
+    {#each laid as { event, startMins, endMins, lane, lanes } (event.occurrenceKey)}
         <EventBlock
             {event}
             {startMins}

@@ -59,10 +59,10 @@
     let filterColumns = $derived(schema.map(c => ({ id: c.id, label: c.label })));
     let sortColumns = $derived(schema.filter(c => c.sortable).map(c => ({ id: c.id, label: c.label })));
 
-    function getFilterValues(colId: string): string[] {
+    function getFilterValues(colId: string): {label: string, value: string}[] {
         const col = schema.find(c => c.id === colId);
         if (col && typeof col.filter_type === 'object' && 'Enum' in col.filter_type) {
-            return col.filter_type.Enum;
+            return col.filter_type.Enum.map(v => ({ label: v, value: v }));
         }
         return [];
     }

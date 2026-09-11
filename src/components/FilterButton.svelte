@@ -3,12 +3,12 @@
     let {
         filters = $bindable([]),
         columns = [],
-        getValuesForColumn = (_col: string): string[] => [],
+        getValuesForColumn = (_col: string): {label: string, value: string}[] => [],
         align = "left",
     }: {
         filters?: F[];
         columns?: {id: string, label: string}[];
-        getValuesForColumn?: (col: string) => string[];
+        getValuesForColumn?: (col: string) => {label: string, value: string}[];
         align?: "left" | "right";
     } = $props();
 
@@ -51,7 +51,7 @@
     </button>
 
     {#if filterMenuOpen}
-        <div class="shared-floating-menu align-{align}" style="min-width: 320px;">
+        <div class="shared-floating-menu align-{align}" style="min-width: 460px;">
             {#each filters as f, i (i)}
                 {@const column = f.column ?? ''}
                 {@const availableValues = getValuesForColumn(column)}
@@ -64,7 +64,7 @@
                                 updateFilter(i, { column: val, value: [] });
                             }
                         }}
-                        style="flex: 1;"
+                        style="flex: 0 0 auto; width: 110px;"
                         class="form-select"
                     >
                         {#each columns as c (c.id)}
@@ -81,13 +81,13 @@
                         <option value="is not">is not</option>
                     </select>
 
-                    <div style="flex: 1; display: flex;">
+                    <div style="flex: 1; min-width: 0; display: flex;">
                         {#if availableValues.length > 0}
                             <MultiSelect
-                                options={availableValues.map(v => ({ label: v, value: v }))}
+                                options={availableValues}
                                 values={Array.isArray(f.value) ? f.value as string[] : (f.value != null ? [f.value as string] : [])}
                                 onchange={(val) => updateFilter(i, { value: val })}
-                                style="flex: 1;"
+                                style="flex: 1; min-width: 0;"
                             />
                         {:else}
                             <input

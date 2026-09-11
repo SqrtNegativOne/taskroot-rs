@@ -33,7 +33,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `time.ts`: Local-date helpers (`ymd`, `addDays`, `dayDiff`, `sameDay`). Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
     - `routes.ts`: Centralized route-path constants.
-    - `domain.ts`: Centralized domain barrel re-exporting generated bindings from `src/lib/bindings/` and domain models/events/filters (modularized in `src/lib/domain/models.ts`, `events.ts`, `filters.ts`).
+    - `domain.ts`: Centralized domain barrel re-exporting generated bindings from `src/lib/bindings/` and domain models/events/timing/filters (modularized in `src/lib/domain/models.ts`, `events.ts`, `timing.ts`, `filters.ts`). `timing.ts` provides the only render-path day-overlap helpers (`instanceOccursOnDay`, `isAllDayTiming`).
   - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo nextest run` in `src-tauri`). Never hand-edit.
   - `src/screens/`: Major UI views. `plan/` (with `day-timeline/`, including `hooks/pointerGesture.svelte.ts` — a window-pointer gesture registry with `pointercancel` and teardown safety — and `date-grid/`) and `do/` (with `stopwatch/`, whose `engine.svelte.ts` consumes the generated `StopwatchState`).
   - `src/components/`: Reusable UI components. `ComingSoon.svelte` consolidates the seven stub route pages; `inspector-pane/` is split into `InspectorPane`, `InspectorTaskFields`/`InspectorEventFields`, and `format.ts`.
@@ -42,9 +42,10 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/commands/`: IPC command handlers split by domain (`tasks.rs`, `events.rs`, `window.rs`, `sync.rs`).
   - `src-tauri/src/error.rs`: `AppError` enum (`thiserror`) returned by ALL IPC commands; serialized as `{code, message}`.
   - `src-tauri/src/events.rs`: Centralized event-name constants (`STOPWATCH_UPDATED`, `SYNC_STARTED/FINISHED/ERROR`, `OAUTH_URL`).
-  - `src-tauri/src/db/`: Modularized SQLite operations using `sqlx` (`tasks.rs`, `events.rs`, `settings.rs`, plus `task_filters.rs` for the dynamic `QueryBuilder` filtering path). `init_db` creates tables using inline SQL.
-  - `src-tauri/src/domain/`: Core data structures (`mod.rs`, `sigil.rs` for sigil parsing, `filters.rs` for filter columns/types).
-  - `src-tauri/src/sync/`: Global sync engine: `mod.rs` (5-minute poller, `SyncState`), `push.rs` (Google push logic), `types.rs`, and the offline queue (`queue.rs`, `queue_store.rs`).
+  - `src-tauri/src/db/`: Modularized SQLite operations using `sqlx` (`tasks.rs`, `events.rs`, `settings.rs`, plus `task_filters.rs` for the dynamic `QueryBuilder` filtering path). `init_db` creates tables using inline SQL, then runs additive `ensure_column!` migrations so older databases gain `events.timezone`, `calendars.sync_token`, and `tasks.task_list_id`.
+  - `src-tauri/src/domain/`: Core data structures (`mod.rs`, `sigil.rs` for sigil parsing, `filters.rs` for filter columns/types) plus `event_timing.rs` — the **single normalization boundary** (`EventTiming`, `EventInstance`, `EventTiming::from_event`) that turns mirrored wire strings into tagged all-day/timed timing. Nothing outside this module may parse `AppEvent::start_time`/`end_time`.
+  - `src-tauri/src/apis/`: Google API clients. `google_calendar/` is split into `mod.rs` (publish/delete transport), `write.rs` (the pure `&AppEvent` → method/URL/body builder; updates use `events.patch`, creates use `events.insert`), `types.rs`, and `events.rs` (incremental `syncToken` list with `showDeleted` and 410-Gone reset); `google_tasks.rs` syncs every task list with `showDeleted` + pagination. Write semantics and per-occurrence gaps are documented in `docs/google-calendar-write.md`.
+  - `src-tauri/src/sync/`: Global sync engine: `mod.rs` (5-minute poller, `SyncState`), `push.rs` (enqueue + `plan_event_sync`, which turns a calendar change into a `SyncAction::Move`), `drain.rs` (drains the queue: publish/move/delete, surfaces the first push failure), `types.rs`, and the offline queue (`queue.rs`, `queue_store.rs`).
   - `src-tauri/src/stopwatch.rs`: Stopwatch backend (`StopwatchState` struct plus `get/toggle/reset_stopwatch` commands).
   - `src-tauri/src/settings.rs`: Settings backend (`AppSettings` struct with `#[derive(TS)]` and schema definition emitting `src/lib/bindings/AppSettings.generated.ts`).
 
@@ -52,6 +53,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `db`, `not-found`, `auth`, `sync`, `invalid-input`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.
 - **Event Name Constants**: Backend event names are constants in `src-tauri/src/events.rs`, mirrored in `src/lib/events.ts` (`stopwatch-updated`, `sync-started`, `sync-finished`, `sync-error`, `oauth-url`). Never inline raw event strings on either side.
 - **Generated Bindings Flow**: `cargo nextest run` in `src-tauri` regenerates `src/lib/bindings/*.generated.ts` via `ts-rs` (`export_bindings_*` tests). After changing any `#[derive(TS)]` struct, run `cargo nextest run` and commit the regenerated files. CI fails on binding drift (`git diff --exit-code src/lib/bindings`). The `#[ts(type = "number")]` convention keeps timestamps as JS `number` — never `bigint`.
+- **Event Instance Projection**: Mirrored `AppEvent` rows stay wire-shaped for the push path. The render path consumes `EventInstance`s produced by `screens::plan::expand` and returned by `query_event_instances`. All-day occurrences are floating dates (`startDate`/`endDateExclusive`) expanded independently of the process timezone; timed occurrences carry UTC instants plus the Google `timeZone`. `occurrenceKey` (`masterId@<date|rfc3339>`) is the stable per-occurrence identity and the key for exception/cancellation suppression. `query_events` still returns raw `AppEvent`s for the inspector; drag/resize calls `reschedule_event`.
 - **Multi-Window Architecture**: Three windows are declared in `tauri.conf.json`:
   - **Main Window** (`main`): The primary Svelte app; hides to tray on close.
   - **Launcher Window** (`launcher`): A spotlight-like command palette triggered via the global-shortcut plugin.
@@ -65,5 +67,6 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
 - **Store Assets Offline**: Store assets offline.
+- **Calendar Write Semantics**: Event edits use Google's `events.patch` (existing `remote_id`) or `events.insert` (new). Never use `events.update`/`PUT`: it is a full replace that wipes unmodeled fields. `recurrence` is rebuilt from `AppEvent.rrule` lines and `timeZone` from `AppEvent.timezone`; `color` is read-only (hex is not a `colorId`). Drag/resize (`reschedule_event`) must enqueue through `sync::push::push_or_enqueue`, like `update_event`.
 - Tautological tests are considered harmful.
 - Please use early returns. This will make code nicer for you too.

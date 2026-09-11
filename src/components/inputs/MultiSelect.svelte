@@ -65,12 +65,12 @@
         </span>
     </button>
     {#if open}
-        <div style="position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1001; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <div style="position: absolute; top: calc(100% + 4px); right: 0; z-index: 1001; min-width: 100%; width: max-content; max-width: 320px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             {#if options.length === 0}
                 <div style="padding: 6px 8px; opacity: 0.5; font-size: 0.9em;">No options</div>
             {:else}
                 {#each options as o (o.value)}
-                    <label style={`padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; width: 100%; border: none; text-align: left; color: inherit; font-family: inherit; font-size: inherit; background: ${values.includes(o.value) ? 'var(--bg-app)' : 'transparent'}; margin: 0; transition: background 0.1s ease;`}
+                    <label title={o.label} style={`padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; width: 100%; border: none; text-align: left; color: inherit; font-family: inherit; font-size: inherit; background: ${values.includes(o.value) ? 'var(--bg-app)' : 'transparent'}; margin: 0; transition: background 0.1s ease; overflow: hidden;`}
                            onpointerenter={(e) => {
                                if (!values.includes(o.value)) e.currentTarget.style.background = 'var(--bg-app)';
                            }}
@@ -81,9 +81,9 @@
                             type="checkbox" 
                             checked={values.includes(o.value)}
                             onchange={(e) => toggleSelect(o, e)}
-                            style="margin: 0; cursor: pointer;"
+                            style="margin: 0; cursor: pointer; flex: 0 0 auto;"
                         />
-                        {o.label}
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;">{o.label}</span>
                     </label>
                 {/each}
             {/if}

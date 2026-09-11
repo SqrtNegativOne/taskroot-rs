@@ -6,7 +6,7 @@ macro_rules! event_select_sql {
         concat!(
             "SELECT id, remote_id, remote_collection_id, task_id, title, description, start_time, end_time, ",
             "rrule, COALESCE(exdates, 'null') as exdates, recurring_event_id, original_start_time, status, ",
-            "updated_at, color, etag, dirty, is_all_day FROM events",
+            "updated_at, color, etag, dirty, is_all_day, timezone FROM events",
             $suffix
         )
     };
@@ -57,8 +57,8 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, status, updated_at, color, etag, dirty, is_all_day
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            original_start_time, status, updated_at, color, etag, dirty, is_all_day, timezone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -78,6 +78,7 @@ pub async fn create_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.etag)
     .bind(event.dirty)
     .bind(event.is_all_day)
+    .bind(event.timezone)
     .execute(pool)
     .await?;
 
@@ -93,7 +94,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             remote_id = ?, remote_collection_id = ?, task_id = ?, title = ?, 
             description = ?, start_time = ?, end_time = ?, 
             rrule = ?, exdates = ?, recurring_event_id = ?, original_start_time = ?, 
-            status = ?, updated_at = ?, color = ?, etag = ?, dirty = ?, is_all_day = ?
+            status = ?, updated_at = ?, color = ?, etag = ?, dirty = ?, is_all_day = ?, timezone = ?
         WHERE id = ?",
     )
     .bind(event.remote_id)
@@ -113,6 +114,7 @@ pub async fn update_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.etag)
     .bind(event.dirty)
     .bind(event.is_all_day)
+    .bind(event.timezone)
     .bind(event.id)
     .execute(pool)
     .await?;
@@ -128,8 +130,8 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
         "INSERT INTO events (
             id, remote_id, remote_collection_id, task_id, title, description, 
             start_time, end_time, rrule, exdates, recurring_event_id, 
-            original_start_time, status, updated_at, color, etag, dirty, is_all_day
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            original_start_time, status, updated_at, color, etag, dirty, is_all_day, timezone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             remote_id = excluded.remote_id, 
             remote_collection_id = excluded.remote_collection_id, 
@@ -147,7 +149,8 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
             color = excluded.color,
             etag = excluded.etag,
             dirty = excluded.dirty,
-            is_all_day = excluded.is_all_day",
+            is_all_day = excluded.is_all_day,
+            timezone = excluded.timezone",
     )
     .bind(event.id)
     .bind(event.remote_id)
@@ -167,6 +170,7 @@ pub async fn upsert_event(pool: &SqlitePool, event: AppEvent) -> Result<(), sqlx
     .bind(event.etag)
     .bind(event.dirty)
     .bind(event.is_all_day)
+    .bind(event.timezone)
     .execute(pool)
     .await?;
 
@@ -288,6 +292,52 @@ pub async fn delete_calendar(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Er
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn get_calendar_sync_token(
+    pool: &SqlitePool,
+    calendar_id: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let row: Option<(Option<String>,)> =
+        sqlx::query_as("SELECT sync_token FROM calendars WHERE id = ?")
+            .bind(calendar_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(row.and_then(|(token,)| token))
+}
+
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn set_calendar_sync_token(
+    pool: &SqlitePool,
+    calendar_id: &str,
+    token: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE calendars SET sync_token = ? WHERE id = ?")
+        .bind(token)
+        .bind(calendar_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Delete a calendar's events without clobbering rows edited locally.
+///
+/// # Errors
+/// Returns an error if the operation fails.
+pub async fn delete_synced_events_for_calendar(
+    pool: &SqlitePool,
+    calendar_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "DELETE FROM events WHERE remote_collection_id = ? AND (dirty IS NULL OR dirty = 0)",
+    )
+    .bind(calendar_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

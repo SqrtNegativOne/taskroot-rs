@@ -25,7 +25,17 @@ pub async fn update_event(
     mut event: domain::AppEvent,
 ) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
-    sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Update).await;
+    let previous = db::get_event(&pool, &event.id.0).await?;
+
+    match sync::push::plan_event_sync(previous.as_ref(), &event) {
+        sync::push::EventSyncPlan::Move { source_calendar_id } => {
+            sync::push::push_event_move_or_enqueue(&app, &mut event, source_calendar_id).await;
+        }
+        sync::push::EventSyncPlan::Update => {
+            sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Update).await;
+        }
+    }
+
     Ok(db::update_event(&pool, event).await?)
 }
 

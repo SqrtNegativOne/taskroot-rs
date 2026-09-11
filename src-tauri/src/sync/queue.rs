@@ -97,7 +97,7 @@ impl SyncQueue {
                     .await?;
             }
             SyncAction::Delete => {
-                self.handle_delete_transition(&transition, item, &indices)
+                self.handle_delete_transition(&transition, item, &indices, &existing_items)
                     .await?;
             }
         }
@@ -123,11 +123,22 @@ impl SyncQueue {
     async fn handle_delete_transition(
         &self,
         transition: &str,
-        item: SyncQueueItem,
+        mut item: SyncQueueItem,
         indices: &ExistingIndices,
+        existing: &[(i64, SyncQueueItem)],
     ) -> Result<(), sqlx::Error> {
         if transition == "delete->delete" {
             return Ok(());
+        }
+        // A pending move has not reached Google yet, so the delete must still be
+        // issued against the calendar the event currently lives in.
+        if let Some((_, move_item)) = indices
+            .r#move
+            .and_then(|id| existing.iter().find(|(existing_id, _)| *existing_id == id))
+        {
+            if item.calendar_id.is_none() {
+                item.calendar_id = move_item.calendar_id.clone();
+            }
         }
         queue_store::remove_ids(&self.pool, &indices.all_ids).await?;
         if transition != "create->delete" && item.remote_id.is_some() {
@@ -175,24 +186,32 @@ impl SyncQueue {
         existing: &[(i64, SyncQueueItem)],
     ) -> Result<(), sqlx::Error> {
         if transition == "create->move" {
+            // Still local-only: the create simply targets the new calendar.
             self.replace_payload(indices.create, existing, &item.item)
                 .await?;
         } else if transition == "update->move" {
-            self.replace_payload(indices.update, existing, &item.item)
-                .await?;
-            queue_store::insert(&self.pool, &item).await?;
+            // The move carries the full payload, so it subsumes the update.
+            self.convert_to_move(indices.update, &item).await?;
         } else if transition == "move->move" {
-            if let Some(id) = indices.r#move {
-                queue_store::update_action_and_payload(&self.pool, id, &item).await?;
-            }
+            self.convert_to_move(indices.r#move, &item).await?;
         } else if transition == "move+update->move" {
-            self.replace_payload(indices.update, existing, &item.item)
-                .await?;
-            if let Some(id) = indices.r#move {
-                queue_store::update_action_and_payload(&self.pool, id, &item).await?;
+            if let Some(id) = indices.update {
+                queue_store::remove_ids(&self.pool, &[id]).await?;
             }
+            self.convert_to_move(indices.r#move, &item).await?;
         } else if transition == "delete->move" {
             eprintln!("Warning: Attempted to move a deleted item. Ignoring.");
+        }
+        Ok(())
+    }
+
+    async fn convert_to_move(
+        &self,
+        target_id: Option<i64>,
+        item: &SyncQueueItem,
+    ) -> Result<(), sqlx::Error> {
+        if let Some(id) = target_id {
+            queue_store::update_action_and_payload(&self.pool, id, item).await?;
         }
         Ok(())
     }
@@ -256,5 +275,177 @@ impl SyncQueue {
     /// Returns an error if the operation fails.
     pub async fn clear(&self) -> Result<(), sqlx::Error> {
         queue_store::clear(&self.pool).await
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::domain::{AppEvent, CollectionId, EventId, RemoteId};
+
+    fn event(calendar: &str, remote_id: Option<&str>) -> SyncItemData {
+        SyncItemData::Event(AppEvent {
+            id: EventId("google-r1".into()),
+            remote_id: remote_id.map(|id| RemoteId(id.into())),
+            remote_collection_id: Some(CollectionId(calendar.into())),
+            task_id: None,
+            title: "Drink water".into(),
+            description: None,
+            start_time: "2026-06-14T19:00:00+05:30".into(),
+            end_time: "2026-06-14T19:05:00+05:30".into(),
+            rrule: None,
+            exdates: None,
+            recurring_event_id: None,
+            original_start_time: None,
+            status: None,
+            updated_at: None,
+            color: None,
+            etag: None,
+            dirty: Some(true),
+            is_all_day: Some(false),
+            timezone: None,
+        })
+    }
+
+    fn item(
+        action: SyncAction,
+        calendar: &str,
+        remote_id: Option<&str>,
+        source: Option<&str>,
+        destination: Option<&str>,
+    ) -> SyncQueueItem {
+        SyncQueueItem {
+            r#type: SyncType::Event,
+            action,
+            item: event(calendar, remote_id),
+            remote_id: remote_id.map(str::to_owned),
+            calendar_id: source.map(str::to_owned),
+            destination_calendar_id: destination.map(str::to_owned),
+            updated_fields: None,
+        }
+    }
+
+    async fn queue() -> SyncQueue {
+        let pool = crate::db::init_db("sqlite::memory:").await.unwrap();
+        SyncQueue::new(Arc::new(pool))
+    }
+
+    async fn stored(queue: &SyncQueue) -> Vec<SyncQueueItem> {
+        queue_store::fetch_all(&queue.pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.item)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn update_then_move_collapses_into_one_move() {
+        let queue = queue().await;
+        queue
+            .push(item(SyncAction::Update, "routine", Some("r1"), None, None))
+            .await
+            .unwrap();
+        queue
+            .push(item(
+                SyncAction::Move,
+                "routine",
+                Some("r1"),
+                Some("busy"),
+                Some("routine"),
+            ))
+            .await
+            .unwrap();
+
+        let rows = stored(&queue).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].action, SyncAction::Move);
+        assert_eq!(rows[0].calendar_id.as_deref(), Some("busy"));
+        assert_eq!(rows[0].destination_calendar_id.as_deref(), Some("routine"));
+    }
+
+    #[tokio::test]
+    async fn create_then_move_only_retargets_the_create() {
+        let queue = queue().await;
+        queue
+            .push(item(SyncAction::Create, "busy", None, None, None))
+            .await
+            .unwrap();
+        queue
+            .push(item(
+                SyncAction::Move,
+                "routine",
+                None,
+                Some("busy"),
+                Some("routine"),
+            ))
+            .await
+            .unwrap();
+
+        let rows = stored(&queue).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].action, SyncAction::Create);
+        let SyncItemData::Event(event) = &rows[0].item else {
+            panic!("expected an event payload");
+        };
+        assert_eq!(
+            event.remote_collection_id.as_ref().map(|id| id.0.as_str()),
+            Some("routine")
+        );
+    }
+
+    #[tokio::test]
+    async fn move_then_move_keeps_one_row_targeting_the_latest_calendar() {
+        let queue = queue().await;
+        queue
+            .push(item(
+                SyncAction::Move,
+                "routine",
+                Some("r1"),
+                Some("busy"),
+                Some("routine"),
+            ))
+            .await
+            .unwrap();
+        queue
+            .push(item(
+                SyncAction::Move,
+                "major",
+                Some("r1"),
+                Some("busy"),
+                Some("major"),
+            ))
+            .await
+            .unwrap();
+
+        let rows = stored(&queue).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].action, SyncAction::Move);
+        assert_eq!(rows[0].destination_calendar_id.as_deref(), Some("major"));
+    }
+
+    #[tokio::test]
+    async fn delete_after_a_pending_move_targets_the_source_calendar() {
+        let queue = queue().await;
+        queue
+            .push(item(
+                SyncAction::Move,
+                "routine",
+                Some("r1"),
+                Some("busy"),
+                Some("routine"),
+            ))
+            .await
+            .unwrap();
+        queue
+            .push(item(SyncAction::Delete, "routine", Some("r1"), None, None))
+            .await
+            .unwrap();
+
+        let rows = stored(&queue).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].action, SyncAction::Delete);
+        assert_eq!(rows[0].calendar_id.as_deref(), Some("busy"));
     }
 }
