@@ -20,6 +20,8 @@ pub mod screens;
 pub mod settings;
 pub mod stopwatch;
 pub mod sync;
+#[cfg(test)]
+pub mod test_support;
 pub mod time_utils;
 
 use error::AppError;

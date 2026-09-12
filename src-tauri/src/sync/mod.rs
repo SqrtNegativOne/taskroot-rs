@@ -28,6 +28,35 @@ pub struct SyncStateManager(pub Mutex<SyncState>);
 
 pub(crate) const SYNC_INTERVAL_SECS: i64 = 5 * 60;
 
+/// Drop every queued offline sync action.
+///
+/// The `clear_sync_queue` command body; the queue's SQL stays in [`queue_store`].
+///
+/// # Errors
+///
+/// Returns an error if the delete fails.
+pub(crate) async fn clear_queue(pool: &SqlitePool) -> Result<(), AppError> {
+    queue_store::clear(pool).await?;
+    Ok(())
+}
+
+/// The queued payloads, oldest first, as the raw JSON the queue stored.
+///
+/// The `get_sync_queue` command body (the dev inspector renders these as-is).
+///
+/// # Errors
+///
+/// Returns an error if the queue cannot be read.
+pub(crate) async fn queue_payloads(
+    pool: &SqlitePool,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    let payloads = queue_store::fetch_payloads(pool).await?;
+    Ok(payloads
+        .iter()
+        .filter_map(|payload| serde_json::from_str(payload).ok())
+        .collect())
+}
+
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn get_sync_state(app: tauri::AppHandle) -> Result<SyncState, AppError> {

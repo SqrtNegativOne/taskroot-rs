@@ -50,6 +50,14 @@ pub(super) async fn fetch_all(pool: &SqlitePool) -> Result<Vec<QueueRow>, sqlx::
         .collect())
 }
 
+/// The stored payloads, oldest first, without decoding them.
+pub(super) async fn fetch_payloads(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT payload FROM sync_queue ORDER BY id ASC")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.into_iter().map(|(payload,)| payload).collect())
+}
+
 pub(super) async fn insert(pool: &SqlitePool, item: &SyncQueueItem) -> Result<(), sqlx::Error> {
     let payload = serde_json::to_string(item).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 

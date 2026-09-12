@@ -3,7 +3,13 @@
 //! The merge rule lives here in one place: a stored value is merged over the
 //! defaults only when its key names an [`AppSettings`] field and the value
 //! deserializes into that field's serde type. Everything else keeps the default.
+//!
+//! The pool-level bodies of the settings commands live here too
+//! ([`read_settings`], [`write_setting`], [`read_ui_state`], [`write_ui_state`])
+//! so they can be driven from tests without an `AppHandle`; the command functions
+//! in the parent module only resolve the pool and delegate.
 
+use crate::db;
 use crate::error::AppError;
 use serde_json::{Map, Value};
 use sqlx::SqlitePool;
@@ -60,6 +66,56 @@ fn defaults_object() -> Map<String, Value> {
             _ => None,
         })
         .unwrap_or_default()
+}
+
+/// The `get_settings` command body: merge the stored rows over the defaults.
+///
+/// # Errors
+///
+/// Returns an error if the stored rows cannot be read.
+pub(super) async fn read_settings(pool: &SqlitePool) -> Result<AppSettings, AppError> {
+    let stored = load_stored_settings(pool).await?;
+    Ok(apply_stored_settings(stored))
+}
+
+/// The `update_setting` command body: validate the value for a known key,
+/// encode it and persist it.
+///
+/// # Errors
+///
+/// Returns an error if a known key rejects the value, or the write fails.
+pub(super) async fn write_setting(
+    pool: &SqlitePool,
+    key: &str,
+    value: &Value,
+) -> Result<(), AppError> {
+    ensure_valid_setting_value(key, value)?;
+    db::set_setting(pool, key, &encode_stored_value(value)?).await?;
+    Ok(())
+}
+
+/// The `get_ui_state` command body: decode one per-component UI-state row.
+///
+/// # Errors
+///
+/// Returns an error if the row cannot be read.
+pub(super) async fn read_ui_state(pool: &SqlitePool, key: &str) -> Result<Value, AppError> {
+    let raw = db::get_ui_state(pool, key).await?;
+    Ok(parse_setting_value(raw.as_deref()))
+}
+
+/// The `set_ui_state` command body: encode and persist one UI-state row.
+///
+/// # Errors
+///
+/// Returns an error if the value cannot be encoded or the write fails.
+pub(super) async fn write_ui_state(
+    pool: &SqlitePool,
+    key: &str,
+    value: &Value,
+) -> Result<(), AppError> {
+    db::set_ui_state(pool, key, &encode_stored_value(value)?).await?;
+    Ok(())
 }
 
 /// The merge rule: `key` names an `AppSettings` field and `value` deserializes

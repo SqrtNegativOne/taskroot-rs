@@ -1,14 +1,13 @@
 # Taskroot: persistence & settings refactor — remaining waves
 
-Working document for the **remaining** work only. Completed waves (P1, P2, P3)
-have been removed along with their prompts; recover them from git history if a
+Working document for the **remaining** work only. Completed waves (P1, P2, P3,
+P5) have been removed along with their prompts; recover them from git history if a
 future change needs the original wording.
 
 ## Status
 
 | Wave | Prompt | State | Depends on |
 |---|---|---|---|
-| 3 | **P5 Command-layer test harness** | ⬜ next | — |
 | 4 | **P4 Retire sidebar `localStorage`** | ⬜ next | P1 + P3 |
 | 5 | **P9 Independent verification** | ⬜ last | all |
 
@@ -21,11 +20,16 @@ Completed:
 - **P3 — Shared backend-hydration primitive** (`src/lib/asyncState.svelte.ts`:
   `createStaleGuard`, `createDebouncedWriter`, `hydrateOnce`; `persistState` and
   `useTauriQuery` now compose it).
+- **P5 — Command-layer test harness** (`src-tauri/src/test_support/`,
+  `commands/tests.rs`, `settings/tests.rs`): handlers are documented as thin
+  wrappers over `&SqlitePool` bodies, and the JS↔Rust command contract is pinned
+  by source-scanning registry tests. No mock-runtime helper: all commands take a
+  concrete `AppHandle<Wry>`, which `MockRuntime` cannot satisfy without changing
+  38 public signatures.
 
-Remaining waves run **serially** in one working directory, in the order above:
-P5 and P4 touch disjoint files but P5 may add command-level test support that P4's
-verification can reuse, and P9 must see the merged result of both. Do not start a
-wave until the previous one is green and committed.
+Remaining waves run **serially** in one working directory, in the order above;
+P9 must see the merged result of everything before it. Do not start a wave until
+the previous one is green and committed.
 
 ## Rules (every prompt)
 
@@ -56,56 +60,6 @@ git diff --exit-code src/lib/bindings    # binding-drift gate
 Stop and report if: a module the prompt assumes does not exist; the fix requires
 renaming a public command or changing the settings-screen contract; a test must be
 deleted or weakened; or there is user-visible data-loss risk.
-
----
-
-## PROMPT P5 — Command-layer test harness + smoke tests
-
-```text
-Goal
-37 `#[tauri::command]` functions exist and none are tested against an `AppHandle` or a
-mock runtime. A typo in `generate_handler!` or a JS/Rust argument-casing mismatch is
-invisible to `cargo nextest` until runtime. Give the command layer a paved road.
-
-Read first
-- src-tauri/src/lib.rs (`generate_handler!`, `db_pool`)
-- src-tauri/src/commands/*.rs, src-tauri/src/settings/, src-tauri/src/screens/plan/mod.rs
-- src-tauri/src/db/mod.rs (tests use `init_db("sqlite::memory:")`)
-- src-tauri/Cargo.toml (note: `tauri` has no `test` feature enabled yet)
-
-Required outcome
-- A documented testing convention in src-tauri/AGENTS.md: commands are thin wrappers over
-  `async fn(&SqlitePool, ...)` functions living in the testable layer; the command body
-  does arg marshalling + `db_pool(&app)` only. Extract bodies where that is not yet true
-  (behaviour-preserving).
-- A reusable test helper that builds an in-memory database pool and a mock Tauri app, so
-  a command can be invoked end-to-end. Use `tauri::test::mock_builder` / `mock_context`;
-  enable the `tauri` `test` feature for tests only ([dev-dependencies] entry or a
-  `test-support` feature — never release builds).
-- If a full mock-webview round trip is impractical on this platform, fall back to:
-  (a) extracting the command body into an `&SqlitePool` function and testing that, and
-  (b) a minimal registry test asserting every command name in `generate_handler!` is
-  unique and snake_case, plus a test that JS-facing argument names match the Rust
-  parameters. Say clearly in AGENTS.md which approach is used and why.
-
-Smoke tests (at minimum)
-- `settings::get_setting` / `settings::update_setting` round trip through the real handler.
-- One `commands::tasks` command and one `commands::events` command round trip.
-- `get_settings` returns defaults when the table is empty.
-
-Constraints
-- Do not change production behaviour to make tests easier, except the thin-wrapper
-  extraction.
-- Keep test modules `#![allow(clippy::unwrap_used, clippy::expect_used)]` and otherwise
-  clean under `cargo clippy --all-targets -- -D warnings`.
-- If you refactor `settings.rs` or `screens/plan/mod.rs`, coordinate so P3 (frontend-only)
-  is not running concurrently.
-
-Verify
-  cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo nextest run
-  git diff --exit-code src/lib/bindings
-Update src-tauri/AGENTS.md with the command-testing convention.
-```
 
 ---
 

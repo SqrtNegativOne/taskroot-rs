@@ -46,11 +46,14 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
     Ok(db::delete_task(&pool, id).await?)
 }
 
-#[tauri::command]
-pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
-    let pool = crate::db_pool(&app)?;
+/// Ids of open tasks whose linked event has already ended.
+///
+/// The `get_past_due_task_ids` command body. The query stays here rather than in
+/// `db` because its failure keeps the `internal` error code the frontend sees
+/// today (`db::*` failures map to `db`).
+pub(crate) async fn past_due_task_ids(pool: &sqlx::SqlitePool) -> Result<Vec<String>, AppError> {
     let now_iso = chrono::Utc::now().to_rfc3339();
-    let ids = sqlx::query_scalar::<_, String>(
+    sqlx::query_scalar::<_, String>(
         r"
         SELECT DISTINCT t.id 
         FROM tasks t 
@@ -60,9 +63,13 @@ pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>,
         ",
     )
     .bind(now_iso)
-    .fetch_all(&*pool)
+    .fetch_all(pool)
     .await
-    .map_err(|e| AppError::Internal(format!("Database error: {e}")))?;
+    .map_err(|e| AppError::Internal(format!("Database error: {e}")))
+}
 
-    Ok(ids)
+#[tauri::command]
+pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
+    let pool = crate::db_pool(&app)?;
+    past_due_task_ids(&pool).await
 }

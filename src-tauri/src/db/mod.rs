@@ -1,4 +1,5 @@
 pub mod events;
+mod maintenance;
 mod migrations;
 pub mod settings;
 pub mod task_filters;
@@ -6,6 +7,7 @@ pub mod tasks;
 pub mod ui_state;
 
 pub use events::*;
+pub use maintenance::*;
 pub use migrations::init_db;
 pub use settings::*;
 pub use task_filters::*;
