@@ -95,4 +95,21 @@ describe('persistState', () => {
         const writes = updateWrites();
         expect(writes).toHaveLength(1);
     });
+
+    it('flushes a pending write when the component is destroyed', async () => {
+        mockStoredSetting(null);
+
+        const { unmount } = render(Harness, {
+            props: { storageKey: KEY, fallback: [], debounceMs: 10_000 },
+        });
+        await waitFor(() => {
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await fireEvent.click(screen.getByText('add'));
+
+        unmount();
+
+        expect(invoke).toHaveBeenCalledWith('set_ui_state', { key: KEY, value: ['added'] });
+    });
 });

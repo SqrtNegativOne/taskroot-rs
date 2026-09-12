@@ -1,25 +1,31 @@
 # Taskroot: persistence & settings refactor — remaining waves
 
-Working document for the remaining work only. Completed waves (P1, P2) and their
-substrate prompts have been removed.
+Working document for the **remaining** work only. Completed waves (P1, P2, P3)
+have been removed along with their prompts; recover them from git history if a
+future change needs the original wording.
 
 ## Status
 
-| Wave | Prompt | State | Isolation | Depends on |
-|---|---|---|---|---|
-| 1 | P1 Settings substrate (serde merge + `ui_state`) | ✅ merged | — | — |
-| 2 | P2 Setting metadata single source (`#[setting(..)]` + `SettingsMeta`) | ✅ merged + gated | — | P1 |
-| 3 | **P3 Shared hydration primitive** | ⬜ next | worktree (parallel) | — |
-| 3 | **P5 Command-layer test harness** | ⬜ next | worktree (parallel) | — |
-| 4 | P4 Retire sidebar `localStorage` | ⬜ | solo | P1 + P3 |
-| 5 | P9 Independent verification | ⬜ last | read-only | all |
+| Wave | Prompt | State | Depends on |
+|---|---|---|---|
+| 3 | **P5 Command-layer test harness** | ⬜ next | — |
+| 4 | **P4 Retire sidebar `localStorage`** | ⬜ next | P1 + P3 |
+| 5 | **P9 Independent verification** | ⬜ last | all |
 
-P3 and P5 touch disjoint files and can run concurrently. If P5 chooses to refactor
-command bodies, it must add `src-tauri/src/settings/` and
-`src-tauri/src/screens/plan/mod.rs` to its diff — then run P3 and P5 sequentially.
+Completed:
 
-P2 gate note: the serialized schema contract is pinned by
-`src-tauri/src/settings/metadata/tests.rs`; do not break the camelCase/`type` keys.
+- **P1 — Settings substrate** (serde merge + `ui_state` table).
+- **P2 — Setting metadata single source** (`#[setting(..)]` + `SettingsMeta`). The
+  serialized schema contract (camelCase + `type` keys) is pinned by
+  `src-tauri/src/settings/metadata/tests.rs`; do not break it.
+- **P3 — Shared backend-hydration primitive** (`src/lib/asyncState.svelte.ts`:
+  `createStaleGuard`, `createDebouncedWriter`, `hydrateOnce`; `persistState` and
+  `useTauriQuery` now compose it).
+
+Remaining waves run **serially** in one working directory, in the order above:
+P5 and P4 touch disjoint files but P5 may add command-level test support that P4's
+verification can reuse, and P9 must see the merged result of both. Do not start a
+wave until the previous one is green and committed.
 
 ## Rules (every prompt)
 
@@ -35,7 +41,6 @@ P2 gate note: the serialized schema contract is pinned by
   string.
 - Files > 250 LOC: split. Prefer early returns. No tautological tests.
 - Update the relevant `AGENTS.md` for any new file, table, command, or convention.
-- One writer per working directory; parallel prompts run in isolated worktrees.
 
 ## Definition of done (every prompt)
 
@@ -51,52 +56,6 @@ git diff --exit-code src/lib/bindings    # binding-drift gate
 Stop and report if: a module the prompt assumes does not exist; the fix requires
 renaming a public command or changing the settings-screen contract; a test must be
 deleted or weakened; or there is user-visible data-loss risk.
-
----
-
-## PROMPT P3 — Shared backend-hydration primitive; refactor `persistState`
-
-```text
-Goal
-Extract the repeated "read once from the backend, then keep a reactive value in sync"
-logic into one documented primitive, and move the existing copies onto it.
-
-Current duplication (all three encode the same idea)
-- src/lib/store.svelte.ts   — idempotent `init()` with a cached bootstrap promise.
-- src/lib/safeInvoke.svelte.ts — `useTauriQuery` with a bespoke stale-guard request-id
-                              counter + `store-updated` listener.
-- src/lib/persisted.svelte.ts — `persistState` with a bespoke hydration flag, debounce
-                              timer, unchanged-value suppression and `onDestroy` flush.
-
-Required outcome
-- A small, documented module (e.g. src/lib/asyncState.svelte.ts) exporting the shared
-  pieces: hydrate-once-from-command, stale-response guarding, debounced write-back,
-  flush-on-destroy. Keep it minimal; do not build a framework.
-- `persistState` re-implemented on top of it with identical external behaviour
-  (hydrate once, suppress writes while hydrating, skip unchanged values, flush on
-  destroy, optional validator). All `persistedKeys` call sites keep working unchanged.
-- Decide and document where `persistState` belongs; keep src/lib/persisted.svelte.ts as
-  the public entry point unless there is a strong reason not to.
-- Optionally expose a bindable `$state` box in addition to the current `(read, write)`
-  callbacks, but only change call sites where it removes real duplication.
-
-Constraints
-- The 5 tests in src/lib/persisted.test.ts must pass unchanged (they encode the contract).
-- Frontend-only: do not touch `settings.rs`. Do not migrate sidebar localStorage (P4).
-
-Tests
-- Keep all existing `persistState` tests green.
-- Add tests for the primitive's stale-response guard and destroy-flush if not already
-  covered indirectly.
-
-Out of scope
-- Rewriting store.svelte.ts in a way that risks the idempotent-bootstrap behaviour; if
-  you do refactor it, preserve and test that behaviour.
-
-Verify
-  bun run check && bun run lint && bun run test:unit
-Update AGENTS.md / src/AGENTS.md with the new primitive and when to use it.
-```
 
 ---
 

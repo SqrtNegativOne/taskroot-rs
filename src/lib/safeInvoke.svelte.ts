@@ -1,6 +1,7 @@
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
+import { createStaleGuard } from './asyncState.svelte';
 
 export type { AppError, AppErrorCode } from './errors';
 export { describeAppError, normalizeAppError, unknownAppError } from './errors';
@@ -51,7 +52,8 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
     let error = $state<E | undefined>(undefined);
     let isLoading = $state(false);
 
-    let latestRequestId = 0;
+    const guard = createStaleGuard();
+    let hasDispatched = false;
     let inflight: Promise<void> | undefined;
     let debounceHandle: ReturnType<typeof setTimeout> | undefined;
 
@@ -65,7 +67,7 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
             void listen('store-updated', () => {
                 if (isCleanedUp) return;
                 const argsToUse = lastArgs ?? options.args;
-                if (argsToUse !== undefined || latestRequestId > 0) {
+                if (argsToUse !== undefined || hasDispatched) {
                     void dispatch(argsToUse);
                 }
             }).then((un) => {
@@ -82,13 +84,14 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
 
     async function dispatch(args: InvokeArgs | undefined): Promise<void> {
         lastArgs = args;
-        const requestId = ++latestRequestId;
+        hasDispatched = true;
+        const isCurrent = guard.begin();
         isLoading = true;
         error = undefined;
 
         inflight = (async () => {
             const result = await safeInvoke<T, E>(cmd, args ?? options.args);
-            if (requestId !== latestRequestId) return;
+            if (!isCurrent()) return;
 
             result.match(
                 (value) => {

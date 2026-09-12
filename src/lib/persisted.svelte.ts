@@ -1,5 +1,6 @@
 import { onDestroy, untrack } from 'svelte';
 import { safeInvoke } from './safeInvoke.svelte';
+import { createDebouncedWriter, hydrateOnce } from './asyncState.svelte';
 
 /**
  * Keys for per-component UI state persisted in the backend `ui_state` table via
@@ -38,11 +39,6 @@ interface PersistStateOptions {
     isValid?: (value: unknown) => boolean;
 }
 
-interface PendingWrite<T> {
-    value: T;
-    serialized: string;
-}
-
 /**
  * Keeps a reactive value in sync with the backend `ui_state` store.
  *
@@ -66,54 +62,37 @@ export function persistState<T>(
     const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     let hydrated = $state(false);
     let saved = '';
-    let pending: PendingWrite<T> | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const writer = createDebouncedWriter<T>((value) => {
+        saved = serialize(value);
+        saveSetting(key, value);
+    }, debounceMs);
+    const fallback = serialize(untrack(() => $state.snapshot(read())) as T);
 
-    function flush(): void {
-        if (timer !== undefined) {
-            clearTimeout(timer);
-            timer = undefined;
-        }
-        if (pending === undefined) return;
-        const entry = pending;
-        pending = undefined;
-        saved = entry.serialized;
-        saveSetting(key, entry.value);
-    }
-
-    $effect(() => {
-        let cancelled = false;
-        const fallback = serialize(untrack(() => $state.snapshot(read())) as T);
-        void (async () => {
+    hydrateOnce(
+        async () => {
             const result = await safeInvoke<unknown>('get_ui_state', { key });
-            if (cancelled) return;
-            const stored = result.isOk() ? result.value : null;
+            return result.isOk() ? result.value : null;
+        },
+        (stored) => {
             const present = stored !== null && stored !== undefined;
-            if (present && (options.isValid?.(stored) ?? true)) {
-                write(stored as T);
-                saved = serialize(stored);
-            } else {
+            if (!present || !(options.isValid?.(stored) ?? true)) {
                 saved = fallback;
+                hydrated = true;
+                return;
             }
+            write(stored as T);
+            saved = serialize(stored);
             hydrated = true;
-        })();
-        return () => {
-            cancelled = true;
-        };
-    });
+        },
+    );
 
     $effect(() => {
         const snapshot = $state.snapshot(read()) as T;
         if (!hydrated) return;
         const serialized = serialize(snapshot);
         if (serialized === saved) return;
-        pending = { value: snapshot, serialized };
-        if (timer !== undefined) clearTimeout(timer);
-        timer = setTimeout(() => {
-            timer = undefined;
-            flush();
-        }, debounceMs);
+        writer.schedule(snapshot);
     });
 
-    onDestroy(flush);
+    onDestroy(writer.flush);
 }

@@ -34,6 +34,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `time.ts`: Local-date helpers (`ymd`, `addDays`, `dayDiff`, `sameDay`). Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
     - `persisted.svelte.ts`: `persistState` rune + `persistedKeys` that hydrate per-component UI state (filters, sorts, view modes, pane sizes, collapsible sections) from the backend `ui_state` table via `get_ui_state` and debounce-save changes via `set_ui_state`, flushing pending writes on destroy.
+    - `asyncState.svelte.ts`: Shared backend-hydration primitives composed by `persistState` and `useTauriQuery`: `createStaleGuard` (drop out-of-order responses), `createDebouncedWriter` (coalesce writes + flush on demand), and `hydrateOnce` (read-once-on-mount). Not a framework; compose them and keep state local.
     - `routes.ts`: Centralized route-path constants.
     - `domain.ts`: Centralized domain barrel re-exporting generated bindings from `src/lib/bindings/` and domain models/events/timing/filters (modularized in `src/lib/domain/models.ts`, `events.ts`, `timing.ts`, `filters.ts`). `timing.ts` provides the only render-path day-overlap helpers (`instanceOccursOnDay`, `isAllDayTiming`).
   - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo nextest run` in `src-tauri`). Never hand-edit.
