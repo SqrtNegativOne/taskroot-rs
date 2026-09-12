@@ -193,6 +193,8 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
         let mut min: Option<LitInt> = None;
         let mut max: Option<LitInt> = None;
         let mut danger = false;
+        let mut keywords_seen = false;
+        let mut options_seen = false;
 
         for attr in &field.attrs {
             if !attr.path().is_ident("setting") {
@@ -201,20 +203,37 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
 
             let parsed = attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("label") {
-                    label = Some(meta.value()?.parse::<LitStr>()?.value());
+                    set_once(&mut label, meta.value()?.parse::<LitStr>()?.value(), &meta, "label")?;
                 } else if meta.path.is_ident("kind") {
-                    kind = Some(meta.value()?.parse::<LitStr>()?.value());
+                    set_once(&mut kind, meta.value()?.parse::<LitStr>()?.value(), &meta, "kind")?;
                 } else if meta.path.is_ident("section") {
-                    section = Some(meta.value()?.parse::<LitStr>()?.value());
+                    set_once(
+                        &mut section,
+                        meta.value()?.parse::<LitStr>()?.value(),
+                        &meta,
+                        "section",
+                    )?;
                 } else if meta.path.is_ident("description") {
-                    description = Some(meta.value()?.parse::<LitStr>()?.value());
+                    set_once(
+                        &mut description,
+                        meta.value()?.parse::<LitStr>()?.value(),
+                        &meta,
+                        "description",
+                    )?;
                 } else if meta.path.is_ident("min") {
-                    min = Some(meta.value()?.parse::<LitInt>()?);
+                    set_once(&mut min, meta.value()?.parse::<LitInt>()?, &meta, "min")?;
                 } else if meta.path.is_ident("max") {
-                    max = Some(meta.value()?.parse::<LitInt>()?);
+                    set_once(&mut max, meta.value()?.parse::<LitInt>()?, &meta, "max")?;
                 } else if meta.path.is_ident("danger") {
+                    if danger {
+                        return Err(meta.error("duplicate `danger` in #[setting(..)]"));
+                    }
                     danger = true;
                 } else if meta.path.is_ident("keywords") {
+                    if keywords_seen {
+                        return Err(meta.error("duplicate `keywords` in #[setting(..)]"));
+                    }
+                    keywords_seen = true;
                     let value = meta.value()?;
                     let array: syn::ExprArray = value.parse()?;
                     for element in array.elems {
@@ -224,6 +243,10 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                         keywords.push(text.value());
                     }
                 } else if meta.path.is_ident("options") {
+                    if options_seen {
+                        return Err(meta.error("duplicate `options` in #[setting(..)]"));
+                    }
+                    options_seen = true;
                     let value = meta.value()?;
                     let array: syn::ExprArray = value.parse()?;
                     for element in array.elems {
@@ -325,6 +348,21 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
     };
 
     generated.into()
+}
+
+/// Assign a scalar setting attribute exactly once; a repeated key is a compile
+/// error instead of a silent last-one-wins override.
+fn set_once<T>(
+    slot: &mut Option<T>,
+    value: T,
+    meta: &syn::meta::ParseNestedMeta,
+    name: &str,
+) -> syn::Result<()> {
+    if slot.is_some() {
+        return Err(meta.error(format!("duplicate `{name}` in #[setting(..)]")));
+    }
+    *slot = Some(value);
+    Ok(())
 }
 
 fn parse_setting_option(
