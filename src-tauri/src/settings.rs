@@ -410,6 +410,20 @@ fn accepts_field_value(key: &str, value: &Value) -> bool {
     serde_json::from_value::<AppSettings>(Value::Object(probe)).is_ok()
 }
 
+/// Reject a known `AppSettings` key whose value cannot be deserialized into its
+/// field, instead of storing a value [`get_settings`] will silently ignore.
+///
+/// Unknown keys stay allowed so the command remains a generic key/value setter.
+fn ensure_valid_setting_value(key: &str, value: &Value) -> Result<(), AppError> {
+    let defaults = defaults_object()?;
+    if defaults.contains_key(key) && !accepts_field_value(key, value) {
+        return Err(AppError::InvalidInput(format!(
+            "Setting '{key}' does not accept the provided value"
+        )));
+    }
+    Ok(())
+}
+
 /// Merge stored rows over the defaults: unknown keys are ignored, and a known key
 /// whose stored value cannot be deserialized into its field keeps the default.
 fn apply_stored_settings(stored: HashMap<String, Value>) -> Result<AppSettings, AppError> {
@@ -438,6 +452,7 @@ pub async fn update_setting(
     key: String,
     value: Value,
 ) -> Result<(), AppError> {
+    ensure_valid_setting_value(&key, &value)?;
     let pool = crate::db_pool(&app)?;
 
     let value_str = serde_json::to_string(&value)
@@ -653,5 +668,21 @@ mod tests {
             options.get(1).map(|option| &option.value),
             Some(&serde_json::json!(15))
         );
+    }
+
+    #[test]
+    fn ensure_valid_setting_value_rejects_a_wrongly_typed_known_setting() {
+        let error = ensure_valid_setting_value("sync_interval", &serde_json::json!("15"))
+            .expect_err("a string must be rejected for an i32 setting");
+
+        assert_eq!(error.code(), "invalid-input");
+    }
+
+    #[test]
+    fn ensure_valid_setting_value_accepts_typed_values_and_unknown_keys() {
+        ensure_valid_setting_value("sync_interval", &serde_json::json!(15))
+            .expect("a number is valid");
+        ensure_valid_setting_value("not_a_setting", &serde_json::json!([1, 2]))
+            .expect("unknown keys stay generic");
     }
 }

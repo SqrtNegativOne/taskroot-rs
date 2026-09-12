@@ -17,6 +17,14 @@
         return value ?? item.defaultValue;
     }
 
+    // A <select> value is always a string; map it back to the option's typed
+    // value so numeric settings (e.g. default_task_duration) are not stored as
+    // strings the backend then rejects.
+    function selectedValue(raw: string): SettingValue {
+        const picked = item.options?.find((option) => String(option.value) === raw);
+        return picked ? picked.value : raw;
+    }
+
     async function handleCustomAction(id: string) {
         if (id === 'logout') {
             if (confirm("Are you sure you want to sign out?")) {
@@ -46,7 +54,7 @@
             <select
                 id={item.id}
                 value={selectValue()}
-                onchange={(e) => onchange(e.currentTarget.value)}
+                onchange={(e) => onchange(selectedValue(e.currentTarget.value))}
             >
                 {#each item.options as option (option.value)}
                     <option value={option.value}>{option.label}</option>
