@@ -37,7 +37,7 @@ let singleton: TauriMock | undefined;
  * });
  *
  * const tauri = mockTauriInvoke();
- * tauri.stubCommandValue('get_setting', ['stored']);
+ * tauri.stubCommandValue('get_ui_state', ['stored']);
  * ```
  */
 export function mockTauriInvoke(): TauriMock {

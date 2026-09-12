@@ -14,11 +14,11 @@ const { invoke } = tauri;
 const KEY = 'ui.test.filters';
 
 function mockStoredSetting(value: unknown): void {
-    tauri.stubCommandValue('get_setting', value);
+    tauri.stubCommandValue('get_ui_state', value);
 }
 
 function updateWrites(): unknown[][] {
-    return invoke.mock.calls.filter(([cmd]) => cmd === 'update_setting');
+    return invoke.mock.calls.filter(([cmd]) => cmd === 'set_ui_state');
 }
 
 describe('persistState', () => {
@@ -44,7 +44,7 @@ describe('persistState', () => {
         render(Harness, { props: { storageKey: KEY, fallback: ['fallback'], debounceMs: 5 } });
 
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('get_setting', { key: KEY });
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
         });
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(screen.getByTestId('value').textContent).toBe('fallback');
@@ -68,7 +68,7 @@ describe('persistState', () => {
         await fireEvent.click(screen.getByText('add'));
 
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('update_setting', {
+            expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: KEY,
                 value: ['fallback', 'added'],
             });
@@ -86,7 +86,7 @@ describe('persistState', () => {
         void fireEvent.click(addButton);
 
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('update_setting', {
+            expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: KEY,
                 value: ['added', 'added', 'added'],
             });

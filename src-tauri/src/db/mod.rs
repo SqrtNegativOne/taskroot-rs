@@ -2,11 +2,13 @@ pub mod events;
 pub mod settings;
 pub mod task_filters;
 pub mod tasks;
+pub mod ui_state;
 
 pub use events::*;
 pub use settings::*;
 pub use task_filters::*;
 pub use tasks::*;
+pub use ui_state::*;
 
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
@@ -102,6 +104,11 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS ui_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS sync_queue (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_type TEXT NOT NULL,
@@ -141,7 +148,30 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     ensure_column!(pool, "calendars", "sync_token", "ALTER TABLE calendars ADD COLUMN sync_token TEXT");
     ensure_column!(pool, "tasks", "task_list_id", "ALTER TABLE tasks ADD COLUMN task_list_id TEXT");
 
+    // Per-component UI state used to live as `ui.*` rows in `settings`. Move it to
+    // its dedicated table once; on later boots nothing matches and both statements
+    // are no-ops (or clean up a stray `ui.*` row written through `update_setting`).
+    migrate_legacy_ui_state(&pool).await?;
+
     Ok(pool)
+}
+
+/// Move legacy `ui.*` rows out of `settings` and into `ui_state`.
+///
+/// # Errors
+///
+/// Returns an error if either statement fails.
+async fn migrate_legacy_ui_state(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT OR IGNORE INTO ui_state (key, value)
+         SELECT key, value FROM settings WHERE key LIKE 'ui.%'",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query("DELETE FROM settings WHERE key LIKE 'ui.%'")
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -172,6 +202,7 @@ mod tests {
             "tasks",
             "events",
             "settings",
+            "ui_state",
             "sync_queue",
             "tags",
             "task_tags",
@@ -191,43 +222,80 @@ mod tests {
     async fn test_settings_roundtrip_and_overwrite() {
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
 
+        let key = "test.roundtrip";
+
         assert_eq!(
-            get_setting(&pool, "ui.task_list.filters")
-                .await
-                .expect("get failed"),
+            get_setting(&pool, key).await.expect("get failed"),
             None
         );
 
-        set_setting(&pool, "ui.task_list.filters", r#"[{"column":"status"}]"#)
+        set_setting(&pool, key, r#"[{"column":"status"}]"#)
             .await
             .expect("set failed");
         assert_eq!(
-            get_setting(&pool, "ui.task_list.filters")
+            get_setting(&pool, key)
                 .await
                 .expect("get failed")
                 .as_deref(),
             Some(r#"[{"column":"status"}]"#)
         );
 
-        set_setting(&pool, "ui.task_list.filters", "[]")
-            .await
-            .expect("overwrite failed");
+        set_setting(&pool, key, "[]").await.expect("overwrite failed");
         assert_eq!(
-            get_setting(&pool, "ui.task_list.filters")
+            get_setting(&pool, key)
                 .await
                 .expect("get failed")
                 .as_deref(),
             Some("[]")
         );
 
-        delete_setting(&pool, "ui.task_list.filters")
-            .await
-            .expect("delete failed");
+        delete_setting(&pool, key).await.expect("delete failed");
         assert_eq!(
-            get_setting(&pool, "ui.task_list.filters")
+            get_setting(&pool, key).await.expect("get failed"),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_ui_state_roundtrip() {
+        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
+        let key = "task_list.filters";
+        let value = r#"[{"column":"status","value":["done"]}]"#;
+
+        assert_eq!(get_ui_state(&pool, key).await.expect("get failed"), None);
+
+        set_ui_state(&pool, key, value).await.expect("set failed");
+        assert_eq!(
+            get_ui_state(&pool, key)
+                .await
+                .expect("get failed")
+                .as_deref(),
+            Some(value)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_init_db_migrates_legacy_ui_settings_rows() {
+        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
+        set_setting(&pool, "ui.task_list.sort", r#""title""#)
+            .await
+            .expect("seed failed");
+
+        // Re-running the migration moves the legacy row into `ui_state`.
+        migrate_legacy_ui_state(&pool).await.expect("migrate failed");
+
+        assert_eq!(
+            get_setting(&pool, "ui.task_list.sort")
                 .await
                 .expect("get failed"),
             None
+        );
+        assert_eq!(
+            get_ui_state(&pool, "ui.task_list.sort")
+                .await
+                .expect("get failed")
+                .as_deref(),
+            Some(r#""title""#)
         );
     }
 

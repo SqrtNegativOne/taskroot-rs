@@ -1,3 +1,14 @@
+//! App settings and per-component UI state storage.
+//!
+//! Two channels back persisted state:
+//! - Typed, user-facing app settings are `AppSettings` fields stored as JSON rows
+//!   in the `settings` table and read/written with [`get_settings`] / [`update_setting`].
+//! - Arbitrary per-component UI state (filters, sorts, view modes, pane sizes)
+//!   lives in the dedicated `ui_state` table via [`get_ui_state`] / [`set_ui_state`].
+//!
+//! The rule: if it is a typed app setting, it belongs in `AppSettings`; anything
+//! else the frontend wants to remember goes to `ui_state`. Never smuggle UI state
+//! into `settings` as ad-hoc `ui.*` keys.
 #![allow(clippy::struct_excessive_bools)]
 
 use crate::db;
@@ -6,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
-use tauri::Manager;
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -269,52 +279,55 @@ fn defaults_object() -> Result<Map<String, Value>, AppError> {
     }
 }
 
+/// Decode one stored `settings.value` / `ui_state.value` column into JSON.
+///
+/// Values are JSON by construction; a bare string (an older row or a hand-edited
+/// database) falls back to `Value::String` so one malformed row cannot break a
+/// whole read path.
+#[must_use]
+pub fn decode_stored_value(raw: &str) -> Value {
+    serde_json::from_str(raw).unwrap_or_else(|_| Value::String(raw.to_string()))
+}
+
+/// Decode an optional stored column. Missing keys become `Null` so the frontend
+/// can distinguish "never saved" from a stored `null`.
+#[must_use]
+pub fn parse_setting_value(raw: Option<&str>) -> Value {
+    raw.map_or(Value::Null, decode_stored_value)
+}
+
 async fn load_stored_settings(pool: &SqlitePool) -> Result<HashMap<String, Value>, AppError> {
     let rows: Vec<(String, String)> = sqlx::query_as("SELECT key, value FROM settings")
         .fetch_all(pool)
         .await?;
 
-    let map: HashMap<String, Value> = rows
+    Ok(rows
         .into_iter()
-        .map(|(k, v)| {
-            let parsed = serde_json::from_str(&v).unwrap_or(Value::String(v));
-            (k, parsed)
-        })
-        .collect();
-
-    Ok(map)
+        .map(|(key, value)| (key, decode_stored_value(&value)))
+        .collect())
 }
 
-/// Decode a raw `settings.value` column into JSON. Missing keys become `Null`
-/// so the frontend can distinguish "never saved" from a stored `null`.
-#[must_use]
-pub fn parse_setting_value(raw: Option<String>) -> Value {
-    raw.map_or(Value::Null, |value| {
-        serde_json::from_str(&value).unwrap_or(Value::String(value))
-    })
+/// Whether `value` round-trips through the serde type of the `AppSettings` field
+/// `key`.
+///
+/// The probe is a one-field object; the struct's container-level `#[serde(default)]`
+/// fills every other field from `AppSettings::default()`, so only `key` is
+/// exercised. The struct itself therefore defines which values are acceptable and
+/// no hand-maintained list of JSON variants can drift out of sync.
+fn accepts_field_value(key: &str, value: &Value) -> bool {
+    let mut probe = Map::new();
+    probe.insert(key.to_string(), value.clone());
+    serde_json::from_value::<AppSettings>(Value::Object(probe)).is_ok()
 }
 
-#[tauri::command]
-pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
-    let pool = app
-        .try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))?;
-
-    let stored = load_stored_settings(&pool).await?;
+/// Merge stored rows over the defaults: unknown keys are ignored, and a known key
+/// whose stored value cannot be deserialized into its field keeps the default.
+fn apply_stored_settings(stored: HashMap<String, Value>) -> Result<AppSettings, AppError> {
     let mut merged = defaults_object()?;
 
-    for (key, stored_value) in stored {
-        if let Some(default_value) = merged.get(&key) {
-            let types_match = matches!(
-                (default_value, &stored_value),
-                (Value::Bool(_), Value::Bool(_))
-                    | (Value::Number(_), Value::Number(_))
-                    | (Value::String(_), Value::String(_))
-            );
-
-            if types_match {
-                merged.insert(key, stored_value);
-            }
+    for (key, value) in stored {
+        if merged.contains_key(&key) && accepts_field_value(&key, &value) {
+            merged.insert(key, value);
         }
     }
 
@@ -323,14 +336,19 @@ pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError
 }
 
 #[tauri::command]
+pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
+    let pool = crate::db_pool(&app)?;
+    let stored = load_stored_settings(&pool).await?;
+    apply_stored_settings(stored)
+}
+
+#[tauri::command]
 pub async fn update_setting(
     app: tauri::AppHandle,
     key: String,
     value: Value,
 ) -> Result<(), AppError> {
-    let pool = app
-        .try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))?;
+    let pool = crate::db_pool(&app)?;
 
     let value_str = serde_json::to_string(&value)
         .map_err(|e| AppError::Internal(format!("Failed to serialize setting: {e}")))?;
@@ -339,22 +357,42 @@ pub async fn update_setting(
     Ok(())
 }
 
-/// Read any key stored in the `settings` table (used for per-component UI
-/// state such as filters and sorts). Returns `null` for an unknown key.
+/// Read per-component UI state (filters, sorts, view modes, pane sizes) from the
+/// dedicated `ui_state` table. Returns `null` for an unknown key.
 #[tauri::command]
-pub async fn get_setting(app: tauri::AppHandle, key: String) -> Result<Value, AppError> {
-    let pool = app
-        .try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))?;
+pub async fn get_ui_state(app: tauri::AppHandle, key: String) -> Result<Value, AppError> {
+    let pool = crate::db_pool(&app)?;
+    let raw = db::get_ui_state(&pool, &key).await?;
+    Ok(parse_setting_value(raw.as_deref()))
+}
 
-    let raw = db::get_setting(&pool, &key).await?;
-    Ok(parse_setting_value(raw))
+/// Persist per-component UI state. See [`get_ui_state`].
+#[tauri::command]
+pub async fn set_ui_state(
+    app: tauri::AppHandle,
+    key: String,
+    value: Value,
+) -> Result<(), AppError> {
+    let pool = crate::db_pool(&app)?;
+
+    let value_str = serde_json::to_string(&value)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize UI state: {e}")))?;
+
+    db::set_ui_state(&pool, &key, &value_str).await?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
+
+    fn stored(entries: &[(&str, Value)]) -> HashMap<String, Value> {
+        entries
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), value.clone()))
+            .collect()
+    }
 
     #[test]
     fn parse_setting_value_returns_null_for_missing_key() {
@@ -363,7 +401,7 @@ mod tests {
 
     #[test]
     fn parse_setting_value_decodes_stored_json() {
-        let raw = Some(r#"[{"column":"status","value":["done"]}]"#.to_string());
+        let raw = Some(r#"[{"column":"status","value":["done"]}]"#);
 
         let parsed = parse_setting_value(raw);
 
@@ -374,8 +412,57 @@ mod tests {
     #[test]
     fn parse_setting_value_falls_back_to_raw_string() {
         assert_eq!(
-            parse_setting_value(Some("not json".to_string())),
+            parse_setting_value(Some("not json")),
             Value::String("not json".to_string())
         );
+    }
+
+    #[test]
+    fn apply_stored_settings_keeps_defaults_for_missing_keys() {
+        let settings = apply_stored_settings(HashMap::new()).expect("valid settings");
+
+        assert_eq!(settings.clock_style, AppSettings::default().clock_style);
+    }
+
+    #[test]
+    fn apply_stored_settings_overrides_a_correctly_typed_value() {
+        let settings = apply_stored_settings(stored(&[(
+            "clock_style",
+            Value::String("counter".to_string()),
+        )]))
+        .expect("valid settings");
+
+        assert_eq!(settings.clock_style, "counter");
+    }
+
+    #[test]
+    fn apply_stored_settings_ignores_a_wrongly_typed_value() {
+        let settings =
+            apply_stored_settings(stored(&[("clock_style", json!(42))])).expect("valid settings");
+
+        assert_eq!(settings.clock_style, AppSettings::default().clock_style);
+    }
+
+    #[test]
+    fn apply_stored_settings_ignores_unknown_and_structured_keys() {
+        let settings = apply_stored_settings(stored(&[
+            ("not_a_setting", json!([1, 2, 3])),
+            ("google_access_token", Value::String("token".to_string())),
+        ]))
+        .expect("valid settings");
+
+        assert_eq!(settings.default_calendar_view, "month");
+    }
+
+    #[test]
+    fn apply_stored_settings_keeps_booleans_and_numbers() {
+        let settings = apply_stored_settings(stored(&[
+            ("enable_calendar_sync", Value::Bool(false)),
+            ("sync_interval", json!(15)),
+        ]))
+        .expect("valid settings");
+
+        assert!(!settings.enable_calendar_sync);
+        assert_eq!(settings.sync_interval, 15);
     }
 }

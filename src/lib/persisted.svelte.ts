@@ -29,7 +29,7 @@ function serialize(value: unknown): string {
 }
 
 function saveSetting(key: string, value: unknown): void {
-    void safeInvoke('update_setting', { key, value });
+    void safeInvoke('set_ui_state', { key, value });
 }
 
 interface PersistStateOptions {
@@ -84,7 +84,7 @@ export function persistState<T>(
         let cancelled = false;
         const fallback = serialize(untrack(() => $state.snapshot(read())) as T);
         void (async () => {
-            const result = await safeInvoke<unknown>('get_setting', { key });
+            const result = await safeInvoke<unknown>('get_ui_state', { key });
             if (cancelled) return;
             const stored = result.isOk() ? result.value : null;
             const present = stored !== null && stored !== undefined;
