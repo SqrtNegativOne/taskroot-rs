@@ -2,8 +2,9 @@ import { onDestroy, untrack } from 'svelte';
 import { safeInvoke } from './safeInvoke.svelte';
 
 /**
- * Keys for per-component UI state persisted in the backend `settings` table.
- * Keys are namespaced under `ui.` so they never collide with `AppSettings`.
+ * Keys for per-component UI state persisted in the backend `ui_state` table via
+ * `get_ui_state`/`set_ui_state`. The `ui.` prefix is legacy-stable naming: the
+ * one-time `ui.*` migration copies keys verbatim, so renaming a key orphans it.
  */
 export const persistedKeys = {
     taskListFilters: 'ui.task_list.filters',
@@ -43,7 +44,7 @@ interface PendingWrite<T> {
 }
 
 /**
- * Keeps a reactive value in sync with the backend settings store.
+ * Keeps a reactive value in sync with the backend `ui_state` store.
  *
  * The stored value is read once on mount and written back (debounced) whenever
  * `read()` changes. While hydration is in flight writes are suppressed so a
@@ -51,7 +52,7 @@ interface PendingWrite<T> {
  * component fallback — are never written, so untouched defaults stay current
  * with the code and no redundant saves occur.
  *
- * @param key Backend settings key
+ * @param key Backend `ui_state` key
  * @param read Reads the current reactive value
  * @param write Applies a hydrated value back into component state
  * @param options Debounce window and an optional validator for stored data

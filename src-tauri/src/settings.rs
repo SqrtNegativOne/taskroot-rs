@@ -8,7 +8,9 @@
 //!
 //! The rule: if it is a typed app setting, it belongs in `AppSettings`; anything
 //! else the frontend wants to remember goes to `ui_state`. Never smuggle UI state
-//! into `settings` as ad-hoc `ui.*` keys.
+//! into `settings` as ad-hoc `ui.*` keys. (The `settings` table also carries the
+//! `google_*` OAuth rows written by `auth.rs`; those are not settings and are not
+//! part of `AppSettings`.)
 //!
 //! Settings presentation metadata lives in `#[setting(..)]` attributes next to the
 //! field it describes; [`get_settings_schema`] assembles the UI schema from them
@@ -548,14 +550,30 @@ mod tests {
     }
 
     #[test]
-    fn apply_stored_settings_ignores_unknown_and_structured_keys() {
+    fn apply_stored_settings_ignores_structured_values_and_unknown_keys() {
         let settings = apply_stored_settings(stored(&[
-            ("not_a_setting", serde_json::json!([1, 2, 3])),
+            ("clock_style", serde_json::json!(["guzey"])),
+            ("sync_interval", Value::Null),
             ("google_access_token", Value::String("token".to_string())),
         ]))
-        .expect("valid settings");
+        .expect("structured values and unknown keys must be ignored");
 
-        assert_eq!(settings.default_calendar_view, "month");
+        assert_eq!(
+            serde_json::to_value(&settings).expect("settings serialize"),
+            serde_json::to_value(AppSettings::default()).expect("defaults serialize")
+        );
+    }
+
+    #[test]
+    fn apply_stored_settings_ignores_a_non_integer_number_without_failing_the_read() {
+        let settings = apply_stored_settings(stored(&[
+            ("sync_interval", serde_json::json!(1.5)),
+            ("clock_style", Value::String("counter".to_string())),
+        ]))
+        .expect("one bad field must not fail the read");
+
+        assert_eq!(settings.sync_interval, AppSettings::default().sync_interval);
+        assert_eq!(settings.clock_style, "counter");
     }
 
     #[test]

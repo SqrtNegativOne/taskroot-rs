@@ -275,28 +275,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_init_db_migrates_legacy_ui_settings_rows() {
-        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
+    async fn test_init_db_migrates_legacy_ui_settings_rows_on_reopen() {
+        let path = std::env::temp_dir().join(format!(
+            "taskroot-migration-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        let url = format!("sqlite:{}", path.to_string_lossy());
+
+        let pool = init_db(&url).await.expect("Failed to init db");
         set_setting(&pool, "ui.task_list.sort", r#""title""#)
             .await
             .expect("seed failed");
+        pool.close().await;
 
-        // Re-running the migration moves the legacy row into `ui_state`.
-        migrate_legacy_ui_state(&pool).await.expect("migrate failed");
+        // Reopening goes through `init_db`, which runs the migration boot path.
+        let reopened = init_db(&url)
+            .await
+            .expect("Failed to reopen db with legacy row");
 
         assert_eq!(
-            get_setting(&pool, "ui.task_list.sort")
+            get_setting(&reopened, "ui.task_list.sort")
                 .await
                 .expect("get failed"),
             None
         );
         assert_eq!(
-            get_ui_state(&pool, "ui.task_list.sort")
+            get_ui_state(&reopened, "ui.task_list.sort")
                 .await
                 .expect("get failed")
                 .as_deref(),
             Some(r#""title""#)
         );
+
+        reopened.close().await;
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("db-wal"));
+        let _ = std::fs::remove_file(path.with_extension("db-shm"));
     }
 
     #[tokio::test]
