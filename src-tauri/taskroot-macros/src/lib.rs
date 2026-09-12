@@ -157,6 +157,15 @@ struct SettingOptionTokens {
 ///
 /// Every named field must carry at least `label`, `kind` and `section`; a missing
 /// attribute is a compile error rather than a silently absent schema entry.
+///
+/// Like [`Queryable`], the generated code references crate-absolute paths
+/// (`crate::settings::SettingMeta` / `crate::settings::SettingOption`), so it is
+/// intended for `AppSettings` inside the `taskroot` crate only, not as a
+/// standalone published derive.
+///
+/// Bounds/options are parsed as integer literals (`LitInt`); negative values such
+/// as `min = -5` or `options = [(-1, "x")]` are `Expr::Unary` and rejected. Add
+/// negative-literal support only when a setting actually needs it.
 #[proc_macro_derive(SettingsMeta, attributes(setting))]
 pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);

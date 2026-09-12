@@ -230,8 +230,8 @@ Extract the repeated "read once from the backend, then keep a reactive value in 
 logic into one documented primitive, and refactor the existing copies onto it.
 
 Current duplication (all three encode the same idea)
-- src/lib/store.svelte.ts   — bespoke idempotent `init()` with a cached promise and a
-                              `'not-ready'` retry loop.
+- src/lib/store.svelte.ts   — bespoke idempotent `init()` with a cached bootstrap promise
+                              (no retry loop; the `'not-ready'` code no longer exists).
 - src/lib/safeInvoke.svelte.ts — `useTauriQuery` with a bespoke stale-guard request-id
                               counter + `store-updated` listener.
 - src/lib/persisted.svelte.ts — `persistState` with a bespoke hydration flag, debounce
@@ -263,8 +263,8 @@ Tests (behaviour, not implementation)
   not already covered indirectly.
 
 Out of scope
-- Rewriting `store.svelte.ts` to fully adopt the primitive if that risks the `not-ready`
-  retry behaviour; if you do refactor it, preserve that behaviour and test it.
+- Rewriting `store.svelte.ts` to fully adopt the primitive if that risks the
+  idempotent-bootstrap behaviour; if you do refactor it, preserve that behaviour and test it.
 
 Verify
   bun run check && bun run lint && bun run test:unit
@@ -390,7 +390,7 @@ Specifically check
 3. Hydration primitive (P3)
    - Are the three original copies actually unified, or is `persistState` still carrying its
      own duplicate state machine?
-   - Does the `'not-ready'` retry in `store.svelte.ts` still work if it was touched?
+   - Is `store.svelte.ts` still idempotent (one cached bootstrap promise) if it was touched?
 4. Persistence channels (P4)
    - Is there any remaining `localStorage` write for user-facing state?
    - Does the one-time migration seed correctly and then stop consulting localStorage?
