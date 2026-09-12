@@ -30,6 +30,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `safeInvoke.svelte.ts`: `safeInvoke` (`ResultAsync` wrapper over `invoke`) and the `useTauriQuery` rune (stale-guard via request IDs, optional `debounceMs`).
     - `errors.ts`: Typed `BackendErrorCode`/`AppError` glue mirroring the Rust `AppError` contract (`normalizeAppError`, `describeAppError`).
     - `events.ts`: TypeScript mirrors of the backend event-name constants in `src-tauri/src/events.rs`.
+    - `eventColor.ts`: Shared event-accent presentation (`eventColorVars`) emitting the `--ev-color`/`--ev-bg` custom properties both the date grid and day timeline consume, so their colors cannot diverge.
     - `time.ts`: Local-date helpers (`ymd`, `addDays`, `dayDiff`, `sameDay`). Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
     - `routes.ts`: Centralized route-path constants.

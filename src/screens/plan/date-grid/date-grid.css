@@ -95,8 +95,8 @@
     line-height: 1.25;
     padding: 1px 4px 1px 5px;
     color: white;
-    border-left: 2px solid var(--fg-dimmer);
-    background: var(--bg-surface);
+    border-left: 2px solid var(--ev-color, var(--fg-dimmer));
+    background: var(--ev-bg, var(--bg-surface));
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -106,8 +106,8 @@
   .day-cell-event:hover {
     filter: brightness(1.15);
   }
-  .day-cell-event.ev-plan { border-left-color: var(--accent); background: var(--accent-soft); color: white; }
-  .day-cell-event.ev-meeting { border-left-color: var(--fg-dim); background: var(--bg-surface); }
+  .day-cell-event.ev-plan { border-left-color: var(--ev-color, var(--accent)); background: var(--ev-bg, var(--accent-soft)); color: white; }
+  .day-cell-event.ev-meeting { border-left-color: var(--ev-color, var(--fg-dim)); background: var(--ev-bg, var(--bg-surface)); }
   .day-cell-event.pri-bar-0 { border-left-color: #6a7c92; }
   .day-cell-event.pri-bar-1 { border-left-color: #719379; }
   .day-cell-event.pri-bar-2 { border-left-color: #b59864; }

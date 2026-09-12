@@ -9,6 +9,7 @@
         SNAP_MIN,
     } from './constants';
     import type { EventInstance } from '../../../lib/domain';
+    import { eventColorVars } from '../../../lib/eventColor';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
@@ -144,7 +145,7 @@
             height: {Math.max(height, MIN_EVENT_HEIGHT_PX)}px;
             left: calc({labelOffset}px + ((100% - {labelOffset}px) / {lanes}) * {lane});
             width: calc(((100% - {labelOffset}px) / {lanes}) - 2px);
-            {event.color ? `--ev-color: ${event.color}; --ev-bg: ${event.color + '40'};` : ''}
+            {eventColorVars(event.color)}
         "
         onpointerdown={isGhost ? undefined : onBodyDown}
     >

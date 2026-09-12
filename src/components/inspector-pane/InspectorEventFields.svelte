@@ -33,7 +33,12 @@
     }
 
     function handleCalendarChange(value: string): void {
-        updateEvent(event.id, (e) => ({ ...e, remoteCollectionId: value || undefined }));
+        const calendar = activeCalendars.find((c) => c.id === value);
+        updateEvent(event.id, (e) => ({
+            ...e,
+            remoteCollectionId: value || undefined,
+            color: calendar?.color ?? e.color,
+        }));
     }
 
     function handleRruleChange(value: string): void {

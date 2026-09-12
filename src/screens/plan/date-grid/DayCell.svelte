@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { EventInstance } from '../../../lib/domain';
+    import { eventColorVars } from '../../../lib/eventColor';
     import { sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
@@ -82,7 +83,7 @@
                 style="
                     cursor: grab;
                     opacity: {dragState?.event?.id === ev.id ? OPACITY_FADED : 1};
-                    {ev.color ? `background-color: ${ev.color}; border-left-color: ${ev.color};` : ''}
+                    {eventColorVars(ev.color)}
                 "
                 onpointerdown={(e) => onEventDragStart?.(e, ev)}
                 onclick={(e) => {
