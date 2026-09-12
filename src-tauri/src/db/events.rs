@@ -353,3 +353,26 @@ pub async fn get_calendars(
     .await?;
     Ok(calendars)
 }
+
+/// Resolve the background color a locally authored event should inherit.
+///
+/// The Google sync path bakes the calendar's background color into
+/// `events.color` (with a per-event `colorId` taking precedence). Rows created
+/// outside that path — e.g. a new event in the UI — skip the denormalization and
+/// would render uncolored until their first round-trip. This mirrors the sync
+/// fallback chain: explicit calendar, then primary, then the first calendar.
+///
+/// # Errors
+///
+/// Returns an error if the calendar lookup fails.
+pub async fn resolve_calendar_color(
+    pool: &SqlitePool,
+    calendar_id: Option<&crate::domain::CollectionId>,
+) -> Result<Option<crate::domain::Color>, sqlx::Error> {
+    let calendars = get_calendars(pool).await?;
+    let selected = calendar_id
+        .and_then(|id| calendars.iter().find(|cal| &cal.id == id))
+        .or_else(|| calendars.iter().find(|cal| cal.is_primary == Some(true)))
+        .or_else(|| calendars.first());
+    Ok(selected.and_then(|cal| cal.color.clone()))
+}

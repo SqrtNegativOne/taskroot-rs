@@ -1,6 +1,7 @@
 <script lang="ts">
     import { untrack } from 'svelte';
     import type { Snippet } from 'svelte';
+    import { persistState } from '../lib/persisted.svelte';
 
     type Direction = 'horizontal' | 'vertical';
 
@@ -9,6 +10,7 @@
         minSize = 100,
         snapThreshold = 50,
         defaultSize = 300,
+        persistKey,
         pane1,
         pane2
     }: {
@@ -16,6 +18,7 @@
         minSize?: number;
         snapThreshold?: number;
         defaultSize?: number;
+        persistKey?: string;
         pane1: Snippet;
         pane2: Snippet;
     } = $props();
@@ -23,6 +26,16 @@
     let size = $state(untrack(() => defaultSize));
     let isDragging = $state(false);
     let containerRef = $state<HTMLDivElement | null>(null);
+
+    const persistKeyValue = untrack(() => persistKey);
+    if (persistKeyValue !== undefined) {
+        persistState(
+            persistKeyValue,
+            () => size,
+            (stored) => { size = stored; },
+            { isValid: (stored): stored is number => typeof stored === 'number' && Number.isFinite(stored) && stored >= 0 },
+        );
+    }
 
     let isHoriz = $derived(direction === 'horizontal');
 

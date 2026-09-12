@@ -188,6 +188,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_settings_roundtrip_and_overwrite() {
+        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
+
+        assert_eq!(
+            get_setting(&pool, "ui.task_list.filters")
+                .await
+                .expect("get failed"),
+            None
+        );
+
+        set_setting(&pool, "ui.task_list.filters", r#"[{"column":"status"}]"#)
+            .await
+            .expect("set failed");
+        assert_eq!(
+            get_setting(&pool, "ui.task_list.filters")
+                .await
+                .expect("get failed")
+                .as_deref(),
+            Some(r#"[{"column":"status"}]"#)
+        );
+
+        set_setting(&pool, "ui.task_list.filters", "[]")
+            .await
+            .expect("overwrite failed");
+        assert_eq!(
+            get_setting(&pool, "ui.task_list.filters")
+                .await
+                .expect("get failed")
+                .as_deref(),
+            Some("[]")
+        );
+
+        delete_setting(&pool, "ui.task_list.filters")
+            .await
+            .expect("delete failed");
+        assert_eq!(
+            get_setting(&pool, "ui.task_list.filters")
+                .await
+                .expect("get failed"),
+            None
+        );
+    }
+
+    #[tokio::test]
     async fn test_task_crud_roundtrip() {
         let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
         let task = AppTask {
@@ -326,5 +370,46 @@ mod tests {
             .await
             .expect("final fetch failed")
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_calendar_color_uses_event_calendar_then_primary() {
+        use crate::domain::{AppCalendar, CollectionId, Color};
+
+        let pool = init_db("sqlite::memory:").await.expect("Failed to init db");
+        let calendar = |id: &str, color: &str, primary: bool| AppCalendar {
+            id: id.into(),
+            summary: id.into(),
+            color: Some(Color::try_from(color.to_string()).expect("valid color")),
+            is_primary: Some(primary),
+        };
+        upsert_calendar(&pool, calendar("primary-cal", "#ff0000", true))
+            .await
+            .expect("seed primary failed");
+        upsert_calendar(&pool, calendar("work", "#00ff00", false))
+            .await
+            .expect("seed work failed");
+
+        let work = CollectionId::from("work");
+        assert_eq!(
+            resolve_calendar_color(&pool, Some(&work))
+                .await
+                .expect("resolve failed"),
+            Some(Color::try_from("#00ff00".to_string()).expect("valid color"))
+        );
+
+        let unknown = CollectionId::from("unknown");
+        assert_eq!(
+            resolve_calendar_color(&pool, Some(&unknown))
+                .await
+                .expect("resolve failed"),
+            Some(Color::try_from("#ff0000".to_string()).expect("valid color"))
+        );
+        assert_eq!(
+            resolve_calendar_color(&pool, None)
+                .await
+                .expect("resolve failed"),
+            Some(Color::try_from("#ff0000".to_string()).expect("valid color"))
+        );
     }
 }

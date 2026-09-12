@@ -7,6 +7,9 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [sveltekit()],
+  // Under Vitest, resolve the browser build of Svelte so components can mount.
+  // @ts-expect-error process is a nodejs global
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: {
     passWithNoTests: true,
     include: ["src/**/*.{test,spec}.{js,ts}"],

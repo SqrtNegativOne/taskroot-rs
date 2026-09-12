@@ -3,12 +3,10 @@ import type { AppCalendar, AppEvent, AppTask } from './domain';
 import {
     computeFilterDefaults,
     editing,
-    filterEvents,
     hydrateEvents,
     isAppTaskStatus,
     isEventAllDay,
     isYmdString,
-    sortEvents,
     toEventType,
 } from './domain';
 
@@ -214,23 +212,10 @@ describe('computeFilterDefaults', () => {
     });
 });
 
-describe('event helpers: isEventAllDay, filterEvents, sortEvents', () => {
+describe('isEventAllDay', () => {
     it('identifies all-day events correctly', () => {
         expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03' })).toBe(true);
         expect(isEventAllDay({ startTime: '2026-09-03T10:00:00', endTime: '2026-09-03T11:00:00' })).toBe(false);
         expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03', isAllDay: false })).toBe(false);
-    });
-
-    it('filters and sorts hydrated events', () => {
-        const evs = [
-            { id: 'e2', title: 'Beta', startTime: '2026-09-03T11:00:00', endTime: '2026-09-03T12:00:00', category: 'Work' },
-            { id: 'e1', title: 'Alpha', startTime: '2026-09-03T09:00:00', endTime: '2026-09-03T10:00:00', category: 'Personal' },
-        ];
-
-        const filtered = filterEvents(evs, [{ column: 'category', operator: 'is', value: 'Work' }]);
-        expect(filtered.map((e) => e.id)).toEqual(['e2']);
-
-        const sorted = sortEvents(evs, 'startTime');
-        expect(sorted.map((e) => e.id)).toEqual(['e1', 'e2']);
     });
 });

@@ -33,11 +33,13 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
     - `eventColor.ts`: Shared event-accent presentation (`eventColorVars`) emitting the `--ev-color`/`--ev-bg` custom properties both the date grid and day timeline consume, so their colors cannot diverge.
     - `time.ts`: Local-date helpers (`ymd`, `addDays`, `dayDiff`, `sameDay`). Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.
+    - `persisted.svelte.ts`: `persistState` rune + `persistedKeys` that hydrate per-component UI state (filters, sorts, view modes, pane sizes, collapsible sections) from the backend `settings` table via `get_setting` and debounce-save changes via `update_setting`, flushing pending writes on destroy.
     - `routes.ts`: Centralized route-path constants.
     - `domain.ts`: Centralized domain barrel re-exporting generated bindings from `src/lib/bindings/` and domain models/events/timing/filters (modularized in `src/lib/domain/models.ts`, `events.ts`, `timing.ts`, `filters.ts`). `timing.ts` provides the only render-path day-overlap helpers (`instanceOccursOnDay`, `isAllDayTiming`).
   - `src/lib/bindings/`: Generated TypeScript bindings (`.generated.ts`) for Rust data structures (generated via `ts-rs` by running `cargo nextest run` in `src-tauri`). Never hand-edit.
   - `src/screens/`: Major UI views. `plan/` (with `day-timeline/`, including `hooks/pointerGesture.svelte.ts` — a window-pointer gesture registry with `pointercancel` and teardown safety — and `date-grid/`) and `do/` (with `stopwatch/`, whose `engine.svelte.ts` consumes the generated `StopwatchState`).
   - `src/components/`: Reusable UI components. `ComingSoon.svelte` consolidates the seven stub route pages; `inspector-pane/` is split into `InspectorPane`, `InspectorTaskFields`/`InspectorEventFields`, and `format.ts`.
+  - `src/test/`: Shared test utilities (`tauriMock.ts`, the process-wide Tauri IPC mock used by component tests). See `src/AGENTS.md` for the testing conventions.
 - `src-tauri/`: Tauri Rust backend.
   - `src-tauri/src/lib.rs`: Lints, module wiring, `db_pool()`, and `run()`. IPC commands live in `commands/`, not here.
   - `src-tauri/src/commands/`: IPC command handlers split by domain (`tasks.rs`, `events.rs`, `window.rs`, `sync.rs`).
@@ -48,7 +50,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/apis/`: Google API clients. `google_calendar/` is split into `mod.rs` (publish/delete transport), `write.rs` (the pure `&AppEvent` → method/URL/body builder; updates use `events.patch`, creates use `events.insert`), `types.rs`, and `events.rs` (incremental `syncToken` list with `showDeleted` and 410-Gone reset); `google_tasks.rs` syncs every task list with `showDeleted` + pagination. Write semantics and per-occurrence gaps are documented in `docs/google-calendar-write.md`.
   - `src-tauri/src/sync/`: Global sync engine: `mod.rs` (5-minute poller, `SyncState`), `push.rs` (enqueue + `plan_event_sync`, which turns a calendar change into a `SyncAction::Move`), `drain.rs` (drains the queue: publish/move/delete, surfaces the first push failure), `types.rs`, and the offline queue (`queue.rs`, `queue_store.rs`).
   - `src-tauri/src/stopwatch.rs`: Stopwatch backend (`StopwatchState` struct plus `get/toggle/reset_stopwatch` commands).
-  - `src-tauri/src/settings.rs`: Settings backend (`AppSettings` struct with `#[derive(TS)]` and schema definition emitting `src/lib/bindings/AppSettings.generated.ts`).
+  - `src-tauri/src/settings.rs`: Settings backend (`AppSettings` struct with `#[derive(TS)]` and schema definition emitting `src/lib/bindings/AppSettings.generated.ts`) plus the generic `get_setting`/`update_setting` commands that persist arbitrary JSON under `ui.*` keys in the same `settings` table.
 
 ### Key Concepts
 - **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `db`, `not-found`, `auth`, `sync`, `invalid-input`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.

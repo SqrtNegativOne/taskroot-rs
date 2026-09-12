@@ -1,5 +1,6 @@
 <script lang="ts">
     import { store, describeError } from '../../lib/store.svelte';
+    import { persistedKeys } from '../../lib/persisted.svelte';
     import type { AppEvent, AppTask, AppCalendar, EventInstance } from '../../lib/domain';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
@@ -105,6 +106,7 @@
             defaultSize={360}
             minSize={200}
             snapThreshold={50}
+            persistKey={persistedKeys.planTaskPaneSize}
         >
             {#snippet pane1()}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -134,6 +136,7 @@
                         defaultSize={450}
                         minSize={150}
                         snapThreshold={60}
+                        persistKey={persistedKeys.planCalendarSplitSize}
                     >
                         {#snippet pane1()}
                             <DateGrid

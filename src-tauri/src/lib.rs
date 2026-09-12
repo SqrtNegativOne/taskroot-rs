@@ -187,6 +187,7 @@ pub fn run() {
             stopwatch::reset_stopwatch,
             settings::get_settings_schema,
             settings::get_settings,
+            settings::get_setting,
             settings::update_setting,
             sync::get_sync_state
         ])

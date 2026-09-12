@@ -5,6 +5,7 @@
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
     import { computeFilterDefaults, type AppTask } from '../../lib/domain';
+    import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { slide } from 'svelte/transition';
@@ -39,6 +40,19 @@
             onUpdateTask(id, transform);
         }
     }
+
+    persistState(
+        persistedKeys.taskListFilters,
+        () => filters,
+        (stored) => { filters = stored; },
+        { isValid: Array.isArray },
+    );
+    persistState(
+        persistedKeys.taskListSort,
+        () => sort,
+        (stored) => { sort = stored; },
+        { isValid: Array.isArray },
+    );
 
     function deleteTask(id: string) {
         if (onDeleteTask) onDeleteTask(id);

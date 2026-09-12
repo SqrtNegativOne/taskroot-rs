@@ -285,6 +285,15 @@ async fn load_stored_settings(pool: &SqlitePool) -> Result<HashMap<String, Value
     Ok(map)
 }
 
+/// Decode a raw `settings.value` column into JSON. Missing keys become `Null`
+/// so the frontend can distinguish "never saved" from a stored `null`.
+#[must_use]
+pub fn parse_setting_value(raw: Option<String>) -> Value {
+    raw.map_or(Value::Null, |value| {
+        serde_json::from_str(&value).unwrap_or(Value::String(value))
+    })
+}
+
 #[tauri::command]
 pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
     let pool = app
@@ -328,4 +337,45 @@ pub async fn update_setting(
 
     db::set_setting(&pool, &key, &value_str).await?;
     Ok(())
+}
+
+/// Read any key stored in the `settings` table (used for per-component UI
+/// state such as filters and sorts). Returns `null` for an unknown key.
+#[tauri::command]
+pub async fn get_setting(app: tauri::AppHandle, key: String) -> Result<Value, AppError> {
+    let pool = app
+        .try_state::<SqlitePool>()
+        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))?;
+
+    let raw = db::get_setting(&pool, &key).await?;
+    Ok(parse_setting_value(raw))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::*;
+
+    #[test]
+    fn parse_setting_value_returns_null_for_missing_key() {
+        assert_eq!(parse_setting_value(None), Value::Null);
+    }
+
+    #[test]
+    fn parse_setting_value_decodes_stored_json() {
+        let raw = Some(r#"[{"column":"status","value":["done"]}]"#.to_string());
+
+        let parsed = parse_setting_value(raw);
+
+        let first = parsed.as_array().expect("array").first().expect("item");
+        assert_eq!(first["column"], Value::String("status".to_string()));
+    }
+
+    #[test]
+    fn parse_setting_value_falls_back_to_raw_string() {
+        assert_eq!(
+            parse_setting_value(Some("not json".to_string())),
+            Value::String("not json".to_string())
+        );
+    }
 }

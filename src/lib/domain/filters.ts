@@ -1,6 +1,5 @@
 import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
 import type { TaskPriority } from '../bindings/TaskPriority.generated';
-import type { HydratedEvent } from './events';
 
 export interface FilterLike {
     readonly column?: string | null;
@@ -109,80 +108,4 @@ export function computeFilterDefaults(filters: readonly FilterLike[] = []): Filt
     }
 
     return defaults;
-}
-
-function matchesEventTag(e: HydratedEvent, values: readonly string[]): boolean {
-    const taskTags = e.task?.tags ?? [];
-    const allTags = new Set(
-        taskTags.map((t) => {
-            const raw: unknown = t;
-            if (typeof raw === 'string') return raw.toLowerCase();
-            if (typeof raw === 'object' && raw !== null && 'name' in raw) {
-                return String((raw as { readonly name: unknown }).name).toLowerCase();
-            }
-            return '';
-        }),
-    );
-    return values.some((v) => allTags.has(v.toLowerCase()));
-}
-
-function matchesTaskStatus(e: HydratedEvent, values: readonly string[]): boolean {
-    return values.some((v) => {
-        if (v === 'none') return !e.task;
-        if (v === 'done') return e.task?.status === 'done';
-        if (v === 'todo') return e.task?.status !== 'done';
-        return e.task?.status === v;
-    });
-}
-
-function matchesFilter(e: HydratedEvent, f: FilterLike): boolean {
-    const rawValues = Array.isArray(f.value) ? f.value : [f.value];
-    const values = rawValues.map(String);
-    if (values.length === 0) return true;
-
-    let match = true;
-    if (f.column === 'type') {
-        const eventType = (e as { readonly type?: string }).type;
-        match = eventType !== undefined && values.includes(eventType);
-    } else if (f.column === 'tag' || f.column === 'tags') {
-        match = matchesEventTag(e, values);
-    } else if (f.column === 'taskStatus' || f.column === 'status') {
-        match = matchesTaskStatus(e, values);
-    } else if (f.column === 'category') {
-        match = values.includes(e.category ?? '');
-    }
-
-    const isExclusion = f.operator === 'is not' || f.operator === 'does not contain';
-    return isExclusion ? !match : match;
-}
-
-export function filterEvents(
-    evs: readonly HydratedEvent[],
-    filter?: readonly FilterLike[],
-): HydratedEvent[] {
-    if (!filter || filter.length === 0) return [...evs];
-
-    let filtered = [...evs];
-    for (const f of filter) {
-        if (!f.column || f.value === undefined || f.value === null || f.value === '') continue;
-        filtered = filtered.filter((e) => matchesFilter(e, f));
-    }
-    return filtered;
-}
-
-export function sortEvents(
-    evs: readonly HydratedEvent[],
-    sort?: string,
-): HydratedEvent[] {
-    if (!sort) return [...evs];
-    const sorted = [...evs];
-    sorted.sort((a, b) => {
-        if (sort === 'taskStatus') {
-            const aDone = a.task?.status === 'done' ? 1 : 0;
-            const bDone = b.task?.status === 'done' ? 1 : 0;
-            if (aDone !== bDone) return aDone - bDone;
-        }
-        return (a.startTime || '').localeCompare(b.startTime || '');
-    });
-    return sorted;
 }

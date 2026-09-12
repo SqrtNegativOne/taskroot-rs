@@ -194,6 +194,7 @@
             <div class="calendar-wrap" class:half={showNotes}>
                 <DayTimeline
                     {onAddEvent}
+                    variant="sidebar"
                 />
             </div>
             {#if showNotes}

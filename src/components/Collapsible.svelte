@@ -1,20 +1,33 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import type { Snippet } from 'svelte';
+    import { persistState } from '../lib/persisted.svelte';
 
     let {
         title,
         defaultOpen = false,
+        persistKey,
         badge,
         children
     }: {
         title: string;
         defaultOpen?: boolean;
+        persistKey?: string;
         badge?: Snippet;
         children: Snippet;
     } = $props();
 
-    // svelte-ignore state_referenced_locally
-    let isOpen = $state(defaultOpen);
+    let isOpen = $state(untrack(() => defaultOpen));
+
+    const persistKeyValue = untrack(() => persistKey);
+    if (persistKeyValue !== undefined) {
+        persistState(
+            persistKeyValue,
+            () => isOpen,
+            (stored) => { isOpen = stored; },
+            { isValid: (stored): stored is boolean => typeof stored === 'boolean' },
+        );
+    }
 
     function toggle() {
         isOpen = !isOpen;

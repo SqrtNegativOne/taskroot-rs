@@ -1,14 +1,15 @@
 <script lang="ts">
     import './day-timeline.css';
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
-    import { PX_PER_MIN } from './constants';
+    import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
     import { store } from '../../../lib/store.svelte';
 
@@ -17,12 +18,18 @@
         setDragState,
         onEventClick,
         onAddEvent,
+        variant = 'plan',
     }: {
         dragState?: DragState;
         setDragState?: (ds: DragState | undefined) => void;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
+        variant?: 'plan' | 'sidebar';
     } = $props();
+
+    function isNumDaysValue(value: unknown): value is number {
+        return typeof value === 'number' && NUM_DAYS_OPTIONS.includes(value);
+    }
 
     function onResizeEvent(id: string, startTime: string, endTime: string) {
         void store.rescheduleEvent(id, startTime, endTime);
@@ -36,11 +43,29 @@
     let eventQuery = $state('');
     let timelineDate = $state(new Date());
     let today = $state(new Date());
+    let numDays = $state(1);
+
+    const timelineKeys = untrack(() =>
+        variant === 'sidebar'
+            ? { filters: persistedKeys.sidebarTimelineFilters, numDays: persistedKeys.sidebarTimelineNumDays }
+            : { filters: persistedKeys.dayTimelineFilters, numDays: persistedKeys.dayTimelineNumDays },
+    );
+
+    persistState(
+        timelineKeys.filters,
+        () => eventFilters,
+        (stored) => { eventFilters = stored; },
+        { isValid: Array.isArray },
+    );
+    persistState(
+        timelineKeys.numDays,
+        () => numDays,
+        (stored) => { numDays = stored; },
+        { isValid: isNumDaysValue },
+    );
 
     let viewDate = $derived(timelineDate);
     let isToday = $derived(sameDay(viewDate, today));
-    
-    let numDays = $state(1);
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     

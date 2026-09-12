@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { SvelteDate } from 'svelte/reactivity';
+    import { NUM_DAYS_OPTIONS } from '../constants';
 
     let {
         viewDate,
@@ -20,7 +21,6 @@
         setNumDays?: (n: number) => void;
     } = $props();
 
-    const NUM_DAYS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
     let showViewMenu = $state(false);
     let viewMenuRef = $state<HTMLDivElement | null>(null);
 

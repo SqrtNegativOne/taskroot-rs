@@ -3,6 +3,7 @@
     import Stopwatch from './stopwatch/Stopwatch.svelte';
 
     import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import { persistedKeys } from '../../lib/persisted.svelte';
     import type { AppTask } from '../../lib/domain';
 
     let isBreak = $state(false);
@@ -53,28 +54,28 @@
                 </div>
             {/if}
 
-            <Collapsible title="distraction log" defaultOpen={true}>
+            <Collapsible title="distraction log" defaultOpen={true} persistKey={persistedKeys.doDistractionLogOpen}>
                 {#snippet badge()}
                     <span class="badge-count">0 entries</span>
                 {/snippet}
                 <div class="stub-content">Distraction Log Stub</div>
             </Collapsible>
 
-            <Collapsible title="current tasks" defaultOpen={false}>
+            <Collapsible title="current tasks" defaultOpen={false} persistKey={persistedKeys.doCurrentTasksOpen}>
                 {#snippet badge()}
                     <span class="badge-count">{tasks.length} tasks</span>
                 {/snippet}
                 <div class="stub-content">Kanban Stub</div>
             </Collapsible>
 
-            <Collapsible title="tips" defaultOpen={false}>
+            <Collapsible title="tips" defaultOpen={false} persistKey={persistedKeys.doTipsOpen}>
                 {#snippet badge()}
                     <span class="badge-count">0 tips</span>
                 {/snippet}
                 <div class="stub-content">Tips Stub</div>
             </Collapsible>
 
-            <Collapsible title="notes" defaultOpen={false}>
+            <Collapsible title="notes" defaultOpen={false} persistKey={persistedKeys.doNotesOpen}>
                 {#snippet badge()}
                     <span class="badge-count">0 notes</span>
                 {/snippet}

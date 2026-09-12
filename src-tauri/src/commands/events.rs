@@ -12,6 +12,11 @@ pub async fn create_event(
     mut event: domain::AppEvent,
 ) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
+    // New rows must carry the same denormalized calendar color the sync path
+    // writes, or they render uncolored until their first round-trip.
+    if event.color.is_none() {
+        event.color = db::resolve_calendar_color(&pool, event.remote_collection_id.as_ref()).await?;
+    }
     sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Create).await;
     Ok(db::create_event(&pool, event).await?)
 }

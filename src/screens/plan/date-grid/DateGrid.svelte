@@ -9,6 +9,7 @@
     import { ymd } from '../../../lib/time';
     
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
 
     let {
@@ -28,6 +29,19 @@
     let filters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
     let query = $state('');
     let today = $state(new Date());
+
+    persistState(
+        persistedKeys.dateGridFilters,
+        () => filters,
+        (stored) => { filters = stored; },
+        { isValid: Array.isArray },
+    );
+    persistState(
+        persistedKeys.dateGridView,
+        () => view,
+        (stored) => { view = stored; },
+        { isValid: (stored): stored is DateGridView => Object.values(DateGridView).includes(stored as DateGridView) },
+    );
 
     let dateGridRange = $derived.by(() => {
         const d = new Date(anchor);
