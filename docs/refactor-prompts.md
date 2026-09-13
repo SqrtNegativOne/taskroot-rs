@@ -1,14 +1,13 @@
 # Taskroot: persistence & settings refactor — remaining waves
 
 Working document for the **remaining** work only. Completed waves (P1, P2, P3,
-P5) have been removed along with their prompts; recover them from git history if a
-future change needs the original wording.
+P4, P5) have been removed along with their prompts; recover them from git history
+if a future change needs the original wording.
 
 ## Status
 
 | Wave | Prompt | State | Depends on |
 |---|---|---|---|
-| 4 | **P4 Retire sidebar `localStorage`** | ⬜ next | P1 + P3 |
 | 5 | **P9 Independent verification** | ⬜ last | all |
 
 Completed:
@@ -20,6 +19,9 @@ Completed:
 - **P3 — Shared backend-hydration primitive** (`src/lib/asyncState.svelte.ts`:
   `createStaleGuard`, `createDebouncedWriter`, `hydrateOnce`; `persistState` and
   `useTauriQuery` now compose it).
+- **P4 — Sidebar off `localStorage`** (`src/screens/sidebar/state.svelte.ts`):
+  `ui.sidebar.*` is the source of truth, seeded once from the legacy `sidebar_*`
+  keys only when the backend has no row, then the legacy keys are removed.
 - **P5 — Command-layer test harness** (`src-tauri/src/test_support/`,
   `commands/tests.rs`, `settings/tests.rs`): handlers are documented as thin
   wrappers over `&SqlitePool` bodies, and the JS↔Rust command contract is pinned
@@ -60,49 +62,6 @@ git diff --exit-code src/lib/bindings    # binding-drift gate
 Stop and report if: a module the prompt assumes does not exist; the fix requires
 renaming a public command or changing the settings-screen contract; a test must be
 deleted or weakened; or there is user-visible data-loss risk.
-
----
-
-## PROMPT P4 — Consolidate persistence channels (retire sidebar `localStorage`)
-
-```text
-Goal
-There are two persistence channels with no written rule: backend SQLite for app settings
-and per-component UI state, and `localStorage` for sidebar state. Pick one rule, document
-it, and migrate the outlier.
-
-Current localStorage usage (src/screens/sidebar/Sidebar.svelte)
-- `sidebar_tab_top`    (tab position, float)
-- `sidebar_notes`      (notes text)
-- `sidebar_show_notes` (notes pane open/closed)
-(src/routes/dev/+page.svelte is the dev inspector — leave it.)
-
-Required outcome
-- A written rule in src/AGENTS.md: backend SQLite is the source of truth for anything that
-  must survive a webview data reset or be shared across windows; `localStorage` is not used
-  for user-facing state.
-- Migrate the three values to the backend settings/UI-state API (P1), using the P3
-  primitive. Keep the draggable tab behaviour identical.
-- On first run after migration, seed from any existing `localStorage` values so current
-  users do not lose their sidebar position/notes; then stop writing to `localStorage`.
-- `notesText` is free-form and written on every keystroke today: use the debounced
-  write-back from the primitive; do not write per keystroke.
-
-Constraints
-- The sidebar is a separate Tauri webview (`label === 'sidebar'`); the value must be
-  readable from that window via the shared backend, not window-scoped storage.
-- Do not change the sidebar's window-sizing / monitor logic.
-- Depends on P1 (storage API) and P3 (primitive). Do not start before both are merged.
-
-Tests
-- Migration seeds from pre-existing localStorage values when the backend key is absent.
-- After migration the backend value wins and localStorage is not consulted.
-- Round-trip of the notes text and the tab position through the backend.
-
-Verify
-  bun run check && bun run lint && bun run test:unit
-Update src/AGENTS.md with the channel rule.
-```
 
 ---
 

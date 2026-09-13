@@ -1,19 +1,19 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import { getCurrentWindow, currentMonitor, primaryMonitor } from '@tauri-apps/api/window';
     import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
     import { store, describeError } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
     import { ymd, addDays } from '../../lib/time';
     import type { AppEvent } from '../../lib/domain';
+    import { createSidebarState, saveTabTop } from './state.svelte';
 
     let open = $state(false);
     let windowIsSmall = $state(true);
-    let showNotes = $state(false);
-    let notesText = $state('');
-    
-    let tabTop = $state(0);
+    const sidebar = createSidebarState();
+
     let isDragging = $state(false);
+    let monitorReady = $state(false);
     let dragStartScreenY = 0;
     let dragStartTabTop = 0;
 
@@ -39,7 +39,7 @@
             const widthPhysical = Math.round(26 * sf); // 22 + 4px buffer
             const heightPhysical = Math.round(64 * sf);
             const posX = screenX + screenW - widthPhysical;
-            const posY = Math.round(screenY + (tabTop * sf));
+            const posY = Math.round(screenY + (sidebar.tabTop * sf));
             await appWindow.setPosition(new PhysicalPosition(posX, posY));
             await appWindow.setSize(new PhysicalSize(widthPhysical, heightPhysical));
         }
@@ -62,7 +62,7 @@
     }
 
     function toggleNotes() {
-        showNotes = !showNotes;
+        sidebar.showNotes = !sidebar.showNotes;
     }
 
     function onPointerDown(e: PointerEvent) {
@@ -71,7 +71,7 @@
         target.setPointerCapture(e.pointerId);
         isDragging = true;
         dragStartScreenY = e.screenY;
-        dragStartTabTop = tabTop;
+        dragStartTabTop = sidebar.tabTop;
         e.preventDefault(); // prevent text selection
     }
 
@@ -84,13 +84,13 @@
         if (newTabTop < 0) newTabTop = 0;
         if (newTabTop > maxTop) newTabTop = maxTop;
         
-        tabTop = newTabTop;
+        sidebar.tabTop = newTabTop;
 
         if (windowIsSmall) {
             // update OS window position live
             const widthPhysical = Math.round(26 * sf);
             const posX = screenX + screenW - widthPhysical;
-            const posY = Math.round(screenY + (tabTop * sf));
+            const posY = Math.round(screenY + (sidebar.tabTop * sf));
             void getCurrentWindow().setPosition(new PhysicalPosition(posX, posY));
         }
     }
@@ -101,7 +101,7 @@
         target.releasePointerCapture(e.pointerId);
         isDragging = false;
         
-        localStorage.setItem('sidebar_tab_top', tabTop.toString());
+        saveTabTop(sidebar.tabTop);
         
         if (Math.abs(e.screenY - dragStartScreenY) < 3) {
             void toggleSidebar();
@@ -109,9 +109,6 @@
     }
 
     onMount(async () => {
-        notesText = localStorage.getItem('sidebar_notes') ?? '';
-        showNotes = localStorage.getItem('sidebar_show_notes') === 'true';
-
         const appWindow = getCurrentWindow();
         await appWindow.show();
         await appWindow.unminimize();
@@ -127,15 +124,7 @@
                 screenH = monitor.size.height;
                 screenX = monitor.position.x;
                 screenY = monitor.position.y;
-                
-                const savedTabTop = localStorage.getItem('sidebar_tab_top');
-                if (savedTabTop !== null) {
-                    tabTop = parseFloat(savedTabTop);
-                } else {
-                    tabTop = (screenH / sf - 64) / 2;
-                }
-                
-                await updateWindowBounds(open);
+                monitorReady = true;
             }
         } catch (err) {
             console.error("Failed to get monitor:", err);
@@ -143,8 +132,11 @@
     });
 
     $effect(() => {
-        localStorage.setItem('sidebar_notes', notesText);
-        localStorage.setItem('sidebar_show_notes', String(showNotes));
+        if (!sidebar.hydrated || !monitorReady) return;
+        sidebar.tabTop = sidebar.storedTabTop ?? (screenH / sf - 64) / 2;
+        untrack(() => {
+            void updateWindowBounds(open);
+        });
     });
 
     const MS_PER_MINUTE = 60_000;
@@ -176,7 +168,7 @@
 <div class="widget" class:open>
     <button 
         class="tab"
-        style="margin-top: {windowIsSmall ? 0 : tabTop}px;"
+        style="margin-top: {windowIsSmall ? 0 : sidebar.tabTop}px;"
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}
@@ -191,16 +183,16 @@
         {:else if store.error}
             <div class="panel-status">Backend error</div>
         {:else}
-            <div class="calendar-wrap" class:half={showNotes}>
+            <div class="calendar-wrap" class:half={sidebar.showNotes}>
                 <DayTimeline
                     {onAddEvent}
                     variant="sidebar"
                 />
             </div>
-            {#if showNotes}
+            {#if sidebar.showNotes}
                 <div class="notes-wrap">
                     <textarea
-                        bind:value={notesText}
+                        bind:value={sidebar.notes}
                         placeholder="Type notes here..."
                         class="notes-textarea"
                     ></textarea>
