@@ -1,37 +1,64 @@
-# Taskroot: persistence & settings refactor — remaining waves
+# Taskroot: persistence & settings refactor — P9 follow-ups
 
-Working document for the **remaining** work only. Completed waves (P1, P2, P3,
-P4, P5) have been removed along with their prompts; recover them from git history
-if a future change needs the original wording.
+P1–P5 are complete, committed, and independently verified (P9, read-only). No
+planned waves remain. This file now tracks P9's residual findings only; recover
+the original P1–P5 prompts from git history if needed.
 
-## Status
+## P9 result
 
-| Wave | Prompt | State | Depends on |
-|---|---|---|---|
-| 5 | **P9 Independent verification** | ⬜ last | all |
+Full gate green on the P1–P5 result, with no blocking findings:
 
-Completed:
+- `bun run check` → 0 errors / 0 warnings
+- `bun run lint` → clean
+- `bun run test:unit` → 53 passed
+- `cargo clippy --all-targets -- -D warnings` → clean
+- `cargo nextest run` → 129 passed
+- `git diff --exit-code src/lib/bindings` → clean
+- `bun run check:deps` → clean
 
-- **P1 — Settings substrate** (serde merge + `ui_state` table).
-- **P2 — Setting metadata single source** (`#[setting(..)]` + `SettingsMeta`). The
-  serialized schema contract (camelCase + `type` keys) is pinned by
-  `src-tauri/src/settings/metadata/tests.rs`; do not break it.
-- **P3 — Shared backend-hydration primitive** (`src/lib/asyncState.svelte.ts`:
-  `createStaleGuard`, `createDebouncedWriter`, `hydrateOnce`; `persistState` and
-  `useTauriQuery` now compose it).
-- **P4 — Sidebar off `localStorage`** (`src/screens/sidebar/state.svelte.ts`):
-  `ui.sidebar.*` is the source of truth, seeded once from the legacy `sidebar_*`
-  keys only when the backend has no row, then the legacy keys are removed.
-- **P5 — Command-layer test harness** (`src-tauri/src/test_support/`,
-  `commands/tests.rs`, `settings/tests.rs`): handlers are documented as thin
-  wrappers over `&SqlitePool` bodies, and the JS↔Rust command contract is pinned
-  by source-scanning registry tests. No mock-runtime helper: all commands take a
-  concrete `AppHandle<Wry>`, which `MockRuntime` cannot satisfy without changing
-  38 public signatures.
+Verified: the settings merge drops only unmergeable legacy rows (documented
+contract), the metadata schema strings match the pre-P2 output, `persistState`
+no longer owns a timer/flag state machine and `useTauriQuery` uses the stale
+guard, `store.svelte.ts` is still idempotent, the sidebar has no user-facing
+`localStorage` write left, and the one-time migration seeds only when the backend
+is empty. The P5 "no mock-runtime" reason is honest (all commands take a concrete
+`AppHandle<Wry>`).
 
-Remaining waves run **serially** in one working directory, in the order above;
-P9 must see the merged result of everything before it. Do not start a wave until
-the previous one is green and committed.
+## Follow-ups
+
+### Should-fix
+
+- **F1 — frontend arg-contract scan is blind to `.execute({...})` arguments.**
+  `src-tauri/src/test_support/frontend_scan.rs` only reads argument literals at
+  the wrapper call site, so the three `useTauriQuery(...).execute({...})` sites
+  (`src/routes/minitracker/+page.svelte`, `src/screens/do/DoScreen.svelte`,
+  `src/screens/do/stopwatch/Stopwatch.svelte`) are recorded with no keys and are
+  never assertion-checked. Fix: pass args through `options.args`, or bind
+  `.execute({...})` to the preceding command literal in the scanner; at minimum
+  document the gap in `src-tauri/AGENTS.md`.
+- **F2 — no `commands::events` command body is exercised.**
+  `commands/tests.rs`'s `get_active_calendars_returns_every_stored_calendar` calls
+  `db::get_calendars`, not the handler body, so no events command has a covered
+  `&SqlitePool` body. Fix: extract `active_calendars(&SqlitePool)` in
+  `commands/events.rs` and call it from both the handler and the test; or rename
+  the test and state that no events handler has an extracted body.
+
+### Nits
+
+- **N1 — P3 unification is partial.** `store.svelte.ts` still owns its idempotent
+  `initPromise` bootstrap rather than `hydrateOnce`; the P3 out-of-scope note
+  cites a `'not-ready'` retry loop that no longer exists.
+- **N2 — P2 output is not pinned byte-for-byte.** `settings/metadata/tests.rs`
+  pins ids, `defaultValue` and option presence, but not label/option/keyword
+  strings; a snapshot would close the gap.
+- **N3 — `update_setting` still accepts unknown keys**, writing rows
+  `get_settings` will never merge (`settings/storage.rs`); reject them or document
+  the intentional loose setter.
+- **N4 — source-scan heuristics are brittle.** `source_scan.rs`'s
+  `between(..., ']')`, comma-split params, and missing-required-argument blindness
+  should be listed as limits in `src-tauri/AGENTS.md`.
+- **N5 — `src-tauri/AGENTS.md` overstates the mock-runtime cost** ("38 commands";
+  only the ~33 that take `app` would need to be runtime-generic).
 
 ## Rules (every prompt)
 
@@ -62,43 +89,3 @@ git diff --exit-code src/lib/bindings    # binding-drift gate
 Stop and report if: a module the prompt assumes does not exist; the fix requires
 renaming a public command or changing the settings-screen contract; a test must be
 deleted or weakened; or there is user-visible data-loss risk.
-
----
-
-## PROMPT P9 — Independent verification (read-only)
-
-```text
-Role
-Independent verifier. You wrote none of these changes. Be adversarial. Do not fix
-anything; produce a findings report.
-
-Scope
-Review the merged result of P1–P5 against their acceptance criteria and the repo rules in
-AGENTS.md / src/AGENTS.md / src-tauri/AGENTS.md.
-
-Check specifically
-1. Settings substrate (P1): does `get_settings` still silently drop values it cannot merge?
-   Prove it with a test or counterexample. Is the settings-vs-ui_state rule documented and
-   followed? Any second JSON-decode rule left in `settings.rs`?
-2. Metadata single source (P2): is there a test that fails when a new `AppSettings` field is
-   added but not described? Do ids/labels/option values/defaults match the pre-refactor output?
-3. Hydration primitive (P3): are the three original copies unified, or is `persistState`
-   still carrying its own state machine? Is `store.svelte.ts` still idempotent?
-4. Channels (P4): any remaining `localStorage` write for user-facing state? Does the
-   one-time migration seed correctly and then stop consulting localStorage?
-5. Command tests (P5): if a smoke test was skipped in favour of a registry test, is the
-   documented reason honest, or is it hiding an untested command surface? A green suite must
-   not be presented as more coverage than it is.
-
-Run the full gate yourself and report the raw result
-  bun run check && bun run lint && bun run test:unit
-  cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo nextest run
-  git diff --exit-code src/lib/bindings
-  bun run check:deps
-
-Output
-- Ordered findings: blocking / should-fix / nit.
-- For each: file:line, why it violates the stated criterion, and the smallest repro or test.
-- Explicitly list which acceptance criteria you could NOT verify, and why.
-- Propose the minimal fix per finding; no broad rewrites.
-```
