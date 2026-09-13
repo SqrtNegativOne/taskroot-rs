@@ -199,7 +199,8 @@ fn build_settings_schema() -> SchemaRoot {
 ///
 /// `serde_json`'s default map is a `BTreeMap`, so key order is deterministic.
 /// Tests assert the wire contract structurally rather than pinning a full golden
-/// blob, which would be a change-detector.
+/// blob, which would be a change-detector; the user-visible label/keyword/option
+/// strings are pinned separately in `tests.rs`.
 pub(super) fn settings_schema_value() -> Value {
     // `SchemaRoot` is plain data, so serialization is infallible.
     serde_json::to_value(build_settings_schema()).unwrap_or(Value::Null)

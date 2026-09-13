@@ -58,11 +58,18 @@ fn every_command_has_a_handler_signature_and_vice_versa() {
 
 #[test]
 fn frontend_call_sites_match_the_rust_command_signatures() {
-    let params = source_scan::annotated_command_params();
     let calls = frontend_scan::frontend_calls();
     assert!(!calls.is_empty(), "the frontend scan found no call sites");
 
-    for call in &calls {
+    assert_keys_match_rust_signatures(&calls);
+}
+
+/// Panics on a call site that names an unknown command or passes an argument key
+/// its command does not declare.
+fn assert_keys_match_rust_signatures(calls: &[frontend_scan::FrontendCall]) {
+    let params = source_scan::annotated_command_params();
+
+    for call in calls {
         let Some(declared) = params.get(&call.command) else {
             panic!("the frontend invokes `{}`, which is not a command", call.command);
         };
@@ -74,6 +81,34 @@ fn frontend_call_sites_match_the_rust_command_signatures() {
             );
         }
     }
+}
+
+/// A `useTauriQuery(..)` result is usually executed later as
+/// `query.execute({..})`; those keys belong to the same command and must be
+/// checked, or a renamed argument key passes unnoticed.
+#[test]
+fn dot_execute_argument_keys_are_attributed_to_the_command() {
+    let source = "\
+let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+tasksQuery.execute({ filters: [], sort: [], query: \"\" });";
+
+    let calls = frontend_scan::calls_in(source);
+
+    assert_eq!(calls.len(), 1);
+    let call = calls.first().expect("one call site");
+    assert_eq!(call.command, "query_tasks");
+    assert_eq!(call.keys, ["filters", "sort", "query"]);
+    assert_keys_match_rust_signatures(&calls);
+}
+
+#[test]
+#[should_panic(expected = "is passed `bogusKey`")]
+fn a_dot_execute_key_the_command_does_not_declare_fails_the_contract() {
+    let source = "\
+let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+tasksQuery.execute({ bogusKey: 1 });";
+
+    assert_keys_match_rust_signatures(&frontend_scan::calls_in(source));
 }
 
 #[test]
@@ -123,9 +158,7 @@ async fn past_due_task_ids_returns_the_open_tasks_whose_event_has_ended() {
     assert_eq!(overdue_ids, vec!["task-overdue".to_string()]);
 }
 
-/// `commands::events::get_active_calendars` delegates to `db::get_calendars`.
-/// Its own body is the pool lookup plus that delegation, so this is the whole
-/// testable surface of the command.
+/// `commands::events::get_active_calendars` delegates to this pool-level body.
 #[tokio::test]
 async fn get_active_calendars_returns_every_stored_calendar() {
     let pool = test_support::in_memory_pool().await;
@@ -142,7 +175,7 @@ async fn get_active_calendars_returns_every_stored_calendar() {
         .await
         .unwrap();
 
-    let calendars = db::get_calendars(&pool).await.unwrap();
+    let calendars = super::events::active_calendars(&pool).await.unwrap();
 
     assert_eq!(calendars.len(), 2);
     let primary = calendars
@@ -151,4 +184,3 @@ async fn get_active_calendars_returns_every_stored_calendar() {
         .expect("the primary calendar is returned");
     assert_eq!(primary.id, "primary".into());
 }
-

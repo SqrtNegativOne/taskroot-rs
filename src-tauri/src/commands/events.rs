@@ -61,6 +61,20 @@ pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppEr
     Ok(db::delete_event(&pool, id).await?)
 }
 
+/// The stored calendars, active or not.
+///
+/// The `get_active_calendars` command body. It is split out of the handler so
+/// the pool-level body is testable (see `src-tauri/AGENTS.md` → Command Testing).
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub(crate) async fn active_calendars(
+    pool: &sqlx::SqlitePool,
+) -> Result<Vec<domain::AppCalendar>, AppError> {
+    Ok(db::get_calendars(pool).await?)
+}
+
 /// # Errors
 ///
 /// Returns an error if the database is unavailable.
@@ -69,5 +83,5 @@ pub async fn get_active_calendars(
     app: tauri::AppHandle,
 ) -> Result<Vec<domain::AppCalendar>, AppError> {
     let pool = crate::db_pool(&app)?;
-    Ok(db::get_calendars(&pool).await?)
+    active_calendars(&pool).await
 }

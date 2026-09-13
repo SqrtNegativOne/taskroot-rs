@@ -81,6 +81,9 @@ pub(super) async fn read_settings(pool: &SqlitePool) -> Result<AppSettings, AppE
 /// The `update_setting` command body: validate the value for a known key,
 /// encode it and persist it.
 ///
+/// Unknown keys are accepted on purpose — `update_setting` stays a generic
+/// key/value setter, and `read_settings` simply never merges those rows.
+///
 /// # Errors
 ///
 /// Returns an error if a known key rejects the value, or the write fails.

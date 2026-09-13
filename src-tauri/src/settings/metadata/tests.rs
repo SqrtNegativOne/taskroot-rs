@@ -2,6 +2,7 @@
 
 use super::*;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 
 /// The control kinds `SettingRow`/`schema.ts` know how to render. `custom` is
 /// for the button-only pseudo-settings, `action` for frontend-only controls;
@@ -208,4 +209,42 @@ fn numeric_select_options_keep_numeric_values() {
         options.get(1).map(|option| &option.value),
         Some(&serde_json::json!(15))
     );
+}
+
+/// One line per setting: `id | label | keyword,keyword | value=Label | ...`.
+fn metadata_strings() -> String {
+    let mut out = String::new();
+    for meta in AppSettings::setting_metadata() {
+        let _ = write!(out, "{} | {} | {}", meta.id, meta.label, meta.keywords.join(","));
+        for option in meta.options.as_deref().unwrap_or_default() {
+            let _ = write!(out, " | {}={}", option.value, option.label);
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// P2 replaced a hand-written `json!` schema with derived metadata; these strings
+/// are exactly what the settings screen renders. Pin them so a changed label,
+/// keyword or select option is a conscious edit, not silent drift.
+#[test]
+fn user_visible_setting_strings_are_pinned() {
+    let expected = "\
+default_calendar_view | Default View | calendar,view,month,week | \"month\"=Month | \"week\"=Week
+day_timeline_start_view | Timeline View Start Time | timeline,day,start,time,scroll,view
+default_task_duration | Default Duration | task,duration,estimate,time | 0=Not set | 15=15m | 30=30m | 45=45m
+clock_style | Clock Style | stopwatch,timer,guzey,counter,flowtime | \"counter\"=Counter | \"flowtime\"=Flowtime | \"guzey\"=Guzey
+allow_stopwatch_without_task | Allow stopwatch use without selecting task | stopwatch,task,requirement,allow
+flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
+enable_calendar_sync | Enable Bidirectional Google Calendar Sync | google,calendar,sync,events
+enable_tasks_sync | Enable Bidirectional Google Tasks Sync | google,tasks,sync,todos
+sync_interval | Sync Interval (minutes) | sync,interval,poll,time
+keybinding_launcher | Open Launcher | keyboard,shortcut,launcher,open
+keybinding_open_settings | Open Settings | keyboard,shortcut,settings,open
+keybinding_restore_app | Restore App | keyboard,shortcut,restore,maximize,mini tracker,minitracker
+tracker_show_border | Show Window Border | tracker,border,show,outline
+tracker_opacity | Base Opacity (%) | tracker,opacity,transparent,window
+";
+
+    assert_eq!(metadata_strings(), expected);
 }

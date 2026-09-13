@@ -35,13 +35,13 @@ tested at the seam underneath it:
   `#![allow(clippy::unwrap_used, clippy::expect_used)]`, like `db/tests.rs`.
 
 **Why there is no mock-runtime test.** A handler can only be invoked end-to-end through
-`tauri::test::get_ipc_response`, which needs a `Webview<MockRuntime>`. Every command in
-this crate takes the concrete `tauri::AppHandle` (`AppHandle<Wry>`), and `MockRuntime`
+`tauri::test::get_ipc_response`, which needs a `Webview<MockRuntime>`. The commands
+that take `app` use the concrete `tauri::AppHandle` (`AppHandle<Wry>`), and `MockRuntime`
 cannot satisfy that parameter — `AppHandle<Wry>: CommandArg<'_, MockRuntime>` does not
 hold, so the production `generate_handler!` table cannot even be installed into a mock
-app. Making the 38 commands generic over `R: Runtime` would rewrite every public command
-signature, which the thin-wrapper rule does not cover. On Windows there is a second
-blocker: `tauri-build` attaches the Common Controls v6 manifest to binary targets only
+app. Making the 33 commands that take `app` generic over `R: Runtime` would rewrite
+every public command signature, which the thin-wrapper rule does not cover. On Windows
+there is a second blocker: `tauri-build` attaches the Common Controls v6 manifest to binary targets only
 (`rustc-link-arg-bins`), so a test binary that builds an `App` aborts at load with
 `STATUS_ENTRYPOINT_NOT_FOUND` no matter what the handler does.
 
@@ -54,11 +54,23 @@ for the Rust side, `test_support::frontend_scan` for the call sites), asserted i
 - every literal command name at a `safeInvoke`/`useAutoQuery`/`useTauriQuery`/`invoke`
   call site under `../src` is registered, and every argument key it passes matches a
   camelCased Rust parameter of that command (the exact key `#[tauri::command]` looks up).
+  A `useTauriQuery(..)` result bound to a local is followed to its later
+  `query.execute({..})` calls, so those keys are checked too.
 
 Limits to keep in mind: the scan sees literal command names only (a call site that
 computes the name is not checked) and it skips test sources (`src/test/**`, `*.test.ts`,
-`*tests.rs`). A green suite is a contract check, not end-to-end coverage of a handler —
-the handler's own `db_pool(&app)` line is only compile-checked.
+`*tests.rs`). The source heuristics are deliberately shallow and can mis-read
+non-literal code:
+
+- `between(.., ']')` stops at the *first* `]`, so a `]` inside the `generate_handler!`
+  list would truncate the registered-command scan;
+- `#[tauri::command]` parameters are split on every comma, so a parameter type that
+  contains a comma (e.g. a generic) would be mis-split;
+- only that the *supplied* keys are declared is checked — a call site that omits a
+  required argument is not flagged (the handler would reject it at runtime).
+
+A green suite is a contract check, not end-to-end coverage of a handler — the handler's
+own `db_pool(&app)` line is only compile-checked.
 
 ## Style & Idioms
 - **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.

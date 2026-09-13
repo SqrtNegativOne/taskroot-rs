@@ -15,6 +15,10 @@ export class AppStore {
 
     private initPromise: Promise<Result<void, AppError>> | undefined;
 
+    // Idempotent settings bootstrap, cached as a promise so overlapping callers
+    // share one load. It deliberately does not use `hydrateOnce`: that wraps a
+    // component `$effect`, and this store is a module-level singleton outside any
+    // component. (`init()` no longer retries; the old `'not-ready'` loop is gone.)
     init(): Promise<Result<void, AppError>> {
         this.initPromise ??= this.bootstrap();
         return this.initPromise;

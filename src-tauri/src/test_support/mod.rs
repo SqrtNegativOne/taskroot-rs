@@ -7,9 +7,9 @@
 //!
 //! There is deliberately no mock-Tauri helper here. A `#[tauri::command]` handler
 //! can only be invoked through `tauri::test::get_ipc_response`, which needs an
-//! `App<MockRuntime>`, and every command in this crate takes the concrete
+//! `App<MockRuntime>`, and the commands that take `app` use the concrete
 //! `tauri::AppHandle` (i.e. `AppHandle<Wry>`) — `MockRuntime` cannot satisfy that
-//! parameter. Making the commands runtime-generic would change 38 public
+//! parameter. Making those 33 commands runtime-generic would change 33 public
 //! signatures, which this wave does not do. So the smoke tests drive the
 //! `&SqlitePool` body each command delegates to, and [`source_scan`] plus
 //! [`frontend_scan`] check the handler table against the frontend call sites.
