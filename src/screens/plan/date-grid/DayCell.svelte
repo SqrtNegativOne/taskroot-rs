@@ -85,7 +85,6 @@
                 class="day-cell-event"
                 class:is-done={isDone}
                 class:is-readonly={readOnly}
-                title="{isAllDay ? 'All Day' : formatStartTime(ev)} — {title}{readOnly ? ' (read-only calendar)' : ''}"
                 style="
                     cursor: {readOnly ? 'default' : 'grab'};
                     opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
