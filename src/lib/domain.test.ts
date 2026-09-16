@@ -5,7 +5,9 @@ import {
     editing,
     hydrateEvents,
     isAppTaskStatus,
+    isCalendarReadOnly,
     isEventAllDay,
+    isEventReadOnly,
     isYmdString,
     toEventType,
 } from './domain';
@@ -217,5 +219,38 @@ describe('isEventAllDay', () => {
         expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03' })).toBe(true);
         expect(isEventAllDay({ startTime: '2026-09-03T10:00:00', endTime: '2026-09-03T11:00:00' })).toBe(false);
         expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03', isAllDay: false })).toBe(false);
+    });
+});
+
+describe('isCalendarReadOnly', () => {
+    it('treats reader and freeBusyReader calendars as read-only', () => {
+        expect(isCalendarReadOnly({ accessRole: 'reader' })).toBe(true);
+        expect(isCalendarReadOnly({ accessRole: 'freeBusyReader' })).toBe(true);
+    });
+
+    it('treats writer, owner, unset, and undefined as writable', () => {
+        expect(isCalendarReadOnly({ accessRole: 'writer' })).toBe(false);
+        expect(isCalendarReadOnly({ accessRole: 'owner' })).toBe(false);
+        expect(isCalendarReadOnly({ accessRole: undefined })).toBe(false);
+        expect(isCalendarReadOnly(undefined)).toBe(false);
+    });
+});
+
+describe('isEventReadOnly', () => {
+    const calendars: AppCalendar[] = [
+        { id: 'cal-work', summary: 'Work', isPrimary: true, accessRole: 'owner' },
+        { id: 'cal-holidays', summary: 'Holidays', accessRole: 'reader' },
+        { id: 'cal-busy', summary: 'Busy', accessRole: 'freeBusyReader' },
+    ];
+
+    it('checks the calendar the event belongs to', () => {
+        expect(isEventReadOnly({ remoteCollectionId: 'cal-work' }, calendars)).toBe(false);
+        expect(isEventReadOnly({ remoteCollectionId: 'cal-holidays' }, calendars)).toBe(true);
+        expect(isEventReadOnly({ calendarId: 'cal-busy' }, calendars)).toBe(true);
+    });
+
+    it('leaves events without a calendar editable', () => {
+        expect(isEventReadOnly({}, calendars)).toBe(false);
+        expect(isEventReadOnly({ remoteCollectionId: undefined }, [])).toBe(false);
     });
 });

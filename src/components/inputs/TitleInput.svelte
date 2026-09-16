@@ -6,6 +6,7 @@
         class?: string;
         style?: string;
         autofocus?: boolean;
+        disabled?: boolean;
     }
 
     let { 
@@ -14,7 +15,8 @@
         placeholder = 'Enter title...', 
         class: className = '', 
         style = '',
-        autofocus = false
+        autofocus = false,
+        disabled = false
     }: Props = $props();
 
     function handleInput(e: Event & { currentTarget: EventTarget & HTMLInputElement }) {
@@ -29,8 +31,9 @@
     {placeholder}
     oninput={handleInput}
     {autofocus}
+    {disabled}
     class={className}
-    style={`background: var(--bg-surface); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 8px 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s; ${style}`}
+    style={`background: var(--bg-surface); color: var(--fg, inherit); border: 1px solid var(--border, #ccc); border-radius: 4px; padding: 8px 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s; cursor: ${disabled ? 'not-allowed' : 'text'}; opacity: ${disabled ? 0.6 : 1}; ${style}`}
 />
 
 <style>

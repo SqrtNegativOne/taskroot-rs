@@ -2,6 +2,7 @@
     import { store, describeError } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
     import type { AppEvent, AppTask, AppCalendar, EventInstance } from '../../lib/domain';
+    import { isCalendarReadOnly } from '../../lib/domain';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -74,8 +75,9 @@
         const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         
         const activeCalendars = calendarsQuery.data ?? [];
-        const primaryCalendar = activeCalendars.find(c => c.isPrimary);
-        const defaultCalendarId = primaryCalendar ? primaryCalendar.id : (activeCalendars.length > 0 ? activeCalendars[0].id : undefined);
+        const writableCalendars = activeCalendars.filter((c) => !isCalendarReadOnly(c));
+        const primaryCalendar = writableCalendars.find(c => c.isPrimary);
+        const defaultCalendarId = primaryCalendar ? primaryCalendar.id : writableCalendars[0]?.id;
 
         const newEvent: AppEvent = {
             id: crypto.randomUUID(),

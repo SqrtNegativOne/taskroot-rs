@@ -278,6 +278,7 @@ async fn test_resolve_calendar_color_uses_event_calendar_then_primary() {
         summary: id.into(),
         color: Some(Color::try_from(color.to_string()).expect("valid color")),
         is_primary: Some(primary),
+        access_role: None,
     };
     upsert_calendar(&pool, calendar("primary-cal", "#ff0000", true))
         .await

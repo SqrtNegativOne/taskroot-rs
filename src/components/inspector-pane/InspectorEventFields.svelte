@@ -1,6 +1,7 @@
 <script lang="ts">
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
+    import { isCalendarReadOnly } from '../../lib/domain';
     import { getFormattedDate, getFormattedTime } from './format';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TimeInput from '../inputs/TimeInput.svelte';
@@ -9,12 +10,30 @@
         event: AppEvent;
         tasks: AppTask[];
         updateEvent: (id: string, e: (e: AppEvent) => AppEvent) => void;
+        readOnly?: boolean;
     }
 
-    let { event, tasks, updateEvent }: Props = $props();
+    let { event, tasks, updateEvent, readOnly = false }: Props = $props();
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
     let activeCalendars = $derived(calendarsQuery.data ?? []);
+
+    let calendarOptions = $derived.by(() => {
+        const writable = activeCalendars.filter((c) => !isCalendarReadOnly(c));
+        const current = activeCalendars.find((c) => c.id === event.remoteCollectionId);
+        // Keep the event's own read-only calendar in the list so the disabled
+        // picker still shows its name instead of the raw id.
+        const selectable =
+            current && isCalendarReadOnly(current) ? [...writable, current] : writable;
+        return [
+            { label: '-- No calendar --', value: '' },
+            ...selectable.map((c) => ({
+                label: c.summary || c.id,
+                value: c.id,
+                ...(c.color ? { color: c.color } : {}),
+            })),
+        ];
+    });
 
     function updateEventDate(field: 'startTime' | 'endTime', dateStr: string): void {
         if (!event[field]) return;
@@ -51,10 +70,8 @@
     <SelectInput
         value={event.remoteCollectionId ?? ''}
         onchange={handleCalendarChange}
-        options={[
-            { label: '-- No calendar --', value: '' },
-            ...activeCalendars.map(c => ({ label: c.summary || c.id, value: c.id }))
-        ]}
+        disabled={readOnly}
+        options={calendarOptions}
     />
 </div>
 
@@ -63,6 +80,7 @@
     <SelectInput
         value={event.taskId ?? ''}
         onchange={handleAttachmentChange}
+        disabled={readOnly}
         options={[
             { label: '-- No task attached --', value: '' },
             ...tasks.map(t => ({ label: t.title, value: t.id }))
@@ -77,7 +95,9 @@
         type="text"
         placeholder="Custom RRULE (e.g. FREQ=WEEKLY)"
         value={event.rrule ?? ''}
+        disabled={readOnly}
         onchange={(e) => handleRruleChange(e.currentTarget.value)}
+        style="cursor: {readOnly ? 'not-allowed' : 'text'}; opacity: {readOnly ? 0.5 : 1};"
     />
 </div>
 
@@ -89,12 +109,14 @@
             type="date"
             class="inspector-date-input"
             value={getFormattedDate(event.startTime)}
+            disabled={readOnly}
             onchange={(e) => updateEventDate('startTime', e.currentTarget.value)}
         />
         {#if event.startTime.includes('T')}
             <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.startTime)}
+                disabled={readOnly}
                 onchange={(val: string) => updateEventTime('startTime', val)}
             />
         {/if}
@@ -109,12 +131,14 @@
             type="date"
             class="inspector-date-input"
             value={getFormattedDate(event.endTime)}
+            disabled={readOnly}
             onchange={(e) => updateEventDate('endTime', e.currentTarget.value)}
         />
         {#if event.endTime.includes('T')}
             <TimeInput
                 class="inspector-date-input"
                 value={getFormattedTime(event.endTime)}
+                disabled={readOnly}
                 onchange={(val: string) => updateEventTime('endTime', val)}
             />
         {/if}

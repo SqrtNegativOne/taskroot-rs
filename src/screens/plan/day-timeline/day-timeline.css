@@ -91,6 +91,8 @@
   .day-event.is-done { opacity: 0.75; border: 1px dashed var(--border); background: var(--bg-surface-hover); border-left: 2px solid var(--border); }
   .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
   .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-style: dashed; background: transparent !important; }
+  .day-event.is-readonly { opacity: 0.6; cursor: default; }
+  .day-event.is-readonly:hover { border-color: var(--border-strong); }
   .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-color: var(--accent); opacity: 0.95; cursor: grabbing; }
   .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
   .day-event-time {

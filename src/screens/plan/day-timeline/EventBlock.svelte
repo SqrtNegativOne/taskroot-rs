@@ -25,6 +25,7 @@
         onResize,
         onMove,
         onEventClick,
+        readOnly = false,
         labelOffset = DEFAULT_LABEL_OFFSET_PX,
     }: {
         event: EventInstance;
@@ -35,6 +36,7 @@
         onResize?: (id: string, start: number, end: number) => void;
         onMove?: (id: string, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
+        readOnly?: boolean;
         labelOffset?: number;
     } = $props();
 
@@ -80,6 +82,11 @@
         if (!(e.target instanceof Element)) return;
         if (e.target.closest('.day-event-handle')) return;
         if (e.button !== 0) return;
+
+        if (readOnly) {
+            onEventClick?.(event);
+            return;
+        }
 
         e.preventDefault();
         const startY = e.clientY;
@@ -140,6 +147,7 @@
         class:is-short={isShort && !compact}
         class:is-ghost={isGhost}
         class:is-floating={isFloating}
+        class:is-readonly={readOnly}
         style="
             top: {top}px;
             height: {Math.max(height, MIN_EVENT_HEIGHT_PX)}px;
@@ -153,7 +161,7 @@
             role="separator"
             tabindex="-1"
             class="day-event-handle day-event-handle-top"
-            onpointerdown={isGhost ? undefined : onResizeStart('top')}
+            onpointerdown={isGhost || readOnly ? undefined : onResizeStart('top')}
         ></div>
         
         <div class="day-event-inner">
@@ -173,7 +181,7 @@
             role="separator"
             tabindex="-1"
             class="day-event-handle day-event-handle-bottom"
-            onpointerdown={isGhost ? undefined : onResizeStart('bottom')}
+            onpointerdown={isGhost || readOnly ? undefined : onResizeStart('bottom')}
         >
             <span class="day-event-handle-grip">═</span>
         </div>

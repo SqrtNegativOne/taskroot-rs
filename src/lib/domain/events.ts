@@ -17,6 +17,7 @@ export type CalendarLike = AppCalendar | {
     readonly backgroundColor?: string;
     readonly isPrimary?: boolean;
     readonly primary?: boolean;
+    readonly accessRole?: string;
 };
 
 export function resolveEventCalendar<C extends CalendarLike>(
@@ -36,6 +37,28 @@ export function resolveEventCalendar<C extends CalendarLike>(
     }
 
     return calendars.find((c) => c.id === collectionId) ?? primaryCal;
+}
+
+export function isCalendarReadOnly(
+    calendar: { readonly accessRole?: string } | undefined,
+): boolean {
+    return calendar?.accessRole === 'reader' || calendar?.accessRole === 'freeBusyReader';
+}
+
+/**
+ * Whether an event lives in a calendar the signed-in user cannot write to.
+ * Accepts both `AppEvent` (`remoteCollectionId`) and `EventInstance`
+ * (`calendarId`). Events with no calendar are locally authored and editable.
+ */
+export function isEventReadOnly(
+    ev: { readonly remoteCollectionId?: string; readonly calendarId?: string },
+    calendars: readonly CalendarLike[] = [],
+): boolean {
+    const collectionId = ev.remoteCollectionId ?? ev.calendarId;
+    if (!collectionId) {
+        return false;
+    }
+    return isCalendarReadOnly(resolveEventCalendar({ remoteCollectionId: collectionId }, calendars));
 }
 
 export function isEventAllDay(event: {

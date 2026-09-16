@@ -108,6 +108,7 @@ const SCHEMA_SQL: &str = "CREATE TABLE IF NOT EXISTS tasks (
             summary TEXT NOT NULL,
             color TEXT,
             is_primary BOOLEAN DEFAULT 0,
+            access_role TEXT,
             sync_token TEXT
         );";
 
@@ -136,6 +137,12 @@ pub async fn init_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         "calendars",
         "sync_token",
         "ALTER TABLE calendars ADD COLUMN sync_token TEXT"
+    );
+    ensure_column!(
+        pool,
+        "calendars",
+        "access_role",
+        "ALTER TABLE calendars ADD COLUMN access_role TEXT"
     );
     ensure_column!(
         pool,

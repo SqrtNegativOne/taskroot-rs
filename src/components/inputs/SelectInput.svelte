@@ -4,6 +4,7 @@
     interface Option {
         label: string;
         value: string;
+        color?: string;
     }
 
     interface Props {
@@ -12,9 +13,10 @@
         options: Option[];
         class?: string;
         style?: string;
+        disabled?: boolean;
     }
 
-    let { value, onchange, options, class: className = '', style = '' }: Props = $props();
+    let { value, onchange, options, class: className = '', style = '', disabled = false }: Props = $props();
 
     let open = $state(false);
     let ref: HTMLDivElement | null = $state(null);
@@ -42,10 +44,19 @@
     <button
         type="button"
         class="selector-input"
-        style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-app); color: var(--fg); cursor: pointer; min-height: 24px; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; font-family: inherit; font-size: inherit;"
-        onclick={() => open = !open}
+        {disabled}
+        style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-app); color: var(--fg); cursor: {disabled ? 'not-allowed' : 'pointer'}; opacity: {disabled ? 0.5 : 1}; min-height: 24px; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; font-family: inherit; font-size: inherit;"
+        onclick={() => { if (!disabled) open = !open; }}
     >
-        {selectedOption ? selectedOption.label : value}
+        {#if selectedOption?.color}
+            <span
+                aria-hidden="true"
+                style="width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: {selectedOption.color};"
+            ></span>
+        {/if}
+        <span style="color: {selectedOption?.color ?? 'inherit'};">
+            {selectedOption ? selectedOption.label : value}
+        </span>
         <span class="material-symbols-outlined" style="font-size: 16px; margin-left: auto; opacity: 0.5;">
             arrow_drop_down
         </span>
@@ -56,8 +67,14 @@
                 <button
                     type="button"
                     onclick={(e) => handleSelect(o, e)}
-                    style={`padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; background: ${value === o.value ? 'var(--accent-soft)' : 'transparent'}; width: 100%; border: none; text-align: left; color: inherit; font-family: inherit; font-size: inherit;`}
+                    style={`padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; background: ${value === o.value ? 'var(--accent-soft)' : 'transparent'}; width: 100%; border: none; text-align: left; color: ${o.color ?? 'inherit'}; font-family: inherit; font-size: inherit;`}
                 >
+                    {#if o.color}
+                        <span
+                            aria-hidden="true"
+                            style="width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: {o.color};"
+                        ></span>
+                    {/if}
                     {o.label}
                 </button>
             {/each}

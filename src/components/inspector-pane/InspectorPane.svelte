@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import './inspector.css';
-    import type { AppTask, AppEvent } from '../../lib/domain';
+    import type { AppTask, AppEvent, AppCalendar } from '../../lib/domain';
+    import { isEventReadOnly } from '../../lib/domain';
     import InspectorTaskFields from './InspectorTaskFields.svelte';
     import InspectorEventFields from './InspectorEventFields.svelte';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
@@ -21,6 +22,7 @@
 
     const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters: [], sort: [], query: "" }));
     const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({ filters: [], query: "" }));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
 
     let tasks = $derived(tasksQuery.data ?? []);
     let events = $derived(eventsQuery.data ?? []);
@@ -122,6 +124,9 @@
     );
     let currentItem = $derived(currentTask ?? currentEvent);
     let isCurrentTask = $derived(currentTask !== undefined);
+    let isReadOnly = $derived(
+        currentEvent !== undefined && isEventReadOnly(currentEvent, calendarsQuery.data ?? [])
+    );
 
     onMount(() => {
         function handleClickOutside(e: PointerEvent) {
@@ -145,6 +150,7 @@
     }
 
     function handleDelete(): void {
+        if (isReadOnly) return;
         if (currentTask) {
             deleteTask(currentTask.id);
             onClose();
@@ -170,6 +176,7 @@
             <TitleInput
                 value={currentItem.title}
                 onchange={handleTitleChange}
+                disabled={isReadOnly}
                 class="inspector-title-input"
             />
             <button class="icon-btn" onclick={onClose}>✕</button>
@@ -180,6 +187,7 @@
                 <DescriptionInput
                     value={currentTask ? currentTask.notes : currentEvent?.description}
                     onchange={handleDescriptionChange}
+                    disabled={isReadOnly}
                     class="inspector-desc-input"
                 />
             </div>
@@ -187,13 +195,18 @@
             {#if currentTask}
                 <InspectorTaskFields task={currentTask} {tasks} {updateTask} />
             {:else if currentEvent}
-                <InspectorEventFields event={currentEvent} {tasks} {updateEvent} />
+                <InspectorEventFields event={currentEvent} {tasks} {updateEvent} readOnly={isReadOnly} />
             {/if}
 
             <div class="inspector-actions" style="margin-top: 24px;">
-                <button class="btn-danger" onclick={handleDelete}>
+                <button class="btn-danger" onclick={handleDelete} disabled={isReadOnly} style={isReadOnly ? 'opacity: 0.5; cursor: not-allowed;' : ''}>
                     Delete {isCurrentTask ? 'Task' : 'Event'}
                 </button>
+                {#if isReadOnly}
+                    <p style="margin: 8px 0 0; font-size: 12px; color: var(--fg-dim);">
+                        This event is in a read-only calendar.
+                    </p>
+                {/if}
             </div>
         </div>
     {/if}

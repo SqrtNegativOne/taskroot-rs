@@ -4,6 +4,7 @@
     import type { DragState } from './types';
     import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import { isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineHeader from './components/TimelineHeader.svelte';
@@ -30,11 +31,19 @@
     }
 
     function onResizeEvent(id: string, startTime: string, endTime: string) {
+        if (isEventReadOnlyById(id)) return;
         void store.rescheduleEvent(id, startTime, endTime);
     }
 
     function onMoveEvent(id: string, startTime: string, endTime: string) {
+        if (isEventReadOnlyById(id)) return;
         void store.rescheduleEvent(id, startTime, endTime);
+    }
+
+    function isEventReadOnlyById(id: string): boolean {
+        return (eventsQuery.data ?? []).some(
+            (ev) => ev.id === id && isEventReadOnly(ev, activeCalendars),
+        );
     }
 
     let eventFilters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
@@ -143,6 +152,7 @@
                     {onMoveEvent}
                     {onEventClick}
                     {onAddEvent}
+                    calendars={activeCalendars}
                     showTimeLabels={i === 0}
                 />
             {/each}

@@ -167,6 +167,7 @@ async fn get_active_calendars_returns_every_stored_calendar() {
         summary: id.to_string(),
         color: Some(Color::try_from(color.to_string()).unwrap()),
         is_primary: Some(primary),
+        access_role: None,
     };
     db::upsert_calendar(&pool, calendar("primary", "#ff0000", true))
         .await
@@ -183,4 +184,31 @@ async fn get_active_calendars_returns_every_stored_calendar() {
         .find(|cal| cal.is_primary == Some(true))
         .expect("the primary calendar is returned");
     assert_eq!(primary.id, "primary".into());
+}
+
+/// The frontend greys out editing when `accessRole` marks a calendar read-only,
+/// so the field must survive the calendar round-trip unchanged.
+#[tokio::test]
+async fn get_active_calendars_returns_the_access_role() {
+    let pool = test_support::in_memory_pool().await;
+    db::upsert_calendar(
+        &pool,
+        AppCalendar {
+            id: "holidays".into(),
+            summary: "Holidays".into(),
+            color: None,
+            is_primary: Some(false),
+            access_role: Some("reader".into()),
+        },
+    )
+    .await
+    .unwrap();
+
+    let calendars = super::events::active_calendars(&pool).await.unwrap();
+
+    let holidays = calendars
+        .iter()
+        .find(|cal| cal.id == "holidays".into())
+        .expect("the holidays calendar is returned");
+    assert_eq!(holidays.access_role.as_deref(), Some("reader"));
 }

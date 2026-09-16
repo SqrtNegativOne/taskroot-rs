@@ -1,7 +1,8 @@
 <script lang="ts">
     import { HOURS_PER_DAY, MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
     import type { DragState, LaidEvent } from '../types';
-    import type { EventInstance } from '../../../../lib/domain';
+    import type { EventInstance, AppCalendar } from '../../../../lib/domain';
+    import { isEventReadOnly } from '../../../../lib/domain';
     import { sameDay, ymd } from '../../../../lib/time';
 
     import EventBlock from '../EventBlock.svelte';
@@ -20,6 +21,7 @@
         onMoveEvent,
         onEventClick,
         onAddEvent,
+        calendars = [],
         showTimeLabels = true,
     }: {
         date: Date;
@@ -30,14 +32,19 @@
         onMoveEvent?: (id: string, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
+        calendars?: AppCalendar[];
         showTimeLabels?: boolean;
     } = $props();
 
     let isToday = $derived(sameDay(date, today));
     let cellDateStr = $derived(ymd(date));
+    let readOnlyEventIds = $derived(
+        new Set(laid.filter((l) => isEventReadOnly(l.event, calendars)).map((l) => l.event.id)),
+    );
     
     // Event handlers
     function handleResize(id: string, newStartMins: number, newEndMins: number) {
+        if (readOnlyEventIds.has(id)) return;
         const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
         const newStartDt = new Date(cellStart + newStartMins * 60000);
         const newEndDt = new Date(cellStart + newEndMins * 60000);
@@ -45,6 +52,7 @@
     }
 
     function handleMove(id: string, newStartMins: number, newEndMins: number) {
+        if (readOnlyEventIds.has(id)) return;
         const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
         const newStartDt = new Date(cellStart + newStartMins * 60000);
         const newEndDt = new Date(cellStart + newEndMins * 60000);
@@ -136,6 +144,7 @@
             {endMins}
             {lane}
             {lanes}
+            readOnly={readOnlyEventIds.has(event.id)}
             onResize={handleResize}
             onMove={handleMove}
             {onEventClick}

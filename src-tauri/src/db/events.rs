@@ -270,16 +270,18 @@ pub async fn upsert_calendar(
     calendar: crate::domain::AppCalendar,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO calendars (id, summary, color, is_primary) VALUES (?, ?, ?, ?)
+        "INSERT INTO calendars (id, summary, color, is_primary, access_role) VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET 
             summary = excluded.summary, 
             color = excluded.color,
-            is_primary = excluded.is_primary",
+            is_primary = excluded.is_primary,
+            access_role = excluded.access_role",
     )
     .bind(calendar.id)
     .bind(calendar.summary)
     .bind(calendar.color)
     .bind(calendar.is_primary)
+    .bind(calendar.access_role)
     .execute(pool)
     .await?;
     Ok(())
@@ -347,7 +349,7 @@ pub async fn get_calendars(
     pool: &SqlitePool,
 ) -> Result<Vec<crate::domain::AppCalendar>, sqlx::Error> {
     let calendars = sqlx::query_as::<_, crate::domain::AppCalendar>(
-        "SELECT id, summary, color, is_primary FROM calendars",
+        "SELECT id, summary, color, is_primary, access_role FROM calendars",
     )
     .fetch_all(pool)
     .await?;

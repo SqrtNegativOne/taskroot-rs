@@ -93,6 +93,7 @@ async fn sync_calendar_list(pool: &SqlitePool, calendars: &[GoogleCalendarListEn
             summary: cal.summary.clone().unwrap_or_else(|| cal.id.clone()),
             color,
             is_primary: cal.primary,
+            access_role: cal.access_role.clone(),
         };
         let _ = crate::db::upsert_calendar(pool, app_calendar).await;
     }
@@ -377,6 +378,7 @@ mod tests {
             summary: Some("Primary".into()),
             background_color: Some("#123456".into()),
             primary: Some(true),
+            access_role: Some("owner".into()),
         }
     }
 
@@ -472,6 +474,7 @@ mod tests {
                 summary: "Primary".into(),
                 color: None,
                 is_primary: Some(true),
+                access_role: None,
             },
         )
         .await

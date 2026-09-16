@@ -335,6 +335,10 @@ pub struct AppCalendar {
     pub color: Option<Color>,
     #[ts(optional)]
     pub is_primary: Option<bool>,
+    /// Google's `accessRole` (`owner`, `writer`, `reader`, `freeBusyReader`).
+    /// `reader` and `freeBusyReader` calendars reject every write.
+    #[ts(optional)]
+    pub access_role: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]

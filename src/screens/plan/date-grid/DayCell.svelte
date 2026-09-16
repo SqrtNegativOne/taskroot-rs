@@ -1,9 +1,11 @@
 <script lang="ts">
-    import type { EventInstance } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import { isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
+    const OPACITY_READ_ONLY = 0.6;
 
     let {
         cell,
@@ -14,6 +16,7 @@
         onEventDragStart,
         onAddEvent,
         onEventClick,
+        calendars = [],
     }: {
         cell: { date: Date; outOfMonth: boolean };
         today: Date;
@@ -23,6 +26,7 @@
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
+        calendars?: AppCalendar[];
     } = $props();
 
     function formatStartTime(ev: EventInstance) {
@@ -74,18 +78,20 @@
             {@const isDone = false /* TODO: pull done from task */}
             {@const isPastDue = checkPastDue(ev)}
             {@const isAllDay = ev.timing.kind === 'allDay'}
+            {@const readOnly = isEventReadOnly(ev, calendars)}
             
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
                 class="day-cell-event"
                 class:is-done={isDone}
-                title="{isAllDay ? 'All Day' : formatStartTime(ev)} — {title}"
+                class:is-readonly={readOnly}
+                title="{isAllDay ? 'All Day' : formatStartTime(ev)} — {title}{readOnly ? ' (read-only calendar)' : ''}"
                 style="
-                    cursor: grab;
-                    opacity: {dragState?.event?.id === ev.id ? OPACITY_FADED : 1};
+                    cursor: {readOnly ? 'default' : 'grab'};
+                    opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
                     {eventColorVars(ev.color)}
                 "
-                onpointerdown={(e) => onEventDragStart?.(e, ev)}
+                onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, ev)}
                 onclick={(e) => {
                     e.stopPropagation();
                     if (onEventClick) onEventClick(ev);

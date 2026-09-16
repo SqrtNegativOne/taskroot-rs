@@ -215,6 +215,7 @@
                     {onEventDragStart}
                     {onAddEvent}
                     {onEventClick}
+                    calendars={activeCalendars}
                 />
             {/each}
         </div>

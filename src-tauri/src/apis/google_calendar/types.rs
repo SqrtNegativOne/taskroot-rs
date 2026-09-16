@@ -13,6 +13,8 @@ pub(super) struct GoogleCalendarListEntry {
     #[serde(rename = "backgroundColor")]
     pub(super) background_color: Option<String>,
     pub(super) primary: Option<bool>,
+    #[serde(rename = "accessRole")]
+    pub(super) access_role: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
