@@ -15,6 +15,7 @@
 
     let selectorOpen = $state(false);
     let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
+    const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
     let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
     let tasks = $derived(tasksQuery.data ?? []);
@@ -78,11 +79,34 @@
         }
     }
 
+    // P toggles the timed pause; arrow keys resize an active pause by a minute.
+    function handlePauseKey(e: KeyboardEvent): boolean {
+        if (e.code === "KeyP") {
+            e.preventDefault();
+            void stopwatchState.togglePause(pauseMinutes);
+            return true;
+        }
+        if (!stopwatchState.isPaused) return false;
+        if (e.code === "ArrowUp" || e.code === "ArrowRight") {
+            e.preventDefault();
+            void stopwatchState.adjustPause(1);
+            return true;
+        }
+        if (e.code === "ArrowDown" || e.code === "ArrowLeft") {
+            e.preventDefault();
+            void stopwatchState.adjustPause(-1);
+            return true;
+        }
+        return false;
+    }
+
     // Keyboard shortcuts
     function handleKeydown(e: KeyboardEvent) {
         if (e.target instanceof HTMLElement && e.target.matches('input:not(.task-search-input), textarea, [contenteditable]')) {
             return;
         }
+
+        if (handlePauseKey(e)) return;
 
         const isModifier = e.metaKey || e.ctrlKey;
 

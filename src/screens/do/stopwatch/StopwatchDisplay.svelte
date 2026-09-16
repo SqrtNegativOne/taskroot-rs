@@ -14,6 +14,13 @@
 
     let displayData = $derived.by(() => {
         void now.ms;
+        if (engine.isPaused) {
+            const { m, s } = splitTime(engine.pauseRemainingMs);
+            return {
+                primaryText: `PAUSED ${m}:${s}`,
+                showPlayIcon: false
+            };
+        }
         const { m } = splitTime(engine.currentMs);
         const clockStyle = store.settings?.clock_style;
         const showPlayIcon = clockStyle === 'guzey' ? false : engine.isPristine;
@@ -30,6 +37,7 @@
     class="stopwatch-display"
     class:is-running={engine.running}
     class:is-pristine={engine.isPristine}
+    class:is-paused={engine.isPaused}
     onclick={onToggle}
     title="Click to start/stop"
 >

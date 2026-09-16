@@ -12,9 +12,19 @@
     import InspectorPane from '../../components/inspector-pane/InspectorPane.svelte';
     import DateGrid from './date-grid/DateGrid.svelte';
     import DayTimeline from './day-timeline/DayTimeline.svelte';
+    import { createEventDragController } from './hooks/eventDrag.svelte';
     import RecurringActionModal, { type RecurringMode } from '../../components/RecurringActionModal.svelte';
     import type { DragState } from './day-timeline/types';
     let dragState = $state<DragState | undefined>(undefined);
+
+    const startEventDrag = createEventDragController({
+        setDragState: (ds) => { dragState = ds; },
+        onReschedule: (event, payload) => {
+            void mutateOrReport('Failed to move event', () =>
+                store.rescheduleEvent(event.id, payload.startTime, payload.endTime, payload.isAllDay),
+            );
+        },
+    });
     let inspectorState = $state<{ type: 'event' | 'task', id: string } | undefined>(undefined);
     let recurringModalOpen = $state(false);
     let recurringActionType = $state<"edit" | "delete">("edit");
@@ -37,10 +47,6 @@
     }
 
     function onTaskDragStart() {
-        // Drag logic stub
-    }
-
-    function onEventDragStart() {
         // Drag logic stub
     }
 
@@ -141,7 +147,7 @@
                         {#snippet pane1()}
                             <DateGrid
                                 {dragState}
-                                {onEventDragStart}
+                                onEventDragStart={startEventDrag}
                                 {onAddEvent}
                                 {onEventClick}
                             />
@@ -150,7 +156,6 @@
                         {#snippet pane2()}
                             <DayTimeline
                                 {dragState}
-                                setDragState={(ds: import('./day-timeline/types').DragState | undefined) => { dragState = ds; }}
                                 {onEventClick}
                                 {onAddEvent}
                             />

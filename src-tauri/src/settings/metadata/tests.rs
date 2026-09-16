@@ -236,6 +236,8 @@ default_task_duration | Default Duration | task,duration,estimate,time | 0=Not s
 clock_style | Clock Style | stopwatch,timer,guzey,counter,flowtime | \"counter\"=Counter | \"flowtime\"=Flowtime | \"guzey\"=Guzey
 allow_stopwatch_without_task | Allow stopwatch use without selecting task | stopwatch,task,requirement,allow
 flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
+have_long_breaks | Enable Long Breaks | guzey,long,break,rest,hour
+pause_minutes | Pause Duration (minutes) | guzey,pause,timer,break,hold
 enable_calendar_sync | Enable Bidirectional Google Calendar Sync | google,calendar,sync,events
 enable_tasks_sync | Enable Bidirectional Google Tasks Sync | google,tasks,sync,todos
 sync_interval | Sync Interval (minutes) | sync,interval,poll,time

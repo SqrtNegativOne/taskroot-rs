@@ -57,6 +57,22 @@
         "skipTaskbar": true,
         "visible": true,
         "url": "/sidebar"
+      },
+      {
+        "label": "effect",
+        "title": "Effect",
+        "width": 100,
+        "height": 100,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false,
+        "resizable": false,
+        "visible": false,
+        "fullscreen": true,
+        "url": "/effect"
       }
     ],
     "security": {

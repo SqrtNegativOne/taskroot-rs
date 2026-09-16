@@ -16,7 +16,6 @@
         today,
         laid,
         dragState,
-        setDragState,
         onResizeEvent,
         onMoveEvent,
         onEventClick,
@@ -27,7 +26,6 @@
         today: Date;
         laid: LaidEvent[];
         dragState?: DragState;
-        setDragState?: (ds: DragState | undefined) => void;
         onResizeEvent?: (id: string, startTime: string, endTime: string) => void;
         onMoveEvent?: (id: string, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
@@ -120,19 +118,6 @@
     data-drop-kind="day-time"
     data-drop-date={cellDateStr}
     onpointerdown={onGridPointerDown}
-    onpointerenter={() => {
-        if (dragState?.event && setDragState) {
-            setDragState({
-                ...dragState,
-                target: {
-                    kind: 'day-time',
-                    date: cellDateStr,
-                    start: dragState.target?.start ?? 0,
-                    end: dragState.target?.end ?? 0
-                }
-            });
-        }
-    }}
 >
     <div style="position: absolute; top: -32px; left: 0; right: 0; text-align: center; font-weight: bold; font-size: 0.9em; color: {isToday ? 'var(--accent)' : 'var(--fg)'}; padding-bottom: 8px;">
         {Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(date)}

@@ -24,6 +24,8 @@ pub struct StopwatchState {
     pub break_elapsed: u64,
     #[ts(type = "number | null")]
     pub break_running_since: Option<u64>,
+    #[ts(type = "number | null")]
+    pub paused_until: Option<u64>,
 }
 
 pub struct StopwatchManager(pub Mutex<StopwatchState>);
@@ -52,7 +54,52 @@ fn current_epoch_millis() -> Result<u64, AppError> {
 
 #[tauri::command]
 pub fn get_stopwatch_state(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
-    with_locked_state(&app, |s| s.clone())
+    let now = current_epoch_millis()?;
+    with_locked_state(&app, |s| {
+        if s.paused_until.is_some_and(|until| until <= now) {
+            s.paused_until = None;
+        }
+        s.clone()
+    })
+}
+
+/// Toggle a timed pause. An active or expired pause is cleared; otherwise the
+/// timer is paused for `pause_minutes`.
+#[tauri::command]
+pub fn toggle_pause(app: tauri::AppHandle, pause_minutes: u64) -> Result<StopwatchState, AppError> {
+    let now = current_epoch_millis()?;
+    let updated = with_locked_state(&app, |s| {
+        if s.paused_until.is_some_and(|until| until > now) {
+            s.paused_until = None;
+        } else {
+            let duration = pause_minutes.max(1).saturating_mul(60_000);
+            s.paused_until = Some(now.saturating_add(duration));
+        }
+        s.clone()
+    })?;
+    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    Ok(updated)
+}
+
+/// Extend (`delta_minutes > 0`) or shrink an active pause by whole minutes. A
+/// pause reduced to zero or below unpauses.
+#[tauri::command]
+pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<StopwatchState, AppError> {
+    let now = current_epoch_millis()?;
+    let updated = with_locked_state(&app, |s| {
+        if let Some(until) = s.paused_until {
+            let delta = i128::from(delta_minutes).saturating_mul(60_000);
+            let target = i128::from(until).saturating_add(delta);
+            s.paused_until = if target <= i128::from(now) {
+                None
+            } else {
+                u64::try_from(target).ok()
+            };
+        }
+        s.clone()
+    })?;
+    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -113,6 +160,7 @@ pub fn reset_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError
         s.is_break = false;
         s.break_elapsed = 0;
         s.break_running_since = None;
+        s.paused_until = None;
         s.clone()
     })?;
     let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);

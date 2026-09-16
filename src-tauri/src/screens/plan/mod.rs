@@ -72,7 +72,10 @@ pub async fn get_event(
     Ok(db::get_event(&pool, &id).await?)
 }
 
-/// Update a master event's start/end timestamps after a timeline drag.
+/// Update a master event's start/end timestamps after a drag or resize.
+///
+/// When `is_all_day` is true, `start_time`/`end_time` are floating
+/// `YYYY-MM-DD` dates so a grid-to-grid drag keeps an all-day event all-day.
 ///
 /// # Errors
 ///
@@ -83,6 +86,7 @@ pub async fn reschedule_event(
     id: String,
     start_time: String,
     end_time: String,
+    is_all_day: bool,
 ) -> Result<(), AppError> {
     let pool = crate::db_pool(&app)?;
     let Some(mut event) = db::get_event(&pool, &id).await? else {
@@ -90,7 +94,7 @@ pub async fn reschedule_event(
     };
     event.start_time = start_time;
     event.end_time = end_time;
-    event.is_all_day = Some(false);
+    event.is_all_day = Some(is_all_day);
     // A drag/resize must reach Google, not just SQLite. `push_or_enqueue`
     // mirrors `commands::events::update_event`: it marks the row dirty and
     // queues an Update (or triggers an immediate sync).

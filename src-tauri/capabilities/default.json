@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for all windows",
-  "windows": ["main", "launcher", "minitracker", "sidebar"],
+  "windows": ["main", "launcher", "minitracker", "sidebar", "effect"],
   "permissions": [
     "core:default",
     "opener:default",

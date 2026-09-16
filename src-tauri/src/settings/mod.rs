@@ -91,6 +91,23 @@ pub struct AppSettings {
     )]
     pub flowtime_break_divisor: i32,
     #[setting(
+        label = "Enable Long Breaks",
+        description = "Take a long break at the start of every third hour (guzey clock style).",
+        keywords = ["guzey", "long", "break", "rest", "hour"],
+        kind = "checkbox",
+        section = "do_stopwatch"
+    )]
+    pub have_long_breaks: bool,
+    #[setting(
+        label = "Pause Duration (minutes)",
+        description = "How long pressing P pauses the timer (guzey clock style).",
+        keywords = ["guzey", "pause", "timer", "break", "hold"],
+        kind = "number",
+        section = "do_stopwatch",
+        min = 1
+    )]
+    pub pause_minutes: i32,
+    #[setting(
         label = "Enable Bidirectional Google Calendar Sync",
         description = "Self explanatory.",
         keywords = ["google", "calendar", "sync", "events"],
@@ -163,6 +180,8 @@ impl Default for AppSettings {
             clock_style: "guzey".to_string(),
             allow_stopwatch_without_task: false,
             flowtime_break_divisor: 5,
+            have_long_breaks: false,
+            pause_minutes: 10,
             enable_calendar_sync: true,
             enable_tasks_sync: true,
             sync_interval: 5,

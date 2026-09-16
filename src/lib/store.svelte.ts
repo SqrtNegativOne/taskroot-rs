@@ -65,13 +65,16 @@ export class AppStore {
         return this.commit(safeInvoke('update_event', { event }));
     }
 
-    /** Reschedule a dragged timeline instance back onto its master event. */
+    /** Reschedule a dragged instance back onto its master event. */
     rescheduleEvent(
         id: string,
         startTime: string,
         endTime: string,
+        isAllDay = false,
     ): Promise<Result<void, AppError>> {
-        return this.commit(safeInvoke('reschedule_event', { id, startTime, endTime }));
+        return this.commit(
+            safeInvoke('reschedule_event', { id, startTime, endTime, isAllDay }),
+        );
     }
 
     deleteEvent(id: string): Promise<Result<void, AppError>> {

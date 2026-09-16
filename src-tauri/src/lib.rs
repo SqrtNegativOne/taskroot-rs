@@ -84,6 +84,11 @@ pub fn run() {
             )));
             let handle = app.handle().clone();
 
+            if let Some(effect_win) = app.get_webview_window(domain::WindowLabel::Effect.as_str())
+            {
+                let _ = effect_win.set_ignore_cursor_events(true);
+            }
+
             let open_i =
                 tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
             let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
@@ -178,6 +183,9 @@ pub fn run() {
             commands::window::window_restore_main,
             commands::window::show_minitracker,
             commands::window::hide_launcher,
+            commands::window::show_screen_effect,
+            commands::window::hide_screen_effect,
+            commands::window::quit_app,
             commands::window::toggle_launcher,
             commands::window::resize_launcher,
             auth::login_with_google,
@@ -186,6 +194,8 @@ pub fn run() {
             stopwatch::get_stopwatch_state,
             stopwatch::toggle_stopwatch,
             stopwatch::toggle_break,
+            stopwatch::toggle_pause,
+            stopwatch::adjust_pause,
             stopwatch::reset_stopwatch,
             settings::get_settings_schema,
             settings::get_settings,

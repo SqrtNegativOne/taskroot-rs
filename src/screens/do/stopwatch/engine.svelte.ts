@@ -1,9 +1,13 @@
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { safeInvoke } from '../../../lib/safeInvoke.svelte';
-import { STOPWATCH_UPDATED } from '../../../lib/events';
+import { SCREEN_EFFECT, STOPWATCH_UPDATED } from '../../../lib/events';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
 import { useNow } from '../../../lib/useNow.svelte';
+import { guzeyPhase, guzeyRemainingMs, type ClockPhase } from './phases';
+
+export type { ClockPhase } from './phases';
 
 let now: { get value(): Date; get ms(): number };
 $effect.root(() => {
@@ -16,6 +20,7 @@ export class StopwatchState {
     isBreak = $state(false);
     breakElapsed = $state(0);
     breakRunningSince = $state<number | undefined>(undefined);
+    pausedUntil = $state<number | undefined>(undefined);
 
     private unlisten: (() => void) | undefined;
     private connection: Promise<void> | undefined;
@@ -52,6 +57,7 @@ export class StopwatchState {
         this.isBreak = payload.isBreak;
         this.breakElapsed = payload.breakElapsed;
         this.breakRunningSince = payload.breakRunningSince ?? undefined;
+        this.pausedUntil = payload.pausedUntil ?? undefined;
     }
 
     get running() {
@@ -66,32 +72,23 @@ export class StopwatchState {
         return false;
     }
 
-    get activePhase(): 'work' | 'break' | 'long break' {
+    get isPaused(): boolean {
+        return this.pausedUntil !== undefined && this.pausedUntil > now.ms;
+    }
+
+    get pauseRemainingMs(): number {
+        return this.pausedUntil === undefined ? 0 : Math.max(0, this.pausedUntil - now.ms);
+    }
+
+    get activePhase(): ClockPhase {
         if (!store.loaded || !store.settings) return this.isBreak ? 'break' : 'work';
         const style = store.settings.clock_style;
         
         if (style === 'guzey') {
             const date = now.value;
-            const hour = date.getHours();
-            const min = date.getMinutes();
-            if (hour % 3 === 0 && min < 35) return 'long break';
-            if (min >= 0 && min < 5) return 'break';
-            if (min >= 30 && min < 35) return 'break';
-            return 'work';
+            return guzeyPhase(date.getHours(), date.getMinutes(), store.settings.have_long_breaks);
         }
         return this.isBreak ? 'break' : 'work';
-    }
-
-    private getGuzeyRemainingMs(date: Date, min: number, sec: number, ms: number): number {
-        const hour = date.getHours();
-        let targetMin = 60;
-        if (hour % 3 === 0 && min < 35) targetMin = 35;
-        else if (min < 5) targetMin = 5;
-        else if (min < 30) targetMin = 30;
-        else if (min < 35) targetMin = 35;
-        
-        const msLeft = (targetMin * 60 * 1000) - ((min * 60 * 1000) + (sec * 1000) + ms);
-        return Math.max(0, msLeft);
     }
 
     get currentMs() {
@@ -101,10 +98,13 @@ export class StopwatchState {
         const nowMs = now.ms;
         if (style === 'guzey') {
             const date = now.value;
-            const min = date.getMinutes();
-            const sec = date.getSeconds();
-            const ms = date.getMilliseconds();
-            return this.getGuzeyRemainingMs(date, min, sec, ms);
+            return guzeyRemainingMs(
+                date.getHours(),
+                date.getMinutes(),
+                date.getSeconds(),
+                date.getMilliseconds(),
+                store.settings.have_long_breaks,
+            );
         }
         
         if (this.isBreak) {
@@ -122,7 +122,7 @@ export class StopwatchState {
     }
 
     get isPristine() {
-        return this.currentMs === 0 && !this.running && !this.isBreak;
+        return this.currentMs === 0 && !this.running && !this.isBreak && !this.isPaused;
     }
 
     async toggle(): Promise<void> {
@@ -132,6 +132,16 @@ export class StopwatchState {
 
     async toggleBreak(): Promise<void> {
         const result = await safeInvoke<StopwatchSnapshot>('toggle_break');
+        if (result.isOk()) this.updateFromPayload(result.value);
+    }
+
+    async togglePause(minutes: number): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('toggle_pause', { pauseMinutes: minutes });
+        if (result.isOk()) this.updateFromPayload(result.value);
+    }
+
+    async adjustPause(deltaMinutes: number): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('adjust_pause', { deltaMinutes });
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
@@ -153,46 +163,47 @@ export function splitTime(ms: number) {
     };
 }
 
-let lastPhase: 'work' | 'break' | 'long break' | undefined;
+const TRANSITION_SOUNDS: Record<ClockPhase, Partial<Record<ClockPhase, string>>> = {
+    work: { break: 'work_to_break.wav', 'long break': 'work_to_long_break.wav' },
+    break: { work: 'break_to_work.wav' },
+    'long break': { work: 'long_break_to_work.wav' },
+};
 
-function playBeep() {
-    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-        if (getCurrentWindow().label !== 'main') return;
-        try {
-            const ctx = new window.AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, ctx.currentTime);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15);
-            
-            setTimeout(() => {
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(1046.5, ctx.currentTime);
-                gain2.gain.setValueAtTime(0.1, ctx.currentTime);
-                osc2.start();
-                osc2.stop(ctx.currentTime + 0.15);
-            }, 200);
-        } catch (e) {
-            console.error('Failed to play beep', e);
-        }
-    }).catch(() => { /* ignore */ });
+const soundCache = new Map<string, HTMLAudioElement>();
+
+function isMainWindow(): boolean {
+    return getCurrentWindow().label === 'main';
 }
+
+function playSound(file: string): void {
+    if (!isMainWindow()) return;
+    let audio = soundCache.get(file);
+    if (audio === undefined) {
+        audio = new Audio(`/sounds/${file}`);
+        soundCache.set(file, audio);
+    }
+    audio.currentTime = 0;
+    void audio.play().catch(() => { /* autoplay or decode failures are non-fatal */ });
+}
+
+async function triggerScreenEffect(): Promise<void> {
+    if (!isMainWindow()) return;
+    const result = await safeInvoke('show_screen_effect');
+    if (result.isErr()) return;
+    const { emit } = await import('@tauri-apps/api/event');
+    void emit(SCREEN_EFFECT);
+}
+
+let lastPhase: ClockPhase | undefined;
 
 if (typeof window !== 'undefined') {
     $effect.root(() => {
         $effect(() => {
             const currentPhase = stopwatchState.activePhase;
             if (lastPhase !== undefined && lastPhase !== currentPhase) {
-                playBeep();
+                const file = TRANSITION_SOUNDS[lastPhase][currentPhase];
+                if (file !== undefined) playSound(file);
+                void triggerScreenEffect();
             }
             lastPhase = currentPhase;
         });

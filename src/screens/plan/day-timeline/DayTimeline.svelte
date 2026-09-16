@@ -15,13 +15,11 @@
 
     let {
         dragState,
-        setDragState,
         onEventClick,
         onAddEvent,
         variant = 'plan',
     }: {
         dragState?: DragState;
-        setDragState?: (ds: DragState | undefined) => void;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
         variant?: 'plan' | 'sidebar';
@@ -141,7 +139,6 @@
                     {today}
                     laid={planLayout[ymd(d)] ?? []}
                     {dragState}
-                    {setDragState}
                     {onResizeEvent}
                     {onMoveEvent}
                     {onEventClick}

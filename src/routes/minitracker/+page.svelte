@@ -3,6 +3,7 @@
     import { getCurrentWindow, currentMonitor, LogicalPosition } from '@tauri-apps/api/window';
     import { store } from '../../lib/store.svelte';
     import { safeInvoke } from '../../lib/safeInvoke.svelte';
+    import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import { useNow } from '../../lib/useNow.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
 
@@ -38,6 +39,56 @@
     import type { AppTask } from '../../lib/domain';
 
     let isDimmed = $state(false);
+    let isClickDimmed = $state(false);
+    let baseAlpha = $state(0.8);
+
+    const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
+
+    // Seed the wheel-adjusted opacity from the persisted setting once settings
+    // load (and re-seed if another window changes it).
+    $effect(() => {
+        if (store.settings) baseAlpha = store.settings.tracker_opacity / 100;
+    });
+
+    const effectiveOpacity = $derived.by(() => {
+        if (isDimmed) return 0.2;
+        if (isClickDimmed) return Math.max(0.2, baseAlpha - 0.15);
+        return baseAlpha;
+    });
+
+    interface StoredPosition { x: number; y: number }
+
+    function isStoredPosition(value: unknown): value is StoredPosition {
+        if (typeof value !== 'object' || value === null) return false;
+        const candidate = value as { x?: unknown; y?: unknown };
+        return typeof candidate.x === 'number' && typeof candidate.y === 'number';
+    }
+
+    let savedPosition = $state<StoredPosition>({ x: 0, y: 0 });
+
+    persistState<StoredPosition>(
+        persistedKeys.minitrackerPosition,
+        () => savedPosition,
+        (position) => {
+            savedPosition = position;
+            void getCurrentWindow().setPosition(new LogicalPosition(position.x, position.y));
+        },
+        { isValid: isStoredPosition },
+    );
+
+    function adjustOpacity(delta: number): void {
+        const next = Math.min(1, Math.max(0.2, baseAlpha + delta));
+        const percentage = Math.round(next * 100);
+        if (percentage === Math.round(baseAlpha * 100)) return;
+        baseAlpha = percentage / 100;
+        if (store.settings) store.settings.tracker_opacity = percentage;
+        void safeInvoke('update_setting', { key: 'tracker_opacity', value: percentage });
+    }
+
+    function handleWheel(event: WheelEvent): void {
+        event.preventDefault();
+        adjustOpacity(event.deltaY < 0 ? 0.05 : -0.05);
+    }
 
     let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
     let tasks = $derived(tasksQuery.data ?? []);
@@ -54,7 +105,7 @@
 
     let currentMs = $derived.by(() => {
         void now.ms;
-        return stopwatchState.currentMs;
+        return stopwatchState.isPaused ? stopwatchState.pauseRemainingMs : stopwatchState.currentMs;
     });
 
     let timeParts = $derived(splitTime(currentMs));
@@ -75,9 +126,25 @@
         void getCurrentWindow().setAlwaysOnTop(true);
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = KEYBOARD_SHORTCUTS.find((s) => matchesShortcut(e, s));
-            if (!shortcut) return;
-            e.preventDefault();
-            void runShortcut(shortcut.action);
+            if (shortcut) {
+                e.preventDefault();
+                void runShortcut(shortcut.action);
+                return;
+            }
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                void stopwatchState.togglePause(pauseMinutes);
+                return;
+            }
+            if ((e.key === 'ArrowUp' || e.key === 'ArrowRight') && stopwatchState.isPaused) {
+                e.preventDefault();
+                void stopwatchState.adjustPause(1);
+                return;
+            }
+            if ((e.key === 'ArrowDown' || e.key === 'ArrowLeft') && stopwatchState.isPaused) {
+                e.preventDefault();
+                void stopwatchState.adjustPause(-1);
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -111,6 +178,7 @@
 
         isDragging = true;
         readyToDrag = false;
+        isClickDimmed = true;
         dragStartX = e.screenX;
         dragStartY = e.screenY;
 
@@ -142,6 +210,8 @@
         }
 
         readyToDrag = true;
+        pendingX = initialWinX;
+        pendingY = initialWinY;
     };
 
     async function updatePosition() {
@@ -186,14 +256,19 @@
 
     const handlePointerUp = (e: PointerEvent) => {
         if (!isDragging) return;
+        const wasDraggable = readyToDrag;
         isDragging = false;
         readyToDrag = false;
+        isClickDimmed = false;
         const target = e.currentTarget as HTMLElement;
         target.releasePointerCapture(e.pointerId);
+        if (wasDraggable) {
+            savedPosition = { x: pendingX, y: pendingY };
+        }
     };
 
     const handleDoubleClick = async () => {
-        await safeInvoke('window_restore_main');
+        await safeInvoke('quit_app');
     };
 </script>
 
@@ -201,18 +276,21 @@
     role="region"
     aria-label="Mini tracker"
     class="minitracker-container"
-    class:is-dimmed={isDimmed}
+    style="opacity: {effectiveOpacity}"
     ondblclick={handleDoubleClick}
     onpointerdown={handlePointerDown}
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
     onpointercancel={handlePointerUp}
-    title="Double-click to restore main window"
+    onwheel={handleWheel}
+    title="Double-click to quit. Scroll to change opacity."
 >
     <div class="clock" style="color: {textColor}">
         <div class="time">{timeParts.m}:{timeParts.s}</div>
         <div class="byline">
-            {#if store.settings?.clock_style === 'guzey'}
+            {#if stopwatchState.isPaused}
+                paused
+            {:else if store.settings?.clock_style === 'guzey'}
                 {#if stopwatchState.activePhase === 'long break'}
                     long break
                 {:else if stopwatchState.activePhase === 'break'}
@@ -260,16 +338,11 @@
         padding: 16px;
         box-sizing: border-box;
         text-align: center;
-        opacity: 0.8;
         overflow: hidden;
         container-type: size;
         border-radius: 8px; /* Optional: rounding corners */
         box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-
-    .minitracker-container.is-dimmed {
-        opacity: 0.2;
     }
 
     .clock {

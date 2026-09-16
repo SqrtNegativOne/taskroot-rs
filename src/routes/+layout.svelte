@@ -19,6 +19,7 @@
     let isLauncher = $state(false);
     let isMinitracker = $state(false);
     let isSidebar = $state(false);
+    let isEffect = $state(false);
     let isCheckingAuth = $state(true);
     let launcherValue = $state('');
 
@@ -36,12 +37,13 @@
         isLauncher = label === 'launcher';
         isMinitracker = label === 'minitracker';
         isSidebar = (label as string) === 'sidebar';
+        isEffect = label === 'effect';
 
         let unlistenData = () => { /* noop */ };
         let unlistenNav = () => { /* noop */ };
 
         const initialize = async () => {
-            if (!isLauncher && !isMinitracker && !isSidebar) {
+            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
                 const authResult = await safeInvoke<boolean>('is_logged_in');
                 if (authResult.isOk()) {
                     await redirectToInitialRoute(authResult.value);
@@ -61,7 +63,7 @@
                 unlistenData = await listen(LAUNCHER_DATA_UPDATE, (event) => {
                     console.log('launcher data update', event.payload);
                 });
-            } else if (!isMinitracker && !isSidebar) {
+            } else if (!isMinitracker && !isSidebar && !isEffect) {
                 unlistenNav = await listen('launcher-navigate', (event) => {
                     const route = event.payload as string;
                     const validRoutes = Object.values(Routes) as string[];
@@ -124,6 +126,10 @@
     <div class="sidebar-shell">
         {@render children()}
     </div>
+{:else if isEffect}
+    <div class="effect-shell">
+        {@render children()}
+    </div>
 {:else if isCheckingAuth}
     <div class="boot-screen">
         <div class="boot-spinner"></div>
@@ -137,10 +143,19 @@
     </div>
 {/if}
 
-<Notifications />
+{#if !isEffect}
+    <Notifications />
+{/if}
 
 <style>
     .sidebar-shell {
+        height: 100vh;
+        width: 100vw;
+        background: transparent;
+        overflow: hidden;
+    }
+
+    .effect-shell {
         height: 100vh;
         width: 100vw;
         background: transparent;

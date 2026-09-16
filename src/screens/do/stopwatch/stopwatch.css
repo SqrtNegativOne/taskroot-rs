@@ -49,6 +49,12 @@
 .stopwatch-display:hover .sw-digits { opacity: 0.6; }
 .stopwatch-display.is-running .sw-digits { color: var(--fg, #fff); }
 .stopwatch-display.is-running:hover .sw-digits { opacity: 0.6; }
+.stopwatch-display.is-paused .sw-digits {
+  font-size: clamp(44px, 9vw, 120px);
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+.stopwatch-display.is-paused:hover .sw-digits { opacity: 1; }
 .sw-colon {
   font-size: clamp(80px, 14vw, 220px);
   color: var(--fg-dim);

@@ -30,6 +30,31 @@ pub fn hide_launcher(app: tauri::AppHandle) {
     }
 }
 
+/// Show the full-screen, click-through phase-transition effect overlay.
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn show_screen_effect(app: tauri::AppHandle) {
+    if let Some(effect_win) = app.get_webview_window(WindowLabel::Effect.as_str()) {
+        let _ = effect_win.set_always_on_top(true);
+        let _ = effect_win.show();
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn hide_screen_effect(app: tauri::AppHandle) {
+    if let Some(effect_win) = app.get_webview_window(WindowLabel::Effect.as_str()) {
+        let _ = effect_win.hide();
+    }
+}
+
+/// Quit the whole application (used by the mini tracker's double-click).
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 pub fn toggle_launcher_window(app: &tauri::AppHandle) {
     let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) else {
         return;

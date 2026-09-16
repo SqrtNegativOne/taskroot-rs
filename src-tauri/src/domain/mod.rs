@@ -165,6 +165,7 @@ pub enum WindowLabel {
     Main,
     Launcher,
     Minitracker,
+    Effect,
 }
 
 impl WindowLabel {
@@ -174,6 +175,7 @@ impl WindowLabel {
             Self::Main => "main",
             Self::Launcher => "launcher",
             Self::Minitracker => "minitracker",
+            Self::Effect => "effect",
         }
     }
 }
