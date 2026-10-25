@@ -1,78 +1,93 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-//! Command-layer smoke tests for the settings commands.
-//!
-//! Each handler in the parent module resolves the pool and delegates to its
-//! `&SqlitePool` body in [`super::storage`], so these tests drive that body
-//! against a real in-memory database.
+//! Store-backed settings command tests.
 
 use super::{storage, AppSettings};
-use crate::db;
-use crate::test_support::in_memory_pool;
+use crate::store::{persist, Store, StoreState};
 use serde_json::{json, Value};
+use std::path::PathBuf;
+
+fn scratch_dir(name: &str) -> PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("settings-tests")
+        .join(format!("{name}-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).expect("create scratch dir");
+    dir
+}
+
+fn state(name: &str) -> StoreState {
+    StoreState::new(Store::load(scratch_dir(name)).expect("load store"))
+}
 
 #[tokio::test]
 async fn get_settings_returns_the_defaults_when_nothing_is_stored() {
-    let pool = in_memory_pool().await;
-
-    assert_eq!(db::get_setting(&pool, "clock_style").await.unwrap(), None);
-    let settings = storage::read_settings(&pool).await.unwrap();
+    let state = state("defaults");
 
     assert_eq!(
-        serde_json::to_value(settings).unwrap(),
+        serde_json::to_value(storage::read_settings(&state).await.unwrap()).unwrap(),
         serde_json::to_value(AppSettings::default()).unwrap()
     );
 }
 
 #[tokio::test]
-async fn update_setting_round_trips_through_get_settings() {
-    let pool = in_memory_pool().await;
+async fn update_setting_round_trips_through_the_json_file() {
+    let dir = scratch_dir("round-trip");
+    let state = StoreState::new(Store::load(dir.clone()).unwrap());
 
-    storage::write_setting(&pool, "clock_style", &json!("counter"))
+    storage::write_setting(&state, "clock_style", &json!("counter"))
         .await
         .unwrap();
 
     assert_eq!(
-        storage::read_settings(&pool).await.unwrap().clock_style,
+        storage::read_settings(&state).await.unwrap().clock_style,
         "counter"
     );
     assert_eq!(
-        db::get_setting(&pool, "clock_style").await.unwrap().as_deref(),
-        Some("\"counter\"")
+        persist::read_settings(&dir).clock_style,
+        "counter",
+        "the write must reach settings.json"
     );
 }
 
 #[tokio::test]
 async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() {
-    let pool = in_memory_pool().await;
+    let dir = scratch_dir("reject");
+    let state = StoreState::new(Store::load(dir.clone()).unwrap());
 
-    let error = storage::write_setting(&pool, "sync_interval", &json!("15"))
+    let error = storage::write_setting(&state, "sync_interval", &json!("15"))
         .await
         .unwrap_err();
 
     assert_eq!(error.code(), "invalid-input");
-    assert_eq!(db::get_setting(&pool, "sync_interval").await.unwrap(), None);
+    assert!(!dir.join("settings.json").exists());
 }
 
 #[tokio::test]
 async fn ui_state_round_trips_and_is_absent_until_written() {
-    let pool = in_memory_pool().await;
+    let state = state("ui");
     let stored = json!([{ "column": "status", "value": ["done"] }]);
 
     assert_eq!(
-        storage::read_ui_state(&pool, "ui.task_list.filters")
+        storage::read_ui_state(&state, "ui.task_list.filters")
             .await
             .unwrap(),
         Value::Null
     );
 
-    storage::write_ui_state(&pool, "ui.task_list.filters", &stored)
+    storage::write_ui_state(&state, "ui.task_list.filters", &stored)
         .await
         .unwrap();
 
     assert_eq!(
-        storage::read_ui_state(&pool, "ui.task_list.filters")
+        storage::read_ui_state(&state, "ui.task_list.filters")
             .await
             .unwrap(),
         stored
+    );
+    assert_eq!(
+        storage::all_ui_state(&state)
+            .await
+            .get("ui.task_list.filters"),
+        Some(&stored)
     );
 }

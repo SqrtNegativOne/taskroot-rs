@@ -1,63 +1,62 @@
-use crate::db;
+use crate::commands::session::{app_calendar, client_for, store_state};
 use crate::domain;
 use crate::error::AppError;
+use crate::store::ops;
 
 /// # Errors
 ///
-/// Returns an error if the database is unavailable or the write fails.
+/// Returns an error when the account/store is unavailable or the `CalDAV` write
+/// fails. The row is never kept locally on failure.
 #[tauri::command]
 pub async fn create_event(
     app: tauri::AppHandle,
-    mut event: domain::AppEvent,
+    event: domain::AppEvent,
 ) -> Result<(), AppError> {
-    let pool = crate::db_pool(&app)?;
-    // New rows must carry the same denormalized calendar color the sync path
-    // writes, or they render uncolored until their first round-trip.
-    if event.color.is_none() {
-        event.color = db::resolve_calendar_color(&pool, event.remote_collection_id.as_ref()).await?;
-    }
-    Ok(db::create_event(&pool, event).await?)
+    let client = client_for(&app).await?;
+    let state = store_state(&app)?;
+    let mut store = state.lock().await;
+    ops::create_event(&mut store, &client, event).await?;
+    Ok(())
 }
 
 /// # Errors
 ///
-/// Returns an error if the database is unavailable or the write fails.
+/// Returns an error when the event is missing or the `CalDAV` write fails.
 #[tauri::command]
-pub async fn update_event(app: tauri::AppHandle, event: domain::AppEvent) -> Result<(), AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::update_event(&pool, event).await?)
+pub async fn update_event(
+    app: tauri::AppHandle,
+    event: domain::AppEvent,
+) -> Result<(), AppError> {
+    let client = client_for(&app).await?;
+    let state = store_state(&app)?;
+    let mut store = state.lock().await;
+    ops::update_event(&mut store, &client, event).await?;
+    Ok(())
 }
 
 /// # Errors
 ///
-/// Returns an error if the database is unavailable or the delete fails.
+/// Returns an error when the `CalDAV` delete fails.
 #[tauri::command]
 pub async fn delete_event(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::delete_event(&pool, id).await?)
+    let client = client_for(&app).await?;
+    let state = store_state(&app)?;
+    let mut store = state.lock().await;
+    ops::delete_event(&mut store, &client, &id).await?;
+    Ok(())
 }
 
-/// The stored calendars, active or not.
-///
-/// The `get_active_calendars` command body. It is split out of the handler so
-/// the pool-level body is testable (see `src-tauri/AGENTS.md` → Command Testing).
+/// The store's discovered calendars, projected for the frontend.
 ///
 /// # Errors
 ///
-/// Returns an error if the query fails.
-pub(crate) async fn active_calendars(
-    pool: &sqlx::SqlitePool,
-) -> Result<Vec<domain::AppCalendar>, AppError> {
-    Ok(db::get_calendars(pool).await?)
-}
-
-/// # Errors
-///
-/// Returns an error if the database is unavailable.
+/// Returns an error if the store is not initialized.
 #[tauri::command]
 pub async fn get_active_calendars(
     app: tauri::AppHandle,
 ) -> Result<Vec<domain::AppCalendar>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    active_calendars(&pool).await
+    let state = store_state(&app)?;
+    Ok(state
+        .read(|store| store.calendars.iter().map(app_calendar).collect())
+        .await)
 }

@@ -37,7 +37,6 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
 
         let mut is_sortable = false;
         let mut is_filterable = false;
-        let mut db_col = field_name_str.clone();
         let mut filter_type = quote! { crate::domain::FilterType::Text };
         let mut label = field_name_str.clone();
         if let Some(r) = label.get_mut(0..1) {
@@ -51,10 +50,6 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
                 let _ = attr.parse_nested_meta(|meta| {
                     if meta.path.is_ident("sortable") {
                         is_sortable = true;
-                    } else if meta.path.is_ident("db_col") {
-                        let value = meta.value()?;
-                        let s: syn::LitStr = value.parse()?;
-                        db_col = s.value();
                     } else if meta.path.is_ident("label") {
                         let value = meta.value()?;
                         let s: syn::LitStr = value.parse()?;
@@ -87,7 +82,6 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
                 #col_def_name {
                     id: #enum_name::#variant_ident,
                     label: #label.to_string(),
-                    db_col: #db_col.to_string(),
                     filter_type: #filter_type,
                     sortable: #is_sortable,
                 }
@@ -113,7 +107,6 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         pub struct #col_def_name {
             pub id: #enum_name,
             pub label: String,
-            pub db_col: String,
             pub filter_type: crate::domain::FilterType,
             pub sortable: bool,
         }

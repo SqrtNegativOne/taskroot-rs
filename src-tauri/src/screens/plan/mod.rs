@@ -2,44 +2,49 @@ mod expand;
 
 pub use expand::{expand_event_instances, single_instance};
 
-use crate::db;
-use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter};
+use crate::commands::session::{client_for, store_state};
+use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort};
 use crate::error::AppError;
+use crate::store::{ops, query};
 
 /// # Errors
 ///
-/// Returns an error if the operation fails.
+/// Returns an error if the store is not initialized.
 #[tauri::command]
 pub async fn query_tasks(
     app: tauri::AppHandle,
     filters: Vec<AppTaskFilter>,
-    sort: Vec<crate::domain::AppTaskSort>,
+    sort: Vec<AppTaskSort>,
     query: String,
 ) -> Result<Vec<AppTask>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::query_tasks(&pool, filters, sort, query).await?)
+    let state = store_state(&app)?;
+    Ok(state
+        .read(|store| query::query_tasks(&store.tasks(), &filters, &sort, &query))
+        .await)
 }
 
-/// Return raw mirrored events (wire format preserved for the push path).
+/// Return raw events for the inspector (wire-shaped for the write path).
 ///
 /// # Errors
 ///
-/// Returns an error if the operation fails.
+/// Returns an error if the store is not initialized.
 #[tauri::command]
 pub async fn query_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
     query: String,
 ) -> Result<Vec<AppEvent>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::query_events(&pool, filters, query).await?)
+    let state = store_state(&app)?;
+    Ok(state
+        .read(|store| query::query_events(&store.events(), &filters, &query))
+        .await)
 }
 
 /// Return render-ready instances so callers never parse wire timestamps.
 ///
 /// # Errors
 ///
-/// Returns an error if the operation fails.
+/// Returns an error if the store is not initialized.
 #[tauri::command]
 pub async fn query_event_instances(
     app: tauri::AppHandle,
@@ -48,8 +53,10 @@ pub async fn query_event_instances(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<Vec<crate::domain::EventInstance>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    let events = db::query_events(&pool, filters, query).await?;
+    let state = store_state(&app)?;
+    let events = state
+        .read(|store| query::query_events(&store.events(), &filters, &query))
+        .await;
 
     match (start_date, end_date) {
         (Some(start), Some(end)) => Ok(expand_event_instances(&events, &start, &end)),
@@ -61,24 +68,24 @@ pub async fn query_event_instances(
 ///
 /// # Errors
 ///
-/// Returns an error if the operation fails.
+/// Returns an error if the store is not initialized.
 #[tauri::command]
 pub async fn get_event(
     app: tauri::AppHandle,
     id: String,
 ) -> Result<Option<AppEvent>, AppError> {
-    let pool = crate::db_pool(&app)?;
-    Ok(db::get_event(&pool, &id).await?)
+    let state = store_state(&app)?;
+    Ok(state.read(|store| store.event(&id).cloned()).await)
 }
 
 /// Update a master event's start/end timestamps after a drag or resize.
 ///
-/// When `is_all_day` is true, `start_time`/`end_time` are floating
-/// `YYYY-MM-DD` dates so a grid-to-grid drag keeps an all-day event all-day.
+/// Preserves the event's timezone so the write keeps `DTSTART;TZID=…` and the
+/// recurrence stays anchored to the local wall clock.
 ///
 /// # Errors
 ///
-/// Returns an error if the event is missing or the update fails.
+/// Returns an error if the event is missing or the `CalDAV` write fails.
 #[tauri::command]
 pub async fn reschedule_event(
     app: tauri::AppHandle,
@@ -87,15 +94,20 @@ pub async fn reschedule_event(
     end_time: String,
     is_all_day: bool,
 ) -> Result<(), AppError> {
-    let pool = crate::db_pool(&app)?;
-    let Some(mut event) = db::get_event(&pool, &id).await? else {
-        return Err(AppError::NotFound(format!("event {id}")));
+    let state = store_state(&app)?;
+    let mut event = {
+        let store = state.lock().await;
+        store
+            .event(&id)
+            .cloned()
+            .ok_or_else(|| AppError::NotFound(format!("event {id}")))?
     };
     event.start_time = start_time;
     event.end_time = end_time;
     event.is_all_day = Some(is_all_day);
-    db::update_event(&pool, event).await?;
-    Ok(())
+    let client = client_for(&app).await?;
+    let mut store = state.lock().await;
+    ops::update_event(&mut store, &client, event).await
 }
 
 #[tauri::command]

@@ -1,19 +1,19 @@
 # taskroot
 
-taskroot is a local-first desktop task manager built around a simple cycle: **plan** your day on the calendar, **execute** with a focus stopwatch, and **rest** between sessions. It runs as a Svelte 5 single-page app on a Tauri v2 Rust backend, stores everything in a local SQLite database, and optionally syncs two ways with Google Calendar and Google Tasks. The desktop shell is multi-window: a main app window, a spotlight-style command launcher, and an always-on-top mini tracker.
+taskroot is a local-first desktop task manager built around a simple cycle: **plan** your day on the calendar, **execute** with a focus stopwatch, and **rest** between sessions. It runs as a Svelte 5 single-page app on a Tauri v2 Rust backend and keeps its calendar and task data in a CalDAV server (the local Radicale instance is the intended setup), so the same events and tasks show up on the phone. The desktop shell is multi-window: a main app window, a spotlight-style command launcher, and an always-on-top mini tracker.
 
 ## Tech Stack
 - **Frontend**: Svelte 5 (runes) + SvelteKit in SPA mode (Vite, static adapter)
 - **Backend**: Tauri v2 (Rust) exposing typed IPC commands (`Result<T, AppError>`)
-- **Storage**: SQLite via `sqlx`.
+- **Storage**: In-memory CalDAV store with JSON settings/UI state and a read-only `snapshot.json` offline cache; no local database.
 - **Type Sharing**: `ts-rs` generates TypeScript bindings from Rust structs into `src/lib/bindings/`
-- **Sync**: Google Calendar / Tasks via OAuth 2.0 (optional)
+- **Sync**: CalDAV (VEVENT + VTODO) over HTTP Basic; edits `PUT` immediately
 - **Package Manager**: Bun
 
 ## Prerequisites
 - [Bun](https://bun.sh)
 - [Rust toolchain](https://rustup.rs) (stable) plus the [Tauri v2 system dependencies](https://tauri.app/start/prerequisites/) for your platform, and [cargo-nextest](https://nexte.st) (`cargo install cargo-nextest --locked`)
-- For Google login/sync: copy `src-tauri/.env.example` to `src-tauri/.env` and fill in your OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
+- A running CalDAV server. The default is Radicale on `http://127.0.0.1:5232`; connect to it from the app's first-run screen. See `docs/caldav.md`.
 
 ## Getting Started
 ```bash

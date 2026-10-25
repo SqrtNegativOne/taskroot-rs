@@ -1,5 +1,4 @@
 export const BACKEND_ERROR_CODES = [
-    'db',
     'not-found',
     'auth',
     'sync',

@@ -11,6 +11,8 @@
     let isSyncing = $state(false);
     let syncError = $state<string | null>(null);
     let nextSyncAt = $state<Date | null>(null);
+    let offline = $state(false);
+    let lastSynced = $state<Date | null>(null);
 
     const now = useNow();
 
@@ -26,15 +28,21 @@
 
     let tooltipText = $derived.by(() => {
         const parts: string[] = [];
+        if (offline) {
+            parts.push('Offline — showing cached data');
+        }
         if (syncError) {
             parts.push(`Error: ${syncError}`);
+        }
+        if (lastSynced) {
+            parts.push(`Last synced: ${lastSynced.toLocaleTimeString()}`);
         }
         if (countdownText && !isSyncing) {
             parts.push(`Next sync in ${countdownText}`);
         } else if (nextSyncAt) {
             const timeStr = nextSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             parts.push(`Next sync: ${timeStr}`);
-        } else {
+        } else if (!offline) {
             parts.push('Next sync: Unknown');
         }
         return parts.join('\n');
@@ -48,6 +56,8 @@
                     isSyncing = state.is_syncing;
                     syncError = state.error;
                     nextSyncAt = state.next_sync_at ? new Date(state.next_sync_at) : null;
+                    offline = state.offline;
+                    lastSynced = state.last_synced ? new Date(state.last_synced) : null;
                 },
                 (e) => console.error('Failed to get sync state:', e)
             );
@@ -86,6 +96,6 @@
     }
 </script>
 
-<button class="stage" onclick={handleSync} disabled={isSyncing} style="padding: 0 4px; display: flex; background: transparent; border: none; cursor: pointer; color: {syncError ? 'var(--tag-red)' : 'inherit'}; align-items: center; gap: 4px;" aria-label="Sync" title={tooltipText}>
-    <span class="material-symbols-outlined {isSyncing ? 'spinning' : ''}" style="font-size: 18px;">sync</span>
+<button class="stage" onclick={handleSync} disabled={isSyncing} style="padding: 0 4px; display: flex; background: transparent; border: none; cursor: pointer; color: {offline || syncError ? 'var(--tag-red)' : 'inherit'}; align-items: center; gap: 4px;" aria-label={offline ? 'Offline' : 'Sync'} title={tooltipText}>
+    <span class="material-symbols-outlined {isSyncing ? 'spinning' : ''}" style="font-size: 18px;">{offline ? 'cloud_off' : 'sync'}</span>
 </button>

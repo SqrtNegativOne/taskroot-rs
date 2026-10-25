@@ -68,7 +68,7 @@ pub fn read_task_resource(
     let mut tasks = tasks(raw)?;
     for task in &mut tasks {
         task.remote_id = Some(RemoteId::from(href));
-        task.task_list_id = Some(collection_href.to_string());
+        task.remote_collection_id = Some(CollectionId::from(collection_href));
     }
     Ok(tasks)
 }
@@ -233,7 +233,6 @@ fn event_from_component(component: &Component<'_>) -> Result<AppEvent, AppError>
         updated_at: property(component, "LAST-MODIFIED").and_then(iso_value),
         color: text_property(component, "COLOR").and_then(|value| Color::try_from(value).ok()),
         etag: None,
-        dirty: None,
         is_all_day: Some(is_all_day),
         timezone,
     })
@@ -299,12 +298,11 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
     Ok(AppTask {
         id: TaskId::from(uid),
         remote_id: None,
-        task_list_id: None,
+        remote_collection_id: None,
         title: text_property(component, "SUMMARY").unwrap_or_default(),
         status: Some(read_task_status(component)),
         priority: property(component, "PRIORITY").and_then(priority_value),
         tags: read_categories(component),
-        checklist: None,
         parent_task: read_parent(component).map(TaskId::from),
         dependencies: read_dependencies(component),
         est: property(component, "X-TASKROOT-EST")
@@ -322,7 +320,6 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
             .map(|value| due_value(&value)),
         updated_at: property(component, "LAST-MODIFIED").and_then(iso_value),
         etag: None,
-        dirty: None,
     })
 }
 

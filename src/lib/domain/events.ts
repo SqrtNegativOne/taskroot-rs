@@ -15,9 +15,7 @@ export type CalendarLike = AppCalendar | {
     readonly summary?: string;
     readonly color?: string;
     readonly backgroundColor?: string;
-    readonly isPrimary?: boolean;
-    readonly primary?: boolean;
-    readonly accessRole?: string;
+    readonly writable?: boolean;
 };
 
 export function resolveEventCalendar<C extends CalendarLike>(
@@ -28,21 +26,19 @@ export function resolveEventCalendar<C extends CalendarLike>(
         return undefined;
     }
 
-    const isPrimaryCal = (c: C): boolean => Boolean(c.isPrimary ?? (c as { readonly primary?: boolean }).primary);
-    const primaryCal = calendars.find(isPrimaryCal) ?? calendars[0];
-
+    const fallback = calendars[0];
     const collectionId = ev.remoteCollectionId;
-    if (!collectionId || collectionId === 'primary') {
-        return primaryCal;
+    if (!collectionId) {
+        return fallback;
     }
 
-    return calendars.find((c) => c.id === collectionId) ?? primaryCal;
+    return calendars.find((c) => c.id === collectionId) ?? fallback;
 }
 
 export function isCalendarReadOnly(
-    calendar: { readonly accessRole?: string } | undefined,
+    calendar: { readonly writable?: boolean } | undefined,
 ): boolean {
-    return calendar?.accessRole === 'reader' || calendar?.accessRole === 'freeBusyReader';
+    return calendar?.writable === false;
 }
 
 /**

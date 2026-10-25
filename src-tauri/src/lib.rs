@@ -5,13 +5,11 @@
 #![deny(clippy::expect_used)]
 #![allow(clippy::exit, clippy::panic)]
 
-use sqlx::SqlitePool;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub mod caldav;
 pub mod commands;
-pub mod db;
 pub mod domain;
 pub mod error;
 pub mod events;
@@ -19,6 +17,7 @@ pub mod ics;
 pub mod screens;
 pub mod settings;
 pub mod stopwatch;
+pub mod store;
 pub mod sync;
 #[cfg(test)]
 pub mod test_support;
@@ -36,11 +35,6 @@ pub fn toggle_launcher(app: &tauri::AppHandle) {
 pub fn extract_deep_link_route(arg: &str) -> Option<&str> {
     let route = arg.strip_prefix("taskroot://")?;
     Some(route.trim_end_matches('/'))
-}
-
-pub(crate) fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, SqlitePool>, AppError> {
-    app.try_state::<SqlitePool>()
-        .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))
 }
 
 /// The application data directory, created on demand.
@@ -158,15 +152,16 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            let app_data_dir = handle.path().app_data_dir()?;
-            std::fs::create_dir_all(&app_data_dir)?;
+            let data_dir = app_data_dir(&handle)?;
+            let store = store::Store::load(data_dir)?;
+            handle.manage(store::StoreState::new(store));
+            sync::start_sync_engine(handle.clone());
 
-            let db_path = app_data_dir.join("taskroot.db");
-            let db_url = format!("sqlite:{}", db_path.to_str().ok_or("Invalid db path")?);
-
-            let pool = tauri::async_runtime::block_on(async { db::init_db(&db_url).await })?;
-            handle.manage(pool.clone());
-            sync::start_sync_engine(handle, pool);
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = sync::run_tracked_sync(&handle, None).await {
+                    eprintln!("Startup load failed: {error}");
+                }
+            });
 
             Ok(())
         })

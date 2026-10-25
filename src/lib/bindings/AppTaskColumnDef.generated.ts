@@ -2,4 +2,4 @@
 import type { AppTaskFilterColumn } from "./AppTaskFilterColumn.generated";
 import type { FilterType } from "./FilterType.generated";
 
-export type AppTaskColumnDef = { id: AppTaskFilterColumn, label: string, db_col: string, filter_type: FilterType, sortable: boolean, };
+export type AppTaskColumnDef = { id: AppTaskFilterColumn, label: string, filter_type: FilterType, sortable: boolean, };

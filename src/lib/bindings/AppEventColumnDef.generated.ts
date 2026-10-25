@@ -2,4 +2,4 @@
 import type { AppEventFilterColumn } from "./AppEventFilterColumn.generated";
 import type { FilterType } from "./FilterType.generated";
 
-export type AppEventColumnDef = { id: AppEventFilterColumn, label: string, db_col: string, filter_type: FilterType, sortable: boolean, };
+export type AppEventColumnDef = { id: AppEventFilterColumn, label: string, filter_type: FilterType, sortable: boolean, };

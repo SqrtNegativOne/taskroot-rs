@@ -311,7 +311,6 @@ mod tests {
             updated_at: None,
             color: None,
             etag: None,
-            dirty: None,
             is_all_day: None,
             timezone: None,
         }

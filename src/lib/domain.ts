@@ -11,7 +11,6 @@ export type { AppTaskFilter } from './bindings/AppTaskFilter.generated';
 export type { AppTaskFilterColumn } from './bindings/AppTaskFilterColumn.generated';
 export type { AppTaskSort } from './bindings/AppTaskSort.generated';
 export type { AppTaskStatus } from './bindings/AppTaskStatus.generated';
-export type { ChecklistItem } from './bindings/ChecklistItem.generated';
 export type { Color } from './bindings/Color.generated';
 export type { EventStatus } from './bindings/EventStatus.generated';
 export type { EventInstance } from './bindings/EventInstance.generated';

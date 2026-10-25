@@ -138,10 +138,7 @@ pub fn create_event_resource(event: &AppEvent) -> Result<String, AppError> {
 pub fn create_task_resource(task: &AppTask) -> Result<String, AppError> {
     let mut component = Todo::new();
     append_line(&mut component, &format!("UID:{}", task.id));
-    append_line(
-        &mut component,
-        &format!("DTSTAMP:{}", Utc::now().format(ICAL_UTC)),
-    );
+    // `task_specs` owns DTSTAMP and sets exactly one.
     append_specs(&mut component, &task_specs(task));
     Ok(render_calendar(component))
 }
@@ -183,7 +180,14 @@ fn append_line(component: &mut impl icalendar::Component, line: &str) {
     let Some(property) = property_from(name, value) else {
         return;
     };
-    component.append_multi_property(property);
+    // `icalendar` injects a random UID and a fresh DTSTAMP at serialization time
+    // unless those keys live in the singular-property map. Routing them through
+    // `append_multi_property` would hide them and duplicate the value.
+    if name.eq_ignore_ascii_case("UID") || name.eq_ignore_ascii_case("DTSTAMP") {
+        component.append_property(property);
+    } else {
+        component.append_multi_property(property);
+    }
 }
 
 fn property_from(name: &str, value: &str) -> Option<Property> {

@@ -1,6 +1,7 @@
 <script lang="ts">
     import TaskCircle from '../TaskCircle.svelte';
     import type { AppTask } from '../../lib/domain';
+    import { ymd } from '../../lib/time';
 
     let {
         task,
@@ -58,7 +59,11 @@
     }
     
     let dueStr = $derived(task.due ? `due ${task.due}` : "");
-    let overdue = $derived(task.due && task.due < new Date().toISOString() && task.status !== "done");
+    let overdue = $derived(
+        !!task.due
+        && task.due.slice(0, 10) < ymd(new Date())
+        && task.status !== "done",
+    );
 
     let hasTags = $derived(!!task.tags && task.tags.length > 0);
     let est = $derived(task.est ?? 0);

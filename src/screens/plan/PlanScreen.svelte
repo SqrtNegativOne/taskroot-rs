@@ -76,8 +76,9 @@
         
         const activeCalendars = calendarsQuery.data ?? [];
         const writableCalendars = activeCalendars.filter((c) => !isCalendarReadOnly(c));
-        const primaryCalendar = writableCalendars.find(c => c.isPrimary);
-        const defaultCalendarId = primaryCalendar ? primaryCalendar.id : writableCalendars[0]?.id;
+        const defaultCalendar = writableCalendars.find(c => c.component === 'VEVENT')
+            ?? writableCalendars[0];
+        const defaultCalendarId = defaultCalendar?.id;
 
         const newEvent: AppEvent = {
             id: crypto.randomUUID(),
@@ -90,6 +91,9 @@
                 : ymd(addDays(date, 1)),
             remoteCollectionId: defaultCalendarId,
             isAllDay: startMins === undefined,
+            timezone: startMins === undefined
+                ? undefined
+                : Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
         void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
         inspectorState = { type: 'event', id: newEvent.id };

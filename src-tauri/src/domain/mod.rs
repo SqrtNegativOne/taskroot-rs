@@ -50,9 +50,8 @@ macro_rules! impl_ts_string_newtype {
     };
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash)]
 #[serde(transparent)]
-#[sqlx(transparent)]
 pub struct TaskId(pub String);
 impl std::fmt::Display for TaskId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -70,9 +69,8 @@ impl From<&str> for TaskId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash)]
 #[serde(transparent)]
-#[sqlx(transparent)]
 pub struct EventId(pub String);
 impl std::fmt::Display for EventId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -90,9 +88,8 @@ impl From<&str> for EventId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash)]
 #[serde(transparent)]
-#[sqlx(transparent)]
 pub struct RemoteId(pub String);
 impl std::fmt::Display for RemoteId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -110,9 +107,8 @@ impl From<&str> for RemoteId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash)]
 #[serde(transparent)]
-#[sqlx(transparent)]
 pub struct CollectionId(pub String);
 impl std::fmt::Display for CollectionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -130,9 +126,8 @@ impl From<&str> for CollectionId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, std::hash::Hash)]
 #[serde(try_from = "String", into = "String")]
-#[sqlx(transparent)]
 pub struct Color(pub String);
 impl TryFrom<String> for Color {
     type Error = String;
@@ -157,10 +152,9 @@ impl std::fmt::Display for Color {
 
 impl_ts_string_newtype!(TaskId, EventId, RemoteId, CollectionId, Color);
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/WindowLabel.generated.ts")]
 #[serde(rename_all = "kebab-case")]
-#[sqlx(type_name = "TEXT", rename_all = "kebab-case")]
 pub enum WindowLabel {
     Main,
     Launcher,
@@ -180,13 +174,12 @@ impl WindowLabel {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(
     export,
     export_to = "../../src/lib/bindings/AppTaskStatus.generated.ts"
 )]
 #[serde(rename_all = "kebab-case")]
-#[sqlx(type_name = "TEXT", rename_all = "kebab-case")]
 pub enum AppTaskStatus {
     Todo,
     NextUp,
@@ -208,7 +201,7 @@ impl AppTaskStatus {
 
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS, sqlx::Type)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/TaskPriority.generated.ts")]
 #[ts(type = "0 | 1 | 2 | 3 | 4")]
 #[repr(i32)]
@@ -221,27 +214,6 @@ pub enum TaskPriority {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/ChecklistItem.generated.ts"
-)]
-pub struct ChecklistItem {
-    #[serde(default = "default_checklist_id")]
-    pub id: String,
-    #[serde(default)]
-    pub title: String,
-    #[serde(default)]
-    pub done: bool,
-    #[serde(flatten)]
-    #[ts(skip)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
-}
-
-fn default_checklist_id() -> String {
-    uuid::Uuid::new_v4().to_string()
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq, Eq)]
 #[ts(export, export_to = "../../src/lib/bindings/Tag.generated.ts")]
 pub struct Tag {
     pub id: String,
@@ -250,33 +222,29 @@ pub struct Tag {
     pub color: Option<String>,
 }
 
+use crate::caldav::model::CalendarComponent;
 use taskroot_macros::Queryable;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, Queryable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
-    #[query(sortable, db_col = "t.id", label = "Created")]
+    #[query(sortable, label = "Created")]
     pub id: TaskId,
-    #[query(sortable, db_col = "LOWER(t.title)")]
+    #[query(sortable)]
     pub title: String,
     #[ts(optional)]
-    #[query(db_col = "t.status", filter_type = "enum:AppTaskStatus")]
+    #[query(filter_type = "enum:AppTaskStatus")]
     pub status: Option<AppTaskStatus>,
     #[ts(optional)]
-    #[query(sortable, db_col = "COALESCE(t.priority, 0)", filter_type = "number")]
+    #[query(sortable, filter_type = "number")]
     pub priority: Option<TaskPriority>,
     #[ts(optional)]
-    #[sqlx(json)]
-    #[query(db_col = "", filter_type = "relation:task_tags")]
+    #[query(filter_type = "relation:task_tags")]
     pub tags: Option<Vec<Tag>>,
-    #[ts(optional)]
-    #[sqlx(json)]
-    pub checklist: Option<Vec<ChecklistItem>>,
     #[ts(optional)]
     pub parent_task: Option<TaskId>,
     #[ts(optional)]
-    #[sqlx(json)]
     pub dependencies: Option<Vec<TaskId>>,
     #[ts(optional)]
     pub est: Option<i32>,
@@ -290,28 +258,26 @@ pub struct AppTask {
     pub on_canvas: Option<bool>,
     #[ts(optional)]
     pub remote_id: Option<RemoteId>,
+    /// Collection href this task lives in, matching [`AppEvent`].
+    #[ts(optional)]
+    #[query(label = "Collection")]
+    pub remote_collection_id: Option<CollectionId>,
     #[ts(optional)]
     pub notes: Option<String>,
     #[ts(optional)]
     pub tabs: Option<String>,
     #[ts(optional)]
-    #[query(sortable, db_col = "COALESCE(t.due, '9999')", filter_type = "text")]
+    #[query(sortable, filter_type = "text")]
     pub due: Option<String>,
     #[ts(optional)]
     pub updated_at: Option<String>,
     #[ts(optional)]
     pub etag: Option<String>,
-    #[ts(optional)]
-    pub dirty: Option<bool>,
-    /// Google Tasks list this row belongs to (`@default` for legacy rows).
-    #[ts(optional)]
-    pub task_list_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/EventStatus.generated.ts")]
 #[serde(rename_all = "camelCase")]
-#[sqlx(type_name = "TEXT", rename_all = "camelCase")]
 pub enum EventStatus {
     Confirmed,
     Tentative,
@@ -325,7 +291,7 @@ impl EventStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../../src/lib/bindings/AppCalendar.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppCalendar {
@@ -333,15 +299,13 @@ pub struct AppCalendar {
     pub summary: String,
     #[ts(optional)]
     pub color: Option<Color>,
-    #[ts(optional)]
-    pub is_primary: Option<bool>,
-    /// Google's `accessRole` (`owner`, `writer`, `reader`, `freeBusyReader`).
-    /// `reader` and `freeBusyReader` calendars reject every write.
-    #[ts(optional)]
-    pub access_role: Option<String>,
+    /// Whether the current account may write to this collection.
+    pub writable: bool,
+    /// The component kind the collection stores.
+    pub component: CalendarComponent,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, sqlx::FromRow, Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, Queryable)]
 #[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
@@ -349,11 +313,11 @@ pub struct AppEvent {
     #[ts(optional)]
     pub remote_id: Option<RemoteId>,
     #[ts(optional)]
-    #[query(db_col = "remote_collection_id", label = "Calendar")]
+    #[query(label = "Calendar")]
     pub remote_collection_id: Option<CollectionId>,
     #[ts(optional)]
     pub task_id: Option<TaskId>,
-    #[query(db_col = "LOWER(title)")]
+    #[query(sortable)]
     pub title: String,
     #[ts(optional)]
     pub description: Option<String>,
@@ -362,27 +326,23 @@ pub struct AppEvent {
     #[ts(optional)]
     pub rrule: Option<String>,
     #[ts(optional)]
-    #[sqlx(json)]
     pub exdates: Option<Vec<String>>,
     #[ts(optional)]
     pub recurring_event_id: Option<EventId>,
     #[ts(optional)]
     pub original_start_time: Option<String>,
     #[ts(optional)]
-    #[query(db_col = "status", filter_type = "enum:EventStatus")]
+    #[query(filter_type = "enum:EventStatus")]
     pub status: Option<EventStatus>,
     #[ts(optional)]
     pub updated_at: Option<String>,
     #[ts(optional)]
-    #[sqlx(default)]
     pub color: Option<Color>,
     #[ts(optional)]
     pub etag: Option<String>,
     #[ts(optional)]
-    pub dirty: Option<bool>,
-    #[ts(optional)]
     pub is_all_day: Option<bool>,
-    /// IANA timezone captured from Google's `start.dateTime`/`end.dateTime`.
+    /// IANA timezone of a timed event's wall clock (`None` = UTC).
     #[ts(optional)]
     pub timezone: Option<String>,
 }
@@ -404,7 +364,6 @@ mod tests {
                 name: "work".into(),
                 color: None,
             }]),
-            checklist: None,
             parent_task: None,
             dependencies: None,
             est: None,
@@ -413,13 +372,12 @@ mod tests {
             canvas_y: None,
             on_canvas: None,
             remote_id: None,
+            remote_collection_id: None,
             notes: None,
             tabs: None,
             due: None,
             updated_at: None,
             etag: None,
-            dirty: None,
-            task_list_id: None,
         };
 
         let json = serde_json::to_string(&task).unwrap();
@@ -449,7 +407,6 @@ mod tests {
             updated_at: Some("2026-08-26T07:31:42Z".into()),
             color: None,
             etag: None,
-            dirty: None,
             is_all_day: None,
             timezone: None,
         };

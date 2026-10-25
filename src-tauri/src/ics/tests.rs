@@ -182,8 +182,10 @@ fn tasks_org_task_maps_the_workflow_and_the_priority_bucket() {
     assert_eq!(task.tags, None);
     assert_eq!(task.parent_task, None);
     assert_eq!(task.dependencies, None);
-    assert_eq!(task.checklist, None);
-    assert_eq!(task.task_list_id.as_deref(), Some(COLLECTION));
+    assert_eq!(
+        task.remote_collection_id.as_deref().map(String::as_str),
+        Some(COLLECTION)
+    );
     assert_eq!(task.remote_id.as_ref().map(|id| id.0.as_str()), Some(HREF));
 }
 
@@ -569,8 +571,22 @@ fn create_event_resource_uses_the_dto_id_as_uid() {
     .unwrap();
 
     assert!(created.starts_with("BEGIN:VCALENDAR\r\n"));
-    assert!(created.contains("UID:dsh-20261019-cn@dsh-import@taskroot-import"));
-    assert!(created.contains("DTSTAMP:"));
+    assert_eq!(
+        created
+            .lines()
+            .filter(|line| line.starts_with("UID:"))
+            .collect::<Vec<_>>(),
+        vec!["UID:dsh-20261019-cn@dsh-import@taskroot-import"],
+        "a created resource must contain exactly the DTO's UID, not an auto-generated one"
+    );
+    assert_eq!(
+        created
+            .lines()
+            .filter(|line| line.starts_with("DTSTAMP:"))
+            .count(),
+        1,
+        "a created resource must contain exactly one DTSTAMP"
+    );
     assert!(created.contains("DTSTART;TZID=Asia/Kolkata:20261019T110000"));
     assert!(created.contains("EXDATE;TZID=Asia/Kolkata:20261019T110000"));
     assert!(created.contains("RRULE:FREQ=WEEKLY;UNTIL=20261218T235959Z"));
@@ -604,8 +620,21 @@ fn create_task_resource_round_trips_through_the_reader() {
     let created = create_task_resource(&task).unwrap();
 
     assert!(created.contains("BEGIN:VTODO"));
-    assert!(created.contains("UID:1004415175551987562"));
+    assert_eq!(
+        created
+            .lines()
+            .filter(|line| line.starts_with("UID:"))
+            .collect::<Vec<_>>(),
+        vec!["UID:1004415175551987562"]
+    );
     assert!(created.contains("DUE;VALUE=DATE:20261105"));
+    assert_eq!(
+        created
+            .lines()
+            .filter(|line| line.starts_with("DTSTAMP:"))
+            .count(),
+        1
+    );
     let reread = read_task(&created);
     assert_eq!(reread.title, "Floss");
     assert_eq!(reread.status, Some(AppTaskStatus::Done));

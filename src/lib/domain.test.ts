@@ -96,8 +96,8 @@ describe('hydrateEvents', () => {
     ];
 
     const sampleCalendars: AppCalendar[] = [
-        { id: 'cal-work', summary: 'Work Calendar', color: '#4285f4', isPrimary: true },
-        { id: 'cal-home', summary: 'Home Life', color: '#0f9d58' },
+        { id: 'cal-work', summary: 'Work Calendar', color: '#4285f4', writable: true, component: 'VEVENT' },
+        { id: 'cal-home', summary: 'Home Life', color: '#0f9d58', writable: true, component: 'VEVENT' },
     ];
 
     it('hydrates event linked to a task with task details and calendar metadata', () => {
@@ -223,24 +223,22 @@ describe('isEventAllDay', () => {
 });
 
 describe('isCalendarReadOnly', () => {
-    it('treats reader and freeBusyReader calendars as read-only', () => {
-        expect(isCalendarReadOnly({ accessRole: 'reader' })).toBe(true);
-        expect(isCalendarReadOnly({ accessRole: 'freeBusyReader' })).toBe(true);
+    it('treats a non-writable calendar as read-only', () => {
+        expect(isCalendarReadOnly({ writable: false })).toBe(true);
     });
 
-    it('treats writer, owner, unset, and undefined as writable', () => {
-        expect(isCalendarReadOnly({ accessRole: 'writer' })).toBe(false);
-        expect(isCalendarReadOnly({ accessRole: 'owner' })).toBe(false);
-        expect(isCalendarReadOnly({ accessRole: undefined })).toBe(false);
+    it('treats writable and unset calendars as editable', () => {
+        expect(isCalendarReadOnly({ writable: true })).toBe(false);
+        expect(isCalendarReadOnly({ writable: undefined })).toBe(false);
         expect(isCalendarReadOnly(undefined)).toBe(false);
     });
 });
 
 describe('isEventReadOnly', () => {
     const calendars: AppCalendar[] = [
-        { id: 'cal-work', summary: 'Work', isPrimary: true, accessRole: 'owner' },
-        { id: 'cal-holidays', summary: 'Holidays', accessRole: 'reader' },
-        { id: 'cal-busy', summary: 'Busy', accessRole: 'freeBusyReader' },
+        { id: 'cal-work', summary: 'Work', writable: true, component: 'VEVENT' },
+        { id: 'cal-holidays', summary: 'Holidays', writable: false, component: 'VEVENT' },
+        { id: 'cal-busy', summary: 'Busy', writable: false, component: 'VEVENT' },
     ];
 
     it('checks the calendar the event belongs to', () => {
