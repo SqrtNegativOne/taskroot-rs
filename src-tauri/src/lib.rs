@@ -9,8 +9,6 @@ use sqlx::SqlitePool;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-pub mod apis;
-pub mod auth;
 pub mod commands;
 pub mod db;
 pub mod domain;
@@ -73,9 +71,7 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            dotenvy::dotenv().ok();
             let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
-            app.manage(auth::AuthState::default());
             app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
                 stopwatch::StopwatchState::default(),
             )));
@@ -171,8 +167,6 @@ pub fn run() {
             commands::events::get_active_calendars,
             commands::sync::force_sync,
             commands::sync::wipe_local_data,
-            commands::sync::clear_sync_queue,
-            commands::sync::get_sync_queue,
             screens::plan::query_tasks,
             screens::plan::query_events,
             screens::plan::query_event_instances,
@@ -188,9 +182,6 @@ pub fn run() {
             commands::window::quit_app,
             commands::window::toggle_launcher,
             commands::window::resize_launcher,
-            auth::login_with_google,
-            auth::is_logged_in,
-            auth::reset_auth,
             stopwatch::get_stopwatch_state,
             stopwatch::toggle_stopwatch,
             stopwatch::toggle_break,

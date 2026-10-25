@@ -5,7 +5,7 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(
     export,
-    export_to = "../../../src/lib/bindings/ParsedSigils.generated.ts"
+    export_to = "../../src/lib/bindings/ParsedSigils.generated.ts"
 )]
 #[serde(rename_all = "camelCase")]
 pub struct ParsedSigils {
@@ -16,7 +16,7 @@ pub struct ParsedSigils {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, TS)]
 #[ts(
     export,
-    export_to = "../../../src/lib/bindings/SigilProperties.generated.ts"
+    export_to = "../../src/lib/bindings/SigilProperties.generated.ts"
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SigilProperties {

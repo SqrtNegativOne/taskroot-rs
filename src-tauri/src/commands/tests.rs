@@ -11,6 +11,7 @@ use crate::db;
 use crate::domain::{AppCalendar, AppTaskStatus, Color};
 use crate::test_support::{self, frontend_scan, source_scan};
 
+
 #[test]
 fn the_command_table_lists_every_command_once() {
     let registered = source_scan::registered_commands();
@@ -211,61 +212,4 @@ async fn get_active_calendars_returns_the_access_role() {
         .find(|cal| cal.id == "holidays".into())
         .expect("the holidays calendar is returned");
     assert_eq!(holidays.access_role.as_deref(), Some("reader"));
-}
-
-/// A write to a read-only calendar must fail before it can wedge the sync queue
-/// on a 403 from Google.
-#[tokio::test]
-async fn reject_read_only_calendars_refuses_reader_and_allows_writer() {
-    let pool = test_support::in_memory_pool().await;
-    let calendar = |id: &str, role: &str| AppCalendar {
-        id: id.into(),
-        summary: id.to_string(),
-        color: None,
-        is_primary: Some(false),
-        access_role: Some(role.to_string()),
-    };
-    db::upsert_calendar(&pool, calendar("holidays", "reader"))
-        .await
-        .unwrap();
-    db::upsert_calendar(&pool, calendar("work", "owner"))
-        .await
-        .unwrap();
-
-    let holidays: crate::domain::CollectionId = "holidays".into();
-    let work: crate::domain::CollectionId = "work".into();
-
-    let refused = super::events::reject_read_only_calendars(&pool, &[Some(&holidays)]).await;
-    assert!(matches!(
-        refused,
-        Err(crate::error::AppError::InvalidInput(_))
-    ));
-
-    let allowed = super::events::reject_read_only_calendars(&pool, &[Some(&work)]).await;
-    assert!(allowed.is_ok());
-}
-
-/// An event with no calendar targets the primary one, so a read-only primary
-/// must also block the write.
-#[tokio::test]
-async fn reject_read_only_calendars_falls_back_to_the_primary_calendar() {
-    let pool = test_support::in_memory_pool().await;
-    db::upsert_calendar(
-        &pool,
-        AppCalendar {
-            id: "primary".into(),
-            summary: "Primary".into(),
-            color: None,
-            is_primary: Some(true),
-            access_role: Some("freeBusyReader".into()),
-        },
-    )
-    .await
-    .unwrap();
-
-    let refused = super::events::reject_read_only_calendars(&pool, &[None]).await;
-    assert!(matches!(
-        refused,
-        Err(crate::error::AppError::InvalidInput(_))
-    ));
 }

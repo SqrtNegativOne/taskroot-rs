@@ -232,7 +232,7 @@ mod tests {
         let settings = apply_stored_settings(stored(&[
             ("clock_style", serde_json::json!(["guzey"])),
             ("sync_interval", Value::Null),
-            ("google_access_token", Value::String("token".to_string())),
+            ("not_a_setting", Value::String("token".to_string())),
         ]));
 
         assert_eq!(
@@ -255,11 +255,11 @@ mod tests {
     #[test]
     fn apply_stored_settings_keeps_booleans_and_numbers() {
         let settings = apply_stored_settings(stored(&[
-            ("enable_calendar_sync", Value::Bool(false)),
+            ("allow_stopwatch_without_task", Value::Bool(true)),
             ("sync_interval", serde_json::json!(15)),
         ]));
 
-        assert!(!settings.enable_calendar_sync);
+        assert!(settings.allow_stopwatch_without_task);
         assert_eq!(settings.sync_interval, 15);
     }
 

@@ -104,14 +104,6 @@ struct CustomSettingDef {
 
 const CUSTOM_SETTINGS: &[CustomSettingDef] = &[
     CustomSettingDef {
-        section: "sync_integrations",
-        id: "logout",
-        label: "Sign out",
-        description: "Sign out of your Google account.",
-        keywords: &["logout", "signout", "google", "account"],
-        danger: false,
-    },
-    CustomSettingDef {
         section: "sync_danger",
         id: "clear_all_data",
         label: "Clear All Data",

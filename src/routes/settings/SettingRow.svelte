@@ -26,12 +26,7 @@
     }
 
     async function handleCustomAction(id: string) {
-        if (id === 'logout') {
-            if (confirm("Are you sure you want to sign out?")) {
-                await safeInvoke('reset_auth');
-                window.location.reload();
-            }
-        } else if (id === 'clear_all_data') {
+        if (id === 'clear_all_data') {
             if (confirm("Are you sure you want to wipe all local data? This cannot be undone.")) {
                 await safeInvoke('wipe_local_data');
                 window.location.reload();

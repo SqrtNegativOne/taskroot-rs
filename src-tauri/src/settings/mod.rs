@@ -8,9 +8,7 @@
 //!
 //! The rule: if it is a typed app setting, it belongs in `AppSettings`; anything
 //! else the frontend wants to remember goes to `ui_state`. Never smuggle UI state
-//! into `settings` as ad-hoc `ui.*` keys. (The `settings` table also carries the
-//! `google_*` OAuth rows written by `auth.rs`; those are not settings and are not
-//! part of `AppSettings`.)
+//! into `settings` as ad-hoc `ui.*` keys.
 //!
 //! Settings presentation metadata lives in `#[setting(..)]` attributes next to the
 //! field it describes; [`get_settings_schema`] assembles the UI schema from them
@@ -108,22 +106,6 @@ pub struct AppSettings {
     )]
     pub pause_minutes: i32,
     #[setting(
-        label = "Enable Bidirectional Google Calendar Sync",
-        description = "Self explanatory.",
-        keywords = ["google", "calendar", "sync", "events"],
-        kind = "checkbox",
-        section = "sync_integrations"
-    )]
-    pub enable_calendar_sync: bool,
-    #[setting(
-        label = "Enable Bidirectional Google Tasks Sync",
-        description = "Self explanatory.",
-        keywords = ["google", "tasks", "sync", "todos"],
-        kind = "checkbox",
-        section = "sync_integrations"
-    )]
-    pub enable_tasks_sync: bool,
-    #[setting(
         label = "Sync Interval (minutes)",
         keywords = ["sync", "interval", "poll", "time"],
         kind = "number",
@@ -182,8 +164,6 @@ impl Default for AppSettings {
             flowtime_break_divisor: 5,
             have_long_breaks: false,
             pause_minutes: 10,
-            enable_calendar_sync: true,
-            enable_tasks_sync: true,
             sync_interval: 5,
             keybinding_launcher: "Meta+Shift+Space".to_string(),
             keybinding_open_settings: "Ctrl+,".to_string(),

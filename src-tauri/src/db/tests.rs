@@ -93,7 +93,9 @@ async fn test_ui_state_roundtrip() {
 
 #[tokio::test]
 async fn test_init_db_migrates_legacy_ui_settings_rows_on_reopen() {
-    let path = std::env::temp_dir().join(format!("taskroot-migration-{}.db", uuid::Uuid::new_v4()));
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-db");
+    std::fs::create_dir_all(&dir).expect("create test db directory");
+    let path = dir.join(format!("taskroot-migration-{}.db", uuid::Uuid::new_v4()));
     let url = format!("sqlite:{}", path.to_string_lossy());
 
     let pool = init_db(&url).await.expect("Failed to init db");

@@ -5,7 +5,6 @@ pub use expand::{expand_event_instances, single_instance};
 use crate::db;
 use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter};
 use crate::error::AppError;
-use crate::sync;
 
 /// # Errors
 ///
@@ -92,23 +91,9 @@ pub async fn reschedule_event(
     let Some(mut event) = db::get_event(&pool, &id).await? else {
         return Err(AppError::NotFound(format!("event {id}")));
     };
-    crate::commands::events::reject_read_only_calendars(
-        &pool,
-        &[event.remote_collection_id.as_ref()],
-    )
-    .await?;
     event.start_time = start_time;
     event.end_time = end_time;
     event.is_all_day = Some(is_all_day);
-    // A drag/resize must reach Google, not just SQLite. `push_or_enqueue`
-    // mirrors `commands::events::update_event`: it marks the row dirty and
-    // queues an Update (or triggers an immediate sync).
-    //
-    // Note: this moves the row it was given. For a rule-expanded occurrence the
-    // frontend passes the master's id, so the whole series shifts; per-occurrence
-    // moves are part of the exception-instance follow-up (see
-    // `docs/google-calendar-write.md`).
-    sync::push::push_or_enqueue(&app, &mut event, sync::types::SyncAction::Update).await;
     db::update_event(&pool, event).await?;
     Ok(())
 }

@@ -63,9 +63,6 @@
     let hasTags = $derived(!!task.tags && task.tags.length > 0);
     let est = $derived(task.est ?? 0);
     let hasEst = $derived(est > 0);
-    let checklist = $derived(task.checklist ?? []);
-    let hasChecklist = $derived(checklist.length > 0);
-    let doneChecklistItems = $derived(checklist.filter(s => s.done).length);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
@@ -118,11 +115,11 @@
                 </button>
             </div>
         </div>
-        {#if hasEst || hasTags || hasChecklist || dueStr}
+        {#if hasEst || hasTags || dueStr}
             <div class="task-row-line2">
                 {#if hasEst}
                     <span class="meta-est">{est}m</span>
-                    {#if hasTags || hasChecklist}<span class="meta-sep">·</span>{/if}
+                    {#if hasTags}<span class="meta-sep">·</span>{/if}
                 {/if}
                 {#if task.tags}
                     {#each task.tags as tag, i (tag.id)}
@@ -131,11 +128,6 @@
                     {/each}
                 {/if}
                 <span class="meta-spacer"></span>
-                {#if hasChecklist}
-                    <span class="meta-subtasks" title={`${doneChecklistItems}/${checklist.length} checklist items done`}>
-                        ☐{doneChecklistItems}/{checklist.length}
-                    </span>
-                {/if}
                 {#if dueStr}
                     <span class="meta-due" class:is-overdue={overdue}>{dueStr}</span>
                 {/if}

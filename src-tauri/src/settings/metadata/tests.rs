@@ -77,7 +77,6 @@ fn schema_places_every_setting_exactly_once() {
         .iter()
         .map(|meta| meta.id.clone())
         .collect();
-    expected.insert("logout".to_string());
     expected.insert("clear_all_data".to_string());
 
     assert_eq!(unique, expected);
@@ -238,8 +237,6 @@ allow_stopwatch_without_task | Allow stopwatch use without selecting task | stop
 flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
 have_long_breaks | Enable Long Breaks | guzey,long,break,rest,hour
 pause_minutes | Pause Duration (minutes) | guzey,pause,timer,break,hold
-enable_calendar_sync | Enable Bidirectional Google Calendar Sync | google,calendar,sync,events
-enable_tasks_sync | Enable Bidirectional Google Tasks Sync | google,tasks,sync,todos
 sync_interval | Sync Interval (minutes) | sync,interval,poll,time
 keybinding_launcher | Open Launcher | keyboard,shortcut,launcher,open
 keybinding_open_settings | Open Settings | keyboard,shortcut,settings,open

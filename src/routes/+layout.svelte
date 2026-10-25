@@ -20,16 +20,8 @@
     let isMinitracker = $state(false);
     let isSidebar = $state(false);
     let isEffect = $state(false);
-    let isCheckingAuth = $state(true);
+    let isBooting = $state(true);
     let launcherValue = $state('');
-
-    async function redirectToInitialRoute(isLoggedIn: boolean): Promise<void> {
-        if (!isLoggedIn && window.location.pathname !== Routes.LOGIN) {
-            await goto(resolve(Routes.LOGIN));
-        } else if (isLoggedIn && window.location.pathname === Routes.LOGIN) {
-            await goto(resolve(Routes.HOME));
-        }
-    }
 
     onMount(() => {
         const appWindow = getCurrentWindow();
@@ -43,21 +35,12 @@
         let unlistenNav = () => { /* noop */ };
 
         const initialize = async () => {
-            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
-                const authResult = await safeInvoke<boolean>('is_logged_in');
-                if (authResult.isOk()) {
-                    await redirectToInitialRoute(authResult.value);
-                } else {
-                    console.error('Failed to check auth state:', authResult.error);
-                }
-            }
-
             const initResult = await store.init();
             if (initResult.isErr()) {
                 store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
             }
 
-            isCheckingAuth = false;
+            isBooting = false;
 
             if (isLauncher) {
                 unlistenData = await listen(LAUNCHER_DATA_UPDATE, (event) => {
@@ -130,7 +113,7 @@
     <div class="effect-shell">
         {@render children()}
     </div>
-{:else if isCheckingAuth}
+{:else if isBooting}
     <div class="boot-screen">
         <div class="boot-spinner"></div>
     </div>

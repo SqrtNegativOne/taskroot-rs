@@ -1,13 +1,5 @@
-pub mod push;
-pub mod queue;
-mod drain;
-mod queue_store;
-pub mod types;
-
-use crate::auth;
 use crate::error::AppError;
 use chrono::{DateTime, Utc};
-use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::{Arc, Mutex};
@@ -27,35 +19,6 @@ pub struct SyncState {
 pub struct SyncStateManager(pub Mutex<SyncState>);
 
 pub(crate) const SYNC_INTERVAL_SECS: i64 = 5 * 60;
-
-/// Drop every queued offline sync action.
-///
-/// The `clear_sync_queue` command body; the queue's SQL stays in [`queue_store`].
-///
-/// # Errors
-///
-/// Returns an error if the delete fails.
-pub(crate) async fn clear_queue(pool: &SqlitePool) -> Result<(), AppError> {
-    queue_store::clear(pool).await?;
-    Ok(())
-}
-
-/// The queued payloads, oldest first, as the raw JSON the queue stored.
-///
-/// The `get_sync_queue` command body (the dev inspector renders these as-is).
-///
-/// # Errors
-///
-/// Returns an error if the queue cannot be read.
-pub(crate) async fn queue_payloads(
-    pool: &SqlitePool,
-) -> Result<Vec<serde_json::Value>, AppError> {
-    let payloads = queue_store::fetch_payloads(pool).await?;
-    Ok(payloads
-        .iter()
-        .filter_map(|payload| serde_json::from_str(payload).ok())
-        .collect())
-}
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -129,6 +92,7 @@ pub fn start_sync_engine(app: AppHandle, pool: SqlitePool) {
     });
 }
 
+#[allow(clippy::unused_async)]
 pub(crate) async fn run_tracked_sync(
     app: &AppHandle,
     pool: &SqlitePool,
@@ -143,7 +107,7 @@ pub(crate) async fn run_tracked_sync(
     }
     let _ = app.emit(crate::events::SYNC_STARTED, ());
 
-    if let Err(e) = sync_with_google(pool).await {
+    if let Err(e) = sync_all(pool).await {
         let err_str = e.to_string();
         if let Ok(mut guard) = app.state::<SyncStateManager>().0.lock() {
             guard.is_syncing = false;
@@ -161,23 +125,8 @@ pub(crate) async fn run_tracked_sync(
     Ok(())
 }
 
-pub async fn sync_with_google(pool: &SqlitePool) -> Result<()> {
-    let Ok(access_token) = auth::get_valid_access_token(pool).await else {
-        return Ok(());
-    };
-
-    // --- PUSH: Publish local queued items ---
-    let push_error = drain::flush_queue(pool, &access_token).await;
-
-    // --- PULL: Fetch remote items ---
-
-    if let Err(e) = crate::apis::google_calendar::sync(pool, &access_token).await {
-        eprintln!("Google Calendar Sync Error: {e}");
-    }
-
-    if let Err(e) = crate::apis::google_tasks::sync(pool, &access_token).await {
-        eprintln!("Google Tasks Sync Error: {e}");
-    }
-
-    push_error.map_or_else(|| Ok(()), |message| Err(color_eyre::eyre::eyre!("{message}")))
+/// P0 placeholder: there is no remote provider until the `CalDAV` cutover.
+#[allow(clippy::unused_async)]
+pub async fn sync_all(_pool: &SqlitePool) -> Result<(), AppError> {
+    Ok(())
 }

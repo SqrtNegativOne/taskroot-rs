@@ -2,8 +2,7 @@
 //!
 //! These back the `wipe_local_data` command (the settings screen's "clear all
 //! data" button and the dev inspector): the local mirror of remote data is
-//! dropped so the next sync can refetch it. The offline queue is cleared
-//! separately by `sync::clear_queue`, which owns the `sync_queue` table.
+//! dropped so the next sync can refetch it.
 
 use sqlx::SqlitePool;
 

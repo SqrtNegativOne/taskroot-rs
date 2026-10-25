@@ -5,8 +5,6 @@
     import SelectInput from '../inputs/SelectInput.svelte';
     import NumberInput from '../inputs/NumberInput.svelte';
     import TagsInput from '../inputs/TagsInput.svelte';
-    import ChecklistInput from '../inputs/ChecklistInput.svelte';
-    import type { ChecklistItem } from '../../lib/domain';
 
     interface Props {
         task: AppTask;
@@ -119,13 +117,3 @@
     />
 </div>
 
-<div class="inspector-field">
-    <label for={`checklist-${task.id}`}>Checklist</label>
-    <ChecklistInput
-        id={`checklist-${task.id}`}
-        checklist={task.checklist ?? []}
-        onchange={(newChecklist: ChecklistItem[]) => {
-            updateTask(task.id, (t) => ({ ...t, checklist: newChecklist }));
-        }}
-    />
-</div>
