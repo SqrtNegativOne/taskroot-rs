@@ -1,72 +1,100 @@
-use chrono::{DateTime, Days, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Days, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz as ChronoTz;
 use color_eyre::Result;
 use rrule::RRuleSet;
 use std::str::FromStr;
 
-/// Parse an RRULE string and return the occurrences that fall within the
-/// inclusive window `[range_start, range_end]`.
+const ICAL_DATE_TIME: &str = "%Y%m%dT%H%M%S";
+const DTO_DATE: &str = "%Y-%m-%d";
+const DTO_DATE_TIME: &str = "%Y-%m-%dT%H:%M:%S";
+
+/// Expand a **timed** recurrence in the event's own timezone.
 ///
-/// `dt_start` anchors the recurrence (the master event's original start), while
-/// `range_start` / `range_end` bound the occurrences we actually want to render.
-/// Anchoring the query on `range_start` (instead of `dt_start`) is what keeps
+/// `DTSTART` is anchored as `DTSTART;TZID=<zone>`, so `BYDAY`/`BYHOUR` are resolved
+/// against the wall clock and a weekly 09:00 event stays at 09:00 local across a DST
+/// change (plan §8). Each occurrence is returned as a UTC instant for
+/// [`EventInstance`](crate::domain::EventInstance).
+///
+/// `exdates` is the canonical `exdates` slice — wall-clock values in `zone`
+/// (`YYYY-MM-DDTHH:MM:SS`); the exclusion lines are rebuilt from it rather than
+/// scanned out of `rrule_str`, which now carries `RRULE` lines only.
+///
+/// Anchoring the query window on `range_start` instead of `dt_start` keeps
 /// long-lived recurrences visible far from their original `DTSTART`.
 ///
 /// # Errors
-/// Returns an error if the `rrule_str` cannot be parsed.
+/// Returns an error if the rule cannot be parsed.
 pub fn get_occurrences(
     rrule_str: &str,
     dt_start: &DateTime<Utc>,
+    timezone: Option<&str>,
+    exdates: &[String],
     range_start: &DateTime<Utc>,
     range_end: &DateTime<Utc>,
-) -> Result<Vec<DateTime<rrule::Tz>>> {
+) -> Result<Vec<DateTime<Utc>>> {
+    let tz = resolve_tz(timezone);
+    let named = timezone.is_some_and(|_| tz != rrule::Tz::UTC);
     let mut full_rrule = rrule_str.to_string();
     if !full_rrule.contains("DTSTART") {
-        let dt_start_str = dt_start.format("%Y%m%dT%H%M%SZ");
-        full_rrule = format!("DTSTART:{dt_start_str}\n{full_rrule}");
+        let anchor = if named {
+            format!(
+                "DTSTART;TZID={}:{}",
+                tz.name(),
+                dt_start.with_timezone(&tz).format(ICAL_DATE_TIME)
+            )
+        } else {
+            format!("DTSTART:{}Z", dt_start.format(ICAL_DATE_TIME))
+        };
+        full_rrule = format!("{anchor}\n{full_rrule}");
+    }
+    for exdate in timed_exdates(exdates, tz, named) {
+        full_rrule.push('\n');
+        full_rrule.push_str(&exdate);
     }
 
-    // `.limit()` enables the crate's iteration guards so a pathological rule can
-    // never spin forever while we walk from `DTSTART` up to the requested range.
     let rrule_set = RRuleSet::from_str(&full_rrule)
         .map_err(|e| color_eyre::eyre::eyre!("Failed to parse rrule: {e:?}"))?
         .limit();
 
-    let range_start_tz = range_start.with_timezone(&rrule::Tz::UTC);
-    let range_end_tz = range_end.with_timezone(&rrule::Tz::UTC);
-
-    let occurrences = (&rrule_set)
+    Ok((&rrule_set)
         .into_iter()
-        .skip_while(|dt| *dt < range_start_tz)
-        .take_while(|dt| *dt <= range_end_tz)
-        .collect();
-
-    Ok(occurrences)
+        .map(|dt| dt.with_timezone(&Utc))
+        .skip_while(|dt| dt < range_start)
+        .take_while(|dt| dt <= range_end)
+        .collect())
 }
 
 /// Expand a **floating-date** all-day recurrence.
 ///
-/// All-day events have no instant; they are anchored at midnight in the
-/// event's IANA timezone (falling back to UTC) so `BYDAY=MO` keeps landing on
-/// Mondays regardless of the host process timezone. The returned values are
-/// dates in that same anchor timezone, never converted through a system-local
-/// instant.
+/// All-day events have no instant; they are anchored at midnight in the event's
+/// IANA timezone (falling back to UTC) so `BYDAY=MO` keeps landing on Mondays
+/// regardless of the host process timezone. The returned values are dates in that
+/// same anchor timezone. `exdates` holds canonical `YYYY-MM-DD` values.
 ///
 /// # Errors
-/// Returns an error if the `rrule_str` cannot be parsed or the range is invalid.
+/// Returns an error if the rule cannot be parsed or the range is invalid.
 pub fn get_all_day_occurrences(
     rrule_str: &str,
     start_date: NaiveDate,
     timezone: Option<&str>,
+    exdates: &[String],
     range_start: NaiveDate,
     range_end_inclusive: NaiveDate,
 ) -> Result<Vec<NaiveDate>> {
     let tz = resolve_tz(timezone);
 
-    let mut full_rrule = rewrite_all_day_exdates(rrule_str, tz.name());
+    let mut full_rrule = rrule_str.to_string();
     if !full_rrule.contains("DTSTART") {
-        let dt_start_str = format!("{}T000000", start_date.format("%Y%m%d"));
-        full_rrule = format!("DTSTART;TZID={}:{dt_start_str}\n{full_rrule}", tz.name());
+        let anchor = format!(
+            "DTSTART;TZID={}:{}T000000",
+            tz.name(),
+            start_date.format("%Y%m%d")
+        );
+        full_rrule = format!("{anchor}\n{full_rrule}");
+    }
+    for exdate in all_day_exdates(exdates, tz.name()) {
+        full_rrule.push('\n');
+        full_rrule.push_str(&exdate);
     }
 
     let rrule_set = RRuleSet::from_str(&full_rrule)
@@ -79,39 +107,52 @@ pub fn get_all_day_occurrences(
         .ok_or_else(|| color_eyre::eyre::eyre!("range end overflow"))?;
     let range_end_dt = midnight_in(tz, range_end_exclusive)?;
 
-    let occurrences = (&rrule_set)
+    Ok((&rrule_set)
         .into_iter()
         .skip_while(|dt| *dt < range_start_dt)
         .take_while(|dt| *dt < range_end_dt)
         .map(|dt| dt.date_naive())
-        .collect();
-
-    Ok(occurrences)
+        .collect())
 }
 
-/// Rewrite date-only `EXDATE` values (Google's all-day form) into the anchor
-/// timezone so the rule engine can match them against floating occurrences.
-fn rewrite_all_day_exdates(rrule_str: &str, tz_name: &str) -> String {
-    rrule_str
-        .lines()
-        .map(|line| rewrite_exdate_line(line, tz_name))
-        .collect::<Vec<_>>()
-        .join("\n")
+/// Rebuild `EXDATE` lines for a timed recurrence from the canonical slice.
+fn timed_exdates(exdates: &[String], tz: rrule::Tz, named: bool) -> Vec<String> {
+    exdates
+        .iter()
+        .filter_map(|value| {
+            let datetime = NaiveDateTime::parse_from_str(
+                value.strip_suffix('Z').unwrap_or(value),
+                DTO_DATE_TIME,
+            )
+            .or_else(|_| {
+                NaiveDate::parse_from_str(value, DTO_DATE).map(|date| date.and_time(NaiveTime::MIN))
+            })
+            .ok()?;
+            Some(if named {
+                format!(
+                    "EXDATE;TZID={}:{}",
+                    tz.name(),
+                    datetime.format(ICAL_DATE_TIME)
+                )
+            } else {
+                format!("EXDATE:{}Z", datetime.format(ICAL_DATE_TIME))
+            })
+        })
+        .collect()
 }
 
-fn rewrite_exdate_line(line: &str, tz_name: &str) -> String {
-    let Some((prefix, value)) = line.split_once(':') else {
-        return line.to_string();
-    };
-    if !prefix.to_ascii_uppercase().starts_with("EXDATE") || value.contains('T') {
-        return line.to_string();
-    }
-    let dates = value
-        .split(',')
-        .map(|date| format!("{}T000000", date.trim()))
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("EXDATE;TZID={tz_name}:{dates}")
+/// Rebuild date-only `EXDATE` lines in the anchor timezone.
+fn all_day_exdates(exdates: &[String], tz_name: &str) -> Vec<String> {
+    exdates
+        .iter()
+        .filter_map(|value| {
+            let date = NaiveDate::parse_from_str(value.get(..10).unwrap_or(value), DTO_DATE).ok()?;
+            Some(format!(
+                "EXDATE;TZID={tz_name}:{}T000000",
+                date.format("%Y%m%d")
+            ))
+        })
+        .collect()
 }
 
 fn resolve_tz(timezone: Option<&str>) -> rrule::Tz {
@@ -144,7 +185,7 @@ mod tests {
             .unwrap();
         let rule = "RRULE:FREQ=DAILY;COUNT=5";
 
-        let occ = get_occurrences(rule, &start, &start, &end).unwrap();
+        let occ = get_occurrences(rule, &start, None, &[], &start, &end).unwrap();
         assert_eq!(occ.len(), 5);
     }
 
@@ -154,7 +195,15 @@ mod tests {
         let range_start = Utc.with_ymd_and_hms(2026, 9, 1, 0, 0, 0).unwrap();
         let range_end = Utc.with_ymd_and_hms(2026, 9, 7, 23, 59, 59).unwrap();
 
-        let occ = get_occurrences("RRULE:FREQ=DAILY", &dt_start, &range_start, &range_end).unwrap();
+        let occ = get_occurrences(
+            "RRULE:FREQ=DAILY",
+            &dt_start,
+            None,
+            &[],
+            &range_start,
+            &range_end,
+        )
+        .unwrap();
 
         assert_eq!(occ.len(), 7, "one occurrence per day across the week");
     }
@@ -165,9 +214,79 @@ mod tests {
         let range_start = Utc.with_ymd_and_hms(2026, 9, 3, 0, 0, 0).unwrap();
         let range_end = Utc.with_ymd_and_hms(2026, 9, 4, 23, 59, 59).unwrap();
 
-        let occ = get_occurrences("RRULE:FREQ=DAILY", &dt_start, &range_start, &range_end).unwrap();
+        let occ = get_occurrences(
+            "RRULE:FREQ=DAILY",
+            &dt_start,
+            None,
+            &[],
+            &range_start,
+            &range_end,
+        )
+        .unwrap();
 
         assert_eq!(occ.len(), 2);
+    }
+
+    #[test]
+    fn timed_recurrence_keeps_the_local_wall_clock_across_dst() {
+        // Europe/London switches to BST on 2026-03-29: 09:00 local is 09:00Z
+        // before it and 08:00Z after it. The local wall clock must not move.
+        let dt_start = Utc.with_ymd_and_hms(2026, 3, 16, 9, 0, 0).unwrap();
+        let range_start = Utc.with_ymd_and_hms(2026, 3, 16, 0, 0, 0).unwrap();
+        let range_end = Utc.with_ymd_and_hms(2026, 4, 6, 23, 59, 59).unwrap();
+
+        let occ = get_occurrences(
+            "RRULE:FREQ=WEEKLY;BYDAY=MO",
+            &dt_start,
+            Some("Europe/London"),
+            &[],
+            &range_start,
+            &range_end,
+        )
+        .unwrap();
+
+        let stamps = occ
+            .iter()
+            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            stamps,
+            vec![
+                "2026-03-16T09:00:00Z",
+                "2026-03-23T09:00:00Z",
+                "2026-03-30T08:00:00Z",
+                "2026-04-06T08:00:00Z",
+            ]
+        );
+        let london = ChronoTz::from_str("Europe/London").unwrap();
+        assert!(occ
+            .iter()
+            .all(|dt| dt.with_timezone(&london).format("%H:%M").to_string() == "09:00"));
+    }
+
+    #[test]
+    fn an_exdate_wall_clock_removes_that_occurrence() {
+        // 09:00Z is 14:30 in Asia/Kolkata, so the canonical exclusion value is
+        // the local wall clock, not the UTC instant.
+        let dt_start = Utc.with_ymd_and_hms(2026, 9, 1, 9, 0, 0).unwrap();
+        let range_start = Utc.with_ymd_and_hms(2026, 9, 1, 0, 0, 0).unwrap();
+        let range_end = Utc.with_ymd_and_hms(2026, 9, 3, 23, 59, 59).unwrap();
+
+        let occ = get_occurrences(
+            "RRULE:FREQ=DAILY;COUNT=3",
+            &dt_start,
+            Some("Asia/Kolkata"),
+            &["2026-09-02T14:30:00".to_string()],
+            &range_start,
+            &range_end,
+        )
+        .unwrap();
+
+        let stamps = occ
+            .iter()
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(stamps, vec!["2026-09-01", "2026-09-03"]);
     }
 
     fn assert_all_mondays(timezone: Option<&str>) {
@@ -178,6 +297,7 @@ mod tests {
             "RRULE:FREQ=WEEKLY;BYDAY=MO",
             start,
             timezone,
+            &[],
             start,
             range_end,
         )
@@ -203,5 +323,28 @@ mod tests {
     #[test]
     fn all_day_weekly_recurrence_stays_on_monday_in_utc() {
         assert_all_mondays(None);
+    }
+
+    #[test]
+    fn an_all_day_exdate_removes_that_date() {
+        let start = NaiveDate::from_ymd_opt(2026, 9, 7).unwrap();
+        let range_end = NaiveDate::from_ymd_opt(2026, 10, 4).unwrap();
+
+        let occ = get_all_day_occurrences(
+            "RRULE:FREQ=WEEKLY;BYDAY=MO",
+            start,
+            Some("Asia/Kolkata"),
+            &["2026-09-14".to_string()],
+            start,
+            range_end,
+        )
+        .unwrap();
+
+        assert_eq!(
+            occ.iter()
+                .map(|date| date.format("%Y-%m-%d").to_string())
+                .collect::<Vec<_>>(),
+            vec!["2026-09-07", "2026-09-21", "2026-09-28"]
+        );
     }
 }

@@ -5,7 +5,7 @@
 //! hand in raw rows plus a requested range and get back tagged
 //! [`EventTiming`] values.
 
-use crate::domain::{AppEvent, EventId, EventInstance, EventStatus, EventTiming};
+use crate::domain::{wall_clock_to_utc, AppEvent, EventId, EventInstance, EventStatus, EventTiming};
 use crate::time_utils::rrule_utils::{get_all_day_occurrences, get_occurrences};
 use chrono::{DateTime, Days, NaiveDate, Utc};
 use std::collections::HashSet;
@@ -80,7 +80,13 @@ fn push_override(
         .unwrap_or_else(|| event.id.clone());
     let key = event.original_start_time.as_deref().map_or_else(
         || occurrence_key(&master, &timing),
-        |original| format!("{}@{}", master, normalize_exception(original)),
+        |original| {
+            format!(
+                "{}@{}",
+                master,
+                normalize_exception(original, event.timezone.as_deref())
+            )
+        },
     );
     instances.push(build_instance(event, timing, key, true));
 }
@@ -102,6 +108,7 @@ fn expand_recurring(
                 rrule,
                 start_date,
                 event.timezone.as_deref(),
+                event.exdates.as_deref().unwrap_or_default(),
                 range.start_date,
                 range.end_date_inclusive,
             ) else {
@@ -137,14 +144,18 @@ fn expand_recurring(
             end,
             timezone,
         } => {
-            let Ok(occurrences) =
-                get_occurrences(rrule, &start, &range.start_instant, &range.end_instant)
-            else {
+            let Ok(occurrences) = get_occurrences(
+                rrule,
+                &start,
+                event.timezone.as_deref(),
+                event.exdates.as_deref().unwrap_or_default(),
+                &range.start_instant,
+                &range.end_instant,
+            ) else {
                 return;
             };
             let duration = end.signed_duration_since(start);
-            for occurrence in occurrences {
-                let occ_start = occurrence.with_timezone(&Utc);
+            for occ_start in occurrences {
                 let key = format!("{}@{}", event.id, occ_start.to_rfc3339());
                 if exceptions.contains(&key) {
                     continue;
@@ -196,7 +207,10 @@ fn collect_exception_keys(events: &[AppEvent]) -> HashSet<String> {
         else {
             continue;
         };
-        exceptions.insert(format!("{master}@{}", normalize_exception(original)));
+        exceptions.insert(format!(
+            "{master}@{}",
+            normalize_exception(original, event.timezone.as_deref())
+        ));
     }
     exceptions
 }
@@ -210,13 +224,18 @@ fn occurrence_key(id: &EventId, timing: &EventTiming) -> String {
     }
 }
 
-/// Canonicalize an override's `originalStartTime` to the same representation
-/// the master occurrences use: bare date for all-day, UTC RFC 3339 for timed.
-fn normalize_exception(original: &str) -> String {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(original) {
-        return dt.with_timezone(&Utc).to_rfc3339();
+/// Canonicalize an override's `originalStartTime` to the same representation the
+/// master occurrences use: a bare date for all-day, a UTC RFC 3339 instant for
+/// timed. A timed `originalStartTime` is a wall clock in the exception's own
+/// timezone (see `ics::read`), so it must be resolved in that zone.
+fn normalize_exception(original: &str, timezone: Option<&str>) -> String {
+    if original.len() == 10 && !original.contains('T') {
+        return original.to_string();
     }
-    original.to_string()
+    wall_clock_to_utc(original, timezone).map_or_else(
+        || original.to_string(),
+        |instant| instant.to_rfc3339(),
+    )
 }
 
 fn overlaps(timing: &EventTiming, range: &RenderRange) -> bool {
@@ -385,11 +404,11 @@ mod tests {
     }
 
     #[test]
-    fn exdate_inside_rrule_suppresses_all_day_occurrence() {
+    fn an_exdate_suppresses_an_all_day_occurrence() {
         let mut master = event("evt-1", "2026-09-07", "2026-09-08");
-        master.rrule =
-            Some("RRULE:FREQ=WEEKLY;BYDAY=MO\nEXDATE;VALUE=DATE:20260914".into());
+        master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
         master.is_all_day = Some(true);
+        master.exdates = Some(vec!["2026-09-14".into()]);
 
         let instances = expand_event_instances(&[master], "2026-09-07", "2026-10-04");
 
@@ -398,9 +417,10 @@ mod tests {
     }
 
     #[test]
-    fn exdate_inside_rrule_suppresses_timed_occurrence() {
+    fn an_exdate_suppresses_a_timed_occurrence() {
         let mut master = event("evt-1", "2026-09-01T09:00:00Z", "2026-09-01T09:30:00Z");
-        master.rrule = Some("RRULE:FREQ=DAILY;COUNT=3\nEXDATE:20260902T090000Z".into());
+        master.rrule = Some("RRULE:FREQ=DAILY;COUNT=3".into());
+        master.exdates = Some(vec!["2026-09-02T09:00:00".into()]);
 
         let instances = expand_event_instances(
             &[master],
@@ -413,6 +433,62 @@ mod tests {
         assert_eq!(
             starts,
             vec!["2026-09-01T09:00:00+00:00", "2026-09-03T09:00:00+00:00"]
+        );
+    }
+
+    #[test]
+    fn timed_recurrence_expands_in_the_event_zone_across_dst() {
+        // Europe/London 09:00 weekly; BST starts 2026-03-29, so the UTC instants
+        // move by an hour while the local wall clock stays at 09:00.
+        let mut master = event("evt-1", "2026-03-16T09:00:00", "2026-03-16T09:30:00");
+        master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
+        master.timezone = Some("Europe/London".into());
+
+        let instances = expand_event_instances(
+            &[master],
+            "2026-03-16T00:00:00Z",
+            "2026-04-06T23:59:59Z",
+        );
+
+        let starts: Vec<String> = instances.iter().map(timed_start).collect();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-03-16T09:00:00+00:00",
+                "2026-03-23T09:00:00+00:00",
+                "2026-03-30T08:00:00+00:00",
+                "2026-04-06T08:00:00+00:00",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_wall_clock_exception_moves_its_slot_in_the_event_zone() {
+        let mut master = event("evt-1", "2026-10-19T11:00:00", "2026-10-19T12:00:00");
+        master.rrule = Some("RRULE:FREQ=WEEKLY".into());
+        master.timezone = Some("Asia/Kolkata".into());
+
+        let mut moved = event("evt-2", "2026-10-28T11:00:00", "2026-10-28T12:00:00");
+        moved.timezone = Some("Asia/Kolkata".into());
+        moved.recurring_event_id = Some(EventId::from("evt-1"));
+        moved.original_start_time = Some("2026-10-26T11:00:00".into());
+
+        let instances = expand_event_instances(
+            &[master, moved],
+            "2026-10-19T00:00:00Z",
+            "2026-11-02T23:59:59Z",
+        );
+
+        let mut starts: Vec<String> = instances.iter().map(timed_start).collect();
+        starts.sort();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-10-19T05:30:00+00:00",
+                "2026-10-28T05:30:00+00:00",
+                "2026-11-02T05:30:00+00:00",
+            ],
+            "the 2026-10-26 slot is replaced by the moved exception"
         );
     }
 
