@@ -9,11 +9,13 @@ use sqlx::SqlitePool;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
+pub mod caldav;
 pub mod commands;
 pub mod db;
 pub mod domain;
 pub mod error;
 pub mod events;
+pub mod ics;
 pub mod screens;
 pub mod settings;
 pub mod stopwatch;
@@ -39,6 +41,28 @@ pub fn extract_deep_link_route(arg: &str) -> Option<&str> {
 pub(crate) fn db_pool(app: &tauri::AppHandle) -> Result<tauri::State<'_, SqlitePool>, AppError> {
     app.try_state::<SqlitePool>()
         .ok_or_else(|| AppError::Internal("Database not initialized yet".to_string()))
+}
+
+/// The application data directory, created on demand.
+///
+/// # Errors
+///
+/// Returns an error if the path cannot be resolved or created.
+pub fn app_data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, AppError> {
+    // Tests and throwaway runs need a data directory inside the repository.
+    let dir = std::env::var_os("TASKROOT_DATA_DIR")
+        .map(std::path::PathBuf::from)
+        .map_or_else(
+            || {
+                app.path()
+                    .app_data_dir()
+                    .map_err(|e| AppError::Internal(format!("Failed to resolve app data dir: {e}")))
+            },
+            Ok,
+        )?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| AppError::Internal(format!("Failed to create app data dir: {e}")))?;
+    Ok(dir)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -78,6 +102,7 @@ pub fn run() {
             app.manage(sync::SyncStateManager(std::sync::Mutex::new(
                 sync::SyncState::default(),
             )));
+            app.manage(caldav::transport::HttpClient::new()?);
             let handle = app.handle().clone();
 
             if let Some(effect_win) = app.get_webview_window(domain::WindowLabel::Effect.as_str())
@@ -193,7 +218,13 @@ pub fn run() {
             settings::get_ui_state,
             settings::set_ui_state,
             settings::update_setting,
-            sync::get_sync_state
+            sync::get_sync_state,
+            caldav::commands::is_account_configured,
+            caldav::commands::get_account,
+            caldav::commands::test_account,
+            caldav::commands::connect_account,
+            caldav::commands::disconnect_account,
+            caldav::commands::refresh_calendars
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));

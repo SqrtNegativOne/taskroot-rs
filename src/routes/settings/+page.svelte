@@ -1,21 +1,28 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
+    import { describeAppError } from '$lib/errors';
+    import { Routes } from '$lib/routes';
+    import type { Account } from '$lib/bindings/Account.generated';
     import SettingRow from './SettingRow.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
 
     let schema = $state<SettingsSchema | null>(null);
     let settings = $state<AppSettings | null>(null);
+    let account = $state<Account | null>(null);
     let activeTabId = $state('');
     let saveError = $state<string | null>(null);
+    let accountError = $state<string | null>(null);
+    let isRemovingAccount = $state(false);
 
     onMount(() => {
         void initialize();
     });
 
     async function initialize(): Promise<void> {
-        await loadSchema();
-        await loadSettings();
+        await Promise.all([loadSchema(), loadSettings(), loadAccount()]);
     }
 
     async function loadSchema(): Promise<void> {
@@ -35,6 +42,28 @@
             (loaded) => (settings = loaded),
             (error) => console.error('Failed to load settings:', error)
         );
+    }
+
+    async function loadAccount(): Promise<void> {
+        const result = await safeInvoke<Account | null>('get_account');
+        result.match(
+            (loaded) => (account = loaded),
+            (error) => (accountError = describeAppError(error))
+        );
+    }
+
+    async function removeAccount(): Promise<void> {
+        isRemovingAccount = true;
+        accountError = null;
+        const result = await safeInvoke('disconnect_account');
+        isRemovingAccount = false;
+
+        if (result.isErr()) {
+            accountError = `Could not remove the account: ${describeAppError(result.error)}`;
+            return;
+        }
+        account = null;
+        await goto(resolve(Routes.CONNECT));
     }
 
     async function handleSettingChange(id: string, value: SettingValue): Promise<void> {
@@ -67,6 +96,31 @@
         </div>
 
         <div class="content">
+            {#if account}
+                <section class="account-card">
+                    <div class="account-copy">
+                        <h2>CalDAV account</h2>
+                        <p class="account-server">{account.username} · {account.serverUrl}</p>
+                        <p class="account-detail">
+                            {account.calendars.length}
+                            {account.calendars.length === 1 ? 'calendar' : 'calendars'} ·
+                            home {account.homeHref}
+                        </p>
+                    </div>
+                    <button
+                        class="remove-account"
+                        onclick={removeAccount}
+                        disabled={isRemovingAccount}
+                    >
+                        {isRemovingAccount ? 'Removing…' : 'Remove account'}
+                    </button>
+                </section>
+            {/if}
+
+            {#if accountError}
+                <div class="save-error" role="alert">{accountError}</div>
+            {/if}
+
             {#if saveError}
                 <div class="save-error" role="alert">{saveError}</div>
             {/if}
@@ -114,6 +168,53 @@
         border-radius: 4px;
         color: var(--tag-red);
         font-size: 13px;
+    }
+
+    .account-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 30px;
+        padding: 14px 18px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+    }
+
+    .account-copy h2 {
+        margin: 0 0 4px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--fg-dim);
+    }
+
+    .account-server {
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .account-detail {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--fg-dim);
+    }
+
+    .remove-account {
+        flex-shrink: 0;
+        padding: 7px 12px;
+        font-size: 13px;
+        color: var(--tag-red);
+        background: transparent;
+        border: 1px solid var(--tag-red);
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .remove-account:disabled {
+        opacity: 0.6;
+        cursor: default;
     }
 
     .sidebar {

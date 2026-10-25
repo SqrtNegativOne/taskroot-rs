@@ -1,0 +1,1 @@
+<?xml version='1.0' encoding='utf-8'?><multistatus xmlns="DAV:"><response><href>/</href><propstat><prop><current-user-principal><href>/me/</href></current-user-principal><resourcetype><collection /></resourcetype></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>

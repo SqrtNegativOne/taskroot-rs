@@ -5,6 +5,7 @@
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
+    import { page } from '$app/state';
     import { store, describeError } from '$lib/store.svelte';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
@@ -34,10 +35,31 @@
         let unlistenData = () => { /* noop */ };
         let unlistenNav = () => { /* noop */ };
 
+        const redirectForAccount = async () => {
+            const configured = await safeInvoke<boolean>('is_account_configured');
+            if (configured.isErr()) {
+                store.error = `Could not check the CalDAV account: ${describeError(configured.error)}`;
+                return;
+            }
+
+            const onConnect = page.url.pathname === Routes.CONNECT;
+            if (!configured.value && !onConnect) {
+                await goto(resolve(Routes.CONNECT));
+                return;
+            }
+            if (configured.value && onConnect) {
+                await goto(resolve(Routes.HOME));
+            }
+        };
+
         const initialize = async () => {
             const initResult = await store.init();
             if (initResult.isErr()) {
                 store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
+            }
+
+            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
+                await redirectForAccount();
             }
 
             isBooting = false;
