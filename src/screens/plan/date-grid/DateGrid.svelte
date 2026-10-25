@@ -4,7 +4,9 @@
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
-    import { instanceOccursOnDay } from '../../../lib/domain';
+    import { instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
+    import { eventColorVars } from '../../../lib/eventColor';
+    import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
     import { SvelteDate } from 'svelte/reactivity';
     import { ymd } from '../../../lib/time';
     
@@ -165,6 +167,26 @@
 
     let displayEvents = $derived(events); // TODO: apply filters and sort
 
+    type GridCell = { date: Date; outOfMonth: boolean };
+
+    let weeks = $derived.by(() => {
+        const rows: GridCell[][] = [];
+        for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+        return rows;
+    });
+
+    let weekLayouts = $derived(
+        weeks.map((week) => ({
+            key: ymd(week[0].date),
+            week,
+            layout: layoutWeekSpans(displayEvents, week.map((c) => c.date)),
+        })),
+    );
+
+    function cellEvents(date: Date): EventInstance[] {
+        return displayEvents.filter((e) => instanceOccursOnDay(e, date) && !isMultiDayAllDay(e));
+    }
+
     let titleLabel = $derived(isStrip
         ? weekRangeLabel(cells[0].date, cells[cells.length - 1].date)
         : `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear().toString()}`);
@@ -204,19 +226,50 @@
                 <div class="cal-dow-cell">{d.toLowerCase()}</div>
             {/each}
         </div>
-        <div class="cal-cells" class:is-grid={!isStrip} class:is-strip-3={isStrip && is3Weeks} class:is-strip-1={isStrip && !is3Weeks}>
-            {#each cells as c (ymd(c.date))}
-                <DayCell
-                    cell={c}
-                    {today}
-                    events={displayEvents.filter(e => instanceOccursOnDay(e, c.date))}
-                    {isWeek}
-                    {dragState}
-                    {onEventDragStart}
-                    {onAddEvent}
-                    {onEventClick}
-                    calendars={activeCalendars}
-                />
+        <div class="cal-cells" class:is-grid={!isStrip} class:is-strip-3={isStrip && is3Weeks} class:is-strip-1={isStrip && !is3Weeks} class:dragging={!!dragState}>
+            {#each weekLayouts as { key, week, layout } (key)}
+                <div class="cal-week" style="--span-lanes: {layout.laneCount}">
+                    {#each week as c (ymd(c.date))}
+                        <DayCell
+                            cell={c}
+                            {today}
+                            events={cellEvents(c.date)}
+                            {isWeek}
+                            {dragState}
+                            {onEventDragStart}
+                            {onAddEvent}
+                            {onEventClick}
+                            calendars={activeCalendars}
+                        />
+                    {/each}
+                    {#each layout.spans as span (span.occurrenceKey)}
+                        {@const readOnly = isEventReadOnly(span.instance, activeCalendars)}
+                        <button
+                            type="button"
+                            class="cal-span"
+                            class:cont-before={span.continuesBefore}
+                            class:cont-after={span.continuesAfter}
+                            class:is-readonly={readOnly}
+                            class:is-dragging={dragState?.event?.id === span.instance.id}
+                            tabindex={span.continuesBefore ? -1 : 0}
+                            title={span.instance.title}
+                            style="
+                                --start-col: {span.startCol};
+                                --span-cols: {span.endColExclusive - span.startCol};
+                                --lane: {span.lane};
+                                cursor: {readOnly ? 'default' : 'grab'};
+                                {eventColorVars(span.instance.color)}
+                            "
+                            onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, span.instance)}
+                            onclick={(e) => {
+                                e.stopPropagation();
+                                onEventClick?.(span.instance);
+                            }}
+                        >
+                            {span.instance.title}
+                        </button>
+                    {/each}
+                </div>
             {/each}
         </div>
     </div>

@@ -3,6 +3,7 @@ import type { EventInstance } from '../../../lib/domain';
 import { ymd } from '../../../lib/time';
 import {
     DEFAULT_DROP_DURATION_MINUTES,
+    MINUTES_PER_DAY,
     gridDayDropPayload,
     snappedDropMinute,
     timelineDropPayload,
@@ -50,6 +51,10 @@ describe('snappedDropMinute', () => {
     it('clamps a drop so the block stays inside the day', () => {
         expect(snappedDropMinute(pxFor(23 * 60), 60)).toBe(23 * 60);
         expect(snappedDropMinute(pxFor(-30), 60)).toBe(0);
+    });
+
+    it('keeps a longer-than-day duration inside the day instead of going negative', () => {
+        expect(snappedDropMinute(pxFor(10 * 60), MINUTES_PER_DAY * 2)).toBe(0);
     });
 });
 
@@ -106,5 +111,15 @@ describe('timelineDropPayload', () => {
         expect(end.getTime() - start.getTime()).toBe(
             DEFAULT_DROP_DURATION_MINUTES * MS_PER_MINUTE,
         );
+    });
+
+    it('clamps a longer-than-day instance to a full day', () => {
+        const event = timed('t3', new Date(2026, 8, 7, 9, 0), new Date(2026, 8, 9, 10, 0));
+
+        const payload = timelineDropPayload(event, '2026-09-10', 0);
+
+        const start = new Date(payload.startTime);
+        const end = new Date(payload.endTime);
+        expect(end.getTime() - start.getTime()).toBe(MINUTES_PER_DAY * MS_PER_MINUTE);
     });
 });

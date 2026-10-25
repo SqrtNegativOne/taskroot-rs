@@ -92,6 +92,11 @@ pub async fn reschedule_event(
     let Some(mut event) = db::get_event(&pool, &id).await? else {
         return Err(AppError::NotFound(format!("event {id}")));
     };
+    crate::commands::events::reject_read_only_calendars(
+        &pool,
+        &[event.remote_collection_id.as_ref()],
+    )
+    .await?;
     event.start_time = start_time;
     event.end_time = end_time;
     event.is_all_day = Some(is_all_day);

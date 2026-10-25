@@ -4,7 +4,7 @@ import { HOURS_PER_DAY, MINUTES_IN_HOUR, PX_PER_MIN, SNAP_MIN } from '../day-tim
 
 export const DEFAULT_DROP_DURATION_MINUTES = 60;
 const MS_PER_MINUTE = 60_000;
-const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
+export const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
 
 export interface ReschedulePayload {
     startTime: string;
@@ -18,8 +18,9 @@ function parseYmd(value: string): Date {
 
 /** Snap a pixel offset within a timeline column to a valid start minute. */
 export function snappedDropMinute(offsetPx: number, durationMins: number): number {
+    const fitted = Math.min(Math.max(durationMins, 0), MINUTES_PER_DAY);
     const raw = Math.round(offsetPx / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-    return Math.max(0, Math.min(MINUTES_PER_DAY - durationMins, raw));
+    return Math.max(0, Math.min(MINUTES_PER_DAY - fitted, raw));
 }
 
 /**
@@ -61,13 +62,16 @@ export function timelineDropPayload(
     date: string,
     minute: number,
 ): ReschedulePayload {
-    const duration =
+    const rawDuration =
         event.timing.kind === 'allDay'
             ? DEFAULT_DROP_DURATION_MINUTES
             : Math.round(
                   (new Date(event.timing.end).getTime() - new Date(event.timing.start).getTime()) /
                       MS_PER_MINUTE,
               );
+    // A single-day timeline cannot hold a longer-than-day block; clamp it so the
+    // drop and its preview stay inside the column instead of overflowing.
+    const duration = Math.min(Math.max(rawDuration, SNAP_MIN), MINUTES_PER_DAY);
 
     const start = parseYmd(date);
     start.setMinutes(minute);

@@ -18,20 +18,28 @@
     padding: 0 6px;
   }
   .cal-cells {
+    --day-pad-top: 4px;
+    --day-hd-h: 20px;
+    --span-h: 18px;
     flex: 1; min-height: 0;
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    display: flex; flex-direction: column;
     border-left: 1px solid var(--border-soft);
     border-top: 1px solid var(--border-soft);
   }
-  .cal-cells.is-grid { grid-template-rows: repeat(6, 1fr); }
-  .cal-cells.is-strip-1 { grid-template-rows: 1fr; }
-  .cal-cells.is-strip-3 { grid-template-rows: repeat(3, 1fr); }
+  .cal-cells.is-strip-1,
+  .cal-cells.is-strip-3 { --day-pad-top: 6px; }
+  .cal-week {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    position: relative;
+  }
 
   .day-cell {
     border-right: 1px solid var(--border-soft);
     border-bottom: 1px solid var(--border-soft);
-    padding: 4px 6px;
+    padding: var(--day-pad-top, 4px) 6px;
     display: flex; flex-direction: column;
     min-height: 0;
     overflow: hidden;
@@ -72,7 +80,8 @@
   }
   .day-cell-hd {
     display: flex; align-items: baseline; gap: 4px;
-    margin-bottom: 3px;
+    height: var(--day-hd-h, 20px);
+    margin-bottom: 0;
   }
   .day-cell-num {
     font-size: 0.82em;
@@ -87,9 +96,39 @@
   .day-cell-events {
     display: flex; flex-direction: column;
     gap: 2px;
+    padding-top: calc(var(--span-lanes, 0) * var(--span-h, 18px));
     min-height: 0;
     overflow: hidden;
   }
+  .cal-span {
+    position: absolute;
+    top: calc(var(--day-pad-top, 4px) + var(--day-hd-h, 20px) + var(--lane) * var(--span-h, 18px));
+    left: calc(var(--start-col) / 7 * 100%);
+    width: calc(var(--span-cols) / 7 * 100%);
+    height: var(--span-h, 18px);
+    box-sizing: border-box;
+    display: block;
+    padding: 0 5px;
+    border: none;
+    border-left: 2px solid var(--ev-color, var(--fg-dimmer));
+    border-radius: 3px;
+    background: var(--ev-bg, var(--bg-surface));
+    color: white;
+    font: inherit;
+    font-size: 0.74em;
+    line-height: var(--span-h, 18px);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: grab;
+  }
+  .cal-span.cont-before { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .cal-span.cont-after { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .cal-span:hover { filter: brightness(1.15); }
+  .cal-span.is-readonly { opacity: 0.6; cursor: default; }
+  .cal-span.is-dragging { opacity: 0.4; }
+  .cal-cells.dragging .cal-span { pointer-events: none; }
   .day-cell-event {
     font-size: 0.74em;
     line-height: 1.25;
@@ -129,6 +168,6 @@
   }
 
   /* Week mode — make cells taller */
-  .day-cell.is-strip { padding: 6px 8px; }
+  .day-cell.is-strip { padding: var(--day-pad-top, 6px) 8px; }
   .day-cell.is-strip .day-cell-num { font-size: 0.95em; }
 
