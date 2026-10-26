@@ -3,9 +3,9 @@ import { safeInvoke } from './safeInvoke.svelte';
 import { createDebouncedWriter, hydrateOnce } from './asyncState.svelte';
 
 /**
- * Keys for per-component UI state persisted in the backend `ui_state` table via
- * `get_ui_state`/`set_ui_state`. The `ui.` prefix is legacy-stable naming: the
- * one-time `ui.*` migration copies keys verbatim, so renaming a key orphans it.
+ * Keys for per-component UI state persisted in the backend `ui-state.json` via
+ * `get_ui_state`/`set_ui_state`. The `ui.` prefix is the persisted key
+ * namespace; renaming a key orphans its stored value.
  */
 export const persistedKeys = {
     taskListFilters: 'ui.task_list.filters',

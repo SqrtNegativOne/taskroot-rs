@@ -1,7 +1,6 @@
 <script lang="ts">
     import { splitTime, type StopwatchState } from './engine.svelte';
     import { useNow } from '../../../lib/useNow.svelte';
-    import { store } from '../../../lib/store.svelte';
 
     const NOW_INTERVAL_MS = 250;
 
@@ -22,11 +21,9 @@
             };
         }
         const { m } = splitTime(engine.currentMs);
-        const clockStyle = store.settings?.clock_style;
-        const showPlayIcon = clockStyle === 'guzey' ? false : engine.isPristine;
         return {
             primaryText: m,
-            showPlayIcon
+            showPlayIcon: engine.isPristine
         };
     });
 </script>

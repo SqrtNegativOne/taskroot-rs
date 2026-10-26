@@ -5,11 +5,10 @@ import { SCREEN_EFFECT, STOPWATCH_UPDATED } from '../../../lib/events';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
 import { useNow } from '../../../lib/useNow.svelte';
-import { guzeyPhase, guzeyRemainingMs, type ClockPhase } from './phases';
 
-export type { ClockPhase } from './phases';
+type ClockPhase = 'work' | 'break';
 
-let now: { get value(): Date; get ms(): number };
+let now: { get ms(): number };
 $effect.root(() => {
     now = useNow();
 });
@@ -65,11 +64,7 @@ export class StopwatchState {
     }
 
     get isCountdown() {
-        if (!store.loaded || !store.settings) return false;
-        const style = store.settings.clock_style;
-        if (style === 'guzey') return true;
-        if (style === 'flowtime' && this.isBreak) return true;
-        return false;
+        return this.isBreak && store.settings?.clock_style === 'flowtime';
     }
 
     get isPaused(): boolean {
@@ -81,32 +76,14 @@ export class StopwatchState {
     }
 
     get activePhase(): ClockPhase {
-        if (!store.loaded || !store.settings) return this.isBreak ? 'break' : 'work';
-        const style = store.settings.clock_style;
-        
-        if (style === 'guzey') {
-            const date = now.value;
-            return guzeyPhase(date.getHours(), date.getMinutes(), store.settings.have_long_breaks);
-        }
         return this.isBreak ? 'break' : 'work';
     }
 
     get currentMs() {
         if (!store.loaded || !store.settings) return 0;
         const style = store.settings.clock_style;
-        
+
         const nowMs = now.ms;
-        if (style === 'guzey') {
-            const date = now.value;
-            return guzeyRemainingMs(
-                date.getHours(),
-                date.getMinutes(),
-                date.getSeconds(),
-                date.getMilliseconds(),
-                store.settings.have_long_breaks,
-            );
-        }
-        
         if (this.isBreak) {
             const breakTaken = this.breakElapsed + (this.breakRunningSince !== undefined ? nowMs - this.breakRunningSince : 0);
             if (style === 'flowtime') {
@@ -164,9 +141,8 @@ export function splitTime(ms: number) {
 }
 
 const TRANSITION_SOUNDS: Record<ClockPhase, Partial<Record<ClockPhase, string>>> = {
-    work: { break: 'work_to_break.wav', 'long break': 'work_to_long_break.wav' },
+    work: { break: 'work_to_break.wav' },
     break: { work: 'break_to_work.wav' },
-    'long break': { work: 'long_break_to_work.wav' },
 };
 
 const soundCache = new Map<string, HTMLAudioElement>();

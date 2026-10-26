@@ -290,26 +290,14 @@
         <div class="byline">
             {#if stopwatchState.isPaused}
                 paused
-            {:else if store.settings?.clock_style === 'guzey'}
-                {#if stopwatchState.activePhase === 'long break'}
-                    long break
-                {:else if stopwatchState.activePhase === 'break'}
-                    break
-                {:else}
-                    {activeTask ? activeTask.title : 'work'}
-                {/if}
-            {:else if stopwatchState.activePhase === 'break'}
+            {:else if stopwatchState.isBreak}
                 {#if stopwatchState.isCountdown}
                     left in break
                 {:else}
                     in break
                 {/if}
             {:else}
-                {#if stopwatchState.isCountdown}
-                    left {activeTask ? `for ${activeTask.title}` : 'for Work session'}
-                {:else}
-                    elapsed {activeTask ? `for ${activeTask.title}` : 'for Work session'}
-                {/if}
+                elapsed {activeTask ? `for ${activeTask.title}` : 'for Work session'}
             {/if}
         </div>
     </div>

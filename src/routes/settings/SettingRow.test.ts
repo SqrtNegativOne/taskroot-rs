@@ -18,10 +18,10 @@ const stringSelect: SettingsSchemaItem = {
     id: 'clock_style',
     label: 'Clock Style',
     type: 'select',
-    defaultValue: 'guzey',
+    defaultValue: 'flowtime',
     options: [
+        { value: 'flowtime', label: 'Flowtime' },
         { value: 'counter', label: 'Counter' },
-        { value: 'guzey', label: 'Guzey' },
     ],
 };
 
@@ -50,7 +50,7 @@ describe('SettingRow select', () => {
         render(SettingRow, {
             props: {
                 item: stringSelect,
-                value: 'guzey',
+                value: 'flowtime',
                 onchange: (next: SettingValue) => {
                     emitted = next;
                 },

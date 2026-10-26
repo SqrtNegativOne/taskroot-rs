@@ -63,13 +63,12 @@ pub struct AppSettings {
     pub default_task_duration: i32,
     #[setting(
         label = "Clock Style",
-        keywords = ["stopwatch", "timer", "guzey", "counter", "flowtime"],
+        keywords = ["stopwatch", "timer", "counter", "flowtime", "flomodoro"],
         kind = "select",
         section = "do_stopwatch",
         options = [
-            ("counter", "Counter"),
             ("flowtime", "Flowtime"),
-            ("guzey", "Guzey")
+            ("counter", "Counter")
         ]
     )]
     pub clock_style: String,
@@ -90,17 +89,9 @@ pub struct AppSettings {
     )]
     pub flowtime_break_divisor: i32,
     #[setting(
-        label = "Enable Long Breaks",
-        description = "Take a long break at the start of every third hour (guzey clock style).",
-        keywords = ["guzey", "long", "break", "rest", "hour"],
-        kind = "checkbox",
-        section = "do_stopwatch"
-    )]
-    pub have_long_breaks: bool,
-    #[setting(
         label = "Pause Duration (minutes)",
-        description = "How long pressing P pauses the timer (guzey clock style).",
-        keywords = ["guzey", "pause", "timer", "break", "hold"],
+        description = "How long pressing P pauses the timer.",
+        keywords = ["pause", "timer", "hold"],
         kind = "number",
         section = "do_stopwatch",
         min = 1
@@ -160,10 +151,9 @@ impl Default for AppSettings {
             default_calendar_view: "month".to_string(),
             day_timeline_start_view: 300,
             default_task_duration: 0,
-            clock_style: "guzey".to_string(),
+            clock_style: "flowtime".to_string(),
             allow_stopwatch_without_task: false,
             flowtime_break_divisor: 5,
-            have_long_breaks: false,
             pause_minutes: 10,
             sync_interval: 5,
             keybinding_launcher: "Meta+Shift+Space".to_string(),

@@ -232,11 +232,10 @@ fn user_visible_setting_strings_are_pinned() {
 default_calendar_view | Default View | calendar,view,month,week | \"month\"=Month | \"week\"=Week
 day_timeline_start_view | Timeline View Start Time | timeline,day,start,time,scroll,view
 default_task_duration | Default Duration | task,duration,estimate,time | 0=Not set | 15=15m | 30=30m | 45=45m
-clock_style | Clock Style | stopwatch,timer,guzey,counter,flowtime | \"counter\"=Counter | \"flowtime\"=Flowtime | \"guzey\"=Guzey
+clock_style | Clock Style | stopwatch,timer,counter,flowtime,flomodoro | \"flowtime\"=Flowtime | \"counter\"=Counter
 allow_stopwatch_without_task | Allow stopwatch use without selecting task | stopwatch,task,requirement,allow
 flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
-have_long_breaks | Enable Long Breaks | guzey,long,break,rest,hour
-pause_minutes | Pause Duration (minutes) | guzey,pause,timer,break,hold
+pause_minutes | Pause Duration (minutes) | pause,timer,hold
 sync_interval | Sync Interval (minutes) | sync,interval,poll,time
 keybinding_launcher | Open Launcher | keyboard,shortcut,launcher,open
 keybinding_open_settings | Open Settings | keyboard,shortcut,settings,open

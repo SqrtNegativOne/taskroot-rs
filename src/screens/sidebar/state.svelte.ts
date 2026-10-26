@@ -2,90 +2,41 @@ import { onDestroy } from 'svelte';
 import { safeInvoke } from '../../lib/safeInvoke.svelte';
 import { createDebouncedWriter, hydrateOnce } from '../../lib/asyncState.svelte';
 
-/**
- * Sidebar state now lives in the backend `ui_state` table. The `sidebar_*`
- * `localStorage` keys are legacy: each is read at most once, only when the
- * backend has no row yet, then removed.
- */
+/** Sidebar state lives in the backend `ui-state.json` under these keys. */
 export const sidebarUiKeys = {
     tabTop: 'ui.sidebar.tab_top',
     notes: 'ui.sidebar.notes',
     showNotes: 'ui.sidebar.show_notes',
 } as const;
 
-const LEGACY_KEYS = {
-    tabTop: 'sidebar_tab_top',
-    notes: 'sidebar_notes',
-    showNotes: 'sidebar_show_notes',
-} as const;
-
 const SETTLE_MS = 400;
 
-/** A legacy `localStorage` value and the typed `ui_state` value it migrates to. */
-export interface SidebarSeed<T> {
-    uiKey: string;
-    legacyKey: string;
-    isValid: (value: unknown) => value is T;
-    parse: (raw: string) => T | undefined;
+function isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
 }
 
-export const sidebarSeeds = {
-    tabTop: {
-        uiKey: sidebarUiKeys.tabTop,
-        legacyKey: LEGACY_KEYS.tabTop,
-        isValid: (value: unknown): value is number =>
-            typeof value === 'number' && Number.isFinite(value),
-        parse: (raw: string) => {
-            const value = Number.parseFloat(raw);
-            return Number.isFinite(value) ? value : undefined;
-        },
-    },
-    notes: {
-        uiKey: sidebarUiKeys.notes,
-        legacyKey: LEGACY_KEYS.notes,
-        isValid: (value: unknown): value is string => typeof value === 'string',
-        parse: (raw: string) => raw,
-    },
-    showNotes: {
-        uiKey: sidebarUiKeys.showNotes,
-        legacyKey: LEGACY_KEYS.showNotes,
-        isValid: (value: unknown): value is boolean => typeof value === 'boolean',
-        parse: (raw: string) => raw === 'true',
-    },
-};
+function isString(value: unknown): value is string {
+    return typeof value === 'string';
+}
 
-/**
- * Reads one persisted sidebar value. When the backend has a row it wins and the
- * legacy key is never consulted; otherwise the value is seeded from the legacy
- * `localStorage` entry, written to the backend, and the legacy key removed.
- */
-export async function readOrSeedSidebar<T>(seed: SidebarSeed<T>): Promise<T | undefined> {
-    const result = await safeInvoke<unknown>('get_ui_state', { key: seed.uiKey });
+function isBoolean(value: unknown): value is boolean {
+    return typeof value === 'boolean';
+}
+
+async function readSidebarValue<T>(
+    key: string,
+    isValid: (value: unknown) => value is T,
+): Promise<T | undefined> {
+    const result = await safeInvoke<unknown>('get_ui_state', { key });
     if (result.isErr()) return undefined;
-
-    const stored = result.value;
-    if (stored !== null && stored !== undefined) {
-        return seed.isValid(stored) ? stored : undefined;
-    }
-    return seedFromLocalStorage(seed);
-}
-
-async function seedFromLocalStorage<T>(seed: SidebarSeed<T>): Promise<T | undefined> {
-    const raw = localStorage.getItem(seed.legacyKey);
-    if (raw === null) return undefined;
-    localStorage.removeItem(seed.legacyKey);
-
-    const value = seed.parse(raw);
-    if (value === undefined) return undefined;
-    await safeInvoke('set_ui_state', { key: seed.uiKey, value });
-    return value;
+    return isValid(result.value) ? result.value : undefined;
 }
 
 export interface SidebarState {
     tabTop: number;
     notes: string;
     showNotes: boolean;
-    /** True once the backend/legacy read has resolved. */
+    /** True once the backend read has resolved. */
     hydrated: boolean;
     /** The stored tab position, or `undefined` when the backend had none. */
     storedTabTop: number | undefined;
@@ -120,9 +71,9 @@ export function createSidebarState(): SidebarState {
     hydrateOnce(
         async () => {
             const [tabTop, notes, showNotes] = await Promise.all([
-                readOrSeedSidebar(sidebarSeeds.tabTop),
-                readOrSeedSidebar(sidebarSeeds.notes),
-                readOrSeedSidebar(sidebarSeeds.showNotes),
+                readSidebarValue(sidebarUiKeys.tabTop, isFiniteNumber),
+                readSidebarValue(sidebarUiKeys.notes, isString),
+                readSidebarValue(sidebarUiKeys.showNotes, isBoolean),
             ]);
             return { tabTop, notes, showNotes };
         },

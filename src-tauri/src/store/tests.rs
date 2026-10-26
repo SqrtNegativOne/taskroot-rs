@@ -41,6 +41,22 @@ fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
 }
 
 #[test]
+fn default_clock_style_is_flowtime() {
+    assert_eq!(
+        crate::settings::AppSettings::default().clock_style,
+        "flowtime"
+    );
+}
+
+#[test]
+fn a_settings_file_without_a_clock_style_uses_the_default() {
+    let dir = scratch_dir("clock-style-missing");
+    std::fs::write(persist::settings_path(&dir), "{}").unwrap();
+
+    assert_eq!(persist::read_settings(&dir).clock_style, "flowtime");
+}
+
+#[test]
 fn apply_setting_rejects_a_wrong_type_and_ignores_unknown_keys() {
     let mut settings = crate::settings::AppSettings::default();
 
