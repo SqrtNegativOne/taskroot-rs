@@ -215,10 +215,10 @@ impl Store {
 
     /// Write the whole store to `snapshot.json`.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the snapshot cannot be serialized or written.
-    pub fn write_snapshot(&self) -> Result<(), AppError> {
+    /// The snapshot is only the offline cache for an unreachable server, so a
+    /// failed write is logged instead of failing the server-backed operation
+    /// that triggered it.
+    pub fn write_snapshot(&self) {
         let snapshot: Snapshot = self
             .resources
             .iter()
@@ -233,7 +233,9 @@ impl Store {
                 )
             })
             .collect();
-        persist::write_json(&self.snapshot_path(), &snapshot)
+        if let Err(error) = persist::write_json(&self.snapshot_path(), &snapshot) {
+            eprintln!("Failed to write the offline snapshot: {error}");
+        }
     }
 
     /// Fill the store from `snapshot.json`. A malformed resource is skipped, so

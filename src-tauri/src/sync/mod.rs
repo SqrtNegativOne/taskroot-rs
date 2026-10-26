@@ -166,7 +166,8 @@ pub async fn sync_all(app: &AppHandle) -> Result<(), AppError> {
     }
     if store.calendars.is_empty() {
         store.mark_synced();
-        return store.write_snapshot();
+        store.write_snapshot();
+        return Ok(());
     }
 
     let result = if store.is_empty() {

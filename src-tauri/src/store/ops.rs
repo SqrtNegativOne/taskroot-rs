@@ -28,7 +28,8 @@ pub async fn full_load(store: &mut Store, client: &CalDavClient) -> Result<(), A
         load_collection(store, client, &calendar).await?;
     }
     store.mark_synced();
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 /// Pull every changed resource, using per-collection sync tokens.
@@ -87,7 +88,8 @@ pub async fn pull(store: &mut Store, client: &CalDavClient) -> Result<(), AppErr
     }
 
     store.mark_synced();
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 async fn load_collection(
@@ -161,7 +163,7 @@ pub async fn create_event(
     event.remote_id = Some(RemoteId(href.clone()));
     event.remote_collection_id = Some(CollectionId(collection.href.clone()));
     store.set_resource(&href, &collection.href, etag.as_deref(), &raw)?;
-    store.write_snapshot()?;
+    store.write_snapshot();
     Ok(event)
 }
 
@@ -193,7 +195,7 @@ pub async fn update_event(
             .await?;
         store.remove_resource(&resource.href);
         store.set_resource(&href, &target.href, etag.as_deref(), &merged)?;
-        store.write_snapshot()?;
+        store.write_snapshot();
         return Ok(());
     }
 
@@ -216,7 +218,8 @@ pub async fn update_event(
     };
 
     store.set_resource(&resource.href, &resource.collection, etag.as_deref(), &merged)?;
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 /// Delete an event. A master deletes its whole resource; an exception removes
@@ -246,7 +249,7 @@ pub async fn delete_event(
             .delete_resource(&resource.href, resource.etag.as_deref())
             .await?;
         store.remove_resource(&resource.href);
-        store.write_snapshot()?;
+        store.write_snapshot();
         return Ok(());
     }
 
@@ -266,7 +269,8 @@ pub async fn delete_event(
             .await?;
         store.remove_resource(&resource.href);
     }
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 /// Create one task resource.
@@ -294,7 +298,7 @@ pub async fn create_task(
     task.remote_id = Some(RemoteId(href.clone()));
     task.remote_collection_id = Some(CollectionId(collection.href.clone()));
     store.set_resource(&href, &collection.href, etag.as_deref(), &raw)?;
-    store.write_snapshot()?;
+    store.write_snapshot();
     Ok(task)
 }
 
@@ -326,7 +330,7 @@ pub async fn update_task(
             .await?;
         store.remove_resource(&resource.href);
         store.set_resource(&href, &target.href, etag.as_deref(), &merged)?;
-        store.write_snapshot()?;
+        store.write_snapshot();
         return Ok(());
     }
 
@@ -349,7 +353,8 @@ pub async fn update_task(
     };
 
     store.set_resource(&resource.href, &resource.collection, etag.as_deref(), &merged)?;
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 /// Delete a task resource.
@@ -389,7 +394,8 @@ pub async fn delete_task(
             .await?;
         store.remove_resource(&resource.href);
     }
-    store.write_snapshot()
+    store.write_snapshot();
+    Ok(())
 }
 
 /// Ids of open tasks whose linked event has already ended.

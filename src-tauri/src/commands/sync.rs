@@ -19,7 +19,7 @@ pub async fn force_sync(app: tauri::AppHandle) -> Result<(), AppError> {
 ///
 /// # Errors
 ///
-/// Returns an error if the snapshot cannot be written or the reload fails.
+/// Returns an error if the reload fails.
 #[tauri::command]
 pub async fn wipe_local_data(app: tauri::AppHandle) -> Result<(), AppError> {
     let state = store_state(&app)?;
@@ -27,7 +27,7 @@ pub async fn wipe_local_data(app: tauri::AppHandle) -> Result<(), AppError> {
         let mut store = state.lock().await;
         store.resources.clear();
         store.tokens.clear();
-        store.write_snapshot()?;
+        store.write_snapshot();
     }
     force_sync(app).await
 }

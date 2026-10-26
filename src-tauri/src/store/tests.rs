@@ -70,7 +70,7 @@ fn snapshot_round_trips_and_each_resource_reparses() {
     store
         .set_resource("/cal/one.ics", "/cal/", Some("\"etag\""), EVENT_RAW)
         .unwrap();
-    store.write_snapshot().unwrap();
+    store.write_snapshot();
 
     let mut loaded = Store::load(dir).unwrap();
     assert_eq!(loaded.load_snapshot().unwrap(), 1);
