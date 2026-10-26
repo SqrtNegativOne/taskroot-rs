@@ -5,6 +5,8 @@
 #![deny(clippy::expect_used)]
 #![allow(clippy::exit, clippy::panic)]
 
+use std::path::{Path, PathBuf};
+
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
@@ -27,6 +29,8 @@ use error::AppError;
 
 pub const LAUNCHER_SHORTCUT: &str = "CommandOrControl+Shift+Space";
 
+static DATA_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
 pub fn toggle_launcher(app: &tauri::AppHandle) {
     commands::window::toggle_launcher_window(app);
 }
@@ -39,24 +43,76 @@ pub fn extract_deep_link_route(arg: &str) -> Option<&str> {
 
 /// The application data directory, created on demand.
 ///
+/// `TASKROOT_DATA_DIR` always wins. Otherwise the platform app-data directory is
+/// used, except in a debug build that cannot write to it: a sandboxed dev run
+/// keeps its data in `<exe dir>/dev-data` instead, seeded from the real directory
+/// so the run still starts with the configured account and settings.
+///
 /// # Errors
 ///
 /// Returns an error if the path cannot be resolved or created.
 pub fn app_data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, AppError> {
-    // Tests and throwaway runs need a data directory inside the repository.
-    let dir = std::env::var_os("TASKROOT_DATA_DIR")
-        .map(std::path::PathBuf::from)
-        .map_or_else(
-            || {
-                app.path()
-                    .app_data_dir()
-                    .map_err(|e| AppError::Internal(format!("Failed to resolve app data dir: {e}")))
-            },
-            Ok,
-        )?;
-    std::fs::create_dir_all(&dir)
+    if let Some(dir) = DATA_DIR.get() {
+        return Ok(dir.clone());
+    }
+    let configured = std::env::var_os("TASKROOT_DATA_DIR");
+    let preferred = match &configured {
+        Some(value) => PathBuf::from(value),
+        None => app
+            .path()
+            .app_data_dir()
+            .map_err(|e| AppError::Internal(format!("Failed to resolve app data dir: {e}")))?,
+    };
+    std::fs::create_dir_all(&preferred)
         .map_err(|e| AppError::Internal(format!("Failed to create app data dir: {e}")))?;
-    Ok(dir)
+    let dir = if configured.is_some() {
+        preferred
+    } else {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(Path::to_path_buf))
+            .and_then(|exe_dir| dev_data_fallback(&preferred, &exe_dir))
+            .unwrap_or(preferred)
+    };
+    Ok(DATA_DIR.get_or_init(|| dir).clone())
+}
+
+/// A sandboxed dev run can read the real app-data directory but not write it, so
+/// the store would have nowhere to persist. Keep the run usable by moving its
+/// data next to the binary instead, seeded with the files that describe the
+/// account.
+fn dev_data_fallback(preferred: &Path, exe_dir: &Path) -> Option<PathBuf> {
+    if !cfg!(debug_assertions) || is_writable(preferred) {
+        return None;
+    }
+    let dir = exe_dir.join("dev-data");
+    std::fs::create_dir_all(&dir).ok()?;
+    if !is_writable(&dir) {
+        return None;
+    }
+    seed_from(preferred, &dir);
+    eprintln!(
+        "App data directory {} is not writable; this debug build uses {}",
+        preferred.display(),
+        dir.display()
+    );
+    Some(dir)
+}
+
+fn seed_from(source: &Path, target: &Path) {
+    for name in ["account.json", "settings.json", "ui-state.json"] {
+        let file = target.join(name);
+        if !file.exists() {
+            let _ = std::fs::copy(source.join(name), &file);
+        }
+    }
+}
+
+fn is_writable(dir: &Path) -> bool {
+    let probe = dir.join(".write-probe");
+    let written = std::fs::write(&probe, b"").is_ok();
+    let _ = std::fs::remove_file(&probe);
+    written
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -241,5 +297,58 @@ mod tests {
         assert_eq!(extract_deep_link_route("taskroot:///"), Some(""));
         assert_eq!(extract_deep_link_route("https://example.com"), None);
         assert_eq!(extract_deep_link_route("--other-arg"), None);
+    }
+
+    fn scratch_dir(name: &str) -> PathBuf {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("lib-tests")
+            .join(format!("{name}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("create scratch dir");
+        dir
+    }
+
+    #[test]
+    fn a_writable_data_dir_is_used_as_is() {
+        let dir = scratch_dir("writable");
+        assert_eq!(dev_data_fallback(&dir, &dir), None);
+    }
+
+    #[test]
+    fn an_unwritable_data_dir_falls_back_next_to_the_binary() {
+        // A regular file can never accept the write probe.
+        let root = scratch_dir("unwritable");
+        let blocked = root.join("blocked");
+        std::fs::write(&blocked, b"").expect("create the blocking file");
+        let exe_dir = root.join("bin");
+        std::fs::create_dir_all(&exe_dir).expect("create the fake binary dir");
+
+        assert_eq!(
+            dev_data_fallback(&blocked, &exe_dir),
+            Some(exe_dir.join("dev-data"))
+        );
+    }
+
+    #[test]
+    fn seeding_copies_the_account_files_without_overwriting() {
+        let root = scratch_dir("seed");
+        let source = root.join("source");
+        let target = root.join("target");
+        std::fs::create_dir_all(&source).expect("create source");
+        std::fs::create_dir_all(&target).expect("create target");
+        std::fs::write(source.join("account.json"), "{\"server\":\"new\"}").expect("write account");
+        std::fs::write(source.join("settings.json"), "{\"stale\":true}").expect("write settings");
+        std::fs::write(target.join("settings.json"), "{\"kept\":true}").expect("write target settings");
+
+        seed_from(&source, &target);
+
+        assert_eq!(
+            std::fs::read_to_string(target.join("account.json")).expect("copied account"),
+            "{\"server\":\"new\"}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(target.join("settings.json")).expect("kept settings"),
+            "{\"kept\":true}"
+        );
     }
 }

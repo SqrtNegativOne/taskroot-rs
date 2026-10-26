@@ -42,7 +42,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src/components/`: Reusable UI components. `ComingSoon.svelte` consolidates the seven stub route pages; `inspector-pane/` is split into `InspectorPane`, `InspectorTaskFields`/`InspectorEventFields`, and `format.ts`.
   - `src/test/`: Shared test utilities (`tauriMock.ts`, the process-wide Tauri IPC mock used by component tests). See `src/AGENTS.md` for the testing conventions.
 - `src-tauri/`: Tauri Rust backend.
-  - `src-tauri/src/lib.rs`: Lints, module wiring, app-data resolution (`app_data_dir`, honouring `TASKROOT_DATA_DIR`), managed `StoreState`, startup load and `run()`. IPC commands live in `commands/`, not here.
+  - `src-tauri/src/lib.rs`: Lints, module wiring, app-data resolution (`app_data_dir`: `TASKROOT_DATA_DIR` override, plus a debug-build fallback to `<exe dir>/dev-data` when the real app-data directory is not writable — see Development Environment Notes), managed `StoreState`, startup load and `run()`. IPC commands live in `commands/`, not here.
   - `src-tauri/src/commands/`: IPC command handlers split by domain (`tasks.rs`, `events.rs`, `window.rs`, `sync.rs`) plus `session.rs` (shared `client_for`/`store_state`/`app_calendar` plumbing). Every handler is a thin wrapper over the store/CalDAV layer; `commands/tests.rs` pins the `generate_handler!` table against the frontend call sites (see `src-tauri/AGENTS.md` → Command Testing).
   - `src-tauri/src/caldav/`: CalDAV protocol layer. `transport.rs` owns the shared `reqwest::Client` and status mapping; `xml.rs` holds request bodies and `roxmltree` parsers; `discovery.rs` resolves principal → calendar-home → collections; `account.rs` persists `account.json` and the keychain password; `client.rs` adds `fetch_resources`/`fetch_hrefs`/`sync_collection`/`put_resource`/`delete_resource`/`mkcalendar`; `commands.rs` exposes the account commands; `model.rs` defines `CalendarInfo`/`CalendarComponent`.
   - `src-tauri/src/store/`: The CalDAV-backed in-memory store. `model.rs` holds `Store`/`Resource`/`Snapshot`; `ops.rs` does `full_load`/`pull` and create/update/delete (immediate `PUT`/`DELETE`, one re-fetch/retry on `412`); `query.rs` is the in-memory filter/sort/search; `persist.rs` reads/writes `settings.json` and `ui-state.json`; `state.rs` is the managed `tokio::sync::Mutex` handle. `snapshot.json` is only a cache for an unreachable server.
@@ -79,3 +79,18 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
 - **Calendar Write Semantics**: Every edit is a read-modify-write on the fetched `.ics` body: merge the DTO into the stored raw resource (`ics::write_*_resource`), then `PUT` with `If-Match` (create: `If-None-Match: *`). Never serialize a DTO into a resource. A `412` re-fetches, re-merges and retries once; a second failure is reported to the UI. Deletes are `DELETE`; a repeating-event exception removes only its component. See `docs/caldav.md`.
 - Tautological tests are considered harmful.
 - Please use early returns. This will make code nicer for you too.
+
+## Development Environment Notes (Windows)
+
+**The agent sandbox confines any executable stored inside this repository to writing inside the repository.** This is not an ACL or antivirus problem and it is not caused by the app:
+
+- `src-tauri/target/debug/tauri-app.exe` gets `Access is denied (os error 5)` for `%APPDATA%`, `%LOCALAPPDATA%`, `%TEMP%`, `Desktop`, `Documents` and `C:\`; only paths under the repo succeed.
+- The very same binary copied to `Desktop` or `Documents` writes everywhere, and a copy of `cmd.exe` placed in the repo is confined exactly like the Rust binary. It also persists when the exe is launched through Task Scheduler, so it is keyed on the image path, not on the parent process.
+- The agent's own shell is *not* confined, so `Set-Content "$env:APPDATA\…"` succeeding proves nothing about what the app can do.
+
+Consequences and the existing mitigations:
+
+- `app_data_dir` (`src-tauri/src/lib.rs`) probes the platform app-data directory and, when a **debug build** cannot write it, uses `<exe dir>/dev-data` instead, seeding `account.json`, `settings.json` and `ui-state.json` from the real directory once and logging a warning. `TASKROOT_DATA_DIR` always wins. So `run.bat`/`bun run tauri dev` is usable for daily work with data in `src-tauri/target/debug/dev-data`; delete that directory to re-seed from `%APPDATA%\com.arkma.tauri-app`.
+- Anything that must persist during a sandboxed run has to live under the repo. Rust tests already write under `src-tauri/target/…`; Vitest needs `TEMP`/`TMP` pointed at `src-tauri/target/vitest-tmp` for the same reason.
+- `snapshot.json` is only the offline cache, so its write failures are logged and ignored (`Store::write_snapshot`) rather than failing the load or an edit. `settings.json` / `account.json` writes still fail loudly — that is deliberate.
+- Bulk edits: PowerShell `-replace` is case-insensitive and will silently rewrite identifiers (`caldav` → `CalDAV`). Prefer `edit`/`.Replace` or `-creplace`.

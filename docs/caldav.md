@@ -21,7 +21,11 @@ Windows/macOS) contains:
 | `settings.json` | `AppSettings`, one object. Malformed → renamed `settings.json.bad`, defaults used. |
 | `ui-state.json` | Flat `{ "<key>": <value> }` map for per-component UI state. |
 | `account.json` | Server URL, username, home-set, principal and discovered collections. No password. |
-| `snapshot.json` | Read-only cache: `href -> { collection, etag, raw }`. Never merged with remote state. |
+| `snapshot.json` | Read-only cache: `href -> { collection, etag, raw }`. Never merged with remote state. A failed write is logged and ignored. |
+
+A debug build whose app-data directory is not writable (a sandboxed dev run) keeps this
+directory next to the executable in `dev-data/` instead, copying `account.json`,
+`settings.json` and `ui-state.json` over once. `TASKROOT_DATA_DIR` overrides both.
 
 Discovery runs at account setup and when the user explicitly refreshes calendars. A normal
 sync never rediscovers.
