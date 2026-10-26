@@ -115,12 +115,45 @@ fn is_writable(dir: &Path) -> bool {
     written
 }
 
+/// `WebView2` keeps its profile in `%LOCALAPPDATA%\<identifier>` and creates no
+/// window at all when that directory cannot be written, which leaves a sandboxed
+/// dev run with no UI. Point it beside the executable instead, like `dev-data`.
+fn configure_dev_webview_storage(context: &tauri::Context) {
+    if !cfg!(debug_assertions) || std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_some() {
+        return;
+    }
+    let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) else {
+        return;
+    };
+    let preferred = local.join(context.config().identifier.as_str());
+    if std::fs::create_dir_all(&preferred).is_ok() && is_writable(&preferred) {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(dir) = exe.parent().map(|dir| dir.join("dev-data").join("EBWebView")) else {
+        return;
+    };
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &dir);
+    eprintln!(
+        "WebView2 profile directory {} is not writable; this debug build uses {}",
+        preferred.display(),
+        dir.display()
+    );
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::too_many_lines, clippy::large_stack_frames)]
 /// # Panics
 ///
 /// Panics if the tauri application fails to run.
 pub fn run() {
+    let context = tauri::generate_context!();
+    configure_dev_webview_storage(&context);
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
@@ -277,7 +310,7 @@ pub fn run() {
             caldav::commands::disconnect_account,
             caldav::commands::refresh_calendars
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));
 }
 

@@ -28,7 +28,7 @@ pub(crate) async fn client_for(app: &AppHandle) -> Result<CalDavClient, AppError
     };
     let http = app
         .try_state::<HttpClient>()
-        .ok_or_else(|| AppError::Internal("The HTTP client is not initialized".to_string()))?;
+        .ok_or_else(|| AppError::NotReady("The HTTP client is not initialized".to_string()))?;
     CalDavClient::from_account(&http, &account, &password)
 }
 
@@ -37,7 +37,7 @@ pub(crate) async fn client_for(app: &AppHandle) -> Result<CalDavClient, AppError
 /// Returns [`AppError::Internal`] when the store was never initialized.
 pub(crate) fn store_state(app: &AppHandle) -> Result<State<'_, StoreState>, AppError> {
     app.try_state::<StoreState>()
-        .ok_or_else(|| AppError::Internal("The store is not initialized".to_string()))
+        .ok_or_else(|| AppError::NotReady("The store is not initialized".to_string()))
 }
 
 /// Project a discovered collection onto the view DTO the frontend consumes.

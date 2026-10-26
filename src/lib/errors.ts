@@ -6,6 +6,7 @@ export const BACKEND_ERROR_CODES = [
     'store',
     'conflict',
     'gone',
+    'not-ready',
     'internal',
 ] as const;
 

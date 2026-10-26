@@ -17,6 +17,11 @@ pub enum AppError {
     #[error("{0}")]
     Gone(String),
 
+    /// The app is still starting: the webview can issue commands before the
+    /// `setup` hook has managed the store. Callers may retry this one.
+    #[error("{0}")]
+    NotReady(String),
+
     #[error("{0}")]
     Internal(String),
 }
@@ -32,6 +37,7 @@ impl AppError {
             Self::Store(_) => "store",
             Self::Conflict(_) => "conflict",
             Self::Gone(_) => "gone",
+            Self::NotReady(_) => "not-ready",
 
             Self::Internal(_) => "internal",
         }
@@ -76,6 +82,7 @@ mod tests {
         assert_eq!(AppError::Store("x".into()).code(), "store");
         assert_eq!(AppError::Conflict("x".into()).code(), "conflict");
         assert_eq!(AppError::Gone("x".into()).code(), "gone");
+        assert_eq!(AppError::NotReady("x".into()).code(), "not-ready");
 
         assert_eq!(
             AppError::from(color_eyre::eyre::eyre!("boom")).code(),

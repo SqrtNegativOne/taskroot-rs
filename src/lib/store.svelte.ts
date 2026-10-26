@@ -1,6 +1,6 @@
 import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
-import { describeAppError, normalizeAppError } from './errors';
+import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import type { AppTask, AppEvent } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
 
@@ -25,11 +25,19 @@ export class AppStore {
     }
 
     private async bootstrap(): Promise<Result<void, AppError>> {
-        const result = await this.refresh();
-        if (result.isOk()) {
-            this.loaded = true;
+        // A webview can issue commands before Rust's `setup` hook has managed the
+        // store, which answers `not-ready` until then. Retry that one briefly
+        // instead of caching the failure and rendering "Loading..." forever.
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+            const result = await this.refresh();
+            if (result.isOk()) {
+                this.loaded = true;
+                return result;
+            }
+            if (result.error.code !== 'not-ready') return result;
+            await new Promise((resolve) => setTimeout(resolve, 150));
         }
-        return result;
+        return err(unknownAppError('The backend did not finish starting.'));
     }
 
     async refresh(): Promise<Result<void, AppError>> {

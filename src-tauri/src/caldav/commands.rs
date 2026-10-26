@@ -189,5 +189,5 @@ pub async fn refresh_calendars(app: AppHandle) -> Result<AccountSummary, AppErro
 fn http_client(app: &AppHandle) -> Result<HttpClient, AppError> {
     app.try_state::<HttpClient>()
         .map(|state| HttpClient(state.0.clone()))
-        .ok_or_else(|| AppError::Internal("The HTTP client is not initialized".to_string()))
+        .ok_or_else(|| AppError::NotReady("The HTTP client is not initialized".to_string()))
 }

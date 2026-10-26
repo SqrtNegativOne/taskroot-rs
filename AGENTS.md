@@ -4,6 +4,10 @@
 
 *Note: Domain-specific rules are located in `src/AGENTS.md` (for Svelte) and `src-tauri/AGENTS.md` (for Rust).*
 
+## Working With the User
+- **Never screenshot the desktop or a running app to inspect the UI.** Do not launch the app just to capture it either. The user runs it themselves and will send a screenshot or describe the screen when asked — ask them.
+- Prefer non-visual introspection for your own checks: ask the user, read logs, or reason from the code. Screen capture is for image files the user hands you, not for verification.
+
 Taskroot is a desktop task management app focusing on planning, executing, and resting. It is built as a Svelte 5 application running on a native Tauri v2 Rust backend.
 
 ## Tech Stack
@@ -55,7 +59,7 @@ Taskroot is a desktop task management app focusing on planning, executing, and r
   - `src-tauri/src/settings/`: Settings backend, split into `mod.rs` (`AppSettings` struct with `#[derive(TS)]` and `#[derive(SettingsMeta)]` field-adjacent metadata plus the IPC commands) and `metadata.rs` (`SettingMeta`/`SettingOption`, `SETTING_SECTIONS`, `CUSTOM_SETTINGS`, and `build_settings_schema`, with tests in `metadata/tests.rs`). `get_settings_schema` is generated from the field attributes, and the binding is emitted to `src/lib/bindings/AppSettings.generated.ts`. `storage.rs` delegates to the store, which persists `settings.json` and `ui-state.json`; a stored value is merged only if it round-trips through its field's serde type and a known key with a wrongly-typed value is rejected with `invalid-input`.
 
 ### Key Concepts
-- **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `not-found`, `auth`, `sync`, `invalid-input`, `store`, `conflict`, `gone`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands.
+- **Typed Error Contract**: Every IPC command returns `Result<T, AppError>`. `AppError` serializes as `{code, message}` with kebab-case codes: `not-found`, `auth`, `sync`, `invalid-input`, `store`, `conflict`, `gone`, `not-ready`, `internal`. The frontend mirror lives in `src/lib/errors.ts` (`BackendErrorCode`). Never return raw strings from commands. `not-ready` means the app is still starting (the store/HTTP client is managed in `setup`, after the webviews exist): the frontend retries it briefly in `AppStore::bootstrap`, so anything that can legitimately run that early must not be reported with it.
 - **Event Name Constants**: Backend event names are constants in `src-tauri/src/events.rs`, mirrored in `src/lib/events.ts` (`stopwatch-updated`, `sync-started`, `sync-finished`, `sync-error`, `screen-effect`). Never inline raw event strings on either side.
 - **Generated Bindings Flow**: `cargo nextest run` in `src-tauri` regenerates `src/lib/bindings/*.generated.ts` via `ts-rs` (`export_bindings_*` tests). After changing any `#[derive(TS)]` struct, run `cargo nextest run` and commit the regenerated files. CI fails on binding drift (`git diff --exit-code src/lib/bindings`). The `#[ts(type = "number")]` convention keeps timestamps as JS `number` — never `bigint`.
 - **Adding a Setting**: Declare the field on `AppSettings` with a `#[setting(label = ..., kind = ..., section = ..., ...)]` attribute (`src-tauri/src/settings/mod.rs`). `#[derive(SettingsMeta)]` turns those attributes into `get_settings_schema`'s output and derives each `defaultValue` from `AppSettings::default()`, so a setting is described once. A field without `#[setting(..)]` fails to compile; a new section is added to `SETTING_SECTIONS`. Field order sets the row order inside a section, and `SETTING_SECTIONS` order sets tab/section order. Run `cargo nextest run` to regenerate the `AppSettings` TS binding.
