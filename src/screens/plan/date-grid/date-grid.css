@@ -95,10 +95,20 @@
   }
   .day-cell-events {
     display: flex; flex-direction: column;
-    gap: 2px;
     padding-top: calc(var(--span-lanes, 0) * var(--span-h, 18px));
+    flex: 1;
     min-height: 0;
     overflow: hidden;
+  }
+  .day-cell-events-scroll {
+    display: flex; flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
   .cal-span {
     position: absolute;

@@ -22,7 +22,7 @@
         onTaskClick,
         footer,
     }: {
-        onUpdateTask?: (id: string, transform: (t: AppTask) => AppTask) => void;
+        onUpdateTask?: (task: AppTask) => void;
         filters?: AppTaskFilter[];
         sort?: import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
@@ -36,9 +36,8 @@
     let query = $state('');
 
     function updateTask(id: string, transform: (t: AppTask) => AppTask) {
-        if (onUpdateTask) {
-            onUpdateTask(id, transform);
-        }
+        const task = filtered.find((t) => t.id === id);
+        if (task) onUpdateTask?.(transform(task));
     }
 
     persistState(

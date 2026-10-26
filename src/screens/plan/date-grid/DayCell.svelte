@@ -40,6 +40,21 @@
     let cellDateStr = $derived(ymd(cell.date));
     let isDragOver = $derived(dragState?.target?.kind === "grid-day" && dragState.target.date === cellDateStr);
     let canAccept = $derived(!!dragState);
+    let eventsEl = $state<HTMLDivElement | undefined>(undefined);
+
+    const WHEEL_LINE_PX = 16;
+
+    // Keep the cell's event list scrollable even when the pointer is over the
+    // date header, where the wheel would otherwise not reach the list.
+    function handleWheel(e: WheelEvent) {
+        if (!eventsEl || (e.target instanceof Node && eventsEl.contains(e.target))) return;
+        const maxScroll = eventsEl.scrollHeight - eventsEl.clientHeight;
+        if (maxScroll <= 0) return;
+        const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? e.deltaY * WHEEL_LINE_PX
+            : e.deltaY;
+        eventsEl.scrollTop = Math.min(maxScroll, Math.max(0, eventsEl.scrollTop + delta));
+    }
 
     // Animation logic
     let displayEvents = $derived(events);
@@ -61,6 +76,7 @@
     class:is-strip={isWeek}
     class:is-drag-over={isDragOver}
     class:can-accept={canAccept}
+    onwheel={handleWheel}
     ondblclick={(e) => {
         if (!(e.target instanceof HTMLElement)) return;
         if (e.target.closest(".day-cell-event")) return;
@@ -73,44 +89,46 @@
         </span>
     </div>
     <div class="day-cell-events">
-        {#each displayEvents as ev (ev.occurrenceKey)}
-            {@const title = ev.title}
-            {@const isDone = false /* TODO: pull done from task */}
-            {@const isPastDue = checkPastDue(ev)}
-            {@const isAllDay = ev.timing.kind === 'allDay'}
-            {@const readOnly = isEventReadOnly(ev, calendars)}
-            
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div
-                class="day-cell-event"
-                class:is-done={isDone}
-                class:is-readonly={readOnly}
-                style="
-                    cursor: {readOnly ? 'default' : 'grab'};
-                    opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
-                    {eventColorVars(ev.color)}
-                "
-                onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, ev)}
-                onclick={(e) => {
-                    e.stopPropagation();
-                    if (onEventClick) onEventClick(ev);
-                }}
-            >
-                {#if !isAllDay}
-                    <span class="day-cell-event-time">
-                        {formatStartTime(ev)}
-                    </span>
-                {/if}
-                <span class="day-cell-event-title" style="display: flex; align-items: center; gap: 2px;">
-                    {#if isPastDue}
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; color: var(--p0);">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
+        <div class="day-cell-events-scroll" bind:this={eventsEl}>
+            {#each displayEvents as ev (ev.occurrenceKey)}
+                {@const title = ev.title}
+                {@const isDone = false /* TODO: pull done from task */}
+                {@const isPastDue = checkPastDue(ev)}
+                {@const isAllDay = ev.timing.kind === 'allDay'}
+                {@const readOnly = isEventReadOnly(ev, calendars)}
+                
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <div
+                    class="day-cell-event"
+                    class:is-done={isDone}
+                    class:is-readonly={readOnly}
+                    style="
+                        cursor: {readOnly ? 'default' : 'grab'};
+                        opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
+                        {eventColorVars(ev.color)}
+                    "
+                    onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, ev)}
+                    onclick={(e) => {
+                        e.stopPropagation();
+                        if (onEventClick) onEventClick(ev);
+                    }}
+                >
+                    {#if !isAllDay}
+                        <span class="day-cell-event-time">
+                            {formatStartTime(ev)}
+                        </span>
                     {/if}
-                    {title}
-                </span>
-            </div>
-        {/each}
+                    <span class="day-cell-event-title" style="display: flex; align-items: center; gap: 2px;">
+                        {#if isPastDue}
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; color: var(--p0);">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        {/if}
+                        {title}
+                    </span>
+                </div>
+            {/each}
+        </div>
     </div>
     
     {#if isDragOver}

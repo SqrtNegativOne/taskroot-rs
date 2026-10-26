@@ -134,6 +134,9 @@
                         onDragStart={onTaskDragStart}
                         {onAddTask}
                         {onDeleteTask}
+                        onUpdateTask={(task: AppTask) => {
+                            void mutateOrReport('Failed to update task', () => store.updateTask(task));
+                        }}
                         onTaskClick={(task: AppTask) => {
                             inspectorState = { type: 'task', id: task.id };
                         }}
