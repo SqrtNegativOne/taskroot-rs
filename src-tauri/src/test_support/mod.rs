@@ -10,7 +10,6 @@
 //! parameter. The store/ICS/CalDAV layers are tested directly instead, and
 //! [`source_scan`] plus [`frontend_scan`] check the handler table against the
 //! frontend call sites.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 pub mod frontend_scan;
 pub mod source_scan;

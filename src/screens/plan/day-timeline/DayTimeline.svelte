@@ -32,12 +32,16 @@
 
     function onResizeEvent(id: string, startTime: string, endTime: string) {
         if (isEventReadOnlyById(id)) return;
-        void store.rescheduleEvent(id, startTime, endTime);
+        void store.mutate('Failed to resize event', () =>
+            store.rescheduleEvent(id, startTime, endTime),
+        );
     }
 
     function onMoveEvent(id: string, startTime: string, endTime: string) {
         if (isEventReadOnlyById(id)) return;
-        void store.rescheduleEvent(id, startTime, endTime);
+        void store.mutate('Failed to move event', () =>
+            store.rescheduleEvent(id, startTime, endTime),
+        );
     }
 
     function isEventReadOnlyById(id: string): boolean {

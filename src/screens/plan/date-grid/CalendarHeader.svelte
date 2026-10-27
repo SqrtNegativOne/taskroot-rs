@@ -129,8 +129,8 @@
                             style="
                                 padding: 8px 12px;
                                 text-align: left;
-                                background: {view === mode || (view === DateGridView.Week && mode === DateGridView.OneWeek) ? 'var(--accent-soft)' : 'transparent'};
-                                color: {view === mode || (view === DateGridView.Week && mode === DateGridView.OneWeek) ? 'var(--accent)' : 'var(--fg)'};
+                                background: {view === mode ? 'var(--accent-soft)' : 'transparent'};
+                                color: {view === mode ? 'var(--accent)' : 'var(--fg)'};
                                 border: none;
                                 cursor: pointer;
                                 font-size: 0.9em;

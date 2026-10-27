@@ -21,15 +21,6 @@ export function safeInvoke<T, E = AppError>(cmd: string, args?: InvokeArgs): Res
     );
 }
 
-/**
- * Declares reactive dependencies for a `$effect` that drives a `useTauriQuery`
- * execution. Svelte tracks any value read here, so the effect re-runs whenever
- * one of them changes — without resorting to bare `void x` statements.
- */
-export function queryDependency(...dependencies: unknown[]): number {
-    return dependencies.reduce<number>((count, value) => (value !== undefined ? count + 1 : count), 0);
-}
-
 interface UseTauriQueryOptions<T, E> {
     args?: InvokeArgs;
     debounceMs?: number;

@@ -8,7 +8,6 @@
 //! Run with `TASKROOT_DATA_DIR=target/e2e-data`:
 //! `cargo run --example e2e_caldav -- --user me --password ...`
 
-#![allow(clippy::panic_in_result_fn)]
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -27,6 +26,36 @@ struct Args {
     server: String,
     user: String,
     password: String,
+}
+
+fn e2e_task(task_id: &str) -> AppTask {
+    AppTask {
+        id: TaskId::from(task_id),
+        title: "Taskroot E2E task".to_string(),
+        status: Some(AppTaskStatus::Todo),
+        priority: Some(TaskPriority::High),
+        tags: None,
+        parent_task: None,
+        dependencies: None,
+        est: Some(30),
+        added: None,
+        canvas_x: None,
+        canvas_y: None,
+        on_canvas: None,
+        remote_id: None,
+        remote_collection_id: None,
+        notes: Some("created by the migration E2E check".to_string()),
+        tabs: None,
+        start: None,
+        due: Some("2026-12-02".to_string()),
+        completed_at: None,
+        rrule: None,
+        geo: None,
+        alarms: None,
+        timezone: None,
+        updated_at: None,
+        etag: None,
+    }
 }
 
 #[tokio::main]
@@ -82,8 +111,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     event.end_time = "2026-12-01T16:30:00".to_string();
     ops::update_event(&mut store, &client, event.clone()).await?;
     let raw = fetch_one(&client, &href).await?;
-    assert!(raw.contains("SUMMARY:Taskroot E2E event edited"));
-    assert!(raw.contains("DTSTART;TZID=Asia/Kolkata:20261201T153000"));
+    ensure(
+        raw.contains("SUMMARY:Taskroot E2E event edited"),
+        "the edited summary did not reach the server",
+    )?;
+    ensure(
+        raw.contains("DTSTART;TZID=Asia/Kolkata:20261201T153000"),
+        "the moved start did not reach the server",
+    )?;
     println!("edited and moved event");
 
     ops::delete_event(&mut store, &client, event_id.as_str()).await?;
@@ -91,27 +126,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("deleted event");
 
     let task_id = format!("e2e-{}", uuid::Uuid::new_v4());
-    let task = AppTask {
-        id: TaskId::from(task_id.as_str()),
-        title: "Taskroot E2E task".to_string(),
-        status: Some(AppTaskStatus::Todo),
-        priority: Some(TaskPriority::High),
-        tags: None,
-        parent_task: None,
-        dependencies: None,
-        est: Some(30),
-        added: None,
-        canvas_x: None,
-        canvas_y: None,
-        on_canvas: None,
-        remote_id: None,
-        remote_collection_id: None,
-        notes: Some("created by the migration E2E check".to_string()),
-        tabs: None,
-        due: Some("2026-12-02".to_string()),
-        updated_at: None,
-        etag: None,
-    };
+    let task = e2e_task(&task_id);
     let mut task = ops::create_task(&mut store, &client, task).await?;
     let task_href = task
         .remote_id
@@ -125,9 +140,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     task.due = Some("2026-12-05".to_string());
     ops::update_task(&mut store, &client, task.clone()).await?;
     let raw = fetch_one(&client, &task_href).await?;
-    assert!(raw.contains("SUMMARY:Taskroot E2E task edited"));
-    assert!(raw.contains("STATUS:COMPLETED"));
-    assert!(raw.contains("DUE;VALUE=DATE:20261205"));
+    ensure(
+        raw.contains("SUMMARY:Taskroot E2E task edited"),
+        "the edited task summary did not reach the server",
+    )?;
+    ensure(
+        raw.contains("STATUS:COMPLETED"),
+        "the completed status did not reach the server",
+    )?;
+    ensure(
+        raw.contains("DUE;VALUE=DATE:20261205"),
+        "the rescheduled due date did not reach the server",
+    )?;
     println!("edited and rescheduled task");
 
     ops::delete_task(&mut store, &client, task_id.as_str()).await?;
@@ -155,16 +179,22 @@ async fn preserve_apple_sort_order(
         .as_deref()
         .ok_or("the tasks.org task has no href")?.clone();
     let before = fetch_one(client, &href).await?;
-    assert!(before.contains("X-APPLE-SORT-ORDER:"), "fixture has no sort order");
+    ensure(
+        before.contains("X-APPLE-SORT-ORDER:"),
+        "fixture has no sort order",
+    )?;
 
     task.title = format!("{original_title} (e2e)");
     ops::update_task(store, client, task.clone()).await?;
     let after = fetch_one(client, &href).await?;
-    assert!(
+    ensure(
         after.contains("X-APPLE-SORT-ORDER:"),
-        "the app edit dropped X-APPLE-SORT-ORDER:\n{after}"
-    );
-    assert!(after.contains("SUMMARY:Brush (e2e)"));
+        format!("the app edit dropped X-APPLE-SORT-ORDER:\n{after}"),
+    )?;
+    ensure(
+        after.contains("SUMMARY:Brush (e2e)"),
+        "the renamed summary did not reach the server",
+    )?;
 
     task.title = original_title;
     ops::update_task(store, client, task).await?;
@@ -183,17 +213,16 @@ async fn restart_and_compare(
 
     let snapshot: BTreeMap<String, tauri_app_lib::store::SnapshotResource> =
         serde_json::from_str(&std::fs::read_to_string(dir.join("snapshot.json"))?)?;
-    assert_eq!(
-        snapshot.len(),
-        restarted.resources.len(),
-        "snapshot and in-memory store disagree after restart"
-    );
+    ensure(
+        snapshot.len() == restarted.resources.len(),
+        "snapshot and in-memory store disagree after restart",
+    )?;
     for (href, entry) in &snapshot {
         let live = fetch_one(client, href).await?;
-        assert_eq!(
-            &live, &entry.raw,
-            "snapshot resource {href} does not match the server"
-        );
+        ensure(
+            live == entry.raw,
+            format!("snapshot resource {href} does not match the server"),
+        )?;
     }
     println!("restart: snapshot and server agree ({} resources)", snapshot.len());
     Ok(())
@@ -209,6 +238,13 @@ async fn fetch_one(client: &CalDavClient, href: &str) -> Result<String, Box<dyn 
         .into_iter()
         .find_map(|resource| resource.calendar_data)
         .ok_or_else(|| format!("{href} was not returned by the server").into())
+}
+
+fn ensure(condition: bool, message: impl Into<String>) -> Result<(), Box<dyn Error>> {
+    if condition {
+        return Ok(());
+    }
+    Err(message.into().into())
 }
 
 async fn assert_exists(client: &CalDavClient, href: &str) -> Result<(), Box<dyn Error>> {

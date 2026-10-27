@@ -1,14 +1,10 @@
 import type { AppCalendar } from '../bindings/AppCalendar.generated';
 import type { AppEvent } from '../bindings/AppEvent.generated';
-import type { AppTask } from '../bindings/AppTask.generated';
+import type { CalendarComponent } from '../bindings/CalendarComponent.generated';
+import { addDays, ymd } from '../time';
 
-export type HydratedEvent = AppEvent & {
-    task?: AppTask;
-    color?: string;
-    category?: string;
-    isInstance?: boolean;
-    baseEventId?: string;
-};
+const MS_PER_MINUTE = 60_000;
+const DEFAULT_EVENT_MINUTES = 60;
 
 export type CalendarLike = AppCalendar | {
     readonly id: string;
@@ -16,12 +12,23 @@ export type CalendarLike = AppCalendar | {
     readonly color?: string;
     readonly backgroundColor?: string;
     readonly writable?: boolean;
+    readonly component?: CalendarComponent;
 };
 
-export function resolveEventCalendar<C extends CalendarLike>(
+export interface NewEventOptions {
+    readonly startMinutes?: number;
+    readonly endMinutes?: number;
+    readonly calendars?: readonly CalendarLike[];
+    /** Title of the draft; defaults to "New Event". */
+    readonly title?: string;
+    /** Task the new event is scheduled for, stored as the event's task link. */
+    readonly taskId?: string;
+}
+
+function resolveEventCalendar(
     ev: { readonly remoteCollectionId?: string },
-    calendars: readonly C[] = [],
-): C | undefined {
+    calendars: readonly CalendarLike[] = [],
+): CalendarLike | undefined {
     if (calendars.length === 0) {
         return undefined;
     }
@@ -41,6 +48,54 @@ export function isCalendarReadOnly(
     return calendar?.writable === false;
 }
 
+function writableEventCalendar(
+    calendars: readonly CalendarLike[],
+): CalendarLike | undefined {
+    return calendars.find(
+        (calendar) => calendar.component === 'VEVENT' && !isCalendarReadOnly(calendar),
+    );
+}
+
+/**
+ * Builds an unsaved `AppEvent` draft for a date and optional time-of-day.
+ * Omitting `startMinutes` creates an all-day event with floating dates; passing
+ * it creates a timed event using the system timezone.
+ */
+export function buildNewEvent(
+    date: Date,
+    { startMinutes, endMinutes, calendars = [], title, taskId }: NewEventOptions = {},
+): AppEvent {
+    const calendar = writableEventCalendar(calendars);
+    const isAllDay = startMinutes === undefined;
+    const link = taskId ? { taskId } : {};
+
+    if (isAllDay) {
+        return {
+            id: crypto.randomUUID(),
+            title: title ?? 'New Event',
+            startTime: ymd(date),
+            endTime: ymd(addDays(date, 1)),
+            remoteCollectionId: calendar?.id,
+            isAllDay: true,
+            ...link,
+        };
+    }
+
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const end = endMinutes ?? startMinutes + DEFAULT_EVENT_MINUTES;
+
+    return {
+        id: crypto.randomUUID(),
+        title: title ?? 'New Event',
+        startTime: new Date(dayStart.getTime() + startMinutes * MS_PER_MINUTE).toISOString(),
+        endTime: new Date(dayStart.getTime() + end * MS_PER_MINUTE).toISOString(),
+        remoteCollectionId: calendar?.id,
+        isAllDay: false,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ...link,
+    };
+}
+
 /**
  * Whether an event lives in a calendar the signed-in user cannot write to.
  * Accepts both `AppEvent` (`remoteCollectionId`) and `EventInstance`
@@ -57,72 +112,4 @@ export function isEventReadOnly(
     return isCalendarReadOnly(resolveEventCalendar({ remoteCollectionId: collectionId }, calendars));
 }
 
-export function isEventAllDay(event: {
-    readonly startTime: string;
-    readonly endTime: string;
-    readonly isAllDay?: boolean;
-}): boolean {
-    if (typeof event.isAllDay === 'boolean') {
-        return event.isAllDay;
-    }
-    const YMD_LENGTH = 10;
-    return (
-        event.startTime.length === YMD_LENGTH &&
-        event.endTime.length === YMD_LENGTH &&
-        !event.startTime.includes('T') &&
-        !event.startTime.includes(' ')
-    );
-}
 
-function resolveEventTitle(ev: AppEvent, task: AppTask | undefined, taskId: string | undefined): string {
-    if (task) {
-        return task.title;
-    }
-    if (ev.title) {
-        return ev.title;
-    }
-    if (taskId) {
-        return 'Unknown Task';
-    }
-    return '';
-}
-
-function hydrateSingleEvent(
-    ev: AppEvent,
-    taskMap: Map<string, AppTask>,
-    calendars: readonly CalendarLike[],
-): HydratedEvent {
-    const cal = resolveEventCalendar(ev, calendars);
-    const calColor = cal?.color ?? (cal as { readonly backgroundColor?: string } | undefined)?.backgroundColor;
-    const color = calColor ?? ev.color;
-    const category = cal?.summary;
-
-    const taskId = ev.taskId ?? (ev as { readonly task_id?: string }).task_id;
-    const task = taskId ? taskMap.get(taskId) : undefined;
-    const title = resolveEventTitle(ev, task, taskId);
-
-    const result: HydratedEvent = { ...ev, title };
-    if (task !== undefined) {
-        result.task = task;
-    }
-    if (color !== undefined) {
-        result.color = color;
-    }
-    if (category !== undefined) {
-        result.category = category;
-    }
-    return result;
-}
-
-export function hydrateEvents(
-    events: readonly AppEvent[],
-    tasks: readonly AppTask[] = [],
-    calendars: readonly CalendarLike[] = [],
-): HydratedEvent[] {
-    const taskMap = new Map<string, AppTask>();
-    for (const task of tasks) {
-        taskMap.set(task.id, task);
-    }
-
-    return events.map((ev) => hydrateSingleEvent(ev, taskMap, calendars));
-}

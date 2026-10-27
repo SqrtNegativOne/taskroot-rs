@@ -148,6 +148,12 @@
     margin-top: 8px;
 }
 
+.inspector-datetime {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .inspector-field-row {
     display: flex;
     flex-direction: row;

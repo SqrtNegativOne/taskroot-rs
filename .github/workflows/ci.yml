@@ -43,5 +43,5 @@ jobs:
       - name: Test (generates ts-rs bindings)
         working-directory: src-tauri
         run: cargo llvm-cov nextest --all-targets --workspace --lcov --output-path lcov.info
-      - name: Fail on generated bindings drift
-        run: git diff --exit-code src/lib/bindings
+      - name: Fail on generated bindings or CLI reference drift
+        run: git diff --exit-code src/lib/bindings docs/cli.md

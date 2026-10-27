@@ -25,19 +25,11 @@ pub struct SyncStateManager(pub Mutex<SyncState>);
 pub(crate) const SYNC_INTERVAL_SECS: i64 = 5 * 60;
 const MIN_SYNC_SECS: u64 = 60;
 const MAX_SYNC_SECS: u64 = 24 * 60 * 60;
-const TRIGGER_DEBOUNCE_SECS: u64 = 10;
-
-#[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-pub fn get_sync_state(app: tauri::AppHandle) -> Result<SyncState, AppError> {
-    let state = app
-        .try_state::<SyncStateManager>()
-        .ok_or_else(|| AppError::Internal("Sync state not initialized yet".to_string()))?;
-    Ok(state
-        .0
-        .lock()
-        .map_or_else(|_| SyncState::default(), |guard| guard.clone()))
-}
+/// Quiet period before a triggered sync runs. Radicale's change hook (`hooks`)
+/// already announces every write, so this only has to be long enough to fold one
+/// user action's several requests (moving a task is a `PUT` plus a `DELETE`) into
+/// a single pull — it is not a polling delay.
+const TRIGGER_QUIET_MS: u64 = 250;
 
 pub struct SyncTrigger(pub tokio::sync::mpsc::Sender<()>);
 
@@ -73,7 +65,7 @@ pub fn start_sync_engine(app: AppHandle) {
             }
             loop {
                 tokio::select! {
-                    () = tokio::time::sleep(Duration::from_secs(TRIGGER_DEBOUNCE_SECS)) => {
+                    () = tokio::time::sleep(Duration::from_millis(TRIGGER_QUIET_MS)) => {
                         break;
                     }
                     opt = rx.recv() => {
@@ -101,7 +93,6 @@ async fn poll_interval(app: &AppHandle) -> u64 {
     seconds.clamp(MIN_SYNC_SECS, MAX_SYNC_SECS)
 }
 
-#[allow(clippy::unused_async)]
 pub(crate) async fn run_tracked_sync(
     app: &AppHandle,
     next_sync_at: Option<DateTime<Utc>>,
@@ -157,13 +148,19 @@ pub async fn sync_all(app: &AppHandle) -> Result<(), AppError> {
     let mut store = state.lock().await;
 
     let dir = crate::app_data_dir(app)?;
-    let account = crate::caldav::account::read_account(&dir)?
+    let mut account = crate::caldav::account::read_account(&dir)?
         .ok_or_else(|| AppError::Auth("No CalDAV account is configured".to_string()))?;
-    if store.calendars != account.calendars {
-        store.calendars.clone_from(&account.calendars);
+    let calendars = crate::caldav::discovery::refresh_collections(&dir, &client, &mut account).await;
+    let same_collections = store.calendars.len() == calendars.len()
+        && store
+            .calendars
+            .iter()
+            .all(|calendar| calendars.iter().any(|fresh| fresh.href == calendar.href));
+    if !same_collections {
         store.resources.clear();
         store.tokens.clear();
     }
+    store.calendars.clone_from(&calendars);
     if store.calendars.is_empty() {
         store.mark_synced();
         store.write_snapshot();

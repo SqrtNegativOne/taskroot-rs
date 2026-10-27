@@ -6,10 +6,10 @@ import {
     DEFAULT_DROP_DURATION_MINUTES,
     MINUTES_PER_DAY,
     gridDayDropPayload,
-    snappedDropMinute,
     timelineDropPayload,
     type ReschedulePayload,
 } from '../date-grid/dropPayload';
+import { dropTargetAt, suppressUpcomingClick } from '../date-grid/dropTarget';
 
 const MS_PER_MINUTE = 60_000;
 
@@ -27,31 +27,6 @@ function durationMinutes(instance: EventInstance): number {
     return Math.min(MINUTES_PER_DAY, Math.max(SNAP_MIN, Math.round(span / MS_PER_MINUTE)));
 }
 
-function targetFromElement(
-    element: Element,
-    clientY: number,
-    duration: number,
-): DragStateTarget | undefined {
-    const kind = element.getAttribute('data-drop-kind');
-    const date = element.getAttribute('data-drop-date');
-    if (!date) return undefined;
-    if (kind === 'grid-day') return { kind, date };
-    if (kind !== 'day-time') return undefined;
-
-    const rect = element.getBoundingClientRect();
-    const minute = snappedDropMinute(clientY - rect.top, duration);
-    return { kind, date, minute, duration };
-}
-
-function dropTargetAt(
-    clientX: number,
-    clientY: number,
-    duration: number,
-): DragStateTarget | undefined {
-    const element = document.elementFromPoint(clientX, clientY)?.closest('[data-drop-kind]');
-    return element ? targetFromElement(element, clientY, duration) : undefined;
-}
-
 function payloadFor(
     instance: EventInstance,
     target: DragStateTarget,
@@ -64,18 +39,6 @@ function payloadFor(
         return gridDayDropPayload(instance, target.date);
     }
     return undefined;
-}
-
-/** Swallow the click that follows a completed drag, so it does not open the inspector. */
-function suppressUpcomingClick() {
-    const suppress = (click: Event) => {
-        click.stopPropagation();
-        click.preventDefault();
-    };
-    window.addEventListener('click', suppress, true);
-    setTimeout(() => {
-        window.removeEventListener('click', suppress, true);
-    }, 0);
 }
 
 /**

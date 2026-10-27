@@ -18,12 +18,21 @@
 //!   exception's `id` is `<UID>@<original_start_time>`, e.g.
 //!   `dsh-abc@2026-10-19T11:00:00` or `dsh-abc@2026-10-19`.
 //! - **`updated_at`** / `added`: ISO 8601 (`2026-10-19T06:49:00Z`).
-//! - **`due`**: `YYYY-MM-DD` for a `DUE;VALUE=DATE`, otherwise
-//!   `YYYY-MM-DDTHH:MM:SS`; the date-only/timed distinction is preserved.
+//! - **`due`** / **`start`** (VTODO): `YYYY-MM-DD` for a `DUE;VALUE=DATE`, otherwise
+//!   `YYYY-MM-DDTHH:MM:SS`; the date-only/timed distinction is preserved. Both are the
+//!   wall clock of [`AppTask::timezone`], which the reader takes from `DUE` and then
+//!   `DTSTART`. A `…Z` value keeps its UTC wall clock and sets `timezone = "UTC"`, so
+//!   the writer can re-emit the same instant instead of floating it.
+//! - **`completed_at`**: ISO 8601 UTC, the `COMPLETED` timestamp.
+//! - **`rrule`** (VTODO): the wire form (`RRULE:FREQ=…`), one line per rule.
+//! - **`geo`**: `GEO` as a latitude/longitude pair.
+//! - **`alarms`**: one entry per `VALARM`, in document order. `minutes_before` is
+//!   positive for "before the anchor", and an absolute trigger keeps its UTC instant.
+//!   Alarms this module cannot express are omitted rather than approximated.
 
 use crate::domain::{
-    AppEvent, AppTask, AppTaskStatus, CollectionId, Color, EventId, EventStatus, RemoteId, Tag,
-    TaskId, TaskPriority,
+    AppEvent, AppTask, AppTaskStatus, CollectionId, Color, EventId, EventStatus, GeoPoint, RemoteId,
+    Tag, TaskAlarmAnchor, TaskAlarmTrigger, TaskId, TaskPriority,
 };
 use crate::error::AppError;
 use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -220,7 +229,7 @@ fn event_from_component(component: &Component<'_>) -> Result<AppEvent, AppError>
         id: EventId::from(id),
         remote_id: None,
         remote_collection_id: None,
-        task_id: None,
+        task_id: text_property(component, "X-TASKROOT-TASK-ID").map(TaskId::from),
         title: text_property(component, "SUMMARY").unwrap_or_default(),
         description: text_property(component, "DESCRIPTION"),
         start_time,
@@ -294,6 +303,14 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
         .ok_or_else(|| AppError::InvalidInput("VTODO without UID".to_string()))?;
     let created = property(component, "CREATED").and_then(iso_value);
     let stamp = property(component, "DTSTAMP").and_then(iso_value);
+    let due = property(component, "DUE").and_then(parse_date_value);
+    let start = property(component, "DTSTART").and_then(parse_date_value);
+    // One zone governs both lines, as tasks.org writes them: `DUE` wins because
+    // it is the field every task has in the UI.
+    let timezone = due
+        .as_ref()
+        .and_then(value_timezone)
+        .or_else(|| start.as_ref().and_then(value_timezone));
 
     Ok(AppTask {
         id: TaskId::from(uid),
@@ -315,9 +332,17 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
         }),
         notes: text_property(component, "DESCRIPTION"),
         tabs: text_property(component, "X-TASKROOT-TABS"),
-        due: property(component, "DUE")
-            .and_then(parse_date_value)
-            .map(|value| due_value(&value)),
+        start: start
+            .as_ref()
+            .and_then(|value| canonical(value, timezone.as_deref())),
+        due: due
+            .as_ref()
+            .and_then(|value| canonical(value, timezone.as_deref())),
+        completed_at: property(component, "COMPLETED").and_then(iso_value),
+        rrule: joined_property(component, "RRULE"),
+        geo: read_geo(component),
+        alarms: read_alarms(component),
+        timezone,
         updated_at: property(component, "LAST-MODIFIED").and_then(iso_value),
         etag: None,
     })
@@ -388,11 +413,116 @@ fn read_dependencies(component: &Component<'_>) -> Option<Vec<TaskId>> {
     Some(ids.into_iter().map(TaskId::from).collect())
 }
 
-fn due_value(value: &DateValue) -> String {
+/// The zone a `DTSTART`/`DUE` value is expressed in: its `TZID`, or `"UTC"` for a
+/// `…Z` value so the writer can keep the instant instead of floating it.
+fn value_timezone(value: &DateValue) -> Option<String> {
     match value {
-        DateValue::Date(date) => date.format(DTO_DATE).to_string(),
-        DateValue::Timed { naive, .. } => naive.format(DTO_DATE_TIME).to_string(),
+        DateValue::Date(_) => None,
+        DateValue::Timed { tzid, utc, .. } => tzid
+            .clone()
+            .or_else(|| utc.then(|| "UTC".to_string())),
     }
+}
+
+fn read_geo(component: &Component<'_>) -> Option<GeoPoint> {
+    let raw = text_property(component, "GEO")?;
+    let (latitude, longitude) = raw.split_once(';')?;
+    Some(GeoPoint {
+        latitude: latitude.trim().parse().ok()?,
+        longitude: longitude.trim().parse().ok()?,
+    })
+}
+
+/// The `VALARM` triggers of a task, in document order.
+///
+/// Alarms this module cannot express are left out; the writer only rewrites the
+/// alarm list when the DTO's list actually changed, so they survive otherwise.
+fn read_alarms(component: &Component<'_>) -> Option<Vec<TaskAlarmTrigger>> {
+    let alarms = component
+        .components
+        .iter()
+        .filter(|child| child.name.as_str() == "VALARM")
+        .filter_map(|child| property(child, "TRIGGER"))
+        .filter_map(alarm_trigger)
+        .collect::<Vec<_>>();
+    if alarms.is_empty() {
+        return None;
+    }
+    Some(alarms)
+}
+
+fn alarm_trigger(trigger: &Property<'_>) -> Option<TaskAlarmTrigger> {
+    let raw = trigger.val.as_str().trim();
+    let absolute = parameter(trigger, "VALUE")
+        .is_some_and(|value| value.eq_ignore_ascii_case("DATE-TIME"))
+        || is_date_time(raw);
+    if absolute {
+        let at = absolute_trigger(raw)?;
+        // tasks.org writes this instant for "the reminder was cleared".
+        if at == "1976-04-01T00:54:45Z" {
+            return None;
+        }
+        return Some(TaskAlarmTrigger::Absolute { at });
+    }
+    let anchor = if parameter(trigger, "RELATED").is_some_and(|value| value.eq_ignore_ascii_case("END"))
+    {
+        TaskAlarmAnchor::End
+    } else {
+        TaskAlarmAnchor::Start
+    };
+    // The DTO counts minutes *before* the anchor, the wire carries a signed
+    // duration: `-PT15M` is 15 minutes before.
+    let minutes_before = duration_minutes(raw)?.checked_neg()?;
+    Some(TaskAlarmTrigger::Relative {
+        minutes_before,
+        anchor,
+    })
+}
+
+fn is_date_time(raw: &str) -> bool {
+    let stamp = raw.strip_suffix('Z').unwrap_or(raw);
+    NaiveDateTime::parse_from_str(stamp, ICAL_DATE_TIME).is_ok()
+}
+
+fn absolute_trigger(raw: &str) -> Option<String> {
+    let naive = NaiveDateTime::parse_from_str(raw.strip_suffix('Z')?, ICAL_DATE_TIME).ok()?;
+    Some(naive.format(DTO_ISO).to_string())
+}
+
+/// Whole minutes in an ISO 8601 duration such as `-PT15M` or `P1D`, signed as
+/// written. A duration that is not a whole number of minutes (`-PT30S`) is not
+/// representable here and is therefore not modelled.
+fn duration_minutes(raw: &str) -> Option<i32> {
+    let (sign, rest) = raw.strip_prefix('-').map_or_else(
+        || (1, raw.strip_prefix('+').unwrap_or(raw)),
+        |rest| (-1, rest),
+    );
+    let rest = rest.strip_prefix('P')?;
+    let mut total = 0_i32;
+    let mut number = String::new();
+    let mut in_time = false;
+    for character in rest.chars() {
+        match character {
+            'T' => in_time = true,
+            '0'..='9' => number.push(character),
+            unit => {
+                let value: i32 = number.parse().ok()?;
+                number.clear();
+                let minutes = match (unit, in_time) {
+                    ('W', false) => value.checked_mul(7 * 24 * 60)?,
+                    ('D', false) => value.checked_mul(24 * 60)?,
+                    ('H', true) => value.checked_mul(60)?,
+                    ('M', true) => value,
+                    _ => return None,
+                };
+                total = total.checked_add(minutes)?;
+            }
+        }
+    }
+    if !number.is_empty() {
+        return None;
+    }
+    total.checked_mul(sign)
 }
 
 fn event_status(property: &Property<'_>) -> Option<EventStatus> {

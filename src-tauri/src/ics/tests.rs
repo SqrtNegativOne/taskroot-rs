@@ -3,18 +3,19 @@
 //! The fixtures are byte-for-byte copies of files under `C:\radicale`; the
 //! exception tests build a multi-component resource in-memory instead (plan §13).
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::lines::property_name;
 use super::*;
 use crate::domain::{
-    AppEvent, AppTask, AppTaskStatus, EventId, EventStatus, Tag, TaskId, TaskPriority,
+    AppEvent, AppTask, AppTaskStatus, EventId, EventStatus, GeoPoint, Tag, TaskAlarmAnchor,
+    TaskAlarmTrigger, TaskId, TaskPriority,
 };
 use proptest::prelude::*;
 
 const MOZILLA: &str = "mozilla-event-with-vtimezone.ics";
 const ALL_DAY: &str = "all-day-event.ics";
 const TASK: &str = "tasks-org-task.ics";
+const TASK_ALARM: &str = "tasks-org-task-alarm.ics";
 const HREF: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/dsh-20261019-cn.ics";
 const COLLECTION: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
 const MASTER_UID: &str = "dsh-20261019-cn@dsh-import";
@@ -28,17 +29,21 @@ const EVENT_PROPERTIES: &[&str] = &[
     "EXDATE",
     "STATUS",
     "COLOR",
+    "X-TASKROOT-TASK-ID",
 ];
 
 const TASK_PROPERTIES: &[&str] = &[
     "SUMMARY",
     "DESCRIPTION",
+    "DTSTART",
     "DUE",
+    "RRULE",
     "STATUS",
     "COMPLETED",
     "PERCENT-COMPLETE",
     "PRIORITY",
     "CATEGORIES",
+    "GEO",
     "RELATED-TO",
     "X-TASKROOT-STATUS",
     "X-TASKROOT-DEPENDENCIES",
@@ -101,6 +106,38 @@ fn assert_only_owned_changed(before: &str, after: &str, owned: &[&str]) {
         kept(before),
         kept(after),
         "a non-owned line changed; owned = {owned:?}"
+    );
+}
+
+/// Lines inside a component that is nested in a resource component — a `VALARM`
+/// inside a `VTODO`, a `STANDARD` inside a `VTIMEZONE`. The writer owns property
+/// names only, so these lines are the ones a name filter would hide.
+fn nested_component_lines(raw: &str) -> Vec<String> {
+    let mut enclosing = 0_usize;
+    let mut lines = Vec::new();
+    for line in content_lines(raw) {
+        if line.starts_with("END:") {
+            if enclosing >= 3 {
+                lines.push(line.clone());
+            }
+            enclosing = enclosing.saturating_sub(1);
+            continue;
+        }
+        if enclosing >= 3 {
+            lines.push(line.clone());
+        }
+        if line.starts_with("BEGIN:") {
+            enclosing = enclosing.saturating_add(1);
+        }
+    }
+    lines
+}
+
+fn assert_nested_preserved(before: &str, after: &str) {
+    assert_eq!(
+        nested_component_lines(before),
+        nested_component_lines(after),
+        "a line inside a nested component changed"
     );
 }
 
@@ -202,6 +239,35 @@ fn event_round_trip_is_byte_identical() {
             "{name} must survive an unedited write unchanged"
         );
     }
+}
+
+#[test]
+fn an_event_task_link_survives_a_write_and_can_be_cleared() {
+    let raw = fixture(MOZILLA);
+    let mut event = read_one(&raw);
+    assert_eq!(event.task_id, None);
+
+    event.task_id = Some(TaskId::from("task-1"));
+    let written = write_event_resource(&raw, &event).unwrap();
+    assert!(
+        written.contains("\r\nX-TASKROOT-TASK-ID:task-1\r\n"),
+        "link must be written: {written}"
+    );
+    assert_eq!(read_one(&written).task_id, Some(TaskId::from("task-1")));
+
+    let created = create_event_resource(&event).unwrap();
+    assert!(
+        created.contains("X-TASKROOT-TASK-ID:task-1"),
+        "a newly built event keeps the link: {created}"
+    );
+
+    event.task_id = None;
+    let cleared = write_event_resource(&written, &event).unwrap();
+    assert!(
+        !cleared.contains("X-TASKROOT-TASK-ID"),
+        "clearing the link must remove the property: {cleared}"
+    );
+    assert_eq!(read_one(&cleared).task_id, None);
 }
 
 #[test]
@@ -736,4 +802,301 @@ fn an_empty_property_value_survives_a_write() {
     let written = write_event_resource(&raw, &event).unwrap();
 
     assert!(written.contains("X-EMPTY:\r\n"));
+}
+
+// ------------------------------------------- tasks.org VTODO fidelity -------
+
+#[test]
+fn a_tasks_org_task_maps_start_due_recurrence_geo_and_reminder() {
+    let task = read_task(&fixture(TASK_ALARM));
+
+    assert_eq!(
+        task.id,
+        TaskId::from("1004415175551987563"),
+        "the VTODO UID is the id"
+    );
+    assert_eq!(task.title, "Water the plants");
+    assert_eq!(task.start.as_deref(), Some("2026-11-05T09:00:00"));
+    assert_eq!(task.due.as_deref(), Some("2026-11-05T18:00:00"));
+    assert_eq!(task.timezone.as_deref(), Some("Asia/Kolkata"));
+    assert_eq!(task.rrule.as_deref(), Some("RRULE:FREQ=DAILY;COUNT=10"));
+    assert_eq!(
+        task.geo,
+        Some(GeoPoint {
+            latitude: 22.572_645,
+            longitude: 88.363_892,
+        })
+    );
+    assert_eq!(
+        task.alarms,
+        Some(vec![TaskAlarmTrigger::Relative {
+            minutes_before: 15,
+            anchor: TaskAlarmAnchor::End,
+        }])
+    );
+    assert_eq!(task.priority, Some(TaskPriority::Medium));
+    assert_eq!(
+        task.parent_task,
+        Some(TaskId::from("1004415175551987000"))
+    );
+    assert_eq!(task.completed_at, None);
+    assert_eq!(
+        task.tags.map(|tags| tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>()),
+        Some(vec!["Garden".to_string(), "Home".to_string()])
+    );
+}
+
+#[test]
+fn retitling_a_task_never_touches_its_alarm_or_its_timezone() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.title = "Water the plants and the herbs".to_string();
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
+    assert_nested_preserved(&raw, &written);
+    assert!(written.contains("BEGIN:VTIMEZONE"));
+    assert!(
+        written.contains("DESCRIPTION:Default Tasks.org description"),
+        "the VALARM DESCRIPTION must not become the task's notes"
+    );
+    assert!(
+        written.contains("\r\nBEGIN:VALARM\r\nTRIGGER;RELATED=END:-PT15M\r\n"),
+        "the alarm block must be untouched"
+    );
+    assert_eq!(read_task(&written).alarms, task.alarms);
+}
+
+#[test]
+fn changing_a_reminder_rewrites_only_its_trigger() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.alarms = Some(vec![TaskAlarmTrigger::Relative {
+        minutes_before: 30,
+        anchor: TaskAlarmAnchor::End,
+    }]);
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    // `TRIGGER` is owned only while the reminder list differs from the resource's.
+    let owned = [TASK_PROPERTIES, &["TRIGGER"]].concat();
+    assert_only_owned_changed(&raw, &written, &owned);
+    assert!(written.contains("TRIGGER;RELATED=END:-PT30M"));
+    assert!(!written.contains("-PT15M"));
+    assert!(
+        written.contains("ACTION:DISPLAY"),
+        "the alarm's action is not a Taskroot property"
+    );
+    assert!(written.contains("DESCRIPTION:Default Tasks.org description"));
+    assert_eq!(read_task(&written).alarms, task.alarms);
+}
+
+#[test]
+fn clearing_the_reminders_removes_every_alarm() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.alarms = None;
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(!written.contains("VALARM"));
+    assert!(written.contains("BEGIN:VTIMEZONE"));
+    assert!(written.contains("SUMMARY:Water the plants"));
+    assert!(written.contains("X-APPLE-SORT-ORDER:813839139"));
+    assert!(written.contains("RRULE:FREQ=DAILY;COUNT=10"));
+    assert_eq!(read_task(&written).alarms, None);
+}
+
+#[test]
+fn adding_a_reminder_creates_a_tasks_org_alarm_block() {
+    let raw = fixture(TASK);
+    let mut task = read_task(&raw);
+    task.alarms = Some(vec![TaskAlarmTrigger::Relative {
+        minutes_before: 60,
+        anchor: TaskAlarmAnchor::Start,
+    }]);
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains(
+        "BEGIN:VALARM\r\nTRIGGER;RELATED=START:-PT60M\r\nACTION:DISPLAY\r\nDESCRIPTION:Default Tasks.org description\r\nEND:VALARM\r\nEND:VTODO\r\n"
+    ));
+    assert_eq!(read_task(&written).alarms, task.alarms);
+}
+
+#[test]
+fn an_absolute_reminder_round_trips() {
+    let raw = fixture(TASK);
+    let mut task = read_task(&raw);
+    task.alarms = Some(vec![TaskAlarmTrigger::Absolute {
+        at: "2026-11-05T17:45:00Z".to_string(),
+    }]);
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("TRIGGER;VALUE=DATE-TIME:20261105T174500Z"));
+    assert_eq!(read_task(&written).alarms, task.alarms);
+}
+
+#[test]
+fn an_unmodelled_alarm_survives_an_unrelated_edit() {
+    let raw = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:a\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT45S\r\nDESCRIPTION:odd\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+    let mut task = read_task(raw);
+    assert_eq!(task.alarms, None, "45 seconds is not a whole minute");
+    task.title = "b".to_string();
+
+    let written = write_task_resource(raw, &task).unwrap();
+
+    assert_nested_preserved(raw, &written);
+    assert!(written.contains("TRIGGER;RELATED=END:-PT45S"));
+    assert!(written.contains("SUMMARY:b"));
+}
+
+#[test]
+fn a_task_without_a_priority_gets_no_priority_line() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.priority = None;
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(!written.contains("PRIORITY"), "tasks.org omits 0");
+    assert_eq!(read_task(&written).priority, None);
+}
+
+#[test]
+fn every_priority_bucket_writes_the_tasks_org_value() {
+    let raw = fixture(TASK);
+    let cases = [
+        (TaskPriority::Urgent, "PRIORITY:1"),
+        (TaskPriority::High, "PRIORITY:3"),
+        (TaskPriority::Medium, "PRIORITY:5"),
+        (TaskPriority::Low, "PRIORITY:7"),
+    ];
+    for (priority, expected) in cases {
+        let mut task = read_task(&raw);
+        task.priority = Some(priority.clone());
+        let written = write_task_resource(&raw, &task).unwrap();
+        assert!(written.contains(expected), "{priority:?} → {expected}");
+        assert_eq!(read_task(&written).priority, Some(priority));
+    }
+}
+
+#[test]
+fn editing_a_completed_task_keeps_its_completion_time() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.status = Some(AppTaskStatus::Done);
+    let completed = write_task_resource(&raw, &task).unwrap();
+    let stamp = read_task(&completed)
+        .completed_at
+        .expect("completing writes COMPLETED");
+
+    let mut edited = read_task(&completed);
+    edited.title = "Watered".to_string();
+    let written = write_task_resource(&completed, &edited).unwrap();
+
+    assert_eq!(
+        read_task(&written).completed_at.as_deref(),
+        Some(stamp.as_str()),
+        "a retitle must not move the completion timestamp"
+    );
+}
+
+#[test]
+fn starting_a_task_writes_dtstart_in_the_task_zone() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.start = Some("2026-11-06T07:30:00".to_string());
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("DTSTART;TZID=Asia/Kolkata:20261106T073000"));
+    assert!(written.contains("DUE;TZID=Asia/Kolkata:20261105T180000"));
+    assert_eq!(
+        read_task(&written).start.as_deref(),
+        Some("2026-11-06T07:30:00")
+    );
+}
+
+#[test]
+fn a_date_only_start_uses_value_date() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    task.start = Some("2026-11-04".to_string());
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("DTSTART;VALUE=DATE:20261104"));
+    assert_eq!(read_task(&written).start.as_deref(), Some("2026-11-04"));
+}
+
+#[test]
+fn an_rrule_is_read_and_written_back_unchanged() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    assert_eq!(task.rrule.as_deref(), Some("RRULE:FREQ=DAILY;COUNT=10"));
+
+    task.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO,WE".to_string());
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("RRULE:FREQ=WEEKLY;BYDAY=MO,WE"));
+    assert!(!written.contains("COUNT=10"));
+    assert_eq!(
+        read_task(&written).rrule.as_deref(),
+        Some("RRULE:FREQ=WEEKLY;BYDAY=MO,WE")
+    );
+
+    task.rrule = None;
+    let cleared = write_task_resource(&raw, &task).unwrap();
+    assert!(!cleared.contains("RRULE"));
+}
+
+#[test]
+fn a_utc_due_date_keeps_its_instant() {
+    let raw = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:a\r\nDUE:20261105T123000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+    let task = read_task(raw);
+
+    assert_eq!(task.due.as_deref(), Some("2026-11-05T12:30:00"));
+    assert_eq!(task.timezone.as_deref(), Some("UTC"));
+
+    let written = write_task_resource(raw, &task).unwrap();
+    assert!(written.contains("DUE;TZID=UTC:20261105T123000"));
+    assert_eq!(read_task(&written).due.as_deref(), Some("2026-11-05T12:30:00"));
+}
+
+#[test]
+fn a_geo_point_round_trips() {
+    let raw = fixture(TASK);
+    let mut task = read_task(&raw);
+    task.geo = Some(GeoPoint {
+        latitude: -33.868_82,
+        longitude: 151.209_3,
+    });
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("GEO:-33.86882;151.2093"));
+    assert_eq!(read_task(&written).geo, task.geo);
+
+    task.geo = None;
+    let cleared = write_task_resource(&written, &task).unwrap();
+    assert!(!cleared.contains("GEO"));
+}
+
+#[test]
+fn create_task_resource_emits_a_valarm_block() {
+    let mut task = read_task(&fixture(TASK));
+    task.alarms = Some(vec![TaskAlarmTrigger::Relative {
+        minutes_before: 15,
+        anchor: TaskAlarmAnchor::End,
+    }]);
+
+    let created = create_task_resource(&task).unwrap();
+
+    assert!(created.contains(
+        "BEGIN:VALARM\r\nTRIGGER;RELATED=END:-PT15M\r\nACTION:DISPLAY\r\nDESCRIPTION:Default Tasks.org description\r\nEND:VALARM\r\nEND:VTODO\r\n"
+    ));
+    assert_eq!(read_task(&created).alarms, task.alarms);
 }

@@ -2,10 +2,11 @@
     import { onMount, untrack } from 'svelte';
     import { getCurrentWindow, currentMonitor, primaryMonitor } from '@tauri-apps/api/window';
     import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
-    import { store, describeError } from '../../lib/store.svelte';
+    import { store } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
-    import { ymd, addDays } from '../../lib/time';
-    import type { AppEvent } from '../../lib/domain';
+    import type { AppCalendar } from '../../lib/domain';
+    import { buildNewEvent } from '../../lib/domain';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { createSidebarState, saveTabTop } from './state.svelte';
 
     let open = $state(false);
@@ -139,29 +140,15 @@
         });
     });
 
-    const MS_PER_MINUTE = 60_000;
-    
-    function mutateOrReport(operation: string, mutation: () => Promise<import('neverthrow').Result<void, import('../../lib/safeInvoke.svelte').AppError>>): Promise<void> {
-        return mutation().then((result) => {
-            if (result.isErr()) {
-                store.error = `${operation}: ${describeError(result.error)}`;
-            }
-        });
-    }
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
 
     function onAddEvent(date: Date, startMins?: number, endMins?: number) {
-        const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const newEvent = {
-            id: crypto.randomUUID(),
-            title: 'New Event',
-            startTime: startMins !== undefined
-                ? new Date(dayStart.getTime() + startMins * MS_PER_MINUTE).toISOString()
-                : ymd(date),
-            endTime: endMins !== undefined
-                ? new Date(dayStart.getTime() + endMins * MS_PER_MINUTE).toISOString()
-                : ymd(addDays(date, 1)),
-        } as AppEvent;
-        void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
+        const newEvent = buildNewEvent(date, {
+            startMinutes: startMins,
+            endMinutes: endMins,
+            calendars: calendarsQuery.data ?? [],
+        });
+        void store.mutate('Failed to create event', () => store.addEvent(newEvent));
     }
 </script>
 

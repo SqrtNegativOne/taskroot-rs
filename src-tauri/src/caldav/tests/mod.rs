@@ -1,11 +1,10 @@
-//! Unit and HTTP-contract tests for the CalDAV layer.
+//! Unit and HTTP-contract tests for the `CalDAV` layer.
 //!
 //! The XML tests drive the real Radicale captures in `caldav/fixtures/`; the
 //! transport and discovery tests run against a local `wiremock` server so the
 //! gate needs no running Radicale. The single test that does need the real
 //! server is `#[ignore]`d.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod account;
 mod client;

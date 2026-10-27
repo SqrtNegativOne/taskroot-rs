@@ -1,9 +1,7 @@
 #![warn(clippy::pedantic, clippy::nursery)]
 #![warn(unreachable_pub)]
-#![allow(clippy::missing_errors_doc)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![allow(clippy::exit, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 
@@ -15,7 +13,9 @@ pub mod commands;
 pub mod domain;
 pub mod error;
 pub mod events;
+pub mod hooks;
 pub mod ics;
+pub mod reminders;
 pub mod screens;
 pub mod settings;
 pub mod stopwatch;
@@ -147,13 +147,27 @@ fn configure_dev_webview_storage(context: &tauri::Context) {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[allow(clippy::too_many_lines, clippy::large_stack_frames)]
-/// # Panics
-///
-/// Panics if the tauri application fails to run.
 pub fn run() {
-    let context = tauri::generate_context!();
+    if let Err(error) = try_run() {
+        eprintln!("error while running tauri application: {error}");
+    }
+}
+
+// `generate_context!` expands to Tauri's own config loader, which terminates the
+// process on a malformed manifest. The stack frame belongs to that macro, not to
+// a function we can split.
+#[allow(clippy::exit, clippy::large_stack_frames)]
+fn app_context() -> tauri::Context {
+    tauri::generate_context!()
+}
+
+fn try_run() -> tauri::Result<()> {
+    let context = app_context();
     configure_dev_webview_storage(&context);
+    build_app().run(context)
+}
+
+fn build_app() -> tauri::Builder<tauri::Wry> {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
@@ -177,93 +191,11 @@ pub fn run() {
                 }
             }
         }))
-        .setup(|app| {
-            let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
-            app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
-                stopwatch::StopwatchState::default(),
-            )));
-            app.manage(sync::SyncStateManager(std::sync::Mutex::new(
-                sync::SyncState::default(),
-            )));
-            app.manage(caldav::transport::HttpClient::new()?);
-            let handle = app.handle().clone();
-
-            if let Some(effect_win) = app.get_webview_window(domain::WindowLabel::Effect.as_str())
-            {
-                let _ = effect_win.set_ignore_cursor_events(true);
-            }
-
-            let open_i =
-                tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
-            let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
-            let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
-
-            let mut tray_builder = tauri::tray::TrayIconBuilder::new()
-                .menu(&menu)
-                .show_menu_on_left_click(false);
-
-            if let Some(icon) = app.default_window_icon() {
-                tray_builder = tray_builder.icon(icon.clone());
-            }
-
-            let _tray = tray_builder
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => {
-                        if let Some(main_win) =
-                            app.get_webview_window(domain::WindowLabel::Main.as_str())
-                        {
-                            let _ = main_win.show();
-                            let _ = main_win.unminimize();
-                            let _ = main_win.set_focus();
-                        }
-                    }
-                    "exit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(main_win) =
-                            app.get_webview_window(domain::WindowLabel::Main.as_str())
-                        {
-                            let _ = main_win.show();
-                            let _ = main_win.unminimize();
-                            let _ = main_win.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
-
-            let data_dir = app_data_dir(&handle)?;
-            let store = store::Store::load(data_dir)?;
-            handle.manage(store::StoreState::new(store));
-            sync::start_sync_engine(handle.clone());
-
-            tauri::async_runtime::spawn(async move {
-                if let Err(error) = sync::run_tracked_sync(&handle, None).await {
-                    eprintln!("Startup load failed: {error}");
-                }
-            });
-
-            Ok(())
-        })
+        .setup(setup_app)
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == domain::WindowLabel::Main.as_str() {
-                    let _ = window.hide();
-                    api.prevent_close();
-                }
-            }
-        })
+        .plugin(tauri_plugin_notification::init())
+        .on_window_event(handle_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::tasks::parse_sigils,
             commands::tasks::create_task,
@@ -291,27 +223,111 @@ pub fn run() {
             commands::window::quit_app,
             commands::window::toggle_launcher,
             commands::window::resize_launcher,
-            stopwatch::get_stopwatch_state,
-            stopwatch::toggle_stopwatch,
-            stopwatch::toggle_break,
-            stopwatch::toggle_pause,
-            stopwatch::adjust_pause,
-            stopwatch::reset_stopwatch,
+            commands::stopwatch::get_stopwatch_state,
+            commands::stopwatch::toggle_stopwatch,
+            commands::stopwatch::toggle_break,
+            commands::stopwatch::toggle_pause,
+            commands::stopwatch::adjust_pause,
+            commands::stopwatch::reset_stopwatch,
             settings::get_settings_schema,
             settings::get_settings,
             settings::get_ui_state,
             settings::set_ui_state,
             settings::update_setting,
-            sync::get_sync_state,
+            commands::sync::get_sync_state,
             caldav::commands::is_account_configured,
             caldav::commands::get_account,
             caldav::commands::test_account,
             caldav::commands::connect_account,
             caldav::commands::disconnect_account,
-            caldav::commands::refresh_calendars
+            caldav::commands::create_calendar,
+            caldav::commands::rename_calendar,
+            caldav::commands::set_calendar_color,
+            caldav::commands::delete_calendar
         ])
-        .run(context)
-        .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));
+}
+
+fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
+    app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
+        stopwatch::StopwatchState::default(),
+    )));
+    app.manage(sync::SyncStateManager(std::sync::Mutex::new(
+        sync::SyncState::default(),
+    )));
+    app.manage(reminders::ReminderState::default());
+    app.manage(caldav::transport::HttpClient::new()?);
+    let handle = app.handle().clone();
+
+    if let Some(effect_win) = app.get_webview_window(domain::WindowLabel::Effect.as_str()) {
+        let _ = effect_win.set_ignore_cursor_events(true);
+    }
+
+    let open_i = tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
+    let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
+    let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
+
+    let mut tray_builder =
+        tauri::tray::TrayIconBuilder::new().menu(&menu).show_menu_on_left_click(false);
+
+    if let Some(icon) = app.default_window_icon() {
+        tray_builder = tray_builder.icon(icon.clone());
+    }
+
+    let _tray = tray_builder
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => {
+                if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
+                    let _ = main_win.show();
+                    let _ = main_win.unminimize();
+                    let _ = main_win.set_focus();
+                }
+            }
+            "exit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                if let Some(main_win) = app.get_webview_window(domain::WindowLabel::Main.as_str()) {
+                    let _ = main_win.show();
+                    let _ = main_win.unminimize();
+                    let _ = main_win.set_focus();
+                }
+            }
+        })
+        .build(app)?;
+
+    let data_dir = app_data_dir(&handle)?;
+    let store = store::Store::load(data_dir)?;
+    handle.manage(store::StoreState::new(store));
+    sync::start_sync_engine(handle.clone());
+    hooks::start(handle.clone());
+    reminders::start_reminder_engine(handle.clone());
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = sync::run_tracked_sync(&handle, None).await {
+            eprintln!("Startup load failed: {error}");
+        }
+    });
+
+    Ok(())
+}
+
+fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        if window.label() == domain::WindowLabel::Main.as_str() {
+            let _ = window.hide();
+            api.prevent_close();
+        }
+    }
 }
 
 #[cfg(test)]

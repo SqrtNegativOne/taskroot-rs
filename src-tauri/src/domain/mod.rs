@@ -222,6 +222,42 @@ pub struct Tag {
     pub color: Option<String>,
 }
 
+/// `GEO` (`RFC 5545` §3.8.1.6), the point tasks.org stores a geofence at.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../src/lib/bindings/GeoPoint.generated.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct GeoPoint {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+/// What a relative reminder counts from.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/TaskAlarmAnchor.generated.ts")]
+#[serde(rename_all = "kebab-case")]
+pub enum TaskAlarmAnchor {
+    /// `TRIGGER;RELATED=START` (the default): the task's start, or its due time
+    /// when it has no start.
+    Start,
+    /// `TRIGGER;RELATED=END`: the task's due time.
+    End,
+}
+
+/// One `VALARM` trigger, in the two shapes tasks.org writes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/TaskAlarmTrigger.generated.ts")]
+#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+pub enum TaskAlarmTrigger {
+    /// `TRIGGER;RELATED=…:-PT15M`. `minutesBefore` is positive for "before"
+    /// and negative for "after"; `0` means "at the anchor".
+    Relative {
+        minutes_before: i32,
+        anchor: TaskAlarmAnchor,
+    },
+    /// `TRIGGER;VALUE=DATE-TIME:…Z`, ISO 8601 UTC.
+    Absolute { at: String },
+}
+
 use crate::caldav::model::CalendarComponent;
 use taskroot_macros::Queryable;
 
@@ -266,9 +302,29 @@ pub struct AppTask {
     pub notes: Option<String>,
     #[ts(optional)]
     pub tabs: Option<String>,
+    /// `DTSTART`: the task's start, which tasks.org also uses as "hide until".
+    /// Canonical form matches [`Self::due`].
+    #[ts(optional)]
+    #[query(filter_type = "text")]
+    pub start: Option<String>,
     #[ts(optional)]
     #[query(sortable, filter_type = "text")]
     pub due: Option<String>,
+    /// The `COMPLETED` timestamp, ISO 8601 UTC.
+    #[ts(optional)]
+    pub completed_at: Option<String>,
+    /// The raw `RRULE` line(s), wire form (`RRULE:FREQ=…`).
+    #[ts(optional)]
+    pub rrule: Option<String>,
+    #[ts(optional)]
+    pub geo: Option<GeoPoint>,
+    /// `VALARM` triggers, in document order.
+    #[ts(optional)]
+    pub alarms: Option<Vec<TaskAlarmTrigger>>,
+    /// IANA timezone `DTSTART`/`DUE` are written in; `None` writes them floating
+    /// and `Some("UTC")` keeps a UTC-suffixed value's instant.
+    #[ts(optional)]
+    pub timezone: Option<String>,
     #[ts(optional)]
     pub updated_at: Option<String>,
     #[ts(optional)]
@@ -349,7 +405,6 @@ pub struct AppEvent {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]
@@ -375,7 +430,13 @@ mod tests {
             remote_collection_id: None,
             notes: None,
             tabs: None,
+            start: None,
             due: None,
+            completed_at: None,
+            rrule: None,
+            geo: None,
+            alarms: None,
+            timezone: None,
             updated_at: None,
             etag: None,
         };

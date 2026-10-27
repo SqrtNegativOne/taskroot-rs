@@ -1,10 +1,11 @@
 <script lang="ts">
     import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter.generated';
     import TaskRow from './TaskRow.svelte';
+    import ListManagerModal from './ListManagerModal.svelte';
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import { computeFilterDefaults, type AppTask } from '../../lib/domain';
+    import { computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -59,6 +60,9 @@
     
     let pastDueQuery = useAutoQuery<string[]>('get_past_due_task_ids', () => ({}));
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
+
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    let listModalOpen = $state(false);
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
@@ -149,6 +153,13 @@
             <SortButton bind:sort sortOptions={sortColumns} />
             <button
                 style="margin-left: auto; background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
+                title="Manage lists"
+                onclick={() => { listModalOpen = true; }}
+            >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+            <button
+                style="background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
                 title="Add Task"
                 onclick={handleAddTask}
             >
@@ -157,7 +168,6 @@
         </div>
     </header>
 
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="task-list"
         ondblclick={(e) => {
@@ -192,3 +202,9 @@
         {@render footer()}
     {/if}
 </aside>
+
+<ListManagerModal
+    isOpen={listModalOpen}
+    calendars={calendarsQuery.data ?? []}
+    onClose={() => { listModalOpen = false; }}
+/>

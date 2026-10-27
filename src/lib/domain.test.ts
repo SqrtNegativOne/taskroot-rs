@@ -1,33 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { AppCalendar, AppEvent, AppTask } from './domain';
+import type { AppCalendar } from './domain';
 import {
+    buildNewEvent,
     computeFilterDefaults,
-    editing,
-    hydrateEvents,
     isAppTaskStatus,
     isCalendarReadOnly,
-    isEventAllDay,
     isEventReadOnly,
-    isYmdString,
-    toEventType,
 } from './domain';
-
-describe('isYmdString', () => {
-    it('returns true for valid YYYY-MM-DD strings', () => {
-        expect(isYmdString('2026-09-03')).toBe(true);
-        expect(isYmdString('1999-12-31')).toBe(true);
-    });
-
-    it('returns false for invalid formats or non-strings', () => {
-        expect(isYmdString('2026-9-3')).toBe(false);
-        expect(isYmdString('2026/09/03')).toBe(false);
-        expect(isYmdString('2026-09-03T10:00:00')).toBe(false);
-        expect(isYmdString('')).toBe(false);
-        expect(isYmdString(null)).toBe(false);
-        expect(isYmdString(undefined)).toBe(false);
-        expect(isYmdString(20260903)).toBe(false);
-    });
-});
 
 describe('isAppTaskStatus', () => {
     it('accepts valid task statuses', () => {
@@ -44,131 +23,6 @@ describe('isAppTaskStatus', () => {
         expect(isAppTaskStatus('')).toBe(false);
         expect(isAppTaskStatus(null)).toBe(false);
         expect(isAppTaskStatus(undefined)).toBe(false);
-    });
-});
-
-describe('toEventType', () => {
-    it('returns known event types verbatim', () => {
-        expect(toEventType('busy', 'info')).toBe('busy');
-        expect(toEventType('info', 'busy')).toBe('info');
-        expect(toEventType('log', 'busy')).toBe('log');
-    });
-
-    it('returns fallback for unknown or missing raw types', () => {
-        expect(toEventType('meeting', 'busy')).toBe('busy');
-        expect(toEventType(undefined, 'info')).toBe('info');
-        expect(toEventType('', 'log')).toBe('log');
-    });
-});
-
-describe('editing builder', () => {
-    const original: AppTask = {
-        id: 'task-1',
-        title: 'Original Title',
-        status: 'todo',
-        notes: 'Initial notes',
-    };
-
-    it('updates properties immutably via .set()', () => {
-        const updated = editing(original)
-            .set('title', 'Updated Title')
-            .set('status', 'doing')
-            .done();
-
-        expect(updated.title).toBe('Updated Title');
-        expect(updated.status).toBe('doing');
-        expect(original.title).toBe('Original Title');
-        expect(original.status).toBe('todo');
-    });
-
-    it('removes optional properties completely via .clear()', () => {
-        const updated = editing(original).clear('notes').done();
-
-        expect('notes' in updated).toBe(false);
-        expect(original.notes).toBe('Initial notes');
-    });
-});
-
-describe('hydrateEvents', () => {
-    const sampleTasks: AppTask[] = [
-        { id: 't1', title: 'Write tests', status: 'next-up', priority: 1 },
-        { id: 't2', title: 'Ship feature', status: 'done', priority: 2 },
-    ];
-
-    const sampleCalendars: AppCalendar[] = [
-        { id: 'cal-work', summary: 'Work Calendar', color: '#4285f4', writable: true, component: 'VEVENT' },
-        { id: 'cal-home', summary: 'Home Life', color: '#0f9d58', writable: true, component: 'VEVENT' },
-    ];
-
-    it('hydrates event linked to a task with task details and calendar metadata', () => {
-        const events: AppEvent[] = [
-            {
-                id: 'e1',
-                title: 'Placeholder',
-                startTime: '2026-09-03T10:00:00',
-                endTime: '2026-09-03T11:00:00',
-                taskId: 't1',
-                remoteCollectionId: 'cal-work',
-            },
-        ];
-
-        const [hydrated] = hydrateEvents(events, sampleTasks, sampleCalendars);
-
-        expect(hydrated.title).toBe('Write tests');
-        expect(hydrated.task?.id).toBe('t1');
-        expect(hydrated.task?.status).toBe('next-up');
-        expect(hydrated.color).toBe('#4285f4');
-        expect(hydrated.category).toBe('Work Calendar');
-    });
-
-    it('keeps original title when event has no taskId', () => {
-        const events: AppEvent[] = [
-            {
-                id: 'e2',
-                title: 'Lunch break',
-                startTime: '2026-09-03T12:00:00',
-                endTime: '2026-09-03T13:00:00',
-                remoteCollectionId: 'cal-home',
-            },
-        ];
-
-        const [hydrated] = hydrateEvents(events, sampleTasks, sampleCalendars);
-
-        expect(hydrated.title).toBe('Lunch break');
-        expect(hydrated.task).toBeUndefined();
-        expect(hydrated.category).toBe('Home Life');
-    });
-
-    it('falls back to primary calendar when collection ID is primary or omitted', () => {
-        const events: AppEvent[] = [
-            {
-                id: 'e3',
-                title: 'Unsynced Event',
-                startTime: '2026-09-03T14:00:00',
-                endTime: '2026-09-03T15:00:00',
-            },
-        ];
-
-        const [hydrated] = hydrateEvents(events, [], sampleCalendars);
-
-        expect(hydrated.category).toBe('Work Calendar');
-        expect(hydrated.color).toBe('#4285f4');
-    });
-
-    it('safely handles empty calendar and task lists', () => {
-        const events: AppEvent[] = [
-            {
-                id: 'e4',
-                title: 'Solo Event',
-                startTime: '2026-09-03T09:00:00',
-                endTime: '2026-09-03T10:00:00',
-            },
-        ];
-
-        const [hydrated] = hydrateEvents(events, [], []);
-
-        expect(hydrated.title).toBe('Solo Event');
-        expect(hydrated.category).toBeUndefined();
     });
 });
 
@@ -214,14 +68,6 @@ describe('computeFilterDefaults', () => {
     });
 });
 
-describe('isEventAllDay', () => {
-    it('identifies all-day events correctly', () => {
-        expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03' })).toBe(true);
-        expect(isEventAllDay({ startTime: '2026-09-03T10:00:00', endTime: '2026-09-03T11:00:00' })).toBe(false);
-        expect(isEventAllDay({ startTime: '2026-09-03', endTime: '2026-09-03', isAllDay: false })).toBe(false);
-    });
-});
-
 describe('isCalendarReadOnly', () => {
     it('treats a non-writable calendar as read-only', () => {
         expect(isCalendarReadOnly({ writable: false })).toBe(true);
@@ -250,5 +96,66 @@ describe('isEventReadOnly', () => {
     it('leaves events without a calendar editable', () => {
         expect(isEventReadOnly({}, calendars)).toBe(false);
         expect(isEventReadOnly({ remoteCollectionId: undefined }, [])).toBe(false);
+    });
+});
+
+describe('buildNewEvent', () => {
+    const date = new Date(2026, 8, 3, 15, 0);
+    const calendars: AppCalendar[] = [
+        { id: 'cal-tasks', summary: 'Tasks', writable: true, component: 'VTODO' },
+        { id: 'cal-readonly', summary: 'Holidays', writable: false, component: 'VEVENT' },
+        { id: 'cal-events', summary: 'Events', writable: true, component: 'VEVENT' },
+    ];
+
+    it('creates a floating all-day event and targets a writable VEVENT calendar', () => {
+        const event = buildNewEvent(date, { calendars });
+
+        expect(event.title).toBe('New Event');
+        expect(typeof event.id).toBe('string');
+        expect(event.startTime).toBe('2026-09-03');
+        expect(event.endTime).toBe('2026-09-04');
+        expect(event.isAllDay).toBe(true);
+        expect(event.timezone).toBeUndefined();
+        expect(event.remoteCollectionId).toBe('cal-events');
+    });
+
+    it('creates a timed event with UTC instants in the system timezone', () => {
+        const event = buildNewEvent(date, {
+            startMinutes: 10 * 60,
+            endMinutes: 11 * 60 + 30,
+            calendars,
+        });
+
+        expect(event.startTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
+        expect(event.endTime).toBe(new Date(2026, 8, 3, 11, 30).toISOString());
+        expect(event.isAllDay).toBe(false);
+        expect(event.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    });
+
+    it('defaults a timed event to one hour when no end is given', () => {
+        const event = buildNewEvent(date, { startMinutes: 9 * 60 });
+
+        expect(event.startTime).toBe(new Date(2026, 8, 3, 9, 0).toISOString());
+        expect(event.endTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
+    });
+
+    it('leaves the collection unset when no writable event calendar exists', () => {
+        const taskCalendars = calendars.filter((calendar) => calendar.component === 'VTODO');
+        const event = buildNewEvent(date, { calendars: taskCalendars });
+
+        expect(event.remoteCollectionId).toBeUndefined();
+    });
+
+    it('adopts the dragged task title and link', () => {
+        const event = buildNewEvent(date, {
+            startMinutes: 9 * 60,
+            endMinutes: 9 * 60 + 30,
+            calendars,
+            title: 'Write the report',
+            taskId: 'task-42',
+        });
+
+        expect(event.title).toBe('Write the report');
+        expect(event.taskId).toBe('task-42');
     });
 });

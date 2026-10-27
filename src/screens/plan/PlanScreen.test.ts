@@ -2,33 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { store } from '../../lib/store.svelte';
+import { notificationStore } from '../../lib/notifications.svelte';
 import PlanScreen from './PlanScreen.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
     const { mockTauriInvoke } = await import('../../test/tauriMock');
     return { invoke: mockTauriInvoke().invoke };
-});
-
-// `@tauri-apps/api/event` is externalized under Vitest, so it reads these
-// globals directly instead of going through the mocked `invoke`.
-vi.hoisted(() => {
-    let nextCallbackId = 0;
-    const globals = window as Window & {
-        __TAURI_INTERNALS__?: {
-            transformCallback: (callback: unknown, once?: boolean) => number;
-            invoke: (command: string, args?: unknown) => Promise<unknown>;
-        };
-        __TAURI_EVENT_PLUGIN_INTERNALS__?: {
-            unregisterListener: (event: string, eventId: number) => void;
-        };
-    };
-    globals.__TAURI_INTERNALS__ = {
-        transformCallback: () => nextCallbackId++,
-        invoke: () => Promise.resolve(undefined),
-    };
-    globals.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
-        unregisterListener: () => { /* noop */ },
-    };
 });
 
 const tauri = mockTauriInvoke();
@@ -44,6 +23,7 @@ describe('PlanScreen task list', () => {
         tauri.reset();
         store.loaded = true;
         store.error = null;
+        notificationStore.notifications = [];
         tauri.stubCommandValue('query_tasks', [task]);
         tauri.stubCommandValue('get_past_due_task_ids', []);
         tauri.stubCommandValue('get_task_schema', []);
@@ -54,6 +34,7 @@ describe('PlanScreen task list', () => {
 
     afterEach(() => {
         cleanup();
+        notificationStore.notifications = [];
         store.loaded = false;
     });
 
@@ -72,5 +53,25 @@ describe('PlanScreen task list', () => {
                 task: { ...task, status: 'done' },
             });
         });
+    });
+
+    it('toasts a failed update instead of replacing the screen with a fatal error', async () => {
+        tauri.stubCommand('update_task', () => Promise.reject({ code: 'sync', message: 'server down' }));
+        render(PlanScreen);
+
+        await screen.findByText('Buy milk');
+        const row = screen.getByText('Buy milk').closest('.task-row');
+        const circle = row?.querySelector('.task-circle');
+        expect(circle).not.toBeNull();
+
+        await fireEvent.click(circle!);
+
+        await waitFor(() => {
+            expect(notificationStore.notifications).toHaveLength(1);
+        });
+        expect(notificationStore.notifications[0]?.message).toBe('Failed to update task: server down');
+        expect(store.error).toBeNull();
+        expect(screen.queryByText('Buy milk')).not.toBeNull();
+        expect(screen.queryByText(/Error loading data from backend/)).toBeNull();
     });
 });

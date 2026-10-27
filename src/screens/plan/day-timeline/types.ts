@@ -31,4 +31,5 @@ export interface DragStateTarget {
 export interface DragState {
     target?: DragStateTarget;
     event?: { id: string };
+    task?: { id: string };
 }

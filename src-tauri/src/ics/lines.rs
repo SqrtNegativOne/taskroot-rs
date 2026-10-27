@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 /// Longest content line, in octets, excluding the line break.
 const MAX_LINE_OCTETS: usize = 75;
+const CALENDAR_KIND: &str = "VCALENDAR";
 const CALENDAR_END: &str = "END:VCALENDAR";
 
 /// One unfolded content line plus the physical lines it was parsed from.
@@ -42,8 +43,9 @@ struct Edits {
 struct OpenComponent {
     kind: String,
     begin: usize,
-    depth: usize,
+    /// Property lines that are *direct* children of this component.
     properties: Vec<usize>,
+    children: Vec<ComponentSpan>,
 }
 
 /// A `BEGIN`/`END` pair that is a direct child of the calendar.
@@ -53,7 +55,12 @@ pub(super) struct ComponentSpan {
     pub(super) uid: Option<String>,
     begin: usize,
     end: usize,
+    /// Indexes of this component's own property lines, never a nested
+    /// component's. A `VALARM`'s `DESCRIPTION` must never look like the
+    /// `VTODO`'s `DESCRIPTION`.
     properties: Vec<usize>,
+    /// Nested components such as `VALARM`, `STANDARD` or `DAYLIGHT`.
+    children: Vec<Self>,
 }
 
 /// Structured access to a raw resource body that never re-serializes it.
@@ -102,51 +109,64 @@ impl Document {
         }
     }
 
-    /// Every direct child of the calendar, in file order.
+    /// Every direct child of the calendar, in file order, each with its own
+    /// nested components attached.
     pub(super) fn components(&self) -> Vec<ComponentSpan> {
-        let mut spans = Vec::new();
+        let mut roots: Vec<ComponentSpan> = Vec::new();
         let mut stack: Vec<OpenComponent> = Vec::new();
         for (index, line) in self.lines.iter().enumerate() {
-            if let Some(kind) = line.as_str().strip_prefix("BEGIN:") {
-                let depth = stack.len();
+            let text = line.as_str();
+            if let Some(kind) = text.strip_prefix("BEGIN:") {
                 stack.push(OpenComponent {
                     kind: kind.to_string(),
                     begin: index,
-                    depth,
                     properties: Vec::new(),
+                    children: Vec::new(),
                 });
                 continue;
             }
-            if line.as_str().starts_with("END:") {
+            if text.starts_with("END:") {
                 let Some(open) = stack.pop() else { continue };
-                if open.depth > 1 || open.kind == "VCALENDAR" {
-                    continue;
-                }
                 let uid = open
                     .properties
                     .iter()
                     .find_map(|line| self.property_value(*line, "UID"));
-                spans.push(ComponentSpan {
+                let span = ComponentSpan {
                     kind: open.kind,
                     uid,
                     begin: open.begin,
                     end: index,
                     properties: open.properties,
-                });
+                    children: open.children,
+                };
+                match stack.last_mut() {
+                    Some(parent) => parent.children.push(span),
+                    None => roots.push(span),
+                }
                 continue;
             }
-            if let Some(owner) = stack.iter_mut().rev().find(|open| open.depth <= 1) {
+            // A content line belongs to the innermost open component only, so a
+            // nested component's properties never leak into its parent's span.
+            if let Some(owner) = stack.last_mut() {
                 owner.properties.push(index);
             }
         }
-        spans
+        flatten_calendar(roots)
     }
 
     /// Rewrite the owned property groups of `span`, leaving everything else alone.
-    pub(super) fn edit_component(&self, span: &ComponentSpan, specs: &[PropertySpec]) -> String {
+    pub(super) fn edit_component(
+        &self,
+        span: &ComponentSpan,
+        specs: &[PropertySpec],
+        nested: &[NestedSpec],
+    ) -> String {
         let mut edits = Edits::default();
         for spec in specs {
             self.apply_spec(span, spec, &mut edits);
+        }
+        for spec in nested {
+            self.apply_nested(span, spec, &mut edits);
         }
         self.render(&edits)
     }
@@ -212,14 +232,62 @@ impl Document {
         let Some(extra) = spec.values.get(matching.len()..) else {
             return;
         };
-        let anchor = matching
-            .last()
-            .map_or(span.end, |last| last.saturating_add(1));
+        // Keep the component's own properties ahead of its nested components,
+        // which is the shape tasks.org writes.
+        let anchor = matching.last().map_or_else(
+            || span.children.first().map_or(span.end, |child| child.begin),
+            |last| last.saturating_add(1),
+        );
         edits
             .insert_before
             .entry(anchor)
             .or_default()
             .extend(extra.iter().cloned().map(RawLine::new));
+    }
+
+    /// Apply a [`NestedSpec`] to `span`'s child components of that kind.
+    ///
+    /// Instances are matched by position, so the DTO's order is the document's
+    /// order. Existing instances keep every line the specs do not own; surplus
+    /// instances are removed; missing ones are appended from their block.
+    fn apply_nested(&self, span: &ComponentSpan, spec: &NestedSpec, edits: &mut Edits) {
+        let existing = span
+            .children
+            .iter()
+            .filter(|child| child.kind == spec.kind)
+            .collect::<Vec<_>>();
+        let mut pending: Vec<RawLine> = Vec::new();
+        for (position, instance) in spec.instances.iter().enumerate() {
+            let Some(child) = existing.get(position) else {
+                pending.extend(instance.block.iter().cloned().map(RawLine::new));
+                continue;
+            };
+            if !pending.is_empty() {
+                edits
+                    .insert_before
+                    .entry(child.begin)
+                    .or_default()
+                    .append(&mut pending);
+            }
+            for property in &instance.specs {
+                self.apply_spec(child, property, edits);
+            }
+        }
+        for surplus in existing.iter().skip(spec.instances.len()) {
+            for index in surplus.begin..=surplus.end {
+                edits.replace.insert(index, Vec::new());
+            }
+        }
+        if !pending.is_empty() {
+            let anchor = existing
+                .last()
+                .map_or(span.end, |child| child.end.saturating_add(1));
+            edits
+                .insert_before
+                .entry(anchor)
+                .or_default()
+                .append(&mut pending);
+        }
     }
 
     fn property_value(&self, index: usize, name: &str) -> Option<String> {
@@ -293,10 +361,57 @@ impl PropertySpec {
     }
 }
 
+/// A nested component kind whose instances this crate owns lines of, such as
+/// `VALARM` inside a `VTODO`.
+#[derive(Debug, Clone)]
+pub(super) struct NestedSpec {
+    pub(super) kind: &'static str,
+    /// The desired instances, in document order.
+    pub(super) instances: Vec<NestedInstance>,
+}
+
+impl NestedSpec {
+    pub(super) const fn new(kind: &'static str) -> Self {
+        Self {
+            kind,
+            instances: Vec::new(),
+        }
+    }
+}
+
+/// One desired nested component.
+#[derive(Debug, Clone)]
+pub(super) struct NestedInstance {
+    /// Property groups to rewrite inside this instance.
+    pub(super) specs: Vec<PropertySpec>,
+    /// Complete content lines (including `BEGIN`/`END`), used only when the
+    /// instance has to be created.
+    pub(super) block: Vec<String>,
+}
+
+impl NestedInstance {
+    pub(super) const fn new(specs: Vec<PropertySpec>, block: Vec<String>) -> Self {
+        Self { specs, block }
+    }
+}
+
 /// Property name of a content line, without parameters.
 pub(super) fn property_name(line: &str) -> &str {
     let end = line.find([';', ':']).unwrap_or(line.len());
     line.get(..end).unwrap_or(line)
+}
+
+/// The resource's components are the children of the calendar object.
+fn flatten_calendar(roots: Vec<ComponentSpan>) -> Vec<ComponentSpan> {
+    let mut spans = Vec::new();
+    for root in roots {
+        if root.kind == CALENDAR_KIND {
+            spans.extend(root.children);
+        } else {
+            spans.push(root);
+        }
+    }
+    spans
 }
 
 fn is_parent_relation(line: &str) -> bool {
@@ -345,7 +460,6 @@ fn fold(text: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -377,7 +491,7 @@ mod tests {
             OwnedKind::Name("SUMMARY"),
             vec!["DESCRIPTION:new".to_string()],
         )];
-        let edited = document.edit_component(&span, &specs);
+        let edited = document.edit_component(&span, &specs, &[]);
         assert!(!edited.contains("hello"));
         assert!(edited.contains("DESCRIPTION:new"));
     }
@@ -433,6 +547,7 @@ mod tests {
                 OwnedKind::Name("COLOR"),
                 vec!["COLOR:#112233".to_string()],
             )],
+            &[],
         );
         assert_eq!(
             edited,
@@ -448,7 +563,145 @@ mod tests {
         let edited = document.edit_component(
             &span,
             &[PropertySpec::new(OwnedKind::Name("EXDATE"), vec![])],
+            &[],
         );
         assert!(!edited.contains("EXDATE"));
+    }
+
+    const TASK_WITH_ALARM: &str = "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:Brush\r\nDESCRIPTION:task notes\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Default Tasks.org description\r\nTRIGGER;RELATED=END:-PT15M\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+
+    fn task_span(document: &Document) -> ComponentSpan {
+        let spans = document.components();
+        assert_eq!(spans.len(), 1, "the resource holds one VTODO");
+        spans.into_iter().next().unwrap()
+    }
+
+    #[test]
+    fn a_nested_components_properties_are_not_the_parents() {
+        let document = Document::parse(TASK_WITH_ALARM);
+        let span = task_span(&document);
+        let properties = span
+            .properties
+            .iter()
+            .map(|index| document.lines[*index].as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            properties,
+            vec!["UID:x", "SUMMARY:Brush", "DESCRIPTION:task notes"],
+            "only direct VTODO properties belong to the VTODO"
+        );
+        assert_eq!(span.children.len(), 1);
+        assert_eq!(span.children[0].kind, "VALARM");
+    }
+
+    #[test]
+    fn rewriting_a_parent_description_leaves_the_alarm_description_alone() {
+        let document = Document::parse(TASK_WITH_ALARM);
+        let span = task_span(&document);
+        let edited = document.edit_component(
+            &span,
+            &[PropertySpec::new(
+                OwnedKind::Name("DESCRIPTION"),
+                vec!["DESCRIPTION:new notes".to_string()],
+            )],
+            &[],
+        );
+
+        assert!(edited.contains("DESCRIPTION:new notes"));
+        assert!(
+            edited.contains("DESCRIPTION:Default Tasks.org description"),
+            "the VALARM's own DESCRIPTION must survive: {edited}"
+        );
+        assert_eq!(
+            edited,
+            TASK_WITH_ALARM.replace("DESCRIPTION:task notes", "DESCRIPTION:new notes")
+        );
+    }
+
+    #[test]
+    fn a_new_property_is_inserted_before_a_nested_component() {
+        let document = Document::parse(TASK_WITH_ALARM);
+        let span = task_span(&document);
+        let edited = document.edit_component(
+            &span,
+            &[PropertySpec::new(
+                OwnedKind::Name("CATEGORIES"),
+                vec!["CATEGORIES:home".to_string()],
+            )],
+            &[],
+        );
+
+        assert!(
+            edited.contains("CATEGORIES:home\r\nBEGIN:VALARM"),
+            "properties stay ahead of nested components: {edited}"
+        );
+    }
+
+    #[test]
+    fn a_nested_spec_rewrites_only_its_owned_lines() {
+        let document = Document::parse(&TASK_WITH_ALARM.replace(
+            "TRIGGER;RELATED=END:-PT15M",
+            "TRIGGER;RELATED=END:-PT15M\r\nX-MOZ-LASTACK:20261020T000000Z",
+        ));
+        let span = task_span(&document);
+        let nested = NestedSpec {
+            kind: "VALARM",
+            instances: vec![NestedInstance::new(
+                vec![PropertySpec::new(
+                    OwnedKind::Name("TRIGGER"),
+                    vec!["TRIGGER;RELATED=END:-PT30M".to_string()],
+                )],
+                Vec::new(),
+            )],
+        };
+        let edited = document.edit_component(&span, &[], &[nested]);
+
+        assert!(edited.contains("TRIGGER;RELATED=END:-PT30M"));
+        assert!(!edited.contains("-PT15M"));
+        assert!(edited.contains("X-MOZ-LASTACK:20261020T000000Z"));
+        assert!(edited.contains("ACTION:DISPLAY"));
+        assert!(edited.contains("DESCRIPTION:Default Tasks.org description"));
+    }
+
+    #[test]
+    fn a_missing_nested_component_is_inserted_before_the_parent_end() {
+        let document = Document::parse(
+            "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:a\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+        );
+        let span = task_span(&document);
+        let nested = NestedSpec {
+            kind: "VALARM",
+            instances: vec![NestedInstance::new(
+                Vec::new(),
+                vec!["BEGIN:VALARM", "ACTION:DISPLAY", "END:VALARM"]
+                    .into_iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            )],
+        };
+        let edited = document.edit_component(&span, &[], &[nested]);
+
+        assert_eq!(
+            edited,
+            "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:a\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+        );
+    }
+
+    #[test]
+    fn surplus_nested_components_are_removed() {
+        let document = Document::parse(&TASK_WITH_ALARM.replace(
+            "END:VALARM\r\n",
+            "END:VALARM\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT45M\r\nEND:VALARM\r\n",
+        ));
+        let span = task_span(&document);
+        let nested = NestedSpec {
+            kind: "VALARM",
+            instances: vec![NestedInstance::new(Vec::new(), Vec::new())],
+        };
+        let edited = document.edit_component(&span, &[], &[nested]);
+
+        assert!(edited.contains("-PT15M"), "the first alarm is kept");
+        assert!(!edited.contains("-PT45M"), "the surplus alarm is removed");
     }
 }

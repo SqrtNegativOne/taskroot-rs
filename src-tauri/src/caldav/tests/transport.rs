@@ -1,4 +1,4 @@
-//! HTTP contract tests for the CalDAV transport, backed by `wiremock`.
+//! HTTP contract tests for the `CalDAV` transport, backed by `wiremock`.
 
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};

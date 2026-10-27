@@ -1,4 +1,4 @@
-//! `iCalendar` read/write for `CalDAV` resources (`caldav-migration-plan.md` §7–§9).
+//! `iCalendar` read/write for `CalDAV` resources.
 //!
 //! Three layers, never blurred:
 //!
@@ -23,7 +23,9 @@
 //! ```
 //!
 //! Everything Taskroot does not own survives byte-identically: `VTIMEZONE`,
-//! `VALARM`, `ATTENDEE`, `X-MOZ-GENERATION`, `X-APPLE-SORT-ORDER`, unknown `X-*`.
+//! `ATTENDEE`, `X-MOZ-GENERATION`, `X-APPLE-SORT-ORDER`, `SEQUENCE`, `LOCATION`,
+//! unknown `X-*`. A `VALARM` is rewritten only when the task's reminder list actually
+//! changed, so a reminder this crate cannot model is preserved by every other edit.
 
 mod lines;
 pub mod read;

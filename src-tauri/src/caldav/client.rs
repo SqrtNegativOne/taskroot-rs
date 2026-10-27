@@ -1,6 +1,6 @@
-//! CalDAV resource operations on top of [`super::transport::CalDavClient`].
+//! `CalDAV` resource operations on top of [`super::transport::CalDavClient`].
 //!
-//! Hrefs are server-rooted paths (see [`super::xml::resolve_href`]); ETags are
+//! Hrefs are server-rooted paths (see [`super::xml::resolve_href`]); `ETags` are
 //! kept exactly as the server returned them, quotes included.
 
 use crate::error::AppError;
@@ -10,8 +10,8 @@ use super::model::CalendarComponent;
 pub use super::transport::CalDavClient;
 use super::transport::{check_status, CalDavRequest, HttpClient};
 use super::xml::{
-    mkcalendar_body, multiget_body, parse_multiget, parse_sync_collection, sync_collection_body,
-    MultiGetResource, SyncCollection,
+    calendar_color_body, mkcalendar_body, multiget_body, parse_multiget, parse_sync_collection,
+    rename_calendar_body, sync_collection_body, MultiGetResource, SyncCollection,
 };
 
 /// `calendar-multiget` batch size; Radicale is happy with far more, but 50 keeps
@@ -36,6 +36,10 @@ impl CalDavClient {
     /// Fetch every resource in a collection: an initial `sync-collection`
     /// followed by `calendar-multiget` batches for the live hrefs.
     ///
+    /// The sync token comes back with the resources so the caller can store it.
+    /// Without it the next `pull` asks for "everything since the beginning" and
+    /// re-downloads the whole collection on every restart.
+    ///
     /// # Errors
     ///
     /// Propagates transport errors and returns [`AppError::Sync`] for malformed
@@ -43,7 +47,7 @@ impl CalDavClient {
     pub async fn fetch_resources(
         &self,
         collection_href: &str,
-    ) -> Result<Vec<MultiGetResource>, AppError> {
+    ) -> Result<(Vec<MultiGetResource>, Option<String>), AppError> {
         let sync = self.sync_collection(collection_href, None).await?;
         let hrefs: Vec<String> = sync
             .changes
@@ -52,7 +56,8 @@ impl CalDavClient {
             .map(|change| change.href.clone())
             .collect();
 
-        self.fetch_hrefs(collection_href, &hrefs).await
+        let resources = self.fetch_hrefs(collection_href, &hrefs).await?;
+        Ok((resources, sync.token))
     }
 
     /// Fetch a specific set of hrefs from one collection, in `multiget` batches.
@@ -98,12 +103,12 @@ impl CalDavClient {
     /// Create or update one resource.
     ///
     /// `create` sends `If-None-Match: *`; an update requires `etag` and sends
-    /// `If-Match`. Returns the ETag from the response, if the server sent one.
+    /// `If-Match`. Returns the `ETag` from the response, if the server sent one.
     ///
     /// # Errors
     ///
-    /// Returns [`AppError::InvalidInput`] for an update without an ETag,
-    /// [`AppError::Conflict`] for a stale ETag and [`AppError::Auth`]/
+    /// Returns [`AppError::InvalidInput`] for an update without an `ETag`,
+    /// [`AppError::Conflict`] for a stale `ETag` and [`AppError::Auth`]/
     /// [`AppError::Sync`] for the usual transport failures.
     pub async fn put_resource(
         &self,
@@ -161,6 +166,42 @@ impl CalDavClient {
         let body = mkcalendar_body(display_name, component);
         self.send(&CalDavRequest::mkcalendar(href, &body)).await?;
         Ok(())
+    }
+
+    /// Set a collection's display name.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport errors.
+    pub async fn set_display_name(&self, href: &str, display_name: &str) -> Result<(), AppError> {
+        let body = rename_calendar_body(display_name);
+        self.send(&CalDavRequest::proppatch(href, &body)).await?;
+        Ok(())
+    }
+
+    /// Set or clear a collection's `calendar-color`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport errors.
+    pub async fn set_calendar_color(
+        &self,
+        href: &str,
+        color: Option<&str>,
+    ) -> Result<(), AppError> {
+        let body = calendar_color_body(color);
+        self.send(&CalDavRequest::proppatch(href, &body)).await?;
+        Ok(())
+    }
+
+    /// Delete a whole collection and everything in it. A `404`/`410` counts as
+    /// success.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport errors.
+    pub async fn delete_collection(&self, href: &str) -> Result<(), AppError> {
+        self.delete_resource(href, None).await
     }
 
     async fn multiget(

@@ -18,7 +18,6 @@
 //! This module is split into [`storage`] (the store-level command bodies) and
 //! [`metadata`] (schema assembly); the command functions stay here and only
 //! resolve the store.
-#![allow(clippy::struct_excessive_bools)]
 
 mod metadata;
 mod storage;
@@ -173,12 +172,21 @@ pub fn get_settings_schema() -> Value {
     metadata::settings_schema_value()
 }
 
+/// # Errors
+///
+/// Returns an error when the store is not initialized or `settings.json` cannot
+/// be read.
 #[tauri::command]
 pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
     let state = crate::commands::session::store_state(&app)?;
     storage::read_settings(&state).await
 }
 
+/// # Errors
+///
+/// Returns [`AppError::InvalidInput`] for a known setting whose value does not
+/// match the field type, and a store error when `settings.json` cannot be
+/// written.
 #[tauri::command]
 pub async fn update_setting(
     app: tauri::AppHandle,
@@ -191,6 +199,11 @@ pub async fn update_setting(
 
 /// Read per-component UI state (filters, sorts, view modes, pane sizes).
 /// Returns `null` for an unknown key.
+///
+/// # Errors
+///
+/// Returns an error when the store is not initialized or `ui-state.json` cannot
+/// be read.
 #[tauri::command]
 pub async fn get_ui_state(app: tauri::AppHandle, key: String) -> Result<Value, AppError> {
     let state = crate::commands::session::store_state(&app)?;
@@ -198,6 +211,11 @@ pub async fn get_ui_state(app: tauri::AppHandle, key: String) -> Result<Value, A
 }
 
 /// Persist per-component UI state. See [`get_ui_state`].
+///
+/// # Errors
+///
+/// Returns an error when the store is not initialized or `ui-state.json` cannot
+/// be written.
 #[tauri::command]
 pub async fn set_ui_state(
     app: tauri::AppHandle,

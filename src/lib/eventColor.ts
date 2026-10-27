@@ -5,7 +5,7 @@ const EVENT_BACKGROUND_ALPHA = '40';
  * Append an 8-bit alpha suffix to a 6-digit hex color. Colors that are already
  * in another notation (or carry their own alpha) are returned unchanged.
  */
-export function withAlpha(color: string, alphaHex: string = EVENT_BACKGROUND_ALPHA): string {
+function withAlpha(color: string, alphaHex: string = EVENT_BACKGROUND_ALPHA): string {
     return HEX_RGB_PATTERN.test(color) ? `${color}${alphaHex}` : color;
 }
 

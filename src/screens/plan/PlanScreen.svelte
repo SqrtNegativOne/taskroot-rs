@@ -1,12 +1,9 @@
 <script lang="ts">
-    import { store, describeError } from '../../lib/store.svelte';
+    import { store } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
-    import type { AppEvent, AppTask, AppCalendar, EventInstance } from '../../lib/domain';
-    import { isCalendarReadOnly } from '../../lib/domain';
-    import type { Result } from 'neverthrow';
-    import type { AppError } from '../../lib/safeInvoke.svelte';
+    import type { AppTask, AppCalendar, EventInstance } from '../../lib/domain';
+    import { buildNewEvent } from '../../lib/domain';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { addDays, ymd } from '../../lib/time';
 
     import SplitPane from '../../components/SplitPane.svelte';
     import TaskListPane from '../../components/tasklist/TaskListPane.svelte';
@@ -14,89 +11,70 @@
     import DateGrid from './date-grid/DateGrid.svelte';
     import DayTimeline from './day-timeline/DayTimeline.svelte';
     import { createEventDragController } from './hooks/eventDrag.svelte';
-    import RecurringActionModal, { type RecurringMode } from '../../components/RecurringActionModal.svelte';
+    import { createTaskDragController } from './hooks/taskDrag.svelte';
     import type { DragState } from './day-timeline/types';
     let dragState = $state<DragState | undefined>(undefined);
 
     const startEventDrag = createEventDragController({
         setDragState: (ds) => { dragState = ds; },
         onReschedule: (event, payload) => {
-            void mutateOrReport('Failed to move event', () =>
+            void store.mutate('Failed to move event', () =>
                 store.rescheduleEvent(event.id, payload.startTime, payload.endTime, payload.isAllDay),
             );
         },
     });
     let inspectorState = $state<{ type: 'event' | 'task', id: string } | undefined>(undefined);
-    let recurringModalOpen = $state(false);
-    let recurringActionType = $state<"edit" | "delete">("edit");
-    
-    function handleRecurringConfirm(mode: RecurringMode) {
-        recurringModalOpen = false;
-        console.log("Confirmed recurring action:", mode);
-    }
 
-    function handleRecurringCancel() {
-        recurringModalOpen = false;
-    }
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
 
-    function mutateOrReport(operation: string, mutation: () => Promise<Result<void, AppError>>): Promise<void> {
-        return mutation().then((result) => {
-            if (result.isErr()) {
-                store.error = `${operation}: ${describeError(result.error)}`;
-            }
-        });
-    }
+    let defaultTaskCollection = $derived(
+        calendarsQuery.data?.find((c) => c.component === 'VTODO' && c.writable)?.id
+    );
 
-    function onTaskDragStart() {
-        // Drag logic stub
-    }
+    const startTaskDrag = createTaskDragController({
+        setDragState: (ds) => { dragState = ds; },
+        defaultDuration: () => store.settings?.default_task_duration || 30,
+        onSchedule: (task, slot) => {
+            const event = buildNewEvent(new Date(`${slot.date}T00:00:00`), {
+                startMinutes: slot.minute,
+                endMinutes: slot.minute + slot.duration,
+                calendars: calendarsQuery.data ?? [],
+                title: task.title,
+                taskId: task.id,
+            });
+            void store
+                .mutate('Failed to schedule task', () => store.addEvent(event))
+                .then((result) => {
+                    if (result.isOk()) inspectorState = { type: 'event', id: event.id };
+                });
+        },
+    });
 
-    function onAddTask(defaults?: Partial<AppTask>) {
+    async function onAddTask(defaults?: Partial<AppTask>) {
         const newTask: AppTask = {
             id: crypto.randomUUID(),
             title: 'New Task',
             status: 'todo',
+            remoteCollectionId: defaultTaskCollection,
             ...defaults
         };
-        void mutateOrReport('Failed to create task', () => store.addTask(newTask));
-        inspectorState = { type: 'task', id: newTask.id };
+        const result = await store.mutate('Failed to create task', () => store.addTask(newTask));
+        if (result.isOk()) inspectorState = { type: 'task', id: newTask.id };
     }
 
     function onDeleteTask(id: string) {
-        void mutateOrReport('Failed to delete task', () => store.deleteTask(id));
+        void store.mutate('Failed to delete task', () => store.deleteTask(id));
         if (inspectorState?.id === id) inspectorState = undefined;
     }
 
-    const MS_PER_MINUTE = 60_000;
-
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
-
-    function onAddEvent(date: Date, startMins?: number, endMins?: number) {
-        const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        
-        const activeCalendars = calendarsQuery.data ?? [];
-        const writableCalendars = activeCalendars.filter((c) => !isCalendarReadOnly(c));
-        const defaultCalendar = writableCalendars.find(c => c.component === 'VEVENT')
-            ?? writableCalendars[0];
-        const defaultCalendarId = defaultCalendar?.id;
-
-        const newEvent: AppEvent = {
-            id: crypto.randomUUID(),
-            title: 'New Event',
-            startTime: startMins !== undefined
-                ? new Date(dayStart.getTime() + startMins * MS_PER_MINUTE).toISOString()
-                : ymd(date),
-            endTime: endMins !== undefined
-                ? new Date(dayStart.getTime() + endMins * MS_PER_MINUTE).toISOString()
-                : ymd(addDays(date, 1)),
-            remoteCollectionId: defaultCalendarId,
-            isAllDay: startMins === undefined,
-            timezone: startMins === undefined
-                ? undefined
-                : Intl.DateTimeFormat().resolvedOptions().timeZone,
-        };
-        void mutateOrReport('Failed to create event', () => store.addEvent(newEvent));
-        inspectorState = { type: 'event', id: newEvent.id };
+    async function onAddEvent(date: Date, startMins?: number, endMins?: number) {
+        const newEvent = buildNewEvent(date, {
+            startMinutes: startMins,
+            endMinutes: endMins,
+            calendars: calendarsQuery.data ?? [],
+        });
+        const result = await store.mutate('Failed to create event', () => store.addEvent(newEvent));
+        if (result.isOk()) inspectorState = { type: 'event', id: newEvent.id };
     }
 
     function onEventClick(ev: EventInstance) {
@@ -121,21 +99,13 @@
             persistKey={persistedKeys.planTaskPaneSize}
         >
             {#snippet pane1()}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div
-                    style="height: 100%; display: flex; flex-direction: column;"
-                    ondblclick={(e) => {
-                        if (e.target instanceof Element && e.target.closest('.task-row')) {
-                            // double click on task row
-                        }
-                    }}
-                >
+                <div style="height: 100%; display: flex; flex-direction: column;">
                     <TaskListPane
-                        onDragStart={onTaskDragStart}
+                        onDragStart={startTaskDrag}
                         {onAddTask}
                         {onDeleteTask}
                         onUpdateTask={(task: AppTask) => {
-                            void mutateOrReport('Failed to update task', () => store.updateTask(task));
+                            void store.mutate('Failed to update task', () => store.updateTask(task));
                         }}
                         onTaskClick={(task: AppTask) => {
                             inspectorState = { type: 'task', id: task.id };
@@ -176,12 +146,6 @@
         <InspectorPane
             {inspectorState}
             onClose={() => { inspectorState = undefined; }}
-        />
-        <RecurringActionModal
-            isOpen={recurringModalOpen}
-            actionType={recurringActionType}
-            onConfirm={handleRecurringConfirm}
-            onCancel={handleRecurringCancel}
         />
     {/if}
 </main>

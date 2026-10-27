@@ -7,7 +7,7 @@ import sonarjs from 'eslint-plugin-sonarjs';
 
 export default tseslint.config(
   {
-    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', '*.config.js', '**/*.cjs', 'script.js', 'test_useNow.svelte.ts', 'build/', 'legacy-src/', 'coverage/'],
+    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', 'build/', 'coverage/'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -37,7 +37,9 @@ export default tseslint.config(
     rules: {
       'no-undef': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      'svelte/valid-compile': 'error',
+      // Svelte compiler warnings are owned by `svelte-check`, which applies the
+      // a11y policy from `svelte.config.js`. ESLint only needs compile errors.
+      'svelte/valid-compile': ['error', { ignoreWarnings: true }],
       'svelte/prefer-svelte-reactivity': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',

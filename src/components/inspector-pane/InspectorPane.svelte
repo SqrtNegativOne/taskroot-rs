@@ -50,7 +50,7 @@
             if (!exdates.includes(targetDate)) {
                 exdates.push(targetDate);
             }
-            void store.updateEvent({ ...masterEvent, exdates });
+            updateEvent(masterEvent.id, (current) => ({ ...current, exdates }));
         }
         if (ev.recurringEventId) {
             deleteEvent(ev.id);
@@ -62,7 +62,7 @@
             let rrule = masterEvent.rrule.replace(/;?(UNTIL|COUNT)=[^;]+/g, '');
             const targetDate = ev.originalStartTime || ev.startTime;
             rrule += `;UNTIL=${formatUntilDate(targetDate)}`;
-            void store.updateEvent({ ...masterEvent, rrule });
+            updateEvent(masterEvent.id, (current) => ({ ...current, rrule }));
         }
         if (ev.recurringEventId) {
             deleteEvent(ev.id);
@@ -98,20 +98,24 @@
 
     function updateTask(id: string, t: (t: AppTask) => AppTask) {
         const current = tasks.find(x => x.id === id);
-        if (current) void store.updateTask(t(current));
+        if (current) {
+            void store.mutate('Failed to update task', () => store.updateTask(t(current)));
+        }
     }
 
     function updateEvent(id: string, e: (e: AppEvent) => AppEvent) {
         const current = events.find(x => x.id === id);
-        if (current) void store.updateEvent(e(current));
+        if (current) {
+            void store.mutate('Failed to update event', () => store.updateEvent(e(current)));
+        }
     }
 
     function deleteTask(id: string) {
-        void store.deleteTask(id);
+        void store.mutate('Failed to delete task', () => store.deleteTask(id));
     }
 
     function deleteEvent(id: string) {
-        void store.deleteEvent(id);
+        void store.mutate('Failed to delete event', () => store.deleteEvent(id));
     }
 
     let paneRef = $state<HTMLElement | null>(null);

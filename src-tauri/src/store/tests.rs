@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Store persistence, snapshot and query tests.
 
 use super::model::Store;
@@ -135,7 +134,13 @@ fn task(id: &str, title: &str, priority: TaskPriority) -> AppTask {
         remote_collection_id: None,
         notes: None,
         tabs: None,
+        start: None,
         due: None,
+        completed_at: None,
+        rrule: None,
+        geo: None,
+        alarms: None,
+        timezone: None,
         updated_at: None,
         etag: None,
     }
@@ -177,4 +182,78 @@ fn empty_filter_values_do_not_match_anything() {
     );
 
     assert_eq!(filtered.len(), 1, "an empty exclusion set filters nothing");
+}
+
+/// A full load must leave the collection's sync token behind, otherwise the next
+/// pull asks the server for "everything since the beginning" and re-downloads the
+/// whole collection — once per restart, and on every wake-up after an offline gap.
+#[tokio::test]
+async fn a_full_load_keeps_the_sync_token_so_the_next_pull_is_a_delta() {
+    use crate::caldav::model::{CalendarComponent, CalendarInfo};
+    use crate::caldav::transport::{CalDavClient, HttpClient};
+    use super::ops;
+    use std::collections::BTreeMap;
+    use wiremock::matchers::{body_string_contains, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const COLLECTION: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
+    const TOKEN: &str = "http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435";
+
+    let server = MockServer::start().await;
+    Mock::given(method("REPORT"))
+        .and(path(COLLECTION))
+        .and(body_string_contains("<d:sync-token/>"))
+        .respond_with(
+            ResponseTemplate::new(207)
+                .set_body_string(include_str!("../caldav/fixtures/sync_collection_initial.xml")),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("REPORT"))
+        .and(path(COLLECTION))
+        .and(body_string_contains("calendar-multiget"))
+        .respond_with(
+            ResponseTemplate::new(207)
+                .set_body_string(include_str!("../caldav/fixtures/multiget.xml")),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let http = HttpClient::new().unwrap();
+    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
+    let mut store = Store {
+        data_dir: scratch_dir("full-load-token"),
+        resources: BTreeMap::new(),
+        calendars: vec![CalendarInfo {
+            href: COLLECTION.to_string(),
+            display_name: "SqrtCal".to_string(),
+            component: CalendarComponent::VEvent,
+            ..CalendarInfo::default()
+        }],
+        tokens: BTreeMap::new(),
+        settings: crate::settings::AppSettings::default(),
+        ui_state: serde_json::Map::new(),
+        offline: false,
+        last_synced: None,
+    };
+
+    ops::full_load(&mut store, &client).await.unwrap();
+    assert_eq!(
+        store.tokens.get(COLLECTION).map(String::as_str),
+        Some(TOKEN)
+    );
+
+    Mock::given(method("REPORT"))
+        .and(path(COLLECTION))
+        .and(body_string_contains(TOKEN))
+        .respond_with(
+            ResponseTemplate::new(207)
+                .set_body_string(include_str!("../caldav/fixtures/sync_collection_delta.xml")),
+        )
+        .mount(&server)
+        .await;
+
+    ops::pull(&mut store, &client).await.unwrap();
+    server.verify().await;
 }

@@ -122,19 +122,29 @@ fn task_column_matches(
             tags.iter()
                 .any(|tag| tag.name.to_lowercase().contains(&needle))
         }),
-        AppTaskFilterColumn::Due => task.due.as_deref().is_some_and(|due| {
-            let needle = value_as_string(value);
-            match operator {
-                FilterOperator::Contains | FilterOperator::DoesNotContain => {
-                    due.to_lowercase().contains(&needle.to_lowercase())
-                }
-                FilterOperator::Is | FilterOperator::IsNot => due == needle,
-            }
-        }),
+        AppTaskFilterColumn::Start => date_text_matches(task.start.as_deref(), value, operator),
+        AppTaskFilterColumn::Due => date_text_matches(task.due.as_deref(), value, operator),
         AppTaskFilterColumn::Remotecollectionid => task
             .remote_collection_id
             .as_ref()
             .is_some_and(|id| id.as_str() == value_as_string(value)),
+    }
+}
+
+fn date_text_matches(
+    date: Option<&str>,
+    value: &serde_json::Value,
+    operator: &FilterOperator,
+) -> bool {
+    let Some(date) = date else {
+        return false;
+    };
+    let needle = value_as_string(value);
+    match operator {
+        FilterOperator::Contains | FilterOperator::DoesNotContain => {
+            date.to_lowercase().contains(&needle.to_lowercase())
+        }
+        FilterOperator::Is | FilterOperator::IsNot => date == needle,
     }
 }
 
@@ -222,6 +232,11 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
         AppTaskFilterColumn::Priority => {
             priority_number(a.priority.as_ref()).cmp(&priority_number(b.priority.as_ref()))
         }
+        AppTaskFilterColumn::Start => a
+            .start
+            .as_deref()
+            .unwrap_or("9999")
+            .cmp(b.start.as_deref().unwrap_or("9999")),
         AppTaskFilterColumn::Due => a
             .due
             .as_deref()
@@ -305,7 +320,13 @@ mod tests {
             remote_collection_id: None,
             notes: None,
             tabs: None,
+            start: None,
             due: None,
+            completed_at: None,
+            rrule: None,
+            geo: None,
+            alarms: None,
+            timezone: None,
             updated_at: None,
             etag: None,
         }

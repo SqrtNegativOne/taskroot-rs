@@ -4,11 +4,14 @@
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::caldav::discovery::{discover, normalize_server_url, DEFAULT_SERVER_URL};
-use crate::caldav::model::CalendarComponent;
+use crate::caldav::account::{read_account, write_account, Account};
+use crate::caldav::discovery::{
+    discover, normalize_server_url, refresh_collections, DEFAULT_SERVER_URL,
+};
+use crate::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::caldav::transport::HttpClient;
 
-use super::{HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
+use super::{scratch_dir, test_client, HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
 
 #[test]
 fn an_empty_server_url_is_the_loopback_default() {
@@ -237,4 +240,64 @@ async fn discovery_works_against_the_real_radicale() {
         .expect("SqrtTasks is discovered");
     assert_eq!(sqrt_tasks.component, CalendarComponent::VTodo);
     assert!(sqrt_cal.writable && sqrt_tasks.writable);
+}
+
+#[tokio::test]
+async fn a_refresh_persists_the_list_the_server_actually_has() {
+    let server = MockServer::start().await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/me/"))
+        .and(header("depth", "1"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(HOME_PROPFIND))
+        .mount(&server)
+        .await;
+
+    let dir = scratch_dir("refresh-collections");
+    let mut account = Account {
+        server_url: server.uri(),
+        username: "me".to_string(),
+        principal_href: "/me/".to_string(),
+        home_href: "/me/".to_string(),
+        calendars: Vec::new(),
+    };
+    write_account(&dir, &account).expect("seed the account file");
+
+    let calendars = refresh_collections(&dir, &test_client(&server), &mut account).await;
+
+    assert_eq!(calendars.len(), 2);
+    assert_eq!(
+        read_account(&dir).unwrap().unwrap().calendars,
+        calendars,
+        "the fresh list must be written back, not just returned"
+    );
+}
+
+#[tokio::test]
+async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
+    let server = MockServer::start().await;
+    Mock::given(method("PROPFIND"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+
+    let cached = vec![CalendarInfo {
+        href: "/me/old/".to_string(),
+        display_name: "Old".to_string(),
+        component: CalendarComponent::VTodo,
+        ..CalendarInfo::default()
+    }];
+    let dir = scratch_dir("refresh-offline");
+    let mut account = Account {
+        server_url: server.uri(),
+        username: "me".to_string(),
+        principal_href: "/me/".to_string(),
+        home_href: "/me/".to_string(),
+        calendars: cached.clone(),
+    };
+    write_account(&dir, &account).expect("seed the account file");
+
+    let calendars = refresh_collections(&dir, &test_client(&server), &mut account).await;
+
+    assert_eq!(calendars, cached, "an offline start must still have lists");
+    assert_eq!(read_account(&dir).unwrap().unwrap().calendars, cached);
 }

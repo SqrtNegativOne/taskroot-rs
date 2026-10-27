@@ -1,6 +1,5 @@
 export enum DateGridView {
     Month = "month",
-    Week = "week",
     OneWeek = "1 week",
     ThreeWeeks = "3 weeks"
 }

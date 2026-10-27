@@ -7,8 +7,8 @@
     import { instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
-    import { SvelteDate } from 'svelte/reactivity';
-    import { ymd } from '../../../lib/time';
+    import { addDays, getWeekNumber, isoWeeksInYear, isoWeekYear, startOfMonth, startOfWeek, ymd } from '../../../lib/time';
+    import { useNow } from '../../../lib/useNow.svelte';
     
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
@@ -30,7 +30,11 @@
     let anchor = $state(new Date());
     let filters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
     let query = $state('');
-    let today = $state(new Date());
+    const now = useNow(60_000);
+    let today = $derived(new Date(now.ms));
+
+    const DAYS_IN_CALENDAR_GRID = 42;
+    const DAYS_IN_THREE_WEEKS = 21;
 
     persistState(
         persistedKeys.dateGridFilters,
@@ -46,35 +50,15 @@
     );
 
     let dateGridRange = $derived.by(() => {
-        const d = new Date(anchor);
-        let start: Date;
-        let end: Date;
-        if (view === DateGridView.OneWeek || view === DateGridView.Week) {
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(d);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 7);
-        } else if (view === DateGridView.ThreeWeeks) {
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(d);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 21);
-        } else {
-            const first = new Date(d.getFullYear(), d.getMonth(), 1);
-            const day = first.getDay();
-            const diff = first.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(first);
-            start.setDate(diff);
-            start.setHours(0,0,0,0);
-            end = new Date(start);
-            end.setDate(start.getDate() + 42);
-        }
+        const start = view === DateGridView.Month
+            ? startOfWeek(startOfMonth(anchor))
+            : startOfWeek(anchor);
+        const dayCount = view === DateGridView.OneWeek
+            ? DAYS_IN_WEEK
+            : view === DateGridView.ThreeWeeks
+                ? DAYS_IN_THREE_WEEKS
+                : DAYS_IN_CALENDAR_GRID;
+        const end = addDays(start, dayCount);
         return { startDate: ymd(start), endDate: ymd(end) };
     });
 
@@ -90,50 +74,18 @@
     let events = $derived(eventsQuery.data ?? []);
     let activeCalendars = $derived(calendarsQuery.data ?? []);
 
-    const DAYS_IN_CALENDAR_GRID = 42;
-    const DAYS_IN_THREE_WEEKS = 21;
-
-    let isWeek = $derived(view === DateGridView.Week || view === DateGridView.OneWeek);
+    let isSingleWeek = $derived(view === DateGridView.OneWeek);
     let is3Weeks = $derived(view === DateGridView.ThreeWeeks);
-    let isStrip = $derived(isWeek || is3Weeks);
-
-    function startOfWeek(d: Date) {
-        const nd = new SvelteDate(d);
-        const day = nd.getDay();
-        const diff = nd.getDate() - day + (day === 0 ? -6 : 1);
-        nd.setDate(diff);
-        nd.setHours(0,0,0,0);
-        return nd;
-    }
-
-    function startOfMonth(d: Date) {
-        return new SvelteDate(d.getFullYear(), d.getMonth(), 1);
-    }
-
-    function addDays(d: Date, days: number) {
-        const nd = new SvelteDate(d);
-        nd.setDate(nd.getDate() + days);
-        return nd;
-    }
-
-    function getWeekNumber(d: Date) {
-        const target = new SvelteDate(d.valueOf());
-        const dayNr = (d.getDay() + 6) % 7;
-        target.setDate(target.getDate() - dayNr + 3);
-        const firstThursday = target.valueOf();
-        target.setMonth(0, 1);
-        if (target.getDay() !== 4) {
-            target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
-        }
-        return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
-    }
+    let isStrip = $derived(isSingleWeek || is3Weeks);
 
     const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const DOW_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
     function weekRangeLabel(a: Date, b: Date) {
-        const prefix = `Week #${getWeekNumber(a).toString()}/52 `;
+        const week = getWeekNumber(a);
+        const totalWeeks = isoWeeksInYear(isoWeekYear(a));
+        const prefix = `Week #${week.toString()}/${totalWeeks.toString()} `;
         if (a.getMonth() === b.getMonth()) {
             return `${prefix}${MONTHS_LONG[a.getMonth()]} ${a.getDate().toString()}–${b.getDate().toString()}, ${a.getFullYear().toString()}`;
         }
@@ -141,22 +93,15 @@
     }
 
     let cells = $derived.by(() => {
-        if (view === DateGridView.OneWeek || view === DateGridView.Week) {
+        if (view === DateGridView.OneWeek || view === DateGridView.ThreeWeeks) {
             const start = startOfWeek(anchor);
-            return Array.from({ length: 7 }, (_, i) => ({
+            const length = view === DateGridView.OneWeek ? DAYS_IN_WEEK : DAYS_IN_THREE_WEEKS;
+            return Array.from({ length }, (_, i) => ({
                 date: addDays(start, i),
                 outOfMonth: false,
             }));
         }
-        if (view === DateGridView.ThreeWeeks) {
-            const start = startOfWeek(anchor);
-            return Array.from({ length: 21 }, (_, i) => ({
-                date: addDays(start, i),
-                outOfMonth: false,
-            }));
-        }
-        const first = startOfMonth(anchor);
-        const start = startOfWeek(first);
+        const start = startOfWeek(startOfMonth(anchor));
         const out = [];
         for (let i = 0; i < DAYS_IN_CALENDAR_GRID; i++) {
             const d = addDays(start, i);
@@ -164,8 +109,6 @@
         }
         return out;
     });
-
-    let displayEvents = $derived(events); // TODO: apply filters and sort
 
     type GridCell = { date: Date; outOfMonth: boolean };
 
@@ -179,12 +122,12 @@
         weeks.map((week) => ({
             key: ymd(week[0].date),
             week,
-            layout: layoutWeekSpans(displayEvents, week.map((c) => c.date)),
+            layout: layoutWeekSpans(events, week.map((c) => c.date)),
         })),
     );
 
     function cellEvents(date: Date): EventInstance[] {
-        return displayEvents.filter((e) => instanceOccursOnDay(e, date) && !isMultiDayAllDay(e));
+        return events.filter((e) => instanceOccursOnDay(e, date) && !isMultiDayAllDay(e));
     }
 
     let titleLabel = $derived(isStrip
@@ -192,10 +135,16 @@
         : `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear().toString()}`);
 
     function shift(n: number) {
-        const d = new SvelteDate(anchor);
-        if (isWeek) d.setDate(d.getDate() + DAYS_IN_WEEK * n);
-        else if (is3Weeks) d.setDate(d.getDate() + DAYS_IN_THREE_WEEKS * n);
-        else d.setMonth(d.getMonth() + n);
+        if (isSingleWeek) {
+            anchor = addDays(anchor, DAYS_IN_WEEK * n);
+            return;
+        }
+        if (is3Weeks) {
+            anchor = addDays(anchor, DAYS_IN_THREE_WEEKS * n);
+            return;
+        }
+        const d = new Date(anchor);
+        d.setMonth(d.getMonth() + n);
         anchor = d;
     }
 </script>
@@ -233,8 +182,9 @@
                         <DayCell
                             cell={c}
                             {today}
+                            nowMs={now.ms}
                             events={cellEvents(c.date)}
-                            {isWeek}
+                            {isSingleWeek}
                             {dragState}
                             {onEventDragStart}
                             {onAddEvent}

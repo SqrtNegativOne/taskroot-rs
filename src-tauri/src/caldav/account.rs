@@ -1,4 +1,4 @@
-//! The single CalDAV account: `account.json` plus the OS keychain password.
+//! The single `CalDAV` account: `account.json` plus the OS keychain password.
 //!
 //! `account.json` never contains the password. It is written atomically (a
 //! sibling `.tmp` file is renamed over it) and a malformed file is a
@@ -19,7 +19,7 @@ use super::model::CalendarInfo;
 
 /// File name of the account record inside the app data directory.
 pub const ACCOUNT_FILE: &str = "account.json";
-/// Keychain service name for the CalDAV password.
+/// Keychain service name for the `CalDAV` password.
 pub const KEYRING_SERVICE: &str = "taskroot.caldav";
 
 const TEMP_FILE: &str = "account.json.tmp";

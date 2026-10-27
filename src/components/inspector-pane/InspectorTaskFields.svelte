@@ -1,10 +1,12 @@
 <script lang="ts">
-    import type { AppTask, AppTaskStatus } from '../../lib/domain';
+    import type { AppTask, AppTaskStatus, AppCalendar } from '../../lib/domain';
     import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
-    import { getFormattedDate } from './format';
+    import { getFormattedDate, getFormattedTime, withDate, withTime } from './format';
     import SelectInput from '../inputs/SelectInput.svelte';
     import NumberInput from '../inputs/NumberInput.svelte';
     import TagsInput from '../inputs/TagsInput.svelte';
+    import TimeInput from '../inputs/TimeInput.svelte';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
 
     interface Props {
         task: AppTask;
@@ -13,6 +15,37 @@
     }
 
     let { task, tasks, updateTask }: Props = $props();
+
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+
+    let listOptions = $derived.by(() => {
+        const todos = (calendarsQuery.data ?? []).filter(c => c.component === 'VTODO');
+        const current = todos.find(c => c.id === task.remoteCollectionId);
+        const selectable = current && !current.writable
+            ? [...todos.filter(c => c.writable), current]
+            : todos.filter(c => c.writable);
+        if (!task.remoteCollectionId) {
+            return [
+                { label: 'Default list', value: '' },
+                ...selectable.map(c => ({ label: c.summary || c.id, value: c.id })),
+            ];
+        }
+        if (current && !selectable.some(c => c.id === current.id)) {
+            return [
+                { label: current.summary || current.id, value: current.id },
+                ...selectable.map(c => ({ label: c.summary || c.id, value: c.id })),
+            ];
+        }
+        return selectable.map(c => ({
+            label: c.summary || c.id,
+            value: c.id,
+            ...(c.color ? { color: c.color } : {}),
+        }));
+    });
+
+    function handleListChange(value: string): void {
+        updateTask(task.id, (t) => ({ ...t, remoteCollectionId: value || undefined }));
+    }
 
     function isTaskPriority(value: number): value is TaskPriority {
         return Number.isInteger(value) && value >= 0 && value <= 4;
@@ -35,8 +68,12 @@
         updateTask(task.id, (t) => ({ ...t, priority: clamped }));
     }
 
-    function handleDueChange(value: string): void {
-        updateTask(task.id, (t) => ({ ...t, due: value || undefined }));
+    function handleDateChange(field: 'start' | 'due', value: string): void {
+        updateTask(task.id, (t) => ({ ...t, [field]: withDate(t[field], value) }));
+    }
+
+    function handleTimeChange(field: 'start' | 'due', value: string): void {
+        updateTask(task.id, (t) => ({ ...t, [field]: withTime(t[field], value) }));
     }
 
     function handleDurationChange(val: number): void {
@@ -52,6 +89,15 @@
         ...tasks.filter(t => t.id !== task.id).map(t => ({ label: t.title, value: t.id }))
     ]);
 </script>
+
+<div class="inspector-field">
+    <label for={`list-${task.id}`}>List</label>
+    <SelectInput
+        value={task.remoteCollectionId ?? ''}
+        onchange={handleListChange}
+        options={listOptions}
+    />
+</div>
 
 <div class="inspector-row">
     <div class="inspector-field">
@@ -78,15 +124,38 @@
     </div>
 </div>
 
-<div class="inspector-field">
-    <label for={`due-${task.id}`}>Due Date</label>
-    <input
-        id={`due-${task.id}`}
-        class="inspector-date-input"
-        type="date"
-        value={getFormattedDate(task.due)}
-        onchange={(e) => handleDueChange(e.currentTarget.value)}
-    />
+<div class="inspector-field-group">
+    <label for={`start-${task.id}`}>Start</label>
+    <div class="inspector-datetime">
+        <input
+            id={`start-${task.id}`}
+            class="inspector-date-input"
+            type="date"
+            value={getFormattedDate(task.start)}
+            onchange={(e) => handleDateChange('start', e.currentTarget.value)}
+        />
+        <TimeInput
+            value={getFormattedTime(task.start)}
+            onchange={(value: string) => handleTimeChange('start', value)}
+        />
+    </div>
+</div>
+
+<div class="inspector-field-group">
+    <label for={`due-${task.id}`}>Due</label>
+    <div class="inspector-datetime">
+        <input
+            id={`due-${task.id}`}
+            class="inspector-date-input"
+            type="date"
+            value={getFormattedDate(task.due)}
+            onchange={(e) => handleDateChange('due', e.currentTarget.value)}
+        />
+        <TimeInput
+            value={getFormattedTime(task.due)}
+            onchange={(value: string) => handleTimeChange('due', value)}
+        />
+    </div>
 </div>
 
 <div class="inspector-field">

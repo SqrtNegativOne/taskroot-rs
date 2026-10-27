@@ -4,7 +4,7 @@
     import StopwatchDisplay from './StopwatchDisplay.svelte';
     import ActiveTaskDisplay from './ActiveTaskDisplay.svelte';
     import TaskSelector from '../TaskSelector.svelte';
-    import { store, describeError } from '../../../lib/store.svelte';
+    import { store } from '../../../lib/store.svelte';
     import type { AppTaskStatus } from '../../../lib/domain';
     import './stopwatch.css';
 
@@ -42,10 +42,7 @@
     async function updateTaskStatus(taskId: string, status: AppTaskStatus): Promise<void> {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
-        const result = await store.updateTask({ ...task, status });
-        if (result.isErr()) {
-            store.error = `Failed to update task status: ${describeError(result.error)}`;
-        }
+        await store.mutate('Failed to update task status', () => store.updateTask({ ...task, status }));
     }
 
     async function setActiveTask(taskId: string): Promise<void> {
@@ -73,10 +70,7 @@
 
     async function openMinitracker(): Promise<void> {
         const { safeInvoke } = await import('../../../lib/safeInvoke.svelte');
-        const result = await safeInvoke('show_minitracker');
-        if (result.isErr()) {
-            store.error = `Failed to open mini tracker: ${describeError(result.error)}`;
-        }
+        await store.mutate('Failed to open mini tracker', async () => safeInvoke('show_minitracker'));
     }
 
     // P toggles the timed pause; arrow keys resize an active pause by a minute.

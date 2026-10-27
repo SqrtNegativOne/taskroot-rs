@@ -97,7 +97,6 @@
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 {#if sort}
                     {#each sort as s, i (i)}
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div 
                             class="sort-row" 
                             draggable="true" 

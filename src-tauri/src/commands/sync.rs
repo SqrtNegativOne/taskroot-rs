@@ -1,6 +1,21 @@
 use crate::commands::session::store_state;
 use crate::error::AppError;
-use crate::sync;
+use crate::sync::{self, SyncState, SyncStateManager};
+use tauri::Manager;
+
+/// # Errors
+///
+/// Returns [`AppError::Internal`] when the sync state is not managed yet.
+#[tauri::command]
+pub fn get_sync_state(app: tauri::AppHandle) -> Result<SyncState, AppError> {
+    let state = app
+        .try_state::<SyncStateManager>()
+        .ok_or_else(|| AppError::Internal("Sync state not initialized yet".to_string()))?;
+    Ok(state
+        .0
+        .lock()
+        .map_or_else(|_| SyncState::default(), |guard| guard.clone()))
+}
 
 /// # Errors
 ///

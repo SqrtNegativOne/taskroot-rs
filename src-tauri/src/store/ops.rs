@@ -6,7 +6,7 @@
 
 use crate::caldav::client::CalDavClient;
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
-use crate::domain::{AppEvent, AppTask, CollectionId, EventTiming, RemoteId};
+use crate::domain::{AppEvent, AppTask, AppTaskStatus, CollectionId, EventTiming, RemoteId};
 use crate::error::AppError;
 use crate::ics;
 use chrono::Utc;
@@ -66,14 +66,7 @@ pub async fn pull(store: &mut Store, client: &CalDavClient) -> Result<(), AppErr
                     store.remove_resource(&href);
                 }
                 apply_fetched(store, &calendar.href, client.fetch_hrefs(&calendar.href, &live).await?);
-                match page.token {
-                    Some(token) => {
-                        store.tokens.insert(calendar.href.clone(), token);
-                    }
-                    None => {
-                        store.tokens.remove(&calendar.href);
-                    }
-                }
+                remember_token(store, &calendar.href, page.token);
             }
             // 403/410/501 all surface as Sync/Gone; a full collection reload is
             // the documented recovery and is idempotent.
@@ -92,12 +85,25 @@ pub async fn pull(store: &mut Store, client: &CalDavClient) -> Result<(), AppErr
     Ok(())
 }
 
+/// Remember the token that describes the state just loaded, so the next `pull`
+/// asks for a delta instead of the whole collection.
+fn remember_token(store: &mut Store, collection: &str, token: Option<String>) {
+    match token {
+        Some(token) => {
+            store.tokens.insert(collection.to_string(), token);
+        }
+        None => {
+            store.tokens.remove(collection);
+        }
+    }
+}
+
 async fn load_collection(
     store: &mut Store,
     client: &CalDavClient,
     calendar: &CalendarInfo,
 ) -> Result<(), AppError> {
-    let fetched = client.fetch_resources(&calendar.href).await?;
+    let (fetched, token) = client.fetch_resources(&calendar.href).await?;
     let live: BTreeSet<&str> = fetched
         .iter()
         .filter(|resource| resource.calendar_data.is_some())
@@ -115,6 +121,7 @@ async fn load_collection(
         store.remove_resource(&href);
     }
     apply_fetched(store, &calendar.href, fetched);
+    remember_token(store, &calendar.href, token);
     Ok(())
 }
 
@@ -315,6 +322,7 @@ pub async fn update_task(
     task: AppTask,
 ) -> Result<(), AppError> {
     let resource = resource_for_task(store, &task)?;
+    ensure_not_ending_a_series(&resource, &task)?;
     let target = match task.remote_collection_id.as_deref() {
         Some(href) => writable_calendar(store, href, CalendarComponent::VTodo)?,
         None => collection_for(store, CalendarComponent::VTodo, None)?,
@@ -432,6 +440,29 @@ fn resource_for_event(store: &Store, event: &AppEvent) -> Result<Resource, AppEr
         .or_else(|| store.resource_for_event(event.id.as_str()))
         .cloned()
         .ok_or_else(|| AppError::NotFound(format!("event {}", event.id)))
+}
+
+/// tasks.org completes a recurring task by rolling the series forward; a plain
+/// `STATUS:COMPLETED` on a recurring master would end the series for every
+/// client instead. Refuse until that roll-forward exists.
+fn ensure_not_ending_a_series(resource: &Resource, task: &AppTask) -> Result<(), AppError> {
+    if task.status != Some(AppTaskStatus::Done) {
+        return Ok(());
+    }
+    let Some(previous) = resource
+        .as_tasks()
+        .and_then(|tasks| tasks.iter().find(|candidate| candidate.id == task.id))
+    else {
+        return Ok(());
+    };
+    let repeats = previous.rrule.is_some() || task.rrule.is_some();
+    if !repeats || previous.status == Some(AppTaskStatus::Done) {
+        return Ok(());
+    }
+    Err(AppError::InvalidInput(format!(
+        "task {} repeats; completing it would end the series for every client",
+        task.id
+    )))
 }
 
 fn resource_for_task(store: &Store, task: &AppTask) -> Result<Resource, AppError> {

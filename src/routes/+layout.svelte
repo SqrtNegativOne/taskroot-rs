@@ -13,8 +13,12 @@
     import Notifications from '../components/Notifications.svelte';
 
     import { listen, emit } from '@tauri-apps/api/event';
-    import { LAUNCHER_DATA_UPDATE } from '$lib/events';
+    import type { RouteId } from '$app/types';
     import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
+
+    function isRouteId(value: string): value is RouteId {
+        return (Object.values(Routes) as string[]).includes(value);
+    }
 
     let { children }: { children: Snippet } = $props();
     let isLauncher = $state(false);
@@ -32,7 +36,6 @@
         isSidebar = (label as string) === 'sidebar';
         isEffect = label === 'effect';
 
-        let unlistenData = () => { /* noop */ };
         let unlistenNav = () => { /* noop */ };
 
         const redirectForAccount = async () => {
@@ -64,17 +67,11 @@
 
             isBooting = false;
 
-            if (isLauncher) {
-                unlistenData = await listen(LAUNCHER_DATA_UPDATE, (event) => {
-                    console.log('launcher data update', event.payload);
-                });
-            } else if (!isMinitracker && !isSidebar && !isEffect) {
+            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
                 unlistenNav = await listen('launcher-navigate', (event) => {
                     const route = event.payload as string;
-                    const validRoutes = Object.values(Routes) as string[];
-                    if (validRoutes.includes(route)) {
+                    if (isRouteId(route)) {
                         void (async () => {
-                            // @ts-expect-error resolving dynamic string route
                             await goto(resolve(route));
                             await safeInvoke('window_restore_main');
                         })();
@@ -86,7 +83,6 @@
         void initialize();
 
         return () => {
-            unlistenData();
             unlistenNav();
         };
     });

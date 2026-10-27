@@ -1,9 +1,10 @@
-//! Tauri commands for CalDAV account setup.
+//! Tauri commands for `CalDAV` account setup.
 //!
 //! Discovery is the only network work here: `test_account` runs it without
-//! persisting anything, `connect_account` persists the account, and
-//! `refresh_calendars` rediscovers with the stored credentials. Calendar data
-//! does not flow through these commands yet.
+//! persisting anything and `connect_account` persists the account. The collection
+//! list is kept fresh at startup by `discovery::refresh_collections`, so there is
+//! no separate refresh command. Calendar data does not flow through these
+//! commands.
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -13,7 +14,7 @@ use crate::error::AppError;
 
 use super::account::{self, Account};
 use super::discovery::{self, Discovery};
-use super::model::CalendarInfo;
+use super::model::{CalendarComponent, CalendarInfo};
 use super::transport::HttpClient;
 
 /// What the connect screen and the settings account card display.
@@ -77,7 +78,7 @@ pub async fn get_account(app: AppHandle) -> Result<Option<Account>, AppError> {
 /// # Errors
 ///
 /// Returns [`AppError::InvalidInput`] for a bad URL, [`AppError::Auth`] for bad
-/// credentials and [`AppError::Sync`] when the server does not speak CalDAV.
+/// credentials and [`AppError::Sync`] when the server does not speak `CalDAV`.
 #[tauri::command]
 pub async fn test_account(
     app: AppHandle,
@@ -153,37 +154,75 @@ pub async fn disconnect_account(app: AppHandle) -> Result<(), AppError> {
     file_result
 }
 
-/// Rediscover the calendars with the stored credentials and overwrite them.
+/// Create a list and refresh the mirrored collection list.
 ///
 /// # Errors
 ///
-/// Returns [`AppError::NotFound`] when no account is stored,
-/// [`AppError::Auth`] when the keychain password is missing, and propagates
-/// discovery/`Store` failures.
+/// Returns the account/`MKCALENDAR`/re-discovery failures.
 #[tauri::command]
-pub async fn refresh_calendars(app: AppHandle) -> Result<AccountSummary, AppError> {
+pub async fn create_calendar(
+    app: AppHandle,
+    display_name: String,
+    component: CalendarComponent,
+) -> Result<(), AppError> {
     let dir = crate::app_data_dir(&app)?;
-    let http = http_client(&app)?;
-    let Some(mut account) = account::read_account(&dir)? else {
-        return Err(AppError::NotFound(
-            "No CalDAV account is configured".to_string(),
-        ));
-    };
-    let Some(password) = account::load_password(&account.username)? else {
-        return Err(AppError::Auth(
-            "The CalDAV password is missing from the OS keychain".to_string(),
-        ));
-    };
+    let client = crate::commands::session::client_for(&app).await?;
+    let state = crate::commands::session::store_state(&app)?;
+    let mut store = state.lock().await;
+    super::calendars::create(&dir, &client, &mut store, &display_name, component).await
+}
 
-    let discovery =
-        discovery::discover(&http, &account.server_url, &account.username, &password).await?;
-    account.server_url = discovery.server_url;
-    account.principal_href = discovery.principal_href;
-    account.home_href = discovery.home_href;
-    account.calendars = discovery.calendars;
-    account::write_account(&dir, &account)?;
+/// Rename a list.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`]/[`AppError::InvalidInput`] for an unknown or
+/// read-only list and propagates the `PROPPATCH` failure.
+#[tauri::command]
+pub async fn rename_calendar(
+    app: AppHandle,
+    href: String,
+    display_name: String,
+) -> Result<(), AppError> {
+    let dir = crate::app_data_dir(&app)?;
+    let client = crate::commands::session::client_for(&app).await?;
+    let state = crate::commands::session::store_state(&app)?;
+    let mut store = state.lock().await;
+    super::calendars::rename(&dir, &client, &mut store, &href, &display_name).await
+}
 
-    Ok(AccountSummary::from_account(&account))
+/// Set or clear (`color: null`) a list's colour.
+///
+/// # Errors
+///
+/// Returns [`AppError::InvalidInput`] for a malformed colour or read-only list
+/// and propagates the `PROPPATCH` failure.
+#[tauri::command]
+pub async fn set_calendar_color(
+    app: AppHandle,
+    href: String,
+    color: Option<String>,
+) -> Result<(), AppError> {
+    let dir = crate::app_data_dir(&app)?;
+    let client = crate::commands::session::client_for(&app).await?;
+    let state = crate::commands::session::store_state(&app)?;
+    let mut store = state.lock().await;
+    super::calendars::set_color(&dir, &client, &mut store, &href, color).await
+}
+
+/// Delete a list, its resources and its sync token.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`]/[`AppError::InvalidInput`] for an unknown or
+/// read-only list and propagates the `DELETE` failure.
+#[tauri::command]
+pub async fn delete_calendar(app: AppHandle, href: String) -> Result<(), AppError> {
+    let dir = crate::app_data_dir(&app)?;
+    let client = crate::commands::session::client_for(&app).await?;
+    let state = crate::commands::session::store_state(&app)?;
+    let mut store = state.lock().await;
+    super::calendars::delete(&dir, &client, &mut store, &href).await
 }
 
 fn http_client(app: &AppHandle) -> Result<HttpClient, AppError> {

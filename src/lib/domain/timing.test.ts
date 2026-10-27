@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../bindings/EventInstance.generated';
-import { instanceOccursOnDay, isAllDayTiming } from './timing';
+import { instanceOccursOnDay } from './timing';
 
 function allDay(startDate: string, endDateExclusive: string): EventInstance {
     return {
@@ -50,12 +50,5 @@ describe('instanceOccursOnDay', () => {
         expect(instanceOccursOnDay(call, new Date(2026, 8, 7))).toBe(true);
         expect(instanceOccursOnDay(call, new Date(2026, 8, 8))).toBe(true);
         expect(instanceOccursOnDay(call, new Date(2026, 8, 9))).toBe(false);
-    });
-
-    it('discriminates timing variants', () => {
-        expect(isAllDayTiming(allDay('2026-09-07', '2026-09-08').timing)).toBe(true);
-        expect(isAllDayTiming(timed('2026-09-07T09:00:00Z', '2026-09-07T10:00:00Z').timing)).toBe(
-            false,
-        );
     });
 });

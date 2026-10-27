@@ -27,7 +27,7 @@ async fn fetch_resources_runs_an_initial_sync_then_one_multiget() {
         .mount(&server)
         .await;
 
-    let resources = test_client(&server)
+    let (resources, token) = test_client(&server)
         .fetch_resources(SQRT_CAL)
         .await
         .unwrap();
@@ -37,6 +37,10 @@ async fn fetch_resources_runs_an_initial_sync_then_one_multiget() {
         .calendar_data
         .as_deref()
         .is_some_and(|raw| raw.contains("UID:dsh-20261017-first-day-of-durga@dsh-import")));
+    assert_eq!(
+        token.as_deref(),
+        Some("http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435")
+    );
 }
 
 #[tokio::test]
@@ -107,6 +111,53 @@ async fn mkcalendar_creates_a_typed_collection() {
             "Google Tasks (imported)",
             CalendarComponent::VTodo,
         )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn renaming_a_collection_proppatches_its_display_name() {
+    let server = MockServer::start().await;
+    Mock::given(method("PROPPATCH"))
+        .and(path("/me/imported/"))
+        .and(body_string_contains("<d:displayname>Errands</d:displayname>"))
+        .respond_with(ResponseTemplate::new(207))
+        .mount(&server)
+        .await;
+
+    test_client(&server)
+        .set_display_name("/me/imported/", "Errands")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn clearing_a_collection_colour_removes_the_property() {
+    let server = MockServer::start().await;
+    Mock::given(method("PROPPATCH"))
+        .and(path("/me/imported/"))
+        .and(body_string_contains("<d:remove>"))
+        .respond_with(ResponseTemplate::new(207))
+        .mount(&server)
+        .await;
+
+    test_client(&server)
+        .set_calendar_color("/me/imported/", None)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn deleting_a_collection_sends_delete_and_accepts_404() {
+    let server = MockServer::start().await;
+    Mock::given(method("DELETE"))
+        .and(path("/me/imported/"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    test_client(&server)
+        .delete_collection("/me/imported/")
         .await
         .unwrap();
 }

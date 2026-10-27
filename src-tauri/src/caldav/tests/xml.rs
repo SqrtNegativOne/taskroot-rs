@@ -2,9 +2,9 @@
 
 use crate::caldav::model::CalendarComponent;
 use crate::caldav::xml::{
-    mkcalendar_body, multiget_body, parse_calendar_home_set, parse_collections,
-    parse_current_user_principal, parse_multiget, parse_sync_collection, resolve_href,
-    sync_collection_body, SYNC_COLLECTION_INITIAL_BODY,
+    calendar_color_body, mkcalendar_body, multiget_body, parse_calendar_home_set, parse_collections,
+    parse_current_user_principal, parse_multiget, parse_sync_collection, rename_calendar_body,
+    resolve_href, sync_collection_body, SYNC_COLLECTION_INITIAL_BODY,
 };
 
 use super::{HOME_PROPFIND, MULTIGET, PRINCIPAL_PROPFIND, ROOT_PROPFIND, SYNC_DELTA, SYNC_INITIAL};
@@ -223,4 +223,23 @@ fn mkcalendar_body_sets_the_display_name_and_component() {
 
     assert!(body.contains("<d:displayname>Tasks &amp; Notes</d:displayname>"));
     assert!(body.contains(r#"<c:comp name="VTODO"/>"#));
+}
+
+#[test]
+fn rename_calendar_body_is_a_propertyupdate_with_an_escaped_name() {
+    let body = rename_calendar_body("Work & <Home>");
+
+    assert!(body.contains(r#"<d:propertyupdate xmlns:d="DAV:">"#));
+    assert!(body.contains("<d:displayname>Work &amp; &lt;Home&gt;</d:displayname>"));
+}
+
+#[test]
+fn calendar_color_body_sets_or_removes_the_apple_property() {
+    let set = calendar_color_body(Some("#ff8800"));
+    assert!(set.contains("<ical:calendar-color>#ff8800</ical:calendar-color>"));
+    assert!(set.contains(r#"xmlns:ical="http://apple.com/ns/ical/""#));
+
+    let removed = calendar_color_body(None);
+    assert!(removed.contains("<d:remove><d:prop><ical:calendar-color/></d:prop></d:remove>"));
+    assert!(!removed.contains("<ical:calendar-color>"));
 }

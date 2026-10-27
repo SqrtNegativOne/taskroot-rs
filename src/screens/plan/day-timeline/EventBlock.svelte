@@ -139,7 +139,6 @@
     {@const compact = height < COMPACT_EVENT_HEIGHT_PX}
     {@const isShort = (end - start) <= SHORT_EVENT_DURATION_MINS}
     
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="day-event"
         class:ev-plan={!!event.taskId}

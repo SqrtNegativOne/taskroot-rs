@@ -1,6 +1,6 @@
 export type NotificationType = "info" | "error" | "success";
 
-export interface NotificationData {
+interface NotificationData {
     id: string;
     message: string;
     type: NotificationType;

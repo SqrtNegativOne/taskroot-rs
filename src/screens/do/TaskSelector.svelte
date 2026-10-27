@@ -16,9 +16,7 @@
 </script>
 
 {#if selectorOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="task-selector-overlay" role="presentation" onclick={onCloseSelector}>
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="task-selector-modal" role="dialog" tabindex="-1" onclick={(e) => e.stopPropagation()}>
             <h3>Select a task</h3>
             <ul class="task-list">

@@ -1,6 +1,6 @@
 //! Whole-resource writes: read-modify-write over the raw body.
 //!
-//! Invariants I1–I3 from `caldav-migration-plan.md` §7:
+//! Invariants I1–I3 (also stated in `AGENTS.md`):
 //!
 //! - **I1** — `PUT` replaces the resource, so a write starts from the body that was
 //!   fetched and only the properties listed in [`events::event_specs`] /
@@ -12,9 +12,14 @@
 //! - **I3** — nothing is round-tripped through `icalendar`'s serializer except a
 //!   brand-new resource, which has nothing to preserve.
 
-use crate::domain::{AppEvent, AppTask, AppTaskStatus, EventStatus, TaskId, TaskPriority};
+use crate::domain::{
+    AppEvent, AppTask, AppTaskStatus, EventStatus, TaskAlarmAnchor, TaskAlarmTrigger, TaskId,
+    TaskPriority,
+};
 use crate::error::AppError;
-use crate::ics::lines::{ComponentSpan, Document, OwnedKind, PropertySpec};
+use crate::ics::lines::{
+    ComponentSpan, Document, NestedInstance, NestedSpec, OwnedKind, PropertySpec,
+};
 use crate::ics::read;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use chrono_tz::Tz as ChronoTz;
@@ -29,6 +34,10 @@ const DTO_DATE_TIME: &str = "%Y-%m-%dT%H:%M:%S";
 
 const EVENT_KIND: &str = "VEVENT";
 const TASK_KIND: &str = "VTODO";
+const ALARM_KIND: &str = "VALARM";
+/// The body tasks.org gives a `DISPLAY` alarm; mirrored so a resource written
+/// here is indistinguishable from one the Android app wrote.
+const DISPLAY_ALARM_DESCRIPTION: &str = "Default Tasks.org description";
 
 /// Merge an edited event into `raw`, adding its component when the resource does
 /// not hold it yet (the importer uses that to append exception instances).
@@ -45,7 +54,7 @@ pub fn write_event_resource(raw: &str, event: &AppEvent) -> Result<String, AppEr
         .position(|candidate| candidate.id == event.id)
     {
         let span = nth_kind(&spans, EVENT_KIND, position)?;
-        return Ok(document.edit_component(span, &event_specs(event)));
+        return Ok(document.edit_component(span, &event_specs(event), &[]));
     }
     ensure_single_uid(&spans, EVENT_KIND, &uid)?;
     let specs = event_specs(event);
@@ -59,18 +68,29 @@ pub fn write_event_resource(raw: &str, event: &AppEvent) -> Result<String, AppEr
 /// Merge an edited task into `raw` in place. A VTODO resource holds exactly one
 /// component per UID, so a missing UID is a stale caller, not an insert.
 ///
+/// `VALARM` is only rewritten when the DTO's reminder list differs from what the
+/// resource already held: an unchanged list leaves every alarm byte-identical,
+/// including alarms this crate cannot model.
+///
 /// # Errors
 /// Returns [`AppError::InvalidInput`] when `raw` is unparseable, and
 /// [`AppError::NotFound`] when no VTODO has this task's UID.
 pub fn write_task_resource(raw: &str, task: &AppTask) -> Result<String, AppError> {
     let document = Document::parse(raw);
     let spans = document.components();
-    let position = read::tasks(raw)?
+    let tasks = read::tasks(raw)?;
+    let position = tasks
         .iter()
         .position(|candidate| candidate.id == task.id)
         .ok_or_else(|| AppError::NotFound(format!("VTODO {} is not in this resource", task.id)))?;
     let span = nth_kind(&spans, TASK_KIND, position)?;
-    Ok(document.edit_component(span, &task_specs(task)))
+    let previous = tasks.get(position);
+    let nested = if previous.is_some_and(|previous| previous.alarms == task.alarms) {
+        Vec::new()
+    } else {
+        vec![task_alarm_spec(task)]
+    };
+    Ok(document.edit_component(span, &task_specs(task), &nested))
 }
 
 /// Remove one event component.
@@ -124,6 +144,10 @@ pub fn delete_task_component(raw: &str, task: &AppTask) -> Result<Option<String>
 /// The DTO's `id` is the UID; an exception (`recurring_event_id` set) also gets a
 /// `RECURRENCE-ID`.
 ///
+/// # Errors
+///
+/// Returns [`AppError::InvalidInput`] when the event's timing strings cannot be
+/// parsed or its fields violate the `VEVENT` contract.
 pub fn create_event_resource(event: &AppEvent) -> Result<String, AppError> {
     let mut component = Event::new();
     for line in event_header_lines(event, &event_uid(event)) {
@@ -135,12 +159,25 @@ pub fn create_event_resource(event: &AppEvent) -> Result<String, AppError> {
 
 /// Build a new one-component VTODO resource with `icalendar`'s builder.
 ///
+/// # Errors
+/// Returns [`AppError::Internal`] if the built body unexpectedly lacks its
+/// `VTODO`, which would mean the builder dropped the component.
 pub fn create_task_resource(task: &AppTask) -> Result<String, AppError> {
     let mut component = Todo::new();
     append_line(&mut component, &format!("UID:{}", task.id));
     // `task_specs` owns DTSTAMP and sets exactly one.
     append_specs(&mut component, &task_specs(task));
-    Ok(render_calendar(component))
+    let rendered = render_calendar(component);
+    if task.alarms.as_ref().is_none_or(Vec::is_empty) {
+        return Ok(rendered);
+    }
+    let document = Document::parse(&rendered);
+    let spans = document.components();
+    let span = spans
+        .iter()
+        .find(|span| span.kind == TASK_KIND)
+        .ok_or_else(|| AppError::Internal("the built resource has no VTODO".to_string()))?;
+    Ok(document.edit_component(span, &[], &[task_alarm_spec(task)]))
 }
 
 fn render_calendar(component: impl Into<icalendar::CalendarComponent>) -> String {
@@ -309,12 +346,20 @@ fn event_specs(event: &AppEvent) -> Vec<PropertySpec> {
                 .as_ref()
                 .map(|color| format!("COLOR:{}", color.0)),
         ),
+        PropertySpec::optional(
+            OwnedKind::Name("X-TASKROOT-TASK-ID"),
+            event
+                .task_id
+                .as_ref()
+                .map(|id| format!("X-TASKROOT-TASK-ID:{}", escape_text(&id.0))),
+        ),
     ]
 }
 
 fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
     let done = task.status == Some(AppTaskStatus::Done);
     let stamp = Utc::now().format(ICAL_UTC).to_string();
+    let zone = task.timezone.as_deref();
     vec![
         PropertySpec::new(
             OwnedKind::Name("SUMMARY"),
@@ -327,8 +372,16 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
                 .map(|notes| format!("DESCRIPTION:{}", escape_text(notes))),
         ),
         PropertySpec::optional(
+            OwnedKind::Name("DTSTART"),
+            task_date_line("DTSTART", task.start.as_deref(), zone),
+        ),
+        PropertySpec::optional(
             OwnedKind::Name("DUE"),
-            task.due.as_deref().and_then(due_line),
+            task_date_line("DUE", task.due.as_deref(), zone),
+        ),
+        PropertySpec::new(
+            OwnedKind::Name("RRULE"),
+            rrule_lines(task.rrule.as_deref()),
         ),
         PropertySpec::new(
             OwnedKind::Name("STATUS"),
@@ -337,25 +390,20 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
                 if done { "COMPLETED" } else { "NEEDS-ACTION" }
             )],
         ),
-        PropertySpec::optional(
-            OwnedKind::Name("COMPLETED"),
-            done.then(|| format!("COMPLETED:{stamp}")),
-        ),
+        PropertySpec::optional(OwnedKind::Name("COMPLETED"), completed_line(task, done, &stamp)),
         PropertySpec::optional(
             OwnedKind::Name("PERCENT-COMPLETE"),
             done.then(|| "PERCENT-COMPLETE:100".to_string()),
         ),
         PropertySpec::new(
             OwnedKind::Name("PRIORITY"),
-            vec![format!(
-                "PRIORITY:{}",
-                priority_value(task.priority.as_ref())
-            )],
+            priority_lines(task.priority.as_ref()),
         ),
         PropertySpec::new(
             OwnedKind::Name("CATEGORIES"),
             category_lines(task.tags.as_deref()),
         ),
+        PropertySpec::optional(OwnedKind::Name("GEO"), geo_line(task)),
         PropertySpec::new(
             OwnedKind::ParentRelation,
             related_lines(task.parent_task.as_ref()),
@@ -408,6 +456,90 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
         ),
         PropertySpec::new(OwnedKind::Name("DTSTAMP"), vec![format!("DTSTAMP:{stamp}")]),
     ]
+}
+
+/// `COMPLETED` carries the DTO's timestamp so editing a finished task does not
+/// move its completion time; a task completed without one gets "now".
+fn completed_line(task: &AppTask, done: bool, stamp: &str) -> Option<String> {
+    if !done {
+        return None;
+    }
+    Some(
+        task.completed_at
+            .as_deref()
+            .and_then(|at| stamp_line("COMPLETED", at))
+            .unwrap_or_else(|| format!("COMPLETED:{stamp}")),
+    )
+}
+
+fn geo_line(task: &AppTask) -> Option<String> {
+    let geo = task.geo?;
+    Some(format!("GEO:{};{}", geo.latitude, geo.longitude))
+}
+
+/// The desired `VALARM` set: property groups for alarms that already exist and a
+/// complete block for each one that has to be created.
+fn task_alarm_spec(task: &AppTask) -> NestedSpec {
+    let mut spec = NestedSpec::new(ALARM_KIND);
+    for alarm in task.alarms.as_deref().unwrap_or_default() {
+        let Some(trigger) = alarm_trigger_line(alarm) else {
+            continue;
+        };
+        spec.instances.push(NestedInstance::new(
+            vec![PropertySpec::new(
+                OwnedKind::Name("TRIGGER"),
+                vec![trigger.clone()],
+            )],
+            vec![
+                format!("BEGIN:{ALARM_KIND}"),
+                trigger,
+                "ACTION:DISPLAY".to_string(),
+                format!("DESCRIPTION:{DISPLAY_ALARM_DESCRIPTION}"),
+                format!("END:{ALARM_KIND}"),
+            ],
+        ));
+    }
+    spec
+}
+
+fn alarm_trigger_line(alarm: &TaskAlarmTrigger) -> Option<String> {
+    match alarm {
+        TaskAlarmTrigger::Relative {
+            minutes_before,
+            anchor,
+        } => {
+            let related = match anchor {
+                TaskAlarmAnchor::Start => "START",
+                TaskAlarmAnchor::End => "END",
+            };
+            Some(format!(
+                "TRIGGER;RELATED={related}:{}",
+                trigger_duration(*minutes_before)
+            ))
+        }
+        TaskAlarmTrigger::Absolute { at } => {
+            let stamp = parse_datetime(at)?;
+            Some(format!("TRIGGER;VALUE=DATE-TIME:{}", stamp.format(ICAL_UTC)))
+        }
+    }
+}
+
+/// A duration for `minutes_before`: negative ("before") or positive ("after").
+fn trigger_duration(minutes_before: i32) -> String {
+    if minutes_before > 0 {
+        format!("-PT{minutes_before}M")
+    } else {
+        format!("PT{}M", minutes_before.unsigned_abs())
+    }
+}
+
+/// tasks.org omits `PRIORITY` for "none" and buckets `1..=4` as high, `5` as
+/// medium and `6..=9` as low; these are the in-bucket values it writes.
+fn priority_lines(priority: Option<&TaskPriority>) -> Vec<String> {
+    match priority_value(priority) {
+        0 => Vec::new(),
+        value => vec![format!("PRIORITY:{value}")],
+    }
 }
 
 fn is_all_day(event: &AppEvent) -> bool {
@@ -483,11 +615,18 @@ fn rrule_lines(rrule: Option<&str>) -> Vec<String> {
         .collect()
 }
 
-fn due_line(due: &str) -> Option<String> {
-    if let Ok(date) = NaiveDate::parse_from_str(due, DTO_DATE) {
-        return Some(format!("DUE;VALUE=DATE:{}", date.format(ICAL_DATE)));
+/// A `DTSTART`/`DUE` line: `VALUE=DATE` for a date-only value, otherwise the
+/// wall clock in `zone` (floating when the task has no zone).
+fn task_date_line(name: &str, value: Option<&str>, zone: Option<&str>) -> Option<String> {
+    let value = value?;
+    if let Ok(date) = NaiveDate::parse_from_str(value, DTO_DATE) {
+        return Some(format!("{name};VALUE=DATE:{}", date.format(ICAL_DATE)));
     }
-    wall_clock(due, None).map(|naive| format!("DUE:{}", naive.format(ICAL_DATE_TIME)))
+    let naive = wall_clock(value, zone)?;
+    Some(zone.map_or_else(
+        || format!("{name}:{}", naive.format(ICAL_DATE_TIME)),
+        |timezone| format!("{name};TZID={timezone}:{}", naive.format(ICAL_DATE_TIME)),
+    ))
 }
 
 fn stamp_line(name: &str, value: &str) -> Option<String> {

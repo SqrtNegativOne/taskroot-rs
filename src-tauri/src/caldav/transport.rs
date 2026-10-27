@@ -1,10 +1,10 @@
-//! HTTP transport for the CalDAV client.
+//! HTTP transport for the `CalDAV` client.
 //!
 //! One long-lived [`reqwest::Client`] is built once and registered in Tauri's
 //! managed state as [`HttpClient`]; every [`CalDavClient`] clones that client
 //! instead of building a new connection pool per request.
 //!
-//! [`CalDavClient::send`] maps the CalDAV-relevant failure statuses onto the
+//! [`CalDavClient::send`] maps the `CalDAV`-relevant failure statuses onto the
 //! application's error contract (`401` → auth, `412` → conflict, `410` → gone,
 //! any other non-`2xx` → sync). [`CalDavClient::send_raw`] skips that mapping
 //! so discovery can follow a redirect and so a delete can treat `404` as
@@ -42,7 +42,7 @@ impl HttpClient {
     }
 }
 
-/// A CalDAV request, resolved against the client's server URL.
+/// A `CalDAV` request, resolved against the client's server URL.
 pub struct CalDavRequest<'a> {
     pub method: &'a str,
     pub path: &'a str,
@@ -95,6 +95,11 @@ impl<'a> CalDavRequest<'a> {
     }
 
     #[must_use]
+    pub const fn proppatch(path: &'a str, body: &'a str) -> Self {
+        Self::new("PROPPATCH", path).with_body(body)
+    }
+
+    #[must_use]
     pub const fn with_depth(mut self, depth: &'a str) -> Self {
         self.depth = Some(depth);
         self
@@ -125,7 +130,7 @@ impl<'a> CalDavRequest<'a> {
     }
 }
 
-/// What every request returns: the status, the response ETag (quotes kept) and
+/// What every request returns: the status, the response `ETag` (quotes kept) and
 /// the decoded body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Response {
@@ -147,7 +152,7 @@ impl Response {
     }
 }
 
-/// A CalDAV client bound to one server and one set of Basic credentials.
+/// A `CalDAV` client bound to one server and one set of Basic credentials.
 pub struct CalDavClient {
     http: reqwest::Client,
     base_url: Url,

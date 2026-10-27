@@ -9,6 +9,48 @@ export type InvokeFn = (command: string, args?: InvokeArgs) => Promise<unknown>;
 /** Handler registered for a single command; receives the args bag. */
 export type CommandHandler = (args: InvokeArgs | undefined) => unknown;
 
+/** The runtime globals that the externalized `@tauri-apps/api` modules read. */
+interface TauriInternals {
+    transformCallback: (callback: unknown, once?: boolean) => number;
+    unregisterCallback: (id: number) => void;
+    invoke: (command: string, args?: unknown, options?: unknown) => Promise<unknown>;
+    convertFileSrc: (path: string, protocol?: string) => string;
+}
+
+interface TauriEventInternals {
+    unregisterListener: (event: string, eventId: number) => void;
+}
+
+type TauriGlobalWindow = Window & {
+    __TAURI_INTERNALS__?: TauriInternals;
+    __TAURI_EVENT_PLUGIN_INTERNALS__?: TauriEventInternals;
+};
+
+let nextCallbackId = 1;
+
+/**
+ * Installs the Tauri runtime globals that `@tauri-apps/api` reads directly.
+ *
+ * `@tauri-apps/api/event` is externalized under Vitest, so its `listen()` calls
+ * (and the unlisten function it returns) bypass `vi.mock('@tauri-apps/api/core')`
+ * and need these globals to exist. Calling this repeatedly replaces the globals
+ * with an equivalent set, and unlisten stays a no-op that resolves cleanly.
+ */
+export function installTauriGlobals(): void {
+    if (typeof window === 'undefined') return;
+
+    const globals = window as TauriGlobalWindow;
+    globals.__TAURI_INTERNALS__ = {
+        transformCallback: () => nextCallbackId++,
+        unregisterCallback: () => { /* noop */ },
+        invoke: () => Promise.resolve(undefined),
+        convertFileSrc: (path) => path,
+    };
+    globals.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+        unregisterListener: () => { /* noop */ },
+    };
+}
+
 export interface TauriMock {
     /** The mocked `invoke`, for direct `expect(invoke)...` assertions. */
     readonly invoke: Mock<InvokeFn>;

@@ -22,7 +22,7 @@ pub enum CalendarComponent {
 }
 
 impl CalendarComponent {
-    /// The value a CalDAV `comp` element carries.
+    /// The value a `CalDAV` `comp` element carries.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {

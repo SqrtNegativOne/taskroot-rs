@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Store-backed settings command tests.
 
 use super::{storage, AppSettings};

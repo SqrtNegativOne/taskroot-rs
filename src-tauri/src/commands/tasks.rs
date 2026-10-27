@@ -4,9 +4,9 @@ use crate::error::AppError;
 use crate::store::ops;
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value, clippy::must_use_candidate)]
+#[must_use]
 pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
-    domain::parse_sigils(&task_name)
+    domain::parse_sigils(task_name)
 }
 
 /// # Errors

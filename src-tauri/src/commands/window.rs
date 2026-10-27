@@ -2,7 +2,6 @@ use crate::domain::WindowLabel;
 use tauri::Manager;
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn window_restore_main(app: tauri::AppHandle) {
     if let Some(main_win) = app.get_webview_window(WindowLabel::Main.as_str()) {
         let _ = main_win.show();
@@ -12,7 +11,6 @@ pub fn window_restore_main(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn show_minitracker(app: tauri::AppHandle) {
     if let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) {
         let _ = mini_win.show();
@@ -23,7 +21,6 @@ pub fn show_minitracker(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn hide_launcher(app: tauri::AppHandle) {
     if let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) {
         let _ = launcher_win.hide();
@@ -32,7 +29,6 @@ pub fn hide_launcher(app: tauri::AppHandle) {
 
 /// Show the full-screen, click-through phase-transition effect overlay.
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn show_screen_effect(app: tauri::AppHandle) {
     if let Some(effect_win) = app.get_webview_window(WindowLabel::Effect.as_str()) {
         let _ = effect_win.set_always_on_top(true);
@@ -41,7 +37,6 @@ pub fn show_screen_effect(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn hide_screen_effect(app: tauri::AppHandle) {
     if let Some(effect_win) = app.get_webview_window(WindowLabel::Effect.as_str()) {
         let _ = effect_win.hide();
@@ -50,7 +45,6 @@ pub fn hide_screen_effect(app: tauri::AppHandle) {
 
 /// Quit the whole application (used by the mini tracker's double-click).
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -71,13 +65,11 @@ pub fn toggle_launcher_window(app: &tauri::AppHandle) {
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn toggle_launcher(app: tauri::AppHandle) {
     toggle_launcher_window(&app);
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
 pub fn resize_launcher(app: tauri::AppHandle, width: f64, height: f64) {
     if let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) {
         let _ = launcher_win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(width, height)));

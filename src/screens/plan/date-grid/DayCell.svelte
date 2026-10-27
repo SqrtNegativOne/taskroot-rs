@@ -10,8 +10,9 @@
     let {
         cell,
         today,
+        nowMs,
         events,
-        isWeek,
+        isSingleWeek,
         dragState,
         onEventDragStart,
         onAddEvent,
@@ -20,8 +21,9 @@
     }: {
         cell: { date: Date; outOfMonth: boolean };
         today: Date;
+        nowMs: number;
         events: EventInstance[];
-        isWeek: boolean;
+        isSingleWeek: boolean;
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
@@ -56,16 +58,12 @@
         eventsEl.scrollTop = Math.min(maxScroll, Math.max(0, eventsEl.scrollTop + delta));
     }
 
-    // Animation logic
-    let displayEvents = $derived(events);
-
     function checkPastDue(ev: EventInstance): boolean {
         if (!ev.taskId || ev.timing.kind !== 'timed') return false;
-        return new Date(ev.timing.end).getTime() < Date.now();
+        return new Date(ev.timing.end).getTime() < nowMs;
     }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     data-drop-kind="grid-day"
     data-drop-date={cellDateStr}
@@ -73,7 +71,7 @@
     class:is-out={cell.outOfMonth}
     class:is-today={isToday}
     class:is-past={isPast}
-    class:is-strip={isWeek}
+    class:is-strip={isSingleWeek}
     class:is-drag-over={isDragOver}
     class:can-accept={canAccept}
     onwheel={handleWheel}
@@ -90,17 +88,14 @@
     </div>
     <div class="day-cell-events">
         <div class="day-cell-events-scroll" bind:this={eventsEl}>
-            {#each displayEvents as ev (ev.occurrenceKey)}
+            {#each events as ev (ev.occurrenceKey)}
                 {@const title = ev.title}
-                {@const isDone = false /* TODO: pull done from task */}
                 {@const isPastDue = checkPastDue(ev)}
                 {@const isAllDay = ev.timing.kind === 'allDay'}
                 {@const readOnly = isEventReadOnly(ev, calendars)}
                 
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div
                     class="day-cell-event"
-                    class:is-done={isDone}
                     class:is-readonly={readOnly}
                     style="
                         cursor: {readOnly ? 'default' : 'grab'};

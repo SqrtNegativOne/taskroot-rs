@@ -1,4 +1,4 @@
-//! CalDAV request bodies and `roxmltree` response parsers.
+//! `CalDAV` request bodies and `roxmltree` response parsers.
 //!
 //! Responses are matched by local element name, so a server may use any XML
 //! namespace prefix (Radicale emits `C:` / `ICAL:` in some responses and the
@@ -73,7 +73,7 @@ pub fn sync_collection_body(token: Option<&str>) -> String {
     )
 }
 
-/// A `calendar-multiget` body asking for the ETag and body of every href.
+/// A `calendar-multiget` body asking for the `ETag` and body of every href.
 #[must_use]
 pub fn multiget_body(hrefs: &[String]) -> String {
     let mut body = String::from(concat!(
@@ -103,6 +103,48 @@ pub fn mkcalendar_body(display_name: &str, component: CalendarComponent) -> Stri
         ),
         escape_xml(display_name),
         component.as_str()
+    )
+}
+
+/// A `PROPPATCH` body renaming an existing collection.
+#[must_use]
+pub fn rename_calendar_body(display_name: &str) -> String {
+    format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="utf-8"?>"#,
+            r#"<d:propertyupdate xmlns:d="DAV:">"#,
+            r#"<d:set><d:prop><d:displayname>{}</d:displayname></d:prop></d:set>"#,
+            r#"</d:propertyupdate>"#,
+        ),
+        escape_xml(display_name)
+    )
+}
+
+/// A `PROPPATCH` body setting `calendar-color`, or removing it when `color` is
+/// `None` (the app's "no colour" state).
+#[must_use]
+pub fn calendar_color_body(color: Option<&str>) -> String {
+    let operation = color.map_or_else(
+        || "<d:remove><d:prop><ical:calendar-color/></d:prop></d:remove>".to_string(),
+        |color| {
+            format!(
+                concat!(
+                    r#"<d:set><d:prop>"#,
+                    r#"<ical:calendar-color>{}</ical:calendar-color>"#,
+                    r#"</d:prop></d:set>"#,
+                ),
+                escape_xml(color)
+            )
+        },
+    );
+    format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="utf-8"?>"#,
+            r#"<d:propertyupdate xmlns:d="DAV:" xmlns:ical="http://apple.com/ns/ical/">"#,
+            "{}",
+            r#"</d:propertyupdate>"#,
+        ),
+        operation
     )
 }
 

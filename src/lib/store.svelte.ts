@@ -1,6 +1,7 @@
 import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
+import { notify } from './notifications.svelte';
 import type { AppTask, AppEvent } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
 
@@ -11,6 +12,7 @@ export function describeError(error: unknown): string {
 export class AppStore {
     settings = $state<AppSettings | null>(null);
     loaded = $state(false);
+    /** Fatal load/bootstrap failure; per-operation failures are surfaced as notifications. */
     error = $state<string | null>(null);
 
     private initPromise: Promise<Result<void, AppError>> | undefined;
@@ -53,6 +55,21 @@ export class AppStore {
         return ok(undefined);
     }
 
+    /**
+     * Run a mutation and report failure as a transient error notification.
+     * `store.error` stays reserved for the fatal load/bootstrap path.
+     */
+    async mutate<T>(
+        operation: string,
+        action: () => Promise<Result<T, AppError>>,
+    ): Promise<Result<T, AppError>> {
+        const result = await action();
+        if (result.isErr()) {
+            notify(`${operation}: ${describeAppError(result.error)}`, 'error');
+        }
+        return result;
+    }
+
     addTask(task: AppTask): Promise<Result<void, AppError>> {
         return this.commit(safeInvoke('create_task', { task }));
     }
@@ -87,6 +104,25 @@ export class AppStore {
 
     deleteEvent(id: string): Promise<Result<void, AppError>> {
         return this.commit(safeInvoke('delete_event', { id }));
+    }
+
+    createCalendar(
+        displayName: string,
+        component: 'VEVENT' | 'VTODO',
+    ): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('create_calendar', { displayName, component }));
+    }
+
+    renameCalendar(href: string, displayName: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('rename_calendar', { href, displayName }));
+    }
+
+    setCalendarColor(href: string, color: string | null): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('set_calendar_color', { href, color }));
+    }
+
+    deleteCalendar(href: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('delete_calendar', { href }));
     }
 
     private async commit(command: ResultAsync<unknown, AppError>): Promise<Result<void, AppError>> {

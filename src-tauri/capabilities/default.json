@@ -19,6 +19,7 @@
     "core:window:allow-primary-monitor",
     "core:window:allow-unminimize",
     "core:window:allow-set-focus",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "notification:default"
   ]
 }

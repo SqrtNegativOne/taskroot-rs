@@ -30,7 +30,8 @@ pub struct SigilProperties {
 }
 
 #[must_use]
-pub fn parse_sigils(input: &str) -> ParsedSigils {
+pub fn parse_sigils(input: impl AsRef<str>) -> ParsedSigils {
+    let input = input.as_ref();
     let mut title_words = Vec::new();
     let mut properties = SigilProperties::default();
 
@@ -104,7 +105,6 @@ fn parse_duration(s: &str) -> Option<i32> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]

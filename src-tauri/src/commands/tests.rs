@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Command-layer contract tests.
 //!
 //! The handlers cannot be invoked from a test binary (see `test_support`), so
