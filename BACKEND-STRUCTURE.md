@@ -23,7 +23,7 @@ graph TD
             cal_ics["ics/"]
             cal_store["store/"]
             cal_sync["sync"]
-            cal_inst["instances"]
+            cal_occ["occurrences"]
             cal_hook["hook"]
         end
         sw["stopwatch/"]
@@ -52,12 +52,12 @@ graph TD
 
     cal_session --> cal_store
     cal_session --> cal_caldav
-    cal_session --> cal_inst
+    cal_session --> cal_occ
     cal_session --> settings
 
     cal_sync --> cal_store
     cal_hook --> cal_sync
-    cal_inst --> cal_dom
+    cal_occ --> cal_dom
     cal_store --> cal_ics
     cal_store --> cal_caldav
     cal_store --> cal_dom
@@ -74,7 +74,7 @@ graph TD
 
 Rules encoded above:
 
-- `calendar/session` is the only calendar-facing API for `ipc/` and `cli/`. It owns the `Store` + `CalDavClient` pairing and exposes task, event, instance and calendar operations.
+- `calendar/session` is the only calendar-facing API for `ipc/` and `cli/`. It owns the `Store` + `CalDavClient` pairing and exposes task, event, occurrence and calendar operations.
 - `ipc/` and `cli/` do not import `calendar/store` or `calendar/caldav` directly. Type-only imports are the exception.
 - `calendar/domain` is the leaf; it imports nothing outside `calendar/`.
 - `calendar/store` is the only writer; `sync` and `hook` call it.
