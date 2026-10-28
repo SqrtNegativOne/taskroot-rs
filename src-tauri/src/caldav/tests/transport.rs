@@ -5,7 +5,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::caldav::transport::CalDavRequest;
 
-use super::{test_client, MULTIGET, SYNC_INVALID_TOKEN, UNAUTHORIZED};
+use super::{test_client, MULTIGET, UNAUTHORIZED};
 
 #[tokio::test]
 async fn a_multiget_response_keeps_its_etag_and_body() {
@@ -110,10 +110,13 @@ async fn gone_maps_to_gone() {
 }
 
 #[tokio::test]
-async fn a_rejected_sync_token_is_a_sync_error_with_status_and_snippet() {
+async fn a_forbidden_response_is_a_sync_error_with_status_and_snippet() {
     let server = MockServer::start().await;
     Mock::given(method("REPORT"))
-        .respond_with(ResponseTemplate::new(403).set_body_string(SYNC_INVALID_TOKEN))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_string(r#"<d:error xmlns:d="DAV:"><d:valid-sync-token/></d:error>"#),
+        )
         .mount(&server)
         .await;
 
@@ -126,7 +129,7 @@ async fn a_rejected_sync_token_is_a_sync_error_with_status_and_snippet() {
     let message = error.to_string();
     assert!(message.contains("403"), "message was: {message}");
     assert!(
-        message.contains("<valid-sync-token"),
+        message.contains("<d:valid-sync-token"),
         "the snippet carries the server body: {message}"
     );
 }

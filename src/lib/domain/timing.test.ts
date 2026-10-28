@@ -6,6 +6,7 @@ function allDay(startDate: string, endDateExclusive: string): EventInstance {
     return {
         id: 'e1',
         occurrenceKey: `e1@${startDate}`,
+        occurrenceStart: startDate,
         title: 'Trip',
         timing: { kind: 'allDay', startDate, endDateExclusive },
         recurring: false,
@@ -17,6 +18,7 @@ function timed(startIso: string, endIso: string): EventInstance {
     return {
         id: 'e2',
         occurrenceKey: `e2@${startIso}`,
+        occurrenceStart: startIso,
         title: 'Call',
         timing: { kind: 'timed', start: startIso, end: endIso, timezone: null },
         recurring: false,

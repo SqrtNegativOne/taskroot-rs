@@ -379,10 +379,7 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
             OwnedKind::Name("DUE"),
             task_date_line("DUE", task.due.as_deref(), zone),
         ),
-        PropertySpec::new(
-            OwnedKind::Name("RRULE"),
-            rrule_lines(task.rrule.as_deref()),
-        ),
+        PropertySpec::new(OwnedKind::Name("RRULE"), rrule_lines(task.rrule.as_deref())),
         PropertySpec::new(
             OwnedKind::Name("STATUS"),
             vec![format!(
@@ -390,7 +387,10 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
                 if done { "COMPLETED" } else { "NEEDS-ACTION" }
             )],
         ),
-        PropertySpec::optional(OwnedKind::Name("COMPLETED"), completed_line(task, done, &stamp)),
+        PropertySpec::optional(
+            OwnedKind::Name("COMPLETED"),
+            completed_line(task, done, &stamp),
+        ),
         PropertySpec::optional(
             OwnedKind::Name("PERCENT-COMPLETE"),
             done.then(|| "PERCENT-COMPLETE:100".to_string()),
@@ -519,7 +519,10 @@ fn alarm_trigger_line(alarm: &TaskAlarmTrigger) -> Option<String> {
         }
         TaskAlarmTrigger::Absolute { at } => {
             let stamp = parse_datetime(at)?;
-            Some(format!("TRIGGER;VALUE=DATE-TIME:{}", stamp.format(ICAL_UTC)))
+            Some(format!(
+                "TRIGGER;VALUE=DATE-TIME:{}",
+                stamp.format(ICAL_UTC)
+            ))
         }
     }
 }

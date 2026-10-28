@@ -5,7 +5,6 @@
 //! gate needs no running Radicale. The single test that does need the real
 //! server is `#[ignore]`d.
 
-
 mod account;
 mod client;
 mod discovery;
@@ -20,10 +19,6 @@ pub(super) const ROOT_PROPFIND: &str = include_str!("../fixtures/root_propfind.x
 pub(super) const PRINCIPAL_PROPFIND: &str = include_str!("../fixtures/principal_propfind.xml");
 pub(super) const HOME_PROPFIND: &str = include_str!("../fixtures/home_propfind.xml");
 pub(super) const MULTIGET: &str = include_str!("../fixtures/multiget.xml");
-pub(super) const SYNC_INITIAL: &str = include_str!("../fixtures/sync_collection_initial.xml");
-pub(super) const SYNC_DELTA: &str = include_str!("../fixtures/sync_collection_delta.xml");
-pub(super) const SYNC_INVALID_TOKEN: &str =
-    include_str!("../fixtures/sync_collection_invalid_token.xml");
 pub(super) const UNAUTHORIZED: &str = include_str!("../fixtures/unauthorized_status.txt");
 
 /// A `CalDavClient` pointed at a wiremock server.

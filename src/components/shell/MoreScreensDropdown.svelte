@@ -13,8 +13,7 @@
         graph: Routes.GRAPH,
         stats: Routes.STATS,
         recap: Routes.RECAP,
-        docs: Routes.DOCS,
-        dev: Routes.DEV
+        docs: Routes.DOCS
     } as const;
 
     type Screen = keyof typeof STAGE_ROUTES;

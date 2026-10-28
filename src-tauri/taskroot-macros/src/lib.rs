@@ -185,7 +185,6 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
         let mut options: Vec<SettingOptionTokens> = Vec::new();
         let mut min: Option<LitInt> = None;
         let mut max: Option<LitInt> = None;
-        let mut danger = false;
         let mut keywords_seen = false;
         let mut options_seen = false;
 
@@ -217,11 +216,6 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                     set_once(&mut min, meta.value()?.parse::<LitInt>()?, &meta, "min")?;
                 } else if meta.path.is_ident("max") {
                     set_once(&mut max, meta.value()?.parse::<LitInt>()?, &meta, "max")?;
-                } else if meta.path.is_ident("danger") {
-                    if danger {
-                        return Err(meta.error("duplicate `danger` in #[setting(..)]"));
-                    }
-                    danger = true;
                 } else if meta.path.is_ident("keywords") {
                     if keywords_seen {
                         return Err(meta.error("duplicate `keywords` in #[setting(..)]"));
@@ -248,7 +242,7 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                 } else {
                     return Err(meta.error(
                         "unknown setting attribute; expected label, kind, section, \
-                         description, keywords, options, min, max or danger",
+                         description, keywords, options, min or max",
                     ));
                 }
                 Ok(())
@@ -300,11 +294,6 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
             Some(value) => quote! { Some(#value) },
             None => quote! { None },
         };
-        let danger = if danger {
-            quote! { Some(true) }
-        } else {
-            quote! { None }
-        };
 
         entries.push(quote! {
             crate::settings::SettingMeta {
@@ -320,7 +309,6 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                     serde_json::to_value(&__defaults.#field_name)
                         .unwrap_or(serde_json::Value::Null),
                 ),
-                danger: #danger,
                 section: #section,
             }
         });

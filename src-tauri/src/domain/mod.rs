@@ -233,7 +233,10 @@ pub struct GeoPoint {
 
 /// What a relative reminder counts from.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/TaskAlarmAnchor.generated.ts")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/TaskAlarmAnchor.generated.ts"
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum TaskAlarmAnchor {
     /// `TRIGGER;RELATED=START` (the default): the task's start, or its due time
@@ -245,8 +248,15 @@ pub enum TaskAlarmAnchor {
 
 /// One `VALARM` trigger, in the two shapes tasks.org writes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/TaskAlarmTrigger.generated.ts")]
-#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/TaskAlarmTrigger.generated.ts"
+)]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum TaskAlarmTrigger {
     /// `TRIGGER;RELATED=…:-PT15M`. `minutesBefore` is positive for "before"
     /// and negative for "after"; `0` means "at the anchor".
@@ -345,6 +355,19 @@ impl EventStatus {
     pub fn all_values() -> Vec<String> {
         vec!["confirmed".into(), "tentative".into(), "cancelled".into()]
     }
+}
+
+/// Which occurrences of a recurring event a write applies to.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/EventScope.generated.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum EventScope {
+    /// Only the selected occurrence; every other occurrence is untouched.
+    This,
+    /// The selected occurrence and every later one.
+    Following,
+    /// The whole series, including its exceptions.
+    All,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]

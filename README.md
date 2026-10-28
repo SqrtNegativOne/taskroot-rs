@@ -5,9 +5,9 @@ taskroot is a local-first desktop task manager built around a simple cycle: **pl
 ## Tech Stack
 - **Frontend**: Svelte 5 (runes) + SvelteKit in SPA mode (Vite, static adapter)
 - **Backend**: Tauri v2 (Rust) exposing typed IPC commands (`Result<T, AppError>`)
-- **Storage**: In-memory CalDAV store with JSON settings/UI state and a read-only `snapshot.json` offline cache; no local database.
+- **Storage**: In-memory CalDAV store with JSON settings/UI state; no local database and no on-disk calendar cache.
 - **Type Sharing**: `ts-rs` generates TypeScript bindings from Rust structs into `src/lib/bindings/`
-- **Sync**: CalDAV (VEVENT + VTODO) over HTTP Basic; edits `PUT` immediately
+- **CalDAV**: VEVENT + VTODO over HTTP Basic; edits `PUT` immediately and Refresh reloads from the server
 - **Package Manager**: Bun
 
 ## Prerequisites

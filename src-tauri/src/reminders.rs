@@ -182,7 +182,9 @@ mod tests {
     }
 
     fn utc(text: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(text).unwrap().with_timezone(&Utc)
+        DateTime::parse_from_rfc3339(text)
+            .unwrap()
+            .with_timezone(&Utc)
     }
 
     fn before(minutes_before: i32) -> TaskAlarmTrigger {

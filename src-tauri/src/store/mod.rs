@@ -1,6 +1,6 @@
-//! In-memory store, snapshot cache and JSON persistence.
+//! In-memory store and JSON persistence.
 //!
-//! The resource map is filled from `CalDAV` at startup and after each pull; edits
+//! The resource map is filled from `CalDAV` at startup and on Refresh; edits
 //! merge into the stored raw body and `PUT` it back immediately.
 
 pub mod model;
@@ -9,7 +9,7 @@ pub mod persist;
 pub mod query;
 pub mod state;
 
-pub use model::{Resource, ResourceItems, Snapshot, SnapshotResource, Store};
+pub use model::{Resource, ResourceItems, Store};
 pub use state::StoreState;
 
 #[cfg(test)]

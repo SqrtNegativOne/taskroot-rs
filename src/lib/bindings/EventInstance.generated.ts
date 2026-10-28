@@ -14,7 +14,13 @@ id: EventId,
 /**
  * Stable identity for one occurrence, e.g. `master@2026-09-07`.
  */
-occurrenceKey: string, title: string, description?: string, timing: EventTiming, 
+occurrenceKey: string, 
+/**
+ * The canonical value of this occurrence for `EXDATE` / `RECURRENCE-ID`:
+ * `YYYY-MM-DD` for all-day, wall clock in the event's zone for timed.
+ * Excluding it removes exactly this occurrence.
+ */
+occurrenceStart: string, title: string, description?: string, timing: EventTiming, 
 /**
  * True when this instance came from a recurrence rule.
  */

@@ -11,7 +11,10 @@ use crate::test_support::{frontend_scan, source_scan};
 fn the_command_table_lists_every_command_once() {
     let registered = source_scan::registered_commands();
 
-    assert!(!registered.is_empty(), "generate_handler! lists no commands");
+    assert!(
+        !registered.is_empty(),
+        "generate_handler! lists no commands"
+    );
     let mut unique = registered.clone();
     unique.sort();
     unique.dedup();
@@ -74,7 +77,9 @@ fn assert_keys_match_rust_signatures(calls: &[frontend_scan::FrontendCall]) {
         };
         for key in &call.keys {
             assert!(
-                declared.iter().any(|param| source_scan::js_key(param) == *key),
+                declared
+                    .iter()
+                    .any(|param| source_scan::js_key(param) == *key),
                 "`{}` is passed `{key}`, but its Rust parameters are {declared:?}",
                 call.command
             );

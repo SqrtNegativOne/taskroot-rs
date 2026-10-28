@@ -1,11 +1,93 @@
-//! Store persistence, snapshot and query tests.
+//! Store persistence and query tests.
 
 use super::model::Store;
 use super::persist;
 use super::query;
-use crate::domain::{AppTask, AppTaskFilter, AppTaskFilterColumn, FilterOperator, TaskId, TaskPriority};
+use crate::domain::{
+    AppTask, AppTaskFilter, AppTaskFilterColumn, EventScope, FilterOperator, TaskId, TaskPriority,
+};
 use serde_json::json;
 use std::path::PathBuf;
+
+use crate::caldav::client::CalDavClient;
+use crate::caldav::model::{CalendarComponent, CalendarInfo};
+use crate::caldav::transport::HttpClient;
+use crate::screens::plan::expand_event_instances;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+const SERIES_HREF: &str = "/cal/series.ics";
+const SERIES_COLLECTION: &str = "/cal/";
+
+/// A weekly 11:00 Asia/Kolkata series, every occurrence 30 minutes long.
+const SERIES_RAW: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:series\r\nDTSTART;TZID=Asia/Kolkata:20261019T110000\r\nDTEND;TZID=Asia/Kolkata:20261019T113000\r\nRRULE:FREQ=WEEKLY\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
+/// The 2026-11-02 occurrence moved to 14:00.
+const MOVED_OCCURRENCE: &str = "BEGIN:VEVENT\r\nUID:series\r\nRECURRENCE-ID;TZID=Asia/Kolkata:20261102T110000\r\nDTSTART;TZID=Asia/Kolkata:20261102T140000\r\nDTEND;TZID=Asia/Kolkata:20261102T143000\r\nSUMMARY:Standup\r\nEND:VEVENT\r\n";
+
+fn series_with_moved_occurrence() -> String {
+    SERIES_RAW.replace(
+        "END:VCALENDAR\r\n",
+        &format!("{MOVED_OCCURRENCE}END:VCALENDAR\r\n"),
+    )
+}
+
+fn store_with_series(name: &str, raw: &str) -> Store {
+    let mut store = Store::load(scratch_dir(name)).unwrap();
+    store.calendars = vec![CalendarInfo {
+        href: SERIES_COLLECTION.to_string(),
+        display_name: "Cal".to_string(),
+        component: CalendarComponent::VEvent,
+        ..CalendarInfo::default()
+    }];
+    store
+        .set_resource(SERIES_HREF, SERIES_COLLECTION, Some("\"etag\""), raw)
+        .unwrap();
+    store
+}
+
+async fn editing_server() -> (MockServer, CalDavClient) {
+    let server = MockServer::start().await;
+    Mock::given(method("PUT"))
+        .and(path(SERIES_HREF))
+        .respond_with(ResponseTemplate::new(204).insert_header("ETag", "\"next\""))
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    let http = HttpClient::new().unwrap();
+    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
+    (server, client)
+}
+
+fn occurrence_starts(store: &Store, start: &str, end: &str) -> Vec<String> {
+    expand_event_instances(&store.events(), start, end)
+        .into_iter()
+        .map(|instance| instance.occurrence_start)
+        .collect()
+}
+
+/// Every timed instance's UTC start, sorted, so an exception's moved slot is
+/// comparable regardless of expansion order.
+fn timed_starts(store: &Store, start: &str, end: &str) -> Vec<String> {
+    let mut starts: Vec<String> = expand_event_instances(&store.events(), start, end)
+        .into_iter()
+        .filter_map(|instance| match instance.timing {
+            crate::domain::EventTiming::Timed { start, .. } => Some(start.to_rfc3339()),
+            crate::domain::EventTiming::AllDay { .. } => None,
+        })
+        .collect();
+    starts.sort();
+    starts
+}
+
+const OCTOBER_RANGE: (&str, &str) = ("2026-10-19T00:00:00Z", "2026-11-02T23:59:59Z");
+
+fn series_raw(store: &Store) -> &str {
+    &store.resource_for_event("series").unwrap().raw
+}
 
 fn scratch_dir(name: &str) -> PathBuf {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -59,7 +141,7 @@ fn a_settings_file_without_a_clock_style_uses_the_default() {
 fn apply_setting_rejects_a_wrong_type_and_ignores_unknown_keys() {
     let mut settings = crate::settings::AppSettings::default();
 
-    let error = persist::apply_setting(&mut settings, "sync_interval", &json!("15"))
+    let error = persist::apply_setting(&mut settings, "pause_minutes", &json!("15"))
         .expect_err("a string must be rejected for an i32 setting");
     assert_eq!(error.code(), "invalid-input");
 
@@ -70,50 +152,270 @@ fn apply_setting_rejects_a_wrong_type_and_ignores_unknown_keys() {
 fn ui_state_round_trips_and_keeps_unknown_keys() {
     let dir = scratch_dir("ui");
     let mut state = serde_json::Map::new();
-    state.insert("ui.date_grid.filters".to_string(), json!([{ "column": "status" }]));
+    state.insert(
+        "ui.date_grid.filters".to_string(),
+        json!([{ "column": "status" }]),
+    );
 
     persist::write_ui_state(&dir, &state).unwrap();
 
     let loaded = persist::read_ui_state(&dir);
-    assert_eq!(loaded.get("ui.date_grid.filters"), state.get("ui.date_grid.filters"));
-}
-
-#[test]
-fn snapshot_round_trips_and_each_resource_reparses() {
-    let dir = scratch_dir("snapshot");
-    let mut store = Store::load(dir.clone()).unwrap();
-    store
-        .set_resource("/cal/one.ics", "/cal/", Some("\"etag\""), EVENT_RAW)
-        .unwrap();
-    store.write_snapshot();
-
-    let mut loaded = Store::load(dir).unwrap();
-    assert_eq!(loaded.load_snapshot().unwrap(), 1);
-
-    let event = loaded.event("one").expect("event is restored");
-    assert_eq!(event.title, "Standup");
     assert_eq!(
-        event.remote_id.as_ref().map(|id| id.as_str()),
-        Some("/cal/one.ics")
+        loaded.get("ui.date_grid.filters"),
+        state.get("ui.date_grid.filters")
     );
 }
 
-#[test]
-fn a_malformed_snapshot_resource_is_skipped() {
-    let dir = scratch_dir("bad-snapshot");
-    let snapshot = json!({
-        "broken": { "collection": "/cal/", "etag": null, "raw": "not an ics" },
-        "one": { "collection": "/cal/", "etag": null, "raw": EVENT_RAW }
-    });
-    std::fs::write(
-        dir.join("snapshot.json"),
-        serde_json::to_string(&snapshot).unwrap(),
+#[tokio::test]
+async fn full_load_replaces_the_store_with_the_server_contents() {
+    use super::ops;
+    use crate::caldav::model::{CalendarComponent, CalendarInfo};
+    use crate::caldav::transport::{CalDavClient, HttpClient};
+    use wiremock::matchers::{body_string_contains, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const COLLECTION: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
+
+    let server = MockServer::start().await;
+    let raw = EVENT_RAW
+        .replace("UID:one", "UID:fresh")
+        .replace("\r\n", "\n");
+    let body = format!(
+        "<?xml version='1.0' encoding='utf-8'?><multistatus xmlns=\"DAV:\" \
+         xmlns:C=\"urn:ietf:params:xml:ns:caldav\"><response><href>{COLLECTION}fresh.ics</href>\
+         <propstat><prop><getetag>\"etag\"</getetag><C:calendar-data>{raw}</C:calendar-data></prop>\
+         <status>HTTP/1.1 200 OK</status></propstat></response></multistatus>",
+    );
+    Mock::given(method("REPORT"))
+        .and(path(COLLECTION))
+        .and(body_string_contains("<c:calendar-query"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let http = HttpClient::new().unwrap();
+    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
+    let mut store = Store::load(scratch_dir("full-load")).unwrap();
+    store
+        .set_resource("/cal/stale.ics", "/cal/", None, EVENT_RAW)
+        .unwrap();
+    store.calendars = vec![CalendarInfo {
+        href: COLLECTION.to_string(),
+        display_name: "SqrtCal".to_string(),
+        component: CalendarComponent::VEvent,
+        ..CalendarInfo::default()
+    }];
+
+    ops::full_load(&mut store, &client).await.unwrap();
+
+    assert_eq!(store.resources.len(), 1, "stale resources are dropped");
+    assert!(store.event("one").is_none());
+    assert_eq!(
+        store.event("fresh").map(|event| event.title.as_str()),
+        Some("Standup")
+    );
+}
+
+#[tokio::test]
+async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("delete-this", SERIES_RAW);
+
+    ops::delete_event(
+        &mut store,
+        &client,
+        "series",
+        EventScope::This,
+        Some("2026-10-26T11:00:00"),
     )
+    .await
     .unwrap();
 
-    let mut store = Store::load(dir).unwrap();
-    assert_eq!(store.load_snapshot().unwrap(), 1);
-    assert!(store.event("one").is_some());
+    let raw = series_raw(&store);
+    assert!(
+        raw.contains("EXDATE;TZID=Asia/Kolkata:20261026T110000"),
+        "the occurrence must be excluded in the event's zone: {raw}"
+    );
+    assert!(raw.contains("RRULE:FREQ=WEEKLY"), "the rule is untouched: {raw}");
+    assert_eq!(
+        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        vec!["2026-10-19T11:00:00", "2026-11-02T11:00:00"],
+        "only the excluded occurrence disappears"
+    );
+}
+
+#[tokio::test]
+async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptions() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("delete-following", &series_with_moved_occurrence());
+
+    ops::delete_event(
+        &mut store,
+        &client,
+        "series",
+        EventScope::Following,
+        Some("2026-10-26T11:00:00"),
+    )
+    .await
+    .unwrap();
+
+    let raw = series_raw(&store);
+    assert!(
+        raw.contains("UNTIL=20261026T052959Z"),
+        "the rule ends one second before 11:00 IST: {raw}"
+    );
+    assert!(
+        !raw.contains("RECURRENCE-ID"),
+        "an exception after the cutoff must not survive: {raw}"
+    );
+    assert_eq!(
+        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        vec!["2026-10-19T11:00:00"]
+    );
+}
+
+#[tokio::test]
+async fn deleting_all_removes_the_whole_resource_when_an_exception_was_selected() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("delete-all", &series_with_moved_occurrence());
+
+    ops::delete_event(
+        &mut store,
+        &client,
+        "series@2026-11-02T11:00:00",
+        EventScope::All,
+        None,
+    )
+    .await
+    .unwrap();
+
+    assert!(store.resources.is_empty(), "the series resource is gone");
+}
+
+#[tokio::test]
+async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("reschedule-this", SERIES_RAW);
+
+    ops::reschedule_event(
+        &mut store,
+        &client,
+        ops::Reschedule {
+            id: "series".to_string(),
+            start_time: "2026-10-26T08:30:00Z".to_string(),
+            end_time: "2026-10-26T09:00:00Z".to_string(),
+            is_all_day: false,
+            scope: EventScope::This,
+            occurrence_start: Some("2026-10-26T11:00:00".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+
+    let raw = series_raw(&store);
+    assert!(
+        raw.contains("RECURRENCE-ID;TZID=Asia/Kolkata:20261026T110000"),
+        "the moved occurrence becomes an exception: {raw}"
+    );
+    assert!(
+        raw.contains("DTSTART;TZID=Asia/Kolkata:20261026T140000"),
+        "the exception keeps the wall clock (08:30Z is 14:00 IST): {raw}"
+    );
+    assert!(raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T110000"));
+    assert_eq!(
+        timed_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        vec![
+            "2026-10-19T05:30:00+00:00",
+            "2026-10-26T08:30:00+00:00",
+            "2026-11-02T05:30:00+00:00"
+        ],
+        "the moved occurrence replaces its slot and the others keep theirs"
+    );
+}
+
+#[tokio::test]
+async fn rescheduling_the_series_moves_the_master() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("reschedule-all", SERIES_RAW);
+
+    ops::reschedule_event(
+        &mut store,
+        &client,
+        ops::Reschedule {
+            id: "series".to_string(),
+            start_time: "2026-10-19T09:30:00Z".to_string(),
+            end_time: "2026-10-19T10:00:00Z".to_string(),
+            is_all_day: false,
+            scope: EventScope::All,
+            occurrence_start: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let raw = series_raw(&store);
+    assert!(raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T150000"), "{raw}");
+    assert!(raw.contains("RRULE:FREQ=WEEKLY"), "{raw}");
+    assert_eq!(
+        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        vec![
+            "2026-10-19T15:00:00",
+            "2026-10-26T15:00:00",
+            "2026-11-02T15:00:00"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn moving_a_series_from_one_occurrence_is_refused() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("reschedule-following", SERIES_RAW);
+
+    let error = ops::reschedule_event(
+        &mut store,
+        &client,
+        ops::Reschedule {
+            id: "series".to_string(),
+            start_time: "2026-10-26T08:30:00Z".to_string(),
+            end_time: "2026-10-26T09:00:00Z".to_string(),
+            is_all_day: false,
+            scope: EventScope::Following,
+            occurrence_start: Some("2026-10-26T11:00:00".to_string()),
+        },
+    )
+    .await
+    .expect_err("rescheduling from an occurrence would shift every earlier one");
+
+    assert_eq!(error.code(), "invalid-input");
+}
+
+#[tokio::test]
+async fn deleting_this_on_a_non_recurring_event_deletes_it() {
+    use super::ops;
+
+    let (_server, client) = editing_server().await;
+    let mut store = store_with_series("delete-this-plain", EVENT_RAW);
+
+    ops::delete_event(&mut store, &client, "one", EventScope::This, None)
+        .await
+        .unwrap();
+
+    assert!(
+        store.resources.is_empty(),
+        "a one-off event has no occurrence to except; it is removed outright"
+    );
 }
 
 fn task(id: &str, title: &str, priority: TaskPriority) -> AppTask {
@@ -147,8 +449,7 @@ fn task(id: &str, title: &str, priority: TaskPriority) -> AppTask {
 }
 
 #[test]
-fn priority_filter_compares_the_numeric_bucket() {
-    let tasks = vec![
+fn priority_filter_compares_the_numeric_bucket() {    let tasks = vec![
         task("a", "Urgent", TaskPriority::Urgent),
         task("b", "Low", TaskPriority::Low),
     ];
@@ -182,78 +483,4 @@ fn empty_filter_values_do_not_match_anything() {
     );
 
     assert_eq!(filtered.len(), 1, "an empty exclusion set filters nothing");
-}
-
-/// A full load must leave the collection's sync token behind, otherwise the next
-/// pull asks the server for "everything since the beginning" and re-downloads the
-/// whole collection — once per restart, and on every wake-up after an offline gap.
-#[tokio::test]
-async fn a_full_load_keeps_the_sync_token_so_the_next_pull_is_a_delta() {
-    use crate::caldav::model::{CalendarComponent, CalendarInfo};
-    use crate::caldav::transport::{CalDavClient, HttpClient};
-    use super::ops;
-    use std::collections::BTreeMap;
-    use wiremock::matchers::{body_string_contains, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
-
-    const COLLECTION: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
-    const TOKEN: &str = "http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435";
-
-    let server = MockServer::start().await;
-    Mock::given(method("REPORT"))
-        .and(path(COLLECTION))
-        .and(body_string_contains("<d:sync-token/>"))
-        .respond_with(
-            ResponseTemplate::new(207)
-                .set_body_string(include_str!("../caldav/fixtures/sync_collection_initial.xml")),
-        )
-        .mount(&server)
-        .await;
-    Mock::given(method("REPORT"))
-        .and(path(COLLECTION))
-        .and(body_string_contains("calendar-multiget"))
-        .respond_with(
-            ResponseTemplate::new(207)
-                .set_body_string(include_str!("../caldav/fixtures/multiget.xml")),
-        )
-        .expect(1)
-        .mount(&server)
-        .await;
-
-    let http = HttpClient::new().unwrap();
-    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
-    let mut store = Store {
-        data_dir: scratch_dir("full-load-token"),
-        resources: BTreeMap::new(),
-        calendars: vec![CalendarInfo {
-            href: COLLECTION.to_string(),
-            display_name: "SqrtCal".to_string(),
-            component: CalendarComponent::VEvent,
-            ..CalendarInfo::default()
-        }],
-        tokens: BTreeMap::new(),
-        settings: crate::settings::AppSettings::default(),
-        ui_state: serde_json::Map::new(),
-        offline: false,
-        last_synced: None,
-    };
-
-    ops::full_load(&mut store, &client).await.unwrap();
-    assert_eq!(
-        store.tokens.get(COLLECTION).map(String::as_str),
-        Some(TOKEN)
-    );
-
-    Mock::given(method("REPORT"))
-        .and(path(COLLECTION))
-        .and(body_string_contains(TOKEN))
-        .respond_with(
-            ResponseTemplate::new(207)
-                .set_body_string(include_str!("../caldav/fixtures/sync_collection_delta.xml")),
-        )
-        .mount(&server)
-        .await;
-
-    ops::pull(&mut store, &client).await.unwrap();
-    server.verify().await;
 }

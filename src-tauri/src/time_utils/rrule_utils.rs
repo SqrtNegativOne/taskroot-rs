@@ -4,9 +4,87 @@ use color_eyre::Result;
 use rrule::RRuleSet;
 use std::str::FromStr;
 
+use crate::domain::wall_clock_to_utc;
+use crate::error::AppError;
+
+const ICAL_DATE: &str = "%Y%m%d";
 const ICAL_DATE_TIME: &str = "%Y%m%dT%H%M%S";
+const ICAL_UTC: &str = "%Y%m%dT%H%M%SZ";
 const DTO_DATE: &str = "%Y-%m-%d";
 const DTO_DATE_TIME: &str = "%Y-%m-%dT%H:%M:%S";
+
+/// Rewrite a series' `RRULE` so it ends immediately before `occurrence_start`.
+///
+/// `occurrence_start` is the canonical occurrence value: `YYYY-MM-DD` for an
+/// all-day event, the wall clock in the event's zone for a timed one. `UNTIL`
+/// carries the same value type as `DTSTART` — a date for an all-day series, UTC
+/// for a zoned one, and a floating local time when the event has no zone.
+///
+/// # Errors
+/// Returns an error when the occurrence start or the resulting rule is invalid.
+pub fn truncate_before(
+    rrule: &str,
+    occurrence_start: &str,
+    timezone: Option<&str>,
+) -> Result<String, AppError> {
+    let until = until_before(occurrence_start, timezone)?;
+    Ok(rrule
+        .lines()
+        .map(|line| replace_until(line, &until))
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+fn until_before(occurrence_start: &str, timezone: Option<&str>) -> Result<String, AppError> {
+    if let Ok(date) = NaiveDate::parse_from_str(occurrence_start, DTO_DATE) {
+        let previous = date
+            .checked_sub_days(Days::new(1))
+            .ok_or_else(|| invalid("the occurrence date cannot be moved back a day"))?;
+        return Ok(previous.format(ICAL_DATE).to_string());
+    }
+    let wall = NaiveDateTime::parse_from_str(occurrence_start, DTO_DATE_TIME).map_err(|_| {
+        invalid(format!(
+            "`{occurrence_start}` is not a canonical occurrence start"
+        ))
+    })?;
+    let last = wall
+        .checked_sub_signed(chrono::Duration::seconds(1))
+        .ok_or_else(|| invalid("the occurrence cannot be moved back a second"))?;
+    match timezone {
+        None => Ok(last.format(ICAL_DATE_TIME).to_string()),
+        Some(zone) => {
+            let instant = wall_clock_to_utc(&last.format(DTO_DATE_TIME).to_string(), Some(zone))
+                .ok_or_else(|| invalid(format!("`{occurrence_start}` does not resolve in {zone}")))?;
+            Ok(instant.format(ICAL_UTC).to_string())
+        }
+    }
+}
+
+fn replace_until(line: &str, until: &str) -> String {
+    let Some((name, value)) = line.split_once(':') else {
+        return line.to_string();
+    };
+    if !name.trim().eq_ignore_ascii_case("RRULE") {
+        return line.to_string();
+    }
+    let kept: Vec<&str> = value
+        .split(';')
+        .filter(|part| !is_until_or_count(part))
+        .collect();
+    if kept.is_empty() {
+        return format!("{name}:UNTIL={until}");
+    }
+    format!("{name}:{};UNTIL={until}", kept.join(";"))
+}
+
+fn is_until_or_count(part: &str) -> bool {
+    let name = part.split_once('=').map_or(part, |(name, _)| name).trim();
+    name.eq_ignore_ascii_case("UNTIL") || name.eq_ignore_ascii_case("COUNT")
+}
+
+fn invalid(message: impl Into<String>) -> AppError {
+    AppError::InvalidInput(message.into())
+}
 
 /// Expand a **timed** recurrence in the event's own timezone.
 ///
@@ -146,7 +224,8 @@ fn all_day_exdates(exdates: &[String], tz_name: &str) -> Vec<String> {
     exdates
         .iter()
         .filter_map(|value| {
-            let date = NaiveDate::parse_from_str(value.get(..10).unwrap_or(value), DTO_DATE).ok()?;
+            let date =
+                NaiveDate::parse_from_str(value.get(..10).unwrap_or(value), DTO_DATE).ok()?;
             Some(format!(
                 "EXDATE;TZID={tz_name}:{}T000000",
                 date.format("%Y%m%d")
@@ -345,5 +424,59 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["2026-09-07", "2026-09-21", "2026-09-28"]
         );
+    }
+
+    #[test]
+    fn truncating_before_an_all_day_occurrence_ends_on_the_previous_day() {
+        let rrule =
+            truncate_before("RRULE:FREQ=WEEKLY;BYDAY=MO", "2026-10-26", Some("Asia/Kolkata"))
+                .unwrap();
+
+        assert_eq!(rrule, "RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261025");
+    }
+
+    #[test]
+    fn truncating_a_zoned_series_writes_until_in_utc() {
+        // 11:00 in Asia/Kolkata is 05:30Z, so the last kept instant is 05:29:59Z.
+        let rrule = truncate_before(
+            "RRULE:FREQ=WEEKLY;COUNT=5",
+            "2026-10-26T11:00:00",
+            Some("Asia/Kolkata"),
+        )
+        .unwrap();
+
+        assert_eq!(rrule, "RRULE:FREQ=WEEKLY;UNTIL=20261026T052959Z");
+    }
+
+    #[test]
+    fn truncating_a_floating_series_keeps_until_floating() {
+        let rrule =
+            truncate_before("RRULE:FREQ=DAILY", "2026-10-26T09:00:00", None).unwrap();
+
+        assert_eq!(rrule, "RRULE:FREQ=DAILY;UNTIL=20261026T085959");
+    }
+
+    #[test]
+    fn a_truncated_series_stops_before_the_requested_occurrence() {
+        let dt_start = wall_clock_to_utc("2026-10-19T11:00:00", Some("Asia/Kolkata")).unwrap();
+        let rrule = truncate_before(
+            "RRULE:FREQ=WEEKLY",
+            "2026-10-26T11:00:00",
+            Some("Asia/Kolkata"),
+        )
+        .unwrap();
+
+        let occ = get_occurrences(
+            &rrule,
+            &dt_start,
+            Some("Asia/Kolkata"),
+            &[],
+            &Utc.with_ymd_and_hms(2026, 10, 19, 0, 0, 0).unwrap(),
+            &Utc.with_ymd_and_hms(2026, 11, 9, 23, 59, 59).unwrap(),
+        )
+        .unwrap();
+
+        let days: Vec<String> = occ.iter().map(|dt| dt.format("%Y-%m-%d").to_string()).collect();
+        assert_eq!(days, vec!["2026-10-19"], "the truncated occurrence is gone");
     }
 }

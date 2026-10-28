@@ -12,6 +12,7 @@ export type { AppTaskFilterColumn } from './bindings/AppTaskFilterColumn.generat
 export type { AppTaskSort } from './bindings/AppTaskSort.generated';
 export type { AppTaskStatus } from './bindings/AppTaskStatus.generated';
 export type { Color } from './bindings/Color.generated';
+export type { EventScope } from './bindings/EventScope.generated';
 export type { EventStatus } from './bindings/EventStatus.generated';
 export type { EventInstance } from './bindings/EventInstance.generated';
 export type { EventTiming } from './bindings/EventTiming.generated';
@@ -21,7 +22,6 @@ export type { LaidEvent } from './bindings/LaidEvent.generated';
 export type { PlanDayLayout } from './bindings/PlanDayLayout.generated';
 export type { SortDirection } from './bindings/SortDirection.generated';
 export type { StopwatchState } from './bindings/StopwatchState.generated';
-export type { SyncState } from './bindings/SyncState.generated';
 export type { Tag } from './bindings/Tag.generated';
 export type { TaskPriority } from './bindings/TaskPriority.generated';
 export type { WindowLabel } from './bindings/WindowLabel.generated';

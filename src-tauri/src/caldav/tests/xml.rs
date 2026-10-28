@@ -2,15 +2,13 @@
 
 use crate::caldav::model::CalendarComponent;
 use crate::caldav::xml::{
-    calendar_color_body, mkcalendar_body, multiget_body, parse_calendar_home_set, parse_collections,
-    parse_current_user_principal, parse_multiget, parse_sync_collection, rename_calendar_body,
-    resolve_href, sync_collection_body, SYNC_COLLECTION_INITIAL_BODY,
+    calendar_color_body, mkcalendar_body, multiget_body, parse_calendar_home_set,
+    parse_calendar_resources, parse_collections, parse_current_user_principal,
+    rename_calendar_body, resolve_href, CALENDAR_QUERY_BODY,
 };
 
-use super::{HOME_PROPFIND, MULTIGET, PRINCIPAL_PROPFIND, ROOT_PROPFIND, SYNC_DELTA, SYNC_INITIAL};
+use super::{HOME_PROPFIND, MULTIGET, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
 
-const SYNC_TOKEN: &str =
-    "http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435";
 const SQRT_CAL: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
 const SQRT_TASKS: &str = "/me/3be68138-2e0e-b50b-63ee-7c07e35627e1/";
 
@@ -113,58 +111,8 @@ fn a_collection_advertising_both_components_is_vevent_only() {
 }
 
 #[test]
-fn sync_collection_reports_the_token_and_every_change() {
-    let sync = parse_sync_collection(SYNC_INITIAL, SQRT_CAL).unwrap();
-
-    assert_eq!(sync.token.as_deref(), Some(SYNC_TOKEN));
-    assert_eq!(sync.changes.len(), 68);
-    assert_eq!(
-        sync.changes
-            .iter()
-            .filter(|change| change.is_removed())
-            .count(),
-        42
-    );
-    assert_eq!(
-        sync.changes
-            .iter()
-            .filter(|change| !change.is_removed())
-            .count(),
-        26
-    );
-
-    let changed = sync
-        .changes
-        .iter()
-        .find(|change| change.href == format!("{SQRT_CAL}dsh-20261017-first-day-of-durga.ics"))
-        .expect("the first event is reported");
-    assert_eq!(changed.status, 200);
-    assert_eq!(
-        changed.etag.as_deref(),
-        Some(r#""5d6e68d703bce2dbaa2a7fa1e555e5d8eaccac14b4784c94dd8cdf829c811926""#)
-    );
-
-    let removed = sync
-        .changes
-        .iter()
-        .find(|change| change.href == format!("{SQRT_CAL}02b22f78-2408-4f93-9111-d5109396698f.ics"))
-        .expect("a deleted href is reported");
-    assert_eq!(removed.status, 404);
-    assert_eq!(removed.etag, None);
-}
-
-#[test]
-fn sync_collection_delta_has_a_token_and_no_changes() {
-    let sync = parse_sync_collection(SYNC_DELTA, SQRT_CAL).unwrap();
-
-    assert_eq!(sync.token.as_deref(), Some(SYNC_TOKEN));
-    let changes = &sync.changes;
-    assert!(changes.is_empty(), "expected no changes, got {changes:?}");
-}
-
-#[test]
-fn multiget_reports_the_href_etag_and_calendar_data() {
-    let resources = parse_multiget(MULTIGET, SQRT_CAL).unwrap();
+fn calendar_resources_report_the_href_etag_and_calendar_data() {
+    let resources = parse_calendar_resources(MULTIGET, SQRT_CAL).unwrap();
 
     assert_eq!(resources.len(), 1);
     let resource = &resources[0];
@@ -201,12 +149,11 @@ fn resolve_href_handles_paths_urls_and_relative_hrefs() {
 }
 
 #[test]
-fn sync_bodies_cover_initial_and_incremental_requests() {
-    assert_eq!(sync_collection_body(None), SYNC_COLLECTION_INITIAL_BODY);
-
-    let incremental = sync_collection_body(Some(SYNC_TOKEN));
-    assert!(incremental.contains(&format!("<d:sync-token>{SYNC_TOKEN}</d:sync-token>")));
-    assert!(!incremental.contains("<d:sync-token/>"));
+fn calendar_query_asks_for_etag_and_data_of_every_calendar() {
+    assert!(CALENDAR_QUERY_BODY.contains("<c:calendar-query"));
+    assert!(CALENDAR_QUERY_BODY.contains("<d:getetag/>"));
+    assert!(CALENDAR_QUERY_BODY.contains("<c:calendar-data/>"));
+    assert!(CALENDAR_QUERY_BODY.contains(r#"<c:comp-filter name="VCALENDAR"/>"#));
 }
 
 #[test]

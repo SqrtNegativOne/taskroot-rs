@@ -2,10 +2,10 @@ mod expand;
 
 pub use expand::{expand_event_instances, single_instance};
 
-use crate::commands::session::{client_for, store_state};
+use crate::commands::session::store_state;
 use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort};
 use crate::error::AppError;
-use crate::store::{ops, query};
+use crate::store::query;
 
 /// # Errors
 ///
@@ -70,44 +70,9 @@ pub async fn query_event_instances(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
-pub async fn get_event(
-    app: tauri::AppHandle,
-    id: String,
-) -> Result<Option<AppEvent>, AppError> {
+pub async fn get_event(app: tauri::AppHandle, id: String) -> Result<Option<AppEvent>, AppError> {
     let state = store_state(&app)?;
     Ok(state.read(|store| store.event(&id).cloned()).await)
-}
-
-/// Update a master event's start/end timestamps after a drag or resize.
-///
-/// Preserves the event's timezone so the write keeps `DTSTART;TZID=…` and the
-/// recurrence stays anchored to the local wall clock.
-///
-/// # Errors
-///
-/// Returns an error if the event is missing or the `CalDAV` write fails.
-#[tauri::command]
-pub async fn reschedule_event(
-    app: tauri::AppHandle,
-    id: String,
-    start_time: String,
-    end_time: String,
-    is_all_day: bool,
-) -> Result<(), AppError> {
-    let state = store_state(&app)?;
-    let mut event = {
-        let store = state.lock().await;
-        store
-            .event(&id)
-            .cloned()
-            .ok_or_else(|| AppError::NotFound(format!("event {id}")))?
-    };
-    event.start_time = start_time;
-    event.end_time = end_time;
-    event.is_all_day = Some(is_all_day);
-    let client = client_for(&app).await?;
-    let mut store = state.lock().await;
-    ops::update_event(&mut store, &client, event).await
 }
 
 #[tauri::command]

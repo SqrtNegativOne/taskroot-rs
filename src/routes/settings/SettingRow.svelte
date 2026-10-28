@@ -3,8 +3,6 @@
     import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
     import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
 
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
-
     interface Props {
         item: SettingsSchemaItem;
         value: SettingValue | undefined;
@@ -24,20 +22,9 @@
         const picked = item.options?.find((option) => String(option.value) === raw);
         return picked ? picked.value : raw;
     }
-
-    async function handleCustomAction(id: string) {
-        if (id === 'clear_all_data') {
-            if (confirm("Are you sure you want to wipe all local data? This cannot be undone.")) {
-                await safeInvoke('wipe_local_data');
-                window.location.reload();
-            }
-        } else {
-            console.log(`Custom action clicked: ${id}`);
-        }
-    }
 </script>
 
-<div class="setting-item" class:danger={item.danger}>
+<div class="setting-item">
     <div class="setting-info">
         <label for={item.id}>{item.label}</label>
         {#if item.description}
@@ -82,10 +69,6 @@
                 value={selectValue() as string}
                 onchange={(val: string) => onchange(val)}
             />
-        {:else if item.type === 'custom' || item.type === 'action'}
-            <button onclick={() => handleCustomAction(item.id)}>
-                {item.label}
-            </button>
         {/if}
     </div>
 </div>
@@ -96,10 +79,6 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 20px;
-    }
-
-    .setting-item.danger label {
-        color: var(--tag-red);
     }
 
     .setting-info {
@@ -141,18 +120,5 @@
     :global(input[type='checkbox']) {
         width: 18px;
         height: 18px;
-    }
-
-    button {
-        padding: 6px 12px;
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        background-color: var(--bg-surface);
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    button:hover {
-        background-color: var(--bg-surface-hover);
     }
 </style>

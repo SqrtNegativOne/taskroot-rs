@@ -6,6 +6,7 @@
     import { describeAppError } from '$lib/errors';
     import { Routes } from '$lib/routes';
     import type { Account } from '$lib/bindings/Account.generated';
+    import { STORE_UPDATED } from '$lib/events';
     import SettingRow from './SettingRow.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
 
@@ -75,7 +76,7 @@
             return;
         }
         const { emit } = await import('@tauri-apps/api/event');
-        void emit('store-updated');
+        void emit(STORE_UPDATED);
         await loadSettings();
     }
 </script>

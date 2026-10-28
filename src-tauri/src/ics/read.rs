@@ -31,8 +31,8 @@
 //!   Alarms this module cannot express are omitted rather than approximated.
 
 use crate::domain::{
-    AppEvent, AppTask, AppTaskStatus, CollectionId, Color, EventId, EventStatus, GeoPoint, RemoteId,
-    Tag, TaskAlarmAnchor, TaskAlarmTrigger, TaskId, TaskPriority,
+    AppEvent, AppTask, AppTaskStatus, CollectionId, Color, EventId, EventStatus, GeoPoint,
+    RemoteId, Tag, TaskAlarmAnchor, TaskAlarmTrigger, TaskId, TaskPriority,
 };
 use crate::error::AppError;
 use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -418,9 +418,9 @@ fn read_dependencies(component: &Component<'_>) -> Option<Vec<TaskId>> {
 fn value_timezone(value: &DateValue) -> Option<String> {
     match value {
         DateValue::Date(_) => None,
-        DateValue::Timed { tzid, utc, .. } => tzid
-            .clone()
-            .or_else(|| utc.then(|| "UTC".to_string())),
+        DateValue::Timed { tzid, utc, .. } => {
+            tzid.clone().or_else(|| utc.then(|| "UTC".to_string()))
+        }
     }
 }
 
@@ -464,12 +464,12 @@ fn alarm_trigger(trigger: &Property<'_>) -> Option<TaskAlarmTrigger> {
         }
         return Some(TaskAlarmTrigger::Absolute { at });
     }
-    let anchor = if parameter(trigger, "RELATED").is_some_and(|value| value.eq_ignore_ascii_case("END"))
-    {
-        TaskAlarmAnchor::End
-    } else {
-        TaskAlarmAnchor::Start
-    };
+    let anchor =
+        if parameter(trigger, "RELATED").is_some_and(|value| value.eq_ignore_ascii_case("END")) {
+            TaskAlarmAnchor::End
+        } else {
+            TaskAlarmAnchor::Start
+        };
     // The DTO counts minutes *before* the anchor, the wire carries a signed
     // duration: `-PT15M` is 15 minutes before.
     let minutes_before = duration_minutes(raw)?.checked_neg()?;

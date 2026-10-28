@@ -97,14 +97,6 @@ pub struct AppSettings {
     )]
     pub pause_minutes: i32,
     #[setting(
-        label = "Sync Interval (minutes)",
-        keywords = ["sync", "interval", "poll", "time"],
-        kind = "number",
-        section = "sync_integrations",
-        min = 1
-    )]
-    pub sync_interval: i32,
-    #[setting(
         label = "Open Launcher",
         keywords = ["keyboard", "shortcut", "launcher", "open"],
         kind = "keybinding",
@@ -154,7 +146,6 @@ impl Default for AppSettings {
             allow_stopwatch_without_task: false,
             flowtime_break_divisor: 5,
             pause_minutes: 10,
-            sync_interval: 5,
             keybinding_launcher: "Meta+Shift+Space".to_string(),
             keybinding_open_settings: "Ctrl+,".to_string(),
             keybinding_restore_app: "Ctrl+Alt+R".to_string(),

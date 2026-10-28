@@ -24,10 +24,7 @@ pub fn get_stopwatch_state(app: tauri::AppHandle) -> Result<StopwatchState, AppE
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
-pub fn toggle_pause(
-    app: tauri::AppHandle,
-    pause_minutes: u64,
-) -> Result<StopwatchState, AppError> {
+pub fn toggle_pause(app: tauri::AppHandle, pause_minutes: u64) -> Result<StopwatchState, AppError> {
     let now = current_epoch_millis()?;
     let updated = with_locked_state(&app, |state| {
         if state.paused_until.is_some_and(|until| until > now) {
@@ -49,10 +46,7 @@ pub fn toggle_pause(
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
-pub fn adjust_pause(
-    app: tauri::AppHandle,
-    delta_minutes: i64,
-) -> Result<StopwatchState, AppError> {
+pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<StopwatchState, AppError> {
     let now = current_epoch_millis()?;
     let updated = with_locked_state(&app, |state| {
         if let Some(until) = state.paused_until {
@@ -79,7 +73,9 @@ pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppErro
     let updated = with_locked_state(&app, |state| {
         if state.is_break {
             if let Some(since) = state.break_running_since {
-                state.break_elapsed = state.break_elapsed.saturating_add(now.saturating_sub(since));
+                state.break_elapsed = state
+                    .break_elapsed
+                    .saturating_add(now.saturating_sub(since));
                 state.break_running_since = None;
             }
             state.is_break = false;
@@ -107,7 +103,9 @@ pub fn toggle_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_locked_state(&app, |state| {
         if state.is_break {
             if let Some(since) = state.break_running_since {
-                state.break_elapsed = state.break_elapsed.saturating_add(now.saturating_sub(since));
+                state.break_elapsed = state
+                    .break_elapsed
+                    .saturating_add(now.saturating_sub(since));
                 state.break_running_since = None;
             }
             state.is_break = false;

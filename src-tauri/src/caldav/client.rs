@@ -10,8 +10,8 @@ use super::model::CalendarComponent;
 pub use super::transport::CalDavClient;
 use super::transport::{check_status, CalDavRequest, HttpClient};
 use super::xml::{
-    calendar_color_body, mkcalendar_body, multiget_body, parse_multiget, parse_sync_collection,
-    rename_calendar_body, sync_collection_body, MultiGetResource, SyncCollection,
+    calendar_color_body, mkcalendar_body, multiget_body, parse_calendar_resources,
+    rename_calendar_body, MultiGetResource, CALENDAR_QUERY_BODY,
 };
 
 /// `calendar-multiget` batch size; Radicale is happy with far more, but 50 keeps
@@ -33,12 +33,7 @@ impl CalDavClient {
         Self::new(http, &account.server_url, &account.username, password)
     }
 
-    /// Fetch every resource in a collection: an initial `sync-collection`
-    /// followed by `calendar-multiget` batches for the live hrefs.
-    ///
-    /// The sync token comes back with the resources so the caller can store it.
-    /// Without it the next `pull` asks for "everything since the beginning" and
-    /// re-downloads the whole collection on every restart.
+    /// Fetch every resource in a collection with one `calendar-query` REPORT.
     ///
     /// # Errors
     ///
@@ -47,17 +42,15 @@ impl CalDavClient {
     pub async fn fetch_resources(
         &self,
         collection_href: &str,
-    ) -> Result<(Vec<MultiGetResource>, Option<String>), AppError> {
-        let sync = self.sync_collection(collection_href, None).await?;
-        let hrefs: Vec<String> = sync
-            .changes
-            .iter()
-            .filter(|change| !change.is_removed())
-            .map(|change| change.href.clone())
-            .collect();
-
-        let resources = self.fetch_hrefs(collection_href, &hrefs).await?;
-        Ok((resources, sync.token))
+    ) -> Result<Vec<MultiGetResource>, AppError> {
+        let response = self
+            .send(
+                &CalDavRequest::report(collection_href)
+                    .with_depth("1")
+                    .with_body(CALENDAR_QUERY_BODY),
+            )
+            .await?;
+        parse_calendar_resources(&response.body, collection_href)
     }
 
     /// Fetch a specific set of hrefs from one collection, in `multiget` batches.
@@ -76,28 +69,6 @@ impl CalDavClient {
             resources.extend(self.multiget(collection_href, batch).await?);
         }
         Ok(resources)
-    }
-
-    /// Request the changes since `token` (`None` asks for the initial set).
-    ///
-    /// # Errors
-    ///
-    /// Propagates transport errors and returns [`AppError::Sync`] for malformed
-    /// responses.
-    pub async fn sync_collection(
-        &self,
-        collection_href: &str,
-        token: Option<&str>,
-    ) -> Result<SyncCollection, AppError> {
-        let body = sync_collection_body(token);
-        let response = self
-            .send(
-                &CalDavRequest::report(collection_href)
-                    .with_depth("1")
-                    .with_body(&body),
-            )
-            .await?;
-        parse_sync_collection(&response.body, collection_href)
     }
 
     /// Create or update one resource.
@@ -217,6 +188,6 @@ impl CalDavClient {
                     .with_body(&body),
             )
             .await?;
-        parse_multiget(&response.body, collection_href)
+        parse_calendar_resources(&response.body, collection_href)
     }
 }

@@ -9,7 +9,6 @@
 //! Output is JSON on stdout; failures are `AppError` text on stderr with a
 //! non-zero exit code.
 
-
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::PathBuf;
@@ -182,9 +181,7 @@ async fn list_events(cli: &Cli) -> Result<(), AppError> {
     let session = open().await?;
     let search = cli.option("search").unwrap_or_default();
     let events = query::query_events(&session.store.events(), &[], search);
-    let start = cli
-        .option("start")
-        .map_or_else(today, ToString::to_string);
+    let start = cli.option("start").map_or_else(today, ToString::to_string);
     let end = cli
         .option("end")
         .map_or_else(|| plus_days(14), ToString::to_string);
@@ -228,7 +225,14 @@ async fn add_event(cli: &Cli) -> Result<(), AppError> {
 async fn remove_event(cli: &Cli) -> Result<(), AppError> {
     let mut session = open().await?;
     let id = cli.require_positional(1, "<id>")?;
-    ops::delete_event(&mut session.store, &session.client, id).await?;
+    ops::delete_event(
+        &mut session.store,
+        &session.client,
+        id,
+        tauri_app_lib::domain::EventScope::All,
+        None,
+    )
+    .await?;
     print_json(&serde_json::json!({ "deleted": id }))
 }
 
@@ -261,11 +265,7 @@ async fn open() -> Result<Session, AppError> {
     let calendars = discovery::refresh_collections(&dir, &client, &mut account).await;
     store.calendars.clone_from(&calendars);
     ops::full_load(&mut store, &client).await?;
-    Ok(Session {
-        dir,
-        store,
-        client,
-    })
+    Ok(Session { dir, store, client })
 }
 
 fn data_dir() -> Result<PathBuf, AppError> {
@@ -278,7 +278,9 @@ fn data_dir() -> Result<PathBuf, AppError> {
             std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share"))
         })
         .ok_or_else(|| {
-            AppError::Store("cannot locate the app data directory; set TASKROOT_DATA_DIR".to_string())
+            AppError::Store(
+                "cannot locate the app data directory; set TASKROOT_DATA_DIR".to_string(),
+            )
         })?;
     Ok(base.join(APP_IDENTIFIER))
 }
@@ -292,7 +294,9 @@ fn find_task(store: &Store, needle: &str) -> Result<AppTask, AppError> {
         .filter(|task| task.id.as_str().starts_with(needle))
         .collect();
     match matches.len() {
-        0 => Err(AppError::NotFound(format!("no task id starts with `{needle}`"))),
+        0 => Err(AppError::NotFound(format!(
+            "no task id starts with `{needle}`"
+        ))),
         1 => Ok(matches.remove(0)),
         count => Err(AppError::InvalidInput(format!(
             "`{needle}` matches {count} tasks; use more of the id"
@@ -510,15 +514,42 @@ struct Verb {
 }
 
 const VERBS: &[Verb] = &[
-    Verb { usage: "help", summary: "this text" },
-    Verb { usage: "lists", summary: "calendars this account can see" },
-    Verb { usage: "list-rm <list>", summary: "delete a list and everything in it" },
-    Verb { usage: "tasks [--search S] [--status S] [--open]", summary: "list tasks" },
-    Verb { usage: "task-show <id>...", summary: "print tasks exactly as stored" },
-    Verb { usage: "task-add --title T [options]", summary: "create a task" },
-    Verb { usage: "task-set <id>... [options]", summary: "change tasks; --list moves them" },
-    Verb { usage: "task-done <id>...", summary: "mark tasks done" },
-    Verb { usage: "task-rm <id>...", summary: "delete tasks" },
+    Verb {
+        usage: "help",
+        summary: "this text",
+    },
+    Verb {
+        usage: "lists",
+        summary: "calendars this account can see",
+    },
+    Verb {
+        usage: "list-rm <list>",
+        summary: "delete a list and everything in it",
+    },
+    Verb {
+        usage: "tasks [--search S] [--status S] [--open]",
+        summary: "list tasks",
+    },
+    Verb {
+        usage: "task-show <id>...",
+        summary: "print tasks exactly as stored",
+    },
+    Verb {
+        usage: "task-add --title T [options]",
+        summary: "create a task",
+    },
+    Verb {
+        usage: "task-set <id>... [options]",
+        summary: "change tasks; --list moves them",
+    },
+    Verb {
+        usage: "task-done <id>...",
+        summary: "mark tasks done",
+    },
+    Verb {
+        usage: "task-rm <id>...",
+        summary: "delete tasks",
+    },
     Verb {
         usage: "events [--start D] [--end D] [--search S]",
         summary: "event instances in a date range (default: today + 14 days)",
@@ -527,7 +558,10 @@ const VERBS: &[Verb] = &[
         usage: "event-add --title T --start S --end E [options]",
         summary: "create an event",
     },
-    Verb { usage: "event-rm <id>", summary: "delete an event" },
+    Verb {
+        usage: "event-rm <id>",
+        summary: "delete an event",
+    },
 ];
 
 const OPTIONS: &[(&str, &str)] = &[
@@ -538,7 +572,10 @@ const OPTIONS: &[(&str, &str)] = &[
     ("--priority P", "0-4, or none/low/medium/high/urgent"),
     ("--status S", "todo, next-up, doing or done"),
     ("--tz ZONE", "IANA zone for timed values"),
-    ("--list NAME", "target list; on task-set this moves the task"),
+    (
+        "--list NAME",
+        "target list; on task-set this moves the task",
+    ),
     ("--clear-due, --clear-start", "drop a date"),
     ("--all-day", "event has no time of day"),
     ("--rrule R", "recurrence rule"),
@@ -618,11 +655,8 @@ mod tests {
             data_dir: PathBuf::new(),
             resources: BTreeMap::new(),
             calendars,
-            tokens: BTreeMap::new(),
             settings: AppSettings::default(),
             ui_state: serde_json::Map::new(),
-            offline: false,
-            last_synced: None,
         };
         for id in task_ids {
             store.resources.insert(

@@ -1,27 +1,37 @@
 <script module lang="ts">
-    export type RecurringMode = "instance" | "following" | "all";
+    export type RecurringMode = "this" | "following" | "all";
 </script>
 
 <script lang="ts">
+    import type { EventScope } from '../lib/domain';
+
     interface Props {
         isOpen: boolean;
-        actionType: "edit" | "delete";
-        onConfirm: (mode: RecurringMode) => void;
+        actionType: "edit" | "delete" | "move";
+        /** Which choices to offer; a move cannot re-anchor a series from one occurrence. */
+        modes?: RecurringMode[];
+        onConfirm: (mode: EventScope) => void;
         onCancel: () => void;
     }
 
-    let { isOpen, actionType, onConfirm, onCancel }: Props = $props();
+    let {
+        isOpen,
+        actionType,
+        modes = ["this", "following", "all"],
+        onConfirm,
+        onCancel,
+    }: Props = $props();
 
-    let selectedMode = $state<RecurringMode>("instance");
+    let selectedMode = $state<EventScope>("this");
 
     // Reset selection when modal opens
     $effect(() => {
         if (isOpen) {
-            selectedMode = "instance";
+            selectedMode = modes.includes("this") ? "this" : modes[0] ?? "this";
         }
     });
 
-    let actionText = $derived(actionType === "edit" ? "Edit" : "Delete");
+    let actionText = $derived(actionType === "delete" ? "Delete" : actionType === "move" ? "Move" : "Edit");
 
     function handleConfirm() {
         onConfirm(selectedMode);
@@ -32,20 +42,26 @@
     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 99999;">
         <div style="background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg);">
             <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">{actionText} recurring event</h3>
-            
+
             <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
-                    <input type="radio" name="recurring_mode" value="instance" bind:group={selectedMode} />
-                    This event
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
-                    <input type="radio" name="recurring_mode" value="following" bind:group={selectedMode} />
-                    This and following events
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
-                    <input type="radio" name="recurring_mode" value="all" bind:group={selectedMode} />
-                    All events
-                </label>
+                {#if modes.includes("this")}
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="recurring_mode" value="this" bind:group={selectedMode} />
+                        This event
+                    </label>
+                {/if}
+                {#if modes.includes("following")}
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="recurring_mode" value="following" bind:group={selectedMode} />
+                        This and following events
+                    </label>
+                {/if}
+                {#if modes.includes("all")}
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="recurring_mode" value="all" bind:group={selectedMode} />
+                        All events
+                    </label>
+                {/if}
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 12px;">

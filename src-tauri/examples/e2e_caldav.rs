@@ -1,15 +1,13 @@
 //! Live Radicale end-to-end check (P4/P6 verification).
 //!
 //! Creates, edits/moves and deletes one event and one task through the same
-//! `Store`/`ops` code the app commands use, restarts the store, and compares the
-//! server against `snapshot.json`. It also edits and then restores a real
-//! tasks.org VTODO to prove `X-APPLE-SORT-ORDER` survives.
+//! `Store`/`ops` code the app commands use, reloads the store from the server,
+//! and compares the reloaded bodies with the server. It also edits and then
+//! restores a real tasks.org VTODO to prove `X-APPLE-SORT-ORDER` survives.
 //!
 //! Run with `TASKROOT_DATA_DIR=target/e2e-data`:
 //! `cargo run --example e2e_caldav -- --user me --password ...`
 
-
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -17,10 +15,9 @@ use tauri_app_lib::caldav::client::CalDavClient;
 use tauri_app_lib::caldav::discovery;
 use tauri_app_lib::caldav::transport::HttpClient;
 use tauri_app_lib::domain::{
-    AppEvent, AppTask, AppTaskStatus, Color, EventId, EventStatus, TaskId, TaskPriority,
+    AppEvent, AppTask, AppTaskStatus, Color, EventId, EventScope, EventStatus, TaskId, TaskPriority,
 };
 use tauri_app_lib::store::{model::Store, ops};
-
 
 struct Args {
     server: String,
@@ -102,7 +99,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let href = event
         .remote_id
         .as_deref()
-        .ok_or("created event has no href")?.clone();
+        .ok_or("created event has no href")?
+        .clone();
     assert_exists(&client, &href).await?;
     println!("created event {href}");
 
@@ -121,7 +119,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )?;
     println!("edited and moved event");
 
-    ops::delete_event(&mut store, &client, event_id.as_str()).await?;
+    ops::delete_event(&mut store, &client, event_id.as_str(), EventScope::All, None).await?;
     assert_absent(&client, &href).await?;
     println!("deleted event");
 
@@ -131,7 +129,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let task_href = task
         .remote_id
         .as_deref()
-        .ok_or("created task has no href")?.clone();
+        .ok_or("created task has no href")?
+        .clone();
     assert_exists(&client, &task_href).await?;
     println!("created task {task_href}");
 
@@ -177,7 +176,8 @@ async fn preserve_apple_sort_order(
     let href = task
         .remote_id
         .as_deref()
-        .ok_or("the tasks.org task has no href")?.clone();
+        .ok_or("the tasks.org task has no href")?
+        .clone();
     let before = fetch_one(client, &href).await?;
     ensure(
         before.contains("X-APPLE-SORT-ORDER:"),
@@ -211,20 +211,23 @@ async fn restart_and_compare(
     restarted.calendars = calendars.to_vec();
     ops::full_load(&mut restarted, client).await?;
 
-    let snapshot: BTreeMap<String, tauri_app_lib::store::SnapshotResource> =
-        serde_json::from_str(&std::fs::read_to_string(dir.join("snapshot.json"))?)?;
-    ensure(
-        snapshot.len() == restarted.resources.len(),
-        "snapshot and in-memory store disagree after restart",
-    )?;
-    for (href, entry) in &snapshot {
+    let hrefs: Vec<String> = restarted.resources.keys().cloned().collect();
+    for href in &hrefs {
         let live = fetch_one(client, href).await?;
+        let loaded = restarted
+            .resources
+            .get(href)
+            .map(|resource| resource.raw.as_str())
+            .ok_or_else(|| format!("{href} disappeared from the reloaded store"))?;
         ensure(
-            live == entry.raw,
-            format!("snapshot resource {href} does not match the server"),
+            live == loaded,
+            format!("reloaded resource {href} does not match the server"),
         )?;
     }
-    println!("restart: snapshot and server agree ({} resources)", snapshot.len());
+    println!(
+        "restart: reloaded {} resources and the server agrees",
+        restarted.resources.len()
+    );
     Ok(())
 }
 

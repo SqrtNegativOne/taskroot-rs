@@ -171,21 +171,19 @@ const REFRESH_TIMEOUT: Duration = Duration::from_secs(3);
 ///
 /// `account.json` is a cache of what the server has, not the truth: a list
 /// created or deleted from another client would otherwise stay invisible until
-/// the next full discovery, and a *deleted* one would fail every sync with a
-/// `404`. Called at startup and by the CLI, so one `PROPFIND` per process.
+/// the next load, and a *deleted* one would fail the collection fetch with a
+/// `404`. Called at startup, on Refresh and by the CLI, so one `PROPFIND` per
+/// load.
 ///
 /// When the server cannot be asked (offline, slow, malformed) the cached list is
-/// returned unchanged; the caller's offline path then runs as before.
+/// returned unchanged.
 pub async fn refresh_collections(
     dir: &Path,
     client: &CalDavClient,
     account: &mut Account,
 ) -> Vec<CalendarInfo> {
-    let fetched = tokio::time::timeout(
-        REFRESH_TIMEOUT,
-        fetch_calendars(client, &account.home_href),
-    )
-    .await;
+    let fetched =
+        tokio::time::timeout(REFRESH_TIMEOUT, fetch_calendars(client, &account.home_href)).await;
 
     let Ok(Ok(calendars)) = fetched else {
         return account.calendars.clone();

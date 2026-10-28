@@ -255,7 +255,10 @@ fn collection_id(task: &AppTask) -> &str {
 
 fn tag_names(task: &AppTask) -> String {
     task.tags.as_ref().map_or_else(String::new, |tags| {
-        tags.iter().map(|tag| tag.name.as_str()).collect::<Vec<_>>().join(",")
+        tags.iter()
+            .map(|tag| tag.name.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
     })
 }
 
@@ -332,7 +335,11 @@ mod tests {
         }
     }
 
-    fn filter(column: AppTaskFilterColumn, operator: FilterOperator, value: serde_json::Value) -> AppTaskFilter {
+    fn filter(
+        column: AppTaskFilterColumn,
+        operator: FilterOperator,
+        value: serde_json::Value,
+    ) -> AppTaskFilter {
         AppTaskFilter {
             column: Some(column),
             operator: Some(operator),

@@ -21,45 +21,37 @@ Windows/macOS) contains:
 | `settings.json` | `AppSettings`, one object. Malformed → renamed `settings.json.bad`, defaults used. |
 | `ui-state.json` | Flat `{ "<key>": <value> }` map for per-component UI state. |
 | `account.json` | Server URL, username, home-set, principal and discovered collections. No password. |
-| `snapshot.json` | Read-only cache: `href -> { collection, etag, raw }`. Never merged with remote state. A failed write is logged and ignored. |
 
 A debug build whose app-data directory is not writable (a sandboxed dev run) keeps this
 directory next to the executable in `dev-data/` instead, copying `account.json`,
 `settings.json` and `ui-state.json` over once. `TASKROOT_DATA_DIR` overrides both.
 
-Discovery runs at account setup, when the user explicitly refreshes calendars, and after a
-list is created (to pick up the server-assigned collection). A normal sync never
-rediscovers.
+Discovery runs at account setup and on every load (startup, Refresh, and after a list is
+created) to pick up the server-assigned collection. There is no background sync.
 
 ## Lists
 
 Lists are CalDAV collections. `create_calendar` sends `MKCALENDAR` for a new
 `<home>/<uuid>/` and re-reads the home; `rename_calendar` and `set_calendar_color`
 `PROPPATCH` `displayname` and `ical:calendar-color` (clearing the colour removes the
-property); `delete_calendar` `DELETE`s the collection and drops its resources and sync
-token from the store. `store.calendars` and `account.json` are rewritten together after
-every change, because `sync_all` replaces the resource cache whenever the two disagree.
+property); `delete_calendar` `DELETE`s the collection and drops its resources from the
+store. `store.calendars` and `account.json` are rewritten together after every change.
 Read-only collections refuse these edits with `invalid-input` before any request is sent.
 
 ## Data flow
 
-1. On start Taskroot re-reads the collection list with one `PROPFIND` of the stored
-   calendar home (~40–70 ms against a local Radicale, capped at 3 s), rewrites
-   `account.json` when it changed, and falls back to the cached list when the server
-   cannot be asked. `account.json` is therefore a cache, not the truth: a list created
-   or deleted elsewhere is picked up at the next start instead of leaving a stale
-   entry that fails every sync with a `404`.
-2. It then `PROPFIND`s each collection, `calendar-multiget`s every resource,
-   parses the raw ICS into memory, and writes `snapshot.json` once.
-2. If the server is unreachable, Taskroot loads `snapshot.json`, marks the UI offline and
-   retries in the background.
+1. On start (and on Refresh) Taskroot re-reads the collection list with one `PROPFIND` of
+   the stored calendar home (~40–70 ms against a local Radicale, capped at 3 s),
+   rewrites `account.json` when it changed, and falls back to the cached list when the
+   server cannot be asked. `account.json` is therefore a cache, not the truth: a list
+   created or deleted elsewhere is picked up at the next load.
+2. It then sends one `calendar-query` REPORT per collection asking for every resource's
+   `ETag` and body, and parses the raw ICS into memory. A failed load leaves the
+   previously loaded resources untouched.
 3. Edits merge into the in-memory raw resource and `PUT` immediately. There is no offline
    edit queue: if Radicale is down the command fails and the UI reports it.
-4. The poller does `sync-collection` per collection (5-minute default, honouring the
-   `sync_interval` setting), falling back to a full `PROPFIND` + multiget on `403`/`410`/`501`.
-   Radicale's `[hook]` plugin (`C:\radicale\taskroot_hook.py`) additionally `POST`s to the
-   app's loopback `/notify`, which triggers the same pull within a couple of seconds, so the
-   poller is only the backstop for changes made behind Radicale's back (files edited on disk).
+4. There is no poller and no change hook. Changes made by another client become visible
+   when the user presses Refresh (or restarts the app).
 5. `PUT` updates use `If-Match: <etag>`; creates use `If-None-Match: *`. A `412` re-fetches,
    re-merges and retries once; a second failure is reported, never silently kept.
 6. Deletes are `DELETE`; `404` counts as success. Deleting a master deletes its whole
@@ -103,7 +95,29 @@ their own tz database. All-day events stay floating dates.
 
 `exdates` is the canonical home of exclusion dates: the parser fills it from `EXDATE`, the
 writer emits it back, and expansion consumes it directly. This is what makes the
-inspector's "delete this occurrence" action survive the next pull.
+inspector's "delete this occurrence" action survive the next pull. The value it writes is
+the instance's `occurrenceStart` (the clicked occurrence's canonical value), never the
+master's `DTSTART` — otherwise "this event" would exclude the first occurrence of the
+series instead of the one the user picked.
+
+### Scoped recurring edits
+
+Occurrence identity is part of the write contract, so the UI never composes `.ics` text.
+`delete_event` and `reschedule_event` take an `EventScope` (`this`, `following`, `all`) plus
+the clicked `occurrenceStart`:
+
+- `this` — delete appends an `EXDATE` for that value (and removes the exception row when
+  one was selected); a move writes a `RECURRENCE-ID` exception at the original slot with
+  the new `DTSTART`/`DTEND`, so the rest of the series keeps its times.
+- `following` — delete rewrites `RRULE` with `UNTIL` one second (one day for all-day events)
+  before the occurrence and drops exceptions at or after it. `UNTIL` is written in UTC for a
+  `TZID` series, as a bare date for all-day, and floating for a zone-less series. A move is
+  rejected: re-anchoring a series from one occurrence is not supported yet.
+- `all` — delete drops every component sharing the UID (the resource goes too when nothing
+  remains); a move shifts the master's `DTSTART`/`DTEND`.
+
+The canonical `occurrenceStart` shapes are the same ones `exdates` uses, so the values a
+projection returns can be written straight back.
 
 ## VTODO mapping
 
@@ -152,7 +166,7 @@ task tree (`parent_task` ↔ `RELATED-TO;RELTYPE=PARENT`).
 ## Testing
 
 - `src-tauri/src/caldav/fixtures/` holds real Radicale XML responses (PROPFIND, multiget,
-  sync-collection, error bodies). Parsers are tested against those, not hand-written XML.
+  error bodies). Parsers are tested against those, not hand-written XML.
 - `src-tauri/src/ics/fixtures/` holds real resources: a Mozilla event with a historical
   `VTIMEZONE`/`EXDATE`/`RRULE`/`X-MOZ-GENERATION`, an all-day event, a tasks.org VTODO with
   `X-APPLE-SORT-ORDER`, and a tasks.org VTODO carrying `VTIMEZONE`, `DTSTART`, `GEO`,

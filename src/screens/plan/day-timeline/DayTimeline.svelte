@@ -3,12 +3,13 @@
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
     import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
-    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, EventScope } from '../../../lib/domain';
     import { isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineHeader from './components/TimelineHeader.svelte';
     import DayColumn from './components/DayColumn.svelte';
+    import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
@@ -30,17 +31,66 @@
         return typeof value === 'number' && NUM_DAYS_OPTIONS.includes(value);
     }
 
-    function onResizeEvent(id: string, startTime: string, endTime: string) {
-        if (isEventReadOnlyById(id)) return;
-        void store.mutate('Failed to resize event', () =>
-            store.rescheduleEvent(id, startTime, endTime),
+    type PendingReschedule = {
+        instance: EventInstance;
+        startTime: string;
+        endTime: string;
+        isAllDay: boolean;
+        operation: string;
+    };
+
+    let pendingReschedule = $state<PendingReschedule | undefined>(undefined);
+    let moveModalOpen = $state(false);
+
+    function onResizeEvent(instance: EventInstance, startTime: string, endTime: string) {
+        requestReschedule(instance, startTime, endTime, 'Failed to resize event');
+    }
+
+    function onMoveEvent(instance: EventInstance, startTime: string, endTime: string) {
+        requestReschedule(instance, startTime, endTime, 'Failed to move event');
+    }
+
+    function requestReschedule(
+        instance: EventInstance,
+        startTime: string,
+        endTime: string,
+        operation: string,
+    ) {
+        if (isEventReadOnlyById(instance.id)) return;
+        const isAllDay = instance.timing.kind === 'allDay';
+        if (!instance.recurring) {
+            commitReschedule(instance, startTime, endTime, isAllDay, 'all', operation);
+            return;
+        }
+        pendingReschedule = { instance, startTime, endTime, isAllDay, operation };
+        moveModalOpen = true;
+    }
+
+    function commitReschedule(
+        instance: EventInstance,
+        startTime: string,
+        endTime: string,
+        isAllDay: boolean,
+        scope: EventScope,
+        operation: string,
+    ) {
+        void store.mutate(operation, () =>
+            store.rescheduleEvent(instance.id, startTime, endTime, isAllDay, scope, instance.occurrenceStart),
         );
     }
 
-    function onMoveEvent(id: string, startTime: string, endTime: string) {
-        if (isEventReadOnlyById(id)) return;
-        void store.mutate('Failed to move event', () =>
-            store.rescheduleEvent(id, startTime, endTime),
+    function handleMoveScope(scope: EventScope) {
+        moveModalOpen = false;
+        const pending = pendingReschedule;
+        pendingReschedule = undefined;
+        if (!pending) return;
+        commitReschedule(
+            pending.instance,
+            pending.startTime,
+            pending.endTime,
+            pending.isAllDay,
+            scope,
+            pending.operation,
         );
     }
 
@@ -162,4 +212,12 @@
             {/each}
         </div>
     </div>
+
+    <RecurringActionModal
+        isOpen={moveModalOpen}
+        actionType="move"
+        modes={['this', 'all']}
+        onConfirm={handleMoveScope}
+        onCancel={() => { moveModalOpen = false; pendingReschedule = undefined; }}
+    />
 </section>

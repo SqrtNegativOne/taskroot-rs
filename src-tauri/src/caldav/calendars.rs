@@ -1,10 +1,8 @@
 //! Calendar collection lifecycle: create, rename, recolour and delete lists.
 //!
 //! Every operation writes the server first, then mirrors the resulting
-//! collection list into the in-memory store and `account.json`. Keeping both in
-//! step matters: `sync_all` replaces the loaded resources whenever the store and
-//! the account disagree, so a stale `account.json` would throw away the cache
-//! after every list edit.
+//! collection list into the in-memory store and `account.json`, so a Refresh
+//! does not have to re-discover the list.
 
 use std::path::Path;
 
@@ -98,7 +96,7 @@ pub async fn set_color(
     replace_calendars(dir, store, calendars)
 }
 
-/// Delete a collection, every resource in it and its sync token.
+/// Delete a collection and every resource in it.
 ///
 /// # Errors
 ///
@@ -117,7 +115,6 @@ pub async fn delete(
     store
         .resources
         .retain(|_, resource| resource.collection != href);
-    store.tokens.remove(href);
     let calendars = store
         .calendars
         .iter()
@@ -125,16 +122,13 @@ pub async fn delete(
         .cloned()
         .collect();
     replace_calendars(dir, store, calendars)?;
-    store.write_snapshot();
     Ok(())
 }
 
 fn require_name(display_name: &str) -> Result<&str, AppError> {
     let name = display_name.trim();
     if name.is_empty() {
-        return Err(AppError::InvalidInput(
-            "A list needs a name".to_string(),
-        ));
+        return Err(AppError::InvalidInput("A list needs a name".to_string()));
     }
     Ok(name)
 }
@@ -142,9 +136,7 @@ fn require_name(display_name: &str) -> Result<&str, AppError> {
 fn ensure_writable(store: &Store, href: &str) -> Result<(), AppError> {
     match store.calendar(href) {
         Some(calendar) if calendar.writable => Ok(()),
-        Some(_) => Err(AppError::InvalidInput(
-            "That list is read-only".to_string(),
-        )),
+        Some(_) => Err(AppError::InvalidInput("That list is read-only".to_string())),
         None => Err(AppError::NotFound(format!("No list at {href}"))),
     }
 }

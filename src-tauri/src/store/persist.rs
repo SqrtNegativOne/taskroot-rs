@@ -25,13 +25,19 @@ pub fn read_settings(dir: &Path) -> AppSettings {
     let path = settings_path(dir);
     match std::fs::read_to_string(&path) {
         Ok(raw) => serde_json::from_str(&raw).unwrap_or_else(|error| {
-            eprintln!("Failed to parse {}: {error}; starting from defaults", path.display());
+            eprintln!(
+                "Failed to parse {}: {error}; starting from defaults",
+                path.display()
+            );
             mark_bad(&path);
             AppSettings::default()
         }),
         Err(error) if error.kind() == ErrorKind::NotFound => AppSettings::default(),
         Err(error) => {
-            eprintln!("Failed to read {}: {error}; starting from defaults", path.display());
+            eprintln!(
+                "Failed to read {}: {error}; starting from defaults",
+                path.display()
+            );
             AppSettings::default()
         }
     }
@@ -66,7 +72,9 @@ pub fn apply_setting(
     let Value::Object(mut map) = serde_json::to_value(&*settings)
         .map_err(|e| AppError::Store(format!("Failed to encode settings: {e}")))?
     else {
-        return Err(AppError::Store("Settings are not a JSON object".to_string()));
+        return Err(AppError::Store(
+            "Settings are not a JSON object".to_string(),
+        ));
     };
     if !map.contains_key(key) {
         return Ok(false);
@@ -74,7 +82,9 @@ pub fn apply_setting(
     let mut probe = Map::new();
     probe.insert(key.to_string(), value.clone());
     serde_json::from_value::<AppSettings>(Value::Object(probe)).map_err(|_| {
-        AppError::InvalidInput(format!("Setting '{key}' does not accept the provided value"))
+        AppError::InvalidInput(format!(
+            "Setting '{key}' does not accept the provided value"
+        ))
     })?;
     map.insert(key.to_string(), value.clone());
     *settings = serde_json::from_value(Value::Object(map))
@@ -131,6 +141,10 @@ fn mark_bad(path: &Path) {
     let bad = path.with_extension("json.bad");
     let _ = std::fs::remove_file(&bad);
     if let Err(error) = std::fs::rename(path, &bad) {
-        eprintln!("Failed to rename {} to {}: {error}", path.display(), bad.display());
+        eprintln!(
+            "Failed to rename {} to {}: {error}",
+            path.display(),
+            bad.display()
+        );
     }
 }

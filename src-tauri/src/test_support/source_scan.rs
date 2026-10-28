@@ -91,11 +91,12 @@ pub(crate) fn is_test_path(path: &Path) -> bool {
         let name = component.as_os_str().to_string_lossy();
         name == "test" || name.starts_with("tests") || name.starts_with("test_")
     });
-    let is_test_file = path.file_name().and_then(|name| name.to_str()).is_some_and(
-        |name| {
+    let is_test_file = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
             name.ends_with("tests.rs") || name.ends_with(".test.ts") || name.ends_with(".spec.ts")
-        },
-    );
+        });
     in_test_dir || is_test_file
 }
 
@@ -132,7 +133,11 @@ pub(crate) fn crate_root() -> PathBuf {
 
 /// The text between the first `open` marker and the next `close` after it.
 fn between<'a>(source: &'a str, open: &str, close: char) -> &'a str {
-    let (_, rest) = source.split_once(open).expect("the opening marker is present");
-    let (body, _) = rest.split_once(close).expect("the closing marker is present");
+    let (_, rest) = source
+        .split_once(open)
+        .expect("the opening marker is present");
+    let (body, _) = rest
+        .split_once(close)
+        .expect("the closing marker is present");
     body
 }

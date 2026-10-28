@@ -131,6 +131,10 @@ pub async fn connect_account(
         return Err(error);
     }
 
+    if let Err(error) = crate::load::load_all(&app).await {
+        eprintln!("[caldav] could not load the new account's calendars: {error}");
+    }
+
     Ok(AccountSummary::from_account(&account))
 }
 
@@ -210,7 +214,7 @@ pub async fn set_calendar_color(
     super::calendars::set_color(&dir, &client, &mut store, &href, color).await
 }
 
-/// Delete a list, its resources and its sync token.
+/// Delete a list and every resource in it.
 ///
 /// # Errors
 ///

@@ -1,33 +1,26 @@
-//! Collection-level contract tests: `sync-collection`, multiget batching and
+//! Collection-level contract tests: `calendar-query`, multiget batching and
 //! `MKCALENDAR`, backed by `wiremock`.
 
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::caldav::model::CalendarComponent;
-use crate::caldav::xml::SYNC_COLLECTION_INITIAL_BODY;
 
-use super::{test_client, MULTIGET, SYNC_DELTA, SYNC_INITIAL};
+use super::{test_client, MULTIGET};
 
 const SQRT_CAL: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
 
 #[tokio::test]
-async fn fetch_resources_runs_an_initial_sync_then_one_multiget() {
+async fn fetch_resources_runs_one_calendar_query() {
     let server = MockServer::start().await;
     Mock::given(method("REPORT"))
         .and(path(SQRT_CAL))
-        .and(body_string_contains("<d:sync-token/>"))
-        .respond_with(ResponseTemplate::new(207).set_body_string(SYNC_INITIAL))
-        .mount(&server)
-        .await;
-    Mock::given(method("REPORT"))
-        .and(path(SQRT_CAL))
-        .and(body_string_contains("calendar-multiget"))
+        .and(body_string_contains("<c:calendar-query"))
         .respond_with(ResponseTemplate::new(207).set_body_string(MULTIGET))
         .mount(&server)
         .await;
 
-    let (resources, token) = test_client(&server)
+    let resources = test_client(&server)
         .fetch_resources(SQRT_CAL)
         .await
         .unwrap();
@@ -37,10 +30,6 @@ async fn fetch_resources_runs_an_initial_sync_then_one_multiget() {
         .calendar_data
         .as_deref()
         .is_some_and(|raw| raw.contains("UID:dsh-20261017-first-day-of-durga@dsh-import")));
-    assert_eq!(
-        token.as_deref(),
-        Some("http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435")
-    );
 }
 
 #[tokio::test]
@@ -61,36 +50,6 @@ async fn fetch_hrefs_asks_for_only_the_given_resources() {
         .unwrap();
 
     assert_eq!(resources.len(), 1);
-}
-
-#[tokio::test]
-async fn sync_collection_sends_the_stored_token() {
-    let server = MockServer::start().await;
-    Mock::given(method("REPORT"))
-        .and(path(SQRT_CAL))
-        .and(body_string_contains(
-            "<d:sync-token>http://radicale.org/ns/sync/572734e7</d:sync-token>",
-        ))
-        .respond_with(ResponseTemplate::new(207).set_body_string(SYNC_DELTA))
-        .mount(&server)
-        .await;
-
-    let sync = test_client(&server)
-        .sync_collection(SQRT_CAL, Some("http://radicale.org/ns/sync/572734e7"))
-        .await
-        .unwrap();
-
-    assert_eq!(
-        sync.token.as_deref(),
-        Some("http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435")
-    );
-    let changes = &sync.changes;
-    assert!(changes.is_empty(), "expected no changes, got {changes:?}");
-}
-
-#[tokio::test]
-async fn an_initial_sync_body_is_used_without_a_token() {
-    assert!(SYNC_COLLECTION_INITIAL_BODY.contains("<d:sync-token/>"));
 }
 
 #[tokio::test]
@@ -121,7 +80,9 @@ async fn renaming_a_collection_proppatches_its_display_name() {
     let server = MockServer::start().await;
     Mock::given(method("PROPPATCH"))
         .and(path("/me/imported/"))
-        .and(body_string_contains("<d:displayname>Errands</d:displayname>"))
+        .and(body_string_contains(
+            "<d:displayname>Errands</d:displayname>",
+        ))
         .respond_with(ResponseTemplate::new(207))
         .mount(&server)
         .await;

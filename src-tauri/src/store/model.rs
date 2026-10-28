@@ -1,30 +1,17 @@
-//! The in-memory resource store and its read-only snapshot.
+//! The in-memory resource store.
 //!
 //! Radicale is the source of truth; this map is the view every command reads and
-//! edits mutate before the resource is `PUT` back. `snapshot.json` is a cache
-//! written after a successful load/edit and read only when startup cannot reach
-//! the server.
+//! edits mutate before the resource is `PUT` back. Nothing is cached on disk: a
+//! startup or Refresh load fills the map from the server.
 
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::domain::{AppEvent, AppTask};
 use crate::error::AppError;
 use crate::settings::AppSettings;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use super::persist;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotResource {
-    pub collection: String,
-    #[serde(default)]
-    pub etag: Option<String>,
-    pub raw: String,
-}
-
-pub type Snapshot = BTreeMap<String, SnapshotResource>;
 
 #[derive(Debug, Clone)]
 pub enum ResourceItems {
@@ -63,16 +50,13 @@ pub struct Store {
     pub data_dir: PathBuf,
     pub resources: BTreeMap<String, Resource>,
     pub calendars: Vec<CalendarInfo>,
-    pub tokens: BTreeMap<String, String>,
     pub settings: AppSettings,
     pub ui_state: serde_json::Map<String, serde_json::Value>,
-    pub offline: bool,
-    pub last_synced: Option<DateTime<Utc>>,
 }
 
 impl Store {
     /// Load settings and UI state; the resource map starts empty and is filled
-    /// from Radicale or `snapshot.json` by the caller.
+    /// from Radicale by the caller.
     ///
     /// # Errors
     ///
@@ -84,17 +68,9 @@ impl Store {
             data_dir,
             resources: BTreeMap::new(),
             calendars: Vec::new(),
-            tokens: BTreeMap::new(),
             settings,
             ui_state,
-            offline: false,
-            last_synced: None,
         })
-    }
-
-    #[must_use]
-    pub fn snapshot_path(&self) -> PathBuf {
-        self.data_dir.join("snapshot.json")
     }
 
     /// Replace (or insert) one resource and re-parse its components.
@@ -212,60 +188,6 @@ impl Store {
             .iter()
             .find(|calendar| calendar.writable && calendar.component == component)
     }
-
-    /// Write the whole store to `snapshot.json`.
-    ///
-    /// The snapshot is only the offline cache for an unreachable server, so a
-    /// failed write is logged instead of failing the server-backed operation
-    /// that triggered it.
-    pub fn write_snapshot(&self) {
-        let snapshot: Snapshot = self
-            .resources
-            .iter()
-            .map(|(href, resource)| {
-                (
-                    href.clone(),
-                    SnapshotResource {
-                        collection: resource.collection.clone(),
-                        etag: resource.etag.clone(),
-                        raw: resource.raw.clone(),
-                    },
-                )
-            })
-            .collect();
-        if let Err(error) = persist::write_json(&self.snapshot_path(), &snapshot) {
-            eprintln!("Failed to write the offline snapshot: {error}");
-        }
-    }
-
-    /// Fill the store from `snapshot.json`. A malformed resource is skipped, so
-    /// one bad cache entry cannot brick an offline start.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the snapshot exists but cannot be decoded.
-    pub fn load_snapshot(&mut self) -> Result<usize, AppError> {
-        let Some(snapshot) = persist::read_optional_json::<Snapshot>(&self.snapshot_path())? else {
-            return Ok(0);
-        };
-        for (href, entry) in snapshot {
-            if let Err(error) = self.set_resource(&href, &entry.collection, entry.etag.as_deref(), &entry.raw)
-            {
-                eprintln!("Skipping unparseable snapshot resource {href}: {error}");
-            }
-        }
-        Ok(self.resources.len())
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.resources.is_empty()
-    }
-
-    pub fn mark_synced(&mut self) {
-        self.offline = false;
-        self.last_synced = Some(Utc::now());
-    }
 }
 
 fn parse_items(raw: &str, href: &str, collection: &str) -> Result<ResourceItems, AppError> {
@@ -278,4 +200,3 @@ fn parse_items(raw: &str, href: &str, collection: &str) -> Result<ResourceItems,
         raw, href, collection,
     )?))
 }
-

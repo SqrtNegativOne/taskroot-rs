@@ -53,7 +53,7 @@ async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() 
     let dir = scratch_dir("reject");
     let state = StoreState::new(Store::load(dir.clone()).unwrap());
 
-    let error = storage::write_setting(&state, "sync_interval", &json!("15"))
+    let error = storage::write_setting(&state, "pause_minutes", &json!("15"))
         .await
         .unwrap_err();
 

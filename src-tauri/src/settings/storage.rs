@@ -3,9 +3,9 @@
 use crate::error::AppError;
 use crate::settings::AppSettings;
 use crate::store::{persist, StoreState};
-use serde_json::Value;
 #[cfg(test)]
 use serde_json::Map;
+use serde_json::Value;
 
 /// # Errors
 ///

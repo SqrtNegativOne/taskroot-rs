@@ -28,8 +28,8 @@
         today: Date;
         laid: LaidEvent[];
         dragState?: DragState;
-        onResizeEvent?: (id: string, startTime: string, endTime: string) => void;
-        onMoveEvent?: (id: string, startTime: string, endTime: string) => void;
+        onResizeEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
+        onMoveEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => void;
         calendars?: AppCalendar[];
@@ -43,20 +43,20 @@
     );
     
     // Event handlers
-    function handleResize(id: string, newStartMins: number, newEndMins: number) {
-        if (readOnlyEventIds.has(id)) return;
+    function handleResize(event: EventInstance, newStartMins: number, newEndMins: number) {
+        if (readOnlyEventIds.has(event.id)) return;
         const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
         const newStartDt = new Date(cellStart + newStartMins * 60000);
         const newEndDt = new Date(cellStart + newEndMins * 60000);
-        if (onResizeEvent) onResizeEvent(id, newStartDt.toISOString(), newEndDt.toISOString());
+        if (onResizeEvent) onResizeEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
     }
 
-    function handleMove(id: string, newStartMins: number, newEndMins: number) {
-        if (readOnlyEventIds.has(id)) return;
+    function handleMove(event: EventInstance, newStartMins: number, newEndMins: number) {
+        if (readOnlyEventIds.has(event.id)) return;
         const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
         const newStartDt = new Date(cellStart + newStartMins * 60000);
         const newEndDt = new Date(cellStart + newEndMins * 60000);
-        if (onMoveEvent) onMoveEvent(id, newStartDt.toISOString(), newEndDt.toISOString());
+        if (onMoveEvent) onMoveEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
     }
 
     // Grid creation logic

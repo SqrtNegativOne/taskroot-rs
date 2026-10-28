@@ -3,7 +3,6 @@
 //! The fixtures are byte-for-byte copies of files under `C:\radicale`; the
 //! exception tests build a multi-component resource in-memory instead (plan §13).
 
-
 use super::lines::property_name;
 use super::*;
 use crate::domain::{
@@ -835,13 +834,11 @@ fn a_tasks_org_task_maps_start_due_recurrence_geo_and_reminder() {
         }])
     );
     assert_eq!(task.priority, Some(TaskPriority::Medium));
-    assert_eq!(
-        task.parent_task,
-        Some(TaskId::from("1004415175551987000"))
-    );
+    assert_eq!(task.parent_task, Some(TaskId::from("1004415175551987000")));
     assert_eq!(task.completed_at, None);
     assert_eq!(
-        task.tags.map(|tags| tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>()),
+        task.tags
+            .map(|tags| tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>()),
         Some(vec!["Garden".to_string(), "Home".to_string()])
     );
 }
@@ -1063,7 +1060,10 @@ fn a_utc_due_date_keeps_its_instant() {
 
     let written = write_task_resource(raw, &task).unwrap();
     assert!(written.contains("DUE;TZID=UTC:20261105T123000"));
-    assert_eq!(read_task(&written).due.as_deref(), Some("2026-11-05T12:30:00"));
+    assert_eq!(
+        read_task(&written).due.as_deref(),
+        Some("2026-11-05T12:30:00")
+    );
 }
 
 #[test]

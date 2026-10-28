@@ -2,7 +2,8 @@ import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import { notify } from './notifications.svelte';
-import type { AppTask, AppEvent } from './domain';
+import { STORE_UPDATED } from './events';
+import type { AppTask, AppEvent, EventScope } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
 
 export function describeError(error: unknown): string {
@@ -90,20 +91,33 @@ export class AppStore {
         return this.commit(safeInvoke('update_event', { event }));
     }
 
-    /** Reschedule a dragged instance back onto its master event. */
+    /** Reschedule one occurrence or the whole series (`scope`). */
     rescheduleEvent(
         id: string,
         startTime: string,
         endTime: string,
-        isAllDay = false,
+        isAllDay: boolean,
+        scope: EventScope,
+        occurrenceStart?: string,
     ): Promise<Result<void, AppError>> {
         return this.commit(
-            safeInvoke('reschedule_event', { id, startTime, endTime, isAllDay }),
+            safeInvoke('reschedule_event', {
+                id,
+                startTime,
+                endTime,
+                isAllDay,
+                scope,
+                occurrenceStart,
+            }),
         );
     }
 
-    deleteEvent(id: string): Promise<Result<void, AppError>> {
-        return this.commit(safeInvoke('delete_event', { id }));
+    deleteEvent(
+        id: string,
+        scope: EventScope,
+        occurrenceStart?: string,
+    ): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('delete_event', { id, scope, occurrenceStart }));
     }
 
     createCalendar(
@@ -129,7 +143,7 @@ export class AppStore {
         const result = await command;
         if (result.isErr()) return err(result.error);
         void import('@tauri-apps/api/event').then(({ emit }) => {
-            void emit('store-updated');
+            void emit(STORE_UPDATED);
         });
         return ok(undefined);
     }
@@ -139,7 +153,7 @@ export const store = new AppStore();
 
 if (typeof window !== 'undefined') {
     void import('@tauri-apps/api/event').then(({ listen }) => {
-        void listen('store-updated', () => {
+        void listen(STORE_UPDATED, () => {
             void store.refresh();
         });
     });

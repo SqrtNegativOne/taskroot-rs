@@ -33,8 +33,8 @@
         endMins: number;
         lane: number;
         lanes: number;
-        onResize?: (id: string, start: number, end: number) => void;
-        onMove?: (id: string, start: number, end: number) => void;
+        onResize?: (event: EventInstance, start: number, end: number) => void;
+        onMove?: (event: EventInstance, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
         readOnly?: boolean;
         labelOffset?: number;
@@ -68,10 +68,10 @@
                     const dm = snappedDeltaMinutes(ev.clientY - startY);
                     if (edge === 'bottom') {
                         const newEnd = clamp(startEnd + dm, startStart + SNAP_MIN, HOURS_PER_DAY * MINUTES_IN_HOUR);
-                        onResize?.(event.id, startStart, newEnd);
+                        onResize?.(event, startStart, newEnd);
                     } else {
                         const newStart = clamp(startStart + dm, 0, startEnd - SNAP_MIN);
-                        onResize?.(event.id, newStart, startEnd);
+                        onResize?.(event, newStart, startEnd);
                     }
                 },
             });
@@ -116,7 +116,7 @@
                 dragOffset = undefined;
                 if (finalDm !== 0) {
                     onMove?.(
-                        event.id,
+                        event,
                         startStart + finalDm,
                         startStart + finalDm + (startEnd - startStart),
                     );

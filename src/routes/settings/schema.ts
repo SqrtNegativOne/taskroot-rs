@@ -1,6 +1,6 @@
 export type SettingValue = string | number | boolean;
 
-export type SettingType = 'select' | 'checkbox' | 'number' | 'time' | 'keybinding' | 'custom' | 'action';
+export type SettingType = 'select' | 'checkbox' | 'number' | 'time' | 'keybinding';
 
 export interface SettingOption {
     value: SettingValue;
@@ -17,7 +17,6 @@ export interface SettingsSchemaItem {
     min?: number;
     max?: number;
     defaultValue?: SettingValue;
-    danger?: boolean;
 }
 
 export interface SettingSection {

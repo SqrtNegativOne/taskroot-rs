@@ -31,8 +31,6 @@ pub struct SettingMeta {
     pub max: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub danger: Option<bool>,
     #[serde(skip)]
     pub section: &'static str,
 }
@@ -67,18 +65,6 @@ const SETTING_SECTIONS: &[SectionDef] = &[
         name: "Stopwatch",
     },
     SectionDef {
-        key: "sync_integrations",
-        tab: "sync",
-        tab_label: "Sync and Backup",
-        name: "Sync & Integrations",
-    },
-    SectionDef {
-        key: "sync_danger",
-        tab: "sync",
-        tab_label: "Sync and Backup",
-        name: "Danger Zone",
-    },
-    SectionDef {
         key: "keybindings",
         tab: "keybindings",
         tab_label: "Keybindings",
@@ -89,27 +75,6 @@ const SETTING_SECTIONS: &[SectionDef] = &[
         tab: "tracker_window",
         tab_label: "Tracker window",
         name: "Appearance",
-    },
-];
-
-/// Button-only settings that act on the app rather than storing a value.
-struct CustomSettingDef {
-    section: &'static str,
-    id: &'static str,
-    label: &'static str,
-    description: &'static str,
-    keywords: &'static [&'static str],
-    danger: bool,
-}
-
-const CUSTOM_SETTINGS: &[CustomSettingDef] = &[
-    CustomSettingDef {
-        section: "sync_danger",
-        id: "clear_all_data",
-        label: "Clear All Data",
-        description: "Permanently delete all your tasks, settings, logs, and other data from both this device and the cloud. This cannot be undone.",
-        keywords: &["delete", "clear", "wipe", "reset", "factory", "all"],
-        danger: true,
     },
 ];
 
@@ -131,42 +96,16 @@ struct SchemaRoot {
     tabs: Vec<SchemaTab>,
 }
 
-fn custom_setting_meta(def: &CustomSettingDef) -> SettingMeta {
-    SettingMeta {
-        id: def.id.to_string(),
-        label: def.label.to_string(),
-        description: Some(def.description.to_string()),
-        keywords: def
-            .keywords
-            .iter()
-            .map(|word| (*word).to_string())
-            .collect(),
-        kind: "custom".to_string(),
-        options: None,
-        min: None,
-        max: None,
-        default_value: None,
-        danger: def.danger.then_some(true),
-        section: def.section,
-    }
-}
-
 fn build_settings_schema() -> SchemaRoot {
     let mut tabs: Vec<SchemaTab> = Vec::new();
     let metadata = AppSettings::setting_metadata();
 
     for def in SETTING_SECTIONS {
-        let mut settings: Vec<SettingMeta> = metadata
+        let settings: Vec<SettingMeta> = metadata
             .iter()
             .filter(|meta| meta.section == def.key)
             .cloned()
             .collect();
-        settings.extend(
-            CUSTOM_SETTINGS
-                .iter()
-                .filter(|custom| custom.section == def.key)
-                .map(custom_setting_meta),
-        );
 
         let section = SchemaSection {
             name: def.name,

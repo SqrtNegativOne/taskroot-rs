@@ -5,9 +5,9 @@
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod events;
+pub mod refresh;
 pub mod session;
 pub mod stopwatch;
-pub mod sync;
 pub mod tasks;
 pub mod window;
 

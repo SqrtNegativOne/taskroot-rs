@@ -13,14 +13,13 @@ pub mod commands;
 pub mod domain;
 pub mod error;
 pub mod events;
-pub mod hooks;
 pub mod ics;
+pub mod load;
 pub mod reminders;
 pub mod screens;
 pub mod settings;
 pub mod stopwatch;
 pub mod store;
-pub mod sync;
 #[cfg(test)]
 pub mod test_support;
 pub mod time_utils;
@@ -132,7 +131,10 @@ fn configure_dev_webview_storage(context: &tauri::Context) {
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
-    let Some(dir) = exe.parent().map(|dir| dir.join("dev-data").join("EBWebView")) else {
+    let Some(dir) = exe
+        .parent()
+        .map(|dir| dir.join("dev-data").join("EBWebView"))
+    else {
         return;
     };
     if std::fs::create_dir_all(&dir).is_err() {
@@ -205,14 +207,13 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             commands::events::create_event,
             commands::events::update_event,
             commands::events::delete_event,
+            commands::events::reschedule_event,
             commands::events::get_active_calendars,
-            commands::sync::force_sync,
-            commands::sync::wipe_local_data,
+            commands::refresh::refresh_data,
             screens::plan::query_tasks,
             screens::plan::query_events,
             screens::plan::query_event_instances,
             screens::plan::get_event,
-            screens::plan::reschedule_event,
             screens::plan::get_task_schema,
             screens::plan::get_event_schema,
             commands::window::window_restore_main,
@@ -234,7 +235,6 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             settings::get_ui_state,
             settings::set_ui_state,
             settings::update_setting,
-            commands::sync::get_sync_state,
             caldav::commands::is_account_configured,
             caldav::commands::get_account,
             caldav::commands::test_account,
@@ -252,9 +252,6 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
         stopwatch::StopwatchState::default(),
     )));
-    app.manage(sync::SyncStateManager(std::sync::Mutex::new(
-        sync::SyncState::default(),
-    )));
     app.manage(reminders::ReminderState::default());
     app.manage(caldav::transport::HttpClient::new()?);
     let handle = app.handle().clone();
@@ -267,8 +264,9 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
     let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
 
-    let mut tray_builder =
-        tauri::tray::TrayIconBuilder::new().menu(&menu).show_menu_on_left_click(false);
+    let mut tray_builder = tauri::tray::TrayIconBuilder::new()
+        .menu(&menu)
+        .show_menu_on_left_click(false);
 
     if let Some(icon) = app.default_window_icon() {
         tray_builder = tray_builder.icon(icon.clone());
@@ -308,15 +306,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app_data_dir(&handle)?;
     let store = store::Store::load(data_dir)?;
     handle.manage(store::StoreState::new(store));
-    sync::start_sync_engine(handle.clone());
-    hooks::start(handle.clone());
-    reminders::start_reminder_engine(handle.clone());
-
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = sync::run_tracked_sync(&handle, None).await {
-            eprintln!("Startup load failed: {error}");
-        }
-    });
+    load::start(handle.clone());
+    reminders::start_reminder_engine(handle);
 
     Ok(())
 }
@@ -387,7 +378,8 @@ mod tests {
         std::fs::create_dir_all(&target).expect("create target");
         std::fs::write(source.join("account.json"), "{\"server\":\"new\"}").expect("write account");
         std::fs::write(source.join("settings.json"), "{\"stale\":true}").expect("write settings");
-        std::fs::write(target.join("settings.json"), "{\"kept\":true}").expect("write target settings");
+        std::fs::write(target.join("settings.json"), "{\"kept\":true}")
+            .expect("write target settings");
 
         seed_from(&source, &target);
 

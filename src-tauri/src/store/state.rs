@@ -1,4 +1,4 @@
-//! Managed store handle shared by every command and the sync engine.
+//! Managed store handle shared by every command and the loader.
 
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -7,7 +7,7 @@ use super::model::Store;
 /// The managed store lock.
 ///
 /// A `tokio::sync::Mutex` is used deliberately: an edit holds the store while
-/// its `PUT` is in flight, so a concurrent pull can never overwrite the merge
+/// its `PUT` is in flight, so a concurrent load can never overwrite the merge
 /// with a stale resource. The single-user data set makes the short lock
 /// contention acceptable.
 pub struct StoreState(pub Mutex<Store>);

@@ -124,7 +124,10 @@ fn parse_date(value: &str) -> Option<NaiveDate> {
 
 /// A single render-ready occurrence produced by the projection boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/EventInstance.generated.ts")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/EventInstance.generated.ts"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct EventInstance {
     /// Row id for this occurrence: the master for rule-expanded instances, or
@@ -132,6 +135,10 @@ pub struct EventInstance {
     pub id: EventId,
     /// Stable identity for one occurrence, e.g. `master@2026-09-07`.
     pub occurrence_key: String,
+    /// The canonical value of this occurrence for `EXDATE` / `RECURRENCE-ID`:
+    /// `YYYY-MM-DD` for all-day, wall clock in the event's zone for timed.
+    /// Excluding it removes exactly this occurrence.
+    pub occurrence_start: String,
     pub title: String,
     #[ts(optional)]
     pub description: Option<String>,
@@ -202,9 +209,11 @@ mod tests {
 
     #[test]
     fn rfc3339_rows_become_timed_timing_in_utc() {
-        let timing =
-            EventTiming::from_event(&event("2026-09-07T09:00:00-07:00", "2026-09-07T10:00:00-07:00"))
-                .unwrap();
+        let timing = EventTiming::from_event(&event(
+            "2026-09-07T09:00:00-07:00",
+            "2026-09-07T10:00:00-07:00",
+        ))
+        .unwrap();
         match timing {
             EventTiming::Timed { start, end, .. } => {
                 assert_eq!(start.to_rfc3339(), "2026-09-07T16:00:00+00:00");
@@ -243,8 +252,8 @@ mod tests {
 
     #[test]
     fn naive_wall_clock_falls_back_to_utc_without_a_timezone() {
-        let timing = EventTiming::from_event(&event("2026-10-19T11:00:00", "2026-10-19T12:00:00"))
-            .unwrap();
+        let timing =
+            EventTiming::from_event(&event("2026-10-19T11:00:00", "2026-10-19T12:00:00")).unwrap();
         match timing {
             EventTiming::Timed { start, .. } => {
                 assert_eq!(start.to_rfc3339(), "2026-10-19T11:00:00+00:00");

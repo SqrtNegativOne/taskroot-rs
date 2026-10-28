@@ -16,7 +16,7 @@
         inspectorState,
         onClose,
     }: {
-        inspectorState?: { type: 'task' | 'event'; id: string };
+        inspectorState?: { type: 'task' | 'event'; id: string; occurrenceStart?: string };
         onClose: () => void;
     } = $props();
 
@@ -29,45 +29,8 @@
 
     let recurringModalOpen = $state(false);
     let eventPendingAction = $state<AppEvent | undefined>(undefined);
-
-    function formatUntilDate(dateStr: string): string {
-        const d = new Date(dateStr);
-        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    }
-
-    function applyRecurringAll(masterId: string) {
-        deleteEvent(masterId);
-        const overrides = events.filter(e => e.recurringEventId === masterId);
-        for (const override of overrides) {
-            deleteEvent(override.id);
-        }
-    }
-
-    function applyRecurringInstance(ev: AppEvent, masterEvent?: AppEvent) {
-        if (masterEvent) {
-            const exdates = [...(masterEvent.exdates || [])];
-            const targetDate = ev.originalStartTime || ev.startTime;
-            if (!exdates.includes(targetDate)) {
-                exdates.push(targetDate);
-            }
-            updateEvent(masterEvent.id, (current) => ({ ...current, exdates }));
-        }
-        if (ev.recurringEventId) {
-            deleteEvent(ev.id);
-        }
-    }
-
-    function applyRecurringFollowing(ev: AppEvent, masterEvent?: AppEvent) {
-        if (masterEvent && masterEvent.rrule) {
-            let rrule = masterEvent.rrule.replace(/;?(UNTIL|COUNT)=[^;]+/g, '');
-            const targetDate = ev.originalStartTime || ev.startTime;
-            rrule += `;UNTIL=${formatUntilDate(targetDate)}`;
-            updateEvent(masterEvent.id, (current) => ({ ...current, rrule }));
-        }
-        if (ev.recurringEventId) {
-            deleteEvent(ev.id);
-        }
-    }
+    /** The clicked occurrence's canonical value, absent when the series itself was opened. */
+    let eventPendingStart = $state<string | undefined>(undefined);
 
     function handleRecurringConfirm(mode: RecurringMode) {
         recurringModalOpen = false;
@@ -76,24 +39,21 @@
             return;
         }
 
-        const ev = eventPendingAction;
-        const masterId = ev.recurringEventId || ev.id;
-        const masterEvent = events.find(e => e.id === masterId);
-
-        if (mode === "all") {
-            applyRecurringAll(masterId);
-        } else if (mode === "instance") {
-            applyRecurringInstance(ev, masterEvent);
-        } else if (mode === "following") {
-            applyRecurringFollowing(ev, masterEvent);
-        }
+        const id = eventPendingAction.id;
+        const occurrenceStart = eventPendingStart;
         eventPendingAction = undefined;
+        eventPendingStart = undefined;
+
+        void store.mutate('Failed to delete event', () =>
+            store.deleteEvent(id, mode, occurrenceStart),
+        );
         onClose();
     }
 
     function handleRecurringCancel() {
         recurringModalOpen = false;
         eventPendingAction = undefined;
+        eventPendingStart = undefined;
     }
 
     function updateTask(id: string, t: (t: AppTask) => AppTask) {
@@ -115,7 +75,7 @@
     }
 
     function deleteEvent(id: string) {
-        void store.mutate('Failed to delete event', () => store.deleteEvent(id));
+        void store.mutate('Failed to delete event', () => store.deleteEvent(id, 'all'));
     }
 
     let paneRef = $state<HTMLElement | null>(null);
@@ -161,6 +121,7 @@
         } else if (currentEvent) {
             if (currentEvent.rrule || currentEvent.recurringEventId) {
                 eventPendingAction = currentEvent;
+                eventPendingStart = inspectorState?.occurrenceStart;
                 recurringModalOpen = true;
             } else {
                 deleteEvent(currentEvent.id);

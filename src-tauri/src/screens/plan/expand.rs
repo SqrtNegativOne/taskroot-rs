@@ -5,10 +5,14 @@
 //! hand in raw rows plus a requested range and get back tagged
 //! [`EventTiming`] values.
 
-use crate::domain::{wall_clock_to_utc, AppEvent, EventId, EventInstance, EventStatus, EventTiming};
+use crate::domain::{
+    wall_clock_to_utc, AppEvent, EventId, EventInstance, EventStatus, EventTiming,
+};
 use crate::time_utils::rrule_utils::{get_all_day_occurrences, get_occurrences};
 use chrono::{DateTime, Days, NaiveDate, Utc};
+use chrono_tz::Tz as ChronoTz;
 use std::collections::HashSet;
+use std::str::FromStr;
 
 /// Requested render window. Date-only boundaries are interpreted in the host's
 /// local calendar (the user's timezone); instants are used as-is.
@@ -46,7 +50,8 @@ pub fn expand_event_instances(
             expand_recurring(event, rrule, timing, &range, &exceptions, &mut instances);
         } else if overlaps(&timing, &range) {
             let key = occurrence_key(&event.id, &timing);
-            instances.push(build_instance(event, timing, key, false));
+            let start = canonical_start(&timing);
+            instances.push(build_instance(event, timing, key, start, false));
         }
     }
 
@@ -62,7 +67,8 @@ pub fn single_instance(event: &AppEvent) -> Option<EventInstance> {
     let timing = EventTiming::from_event(event)?;
     let recurring = event.rrule.is_some() || event.recurring_event_id.is_some();
     let key = occurrence_key(&event.id, &timing);
-    Some(build_instance(event, timing, key, recurring))
+    let start = canonical_start(&timing);
+    Some(build_instance(event, timing, key, start, recurring))
 }
 
 fn push_override(
@@ -88,7 +94,11 @@ fn push_override(
             )
         },
     );
-    instances.push(build_instance(event, timing, key, true));
+    let start = event
+        .original_start_time
+        .clone()
+        .unwrap_or_else(|| canonical_start(&timing));
+    instances.push(build_instance(event, timing, key, start, true));
 }
 
 fn expand_recurring(
@@ -135,7 +145,8 @@ fn expand_recurring(
                     end_date_exclusive: end,
                 };
                 if overlaps(&occ, range) {
-                    instances.push(build_instance(event, occ, key, true));
+                    let start = canonical_start(&occ);
+                    instances.push(build_instance(event, occ, key, start, true));
                 }
             }
         }
@@ -162,16 +173,13 @@ fn expand_recurring(
                 }
                 let occ_end = occ_start.checked_add_signed(duration).unwrap_or(occ_start);
                 if occ_end > range.start_instant && occ_start < range.end_instant {
-                    instances.push(build_instance(
-                        event,
-                        EventTiming::Timed {
-                            start: occ_start,
-                            end: occ_end,
-                            timezone: timezone.clone(),
-                        },
-                        key,
-                        true,
-                    ));
+                    let occ = EventTiming::Timed {
+                        start: occ_start,
+                        end: occ_end,
+                        timezone: timezone.clone(),
+                    };
+                    let start = canonical_start(&occ);
+                    instances.push(build_instance(event, occ, key, start, true));
                 }
             }
         }
@@ -182,11 +190,13 @@ fn build_instance(
     event: &AppEvent,
     timing: EventTiming,
     occurrence_key: String,
+    occurrence_start: String,
     recurring: bool,
 ) -> EventInstance {
     EventInstance {
         id: event.id.clone(),
         occurrence_key,
+        occurrence_start,
         title: event.title.clone(),
         description: event.description.clone(),
         timing,
@@ -224,6 +234,27 @@ fn occurrence_key(id: &EventId, timing: &EventTiming) -> String {
     }
 }
 
+/// The occurrence's start in the canonical `EXDATE` / `RECURRENCE-ID` shape
+/// (`ics::read`): a bare date for all-day, the wall clock in the event's zone
+/// for timed. The frontend writes it back verbatim to exclude one occurrence.
+fn canonical_start(timing: &EventTiming) -> String {
+    match timing {
+        EventTiming::AllDay { start_date, .. } => start_date.format("%Y-%m-%d").to_string(),
+        EventTiming::Timed {
+            start, timezone, ..
+        } => {
+            let wall = timezone
+                .as_deref()
+                .and_then(|name| ChronoTz::from_str(name).ok())
+                .map_or_else(
+                    || start.naive_utc(),
+                    |zone| start.with_timezone(&zone).naive_local(),
+                );
+            wall.format("%Y-%m-%dT%H:%M:%S").to_string()
+        }
+    }
+}
+
 /// Canonicalize an override's `originalStartTime` to the same representation the
 /// master occurrences use: a bare date for all-day, a UTC RFC 3339 instant for
 /// timed. A timed `originalStartTime` is a wall clock in the exception's own
@@ -232,10 +263,8 @@ fn normalize_exception(original: &str, timezone: Option<&str>) -> String {
     if original.len() == 10 && !original.contains('T') {
         return original.to_string();
     }
-    wall_clock_to_utc(original, timezone).map_or_else(
-        || original.to_string(),
-        |instant| instant.to_rfc3339(),
-    )
+    wall_clock_to_utc(original, timezone)
+        .map_or_else(|| original.to_string(), |instant| instant.to_rfc3339())
 }
 
 fn overlaps(timing: &EventTiming, range: &RenderRange) -> bool {
@@ -334,17 +363,12 @@ mod tests {
         let mut master = event("evt-1", "2025-01-01T09:00:00Z", "2025-01-01T09:30:00Z");
         master.rrule = Some("RRULE:FREQ=DAILY".into());
 
-        let instances = expand_event_instances(
-            &[master],
-            "2026-09-01T00:00:00Z",
-            "2026-09-03T23:59:59Z",
-        );
+        let instances =
+            expand_event_instances(&[master], "2026-09-01T00:00:00Z", "2026-09-03T23:59:59Z");
 
         assert_eq!(instances.len(), 3);
         assert!(instances.iter().all(|i| i.recurring));
-        assert!(instances
-            .iter()
-            .all(|i| i.id == EventId::from("evt-1")));
+        assert!(instances.iter().all(|i| i.id == EventId::from("evt-1")));
     }
 
     #[test]
@@ -353,8 +377,7 @@ mod tests {
         master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
         master.is_all_day = Some(true);
 
-        let instances =
-            expand_event_instances(&[master], "2026-09-07", "2026-10-04");
+        let instances = expand_event_instances(&[master], "2026-09-07", "2026-10-04");
 
         let starts: Vec<String> = instances.iter().map(all_day_start).collect();
         assert_eq!(
@@ -370,8 +393,7 @@ mod tests {
         master.is_all_day = Some(true);
         master.timezone = Some("America/Los_Angeles".into());
 
-        let instances =
-            expand_event_instances(&[master], "2026-09-07", "2026-10-04");
+        let instances = expand_event_instances(&[master], "2026-09-07", "2026-10-04");
 
         assert_eq!(instances.len(), 4);
         assert!(instances.iter().all(|i| {
@@ -394,8 +416,7 @@ mod tests {
         cancelled.original_start_time = Some("2026-09-14".into());
         cancelled.status = Some(EventStatus::Cancelled);
 
-        let instances =
-            expand_event_instances(&[master, cancelled], "2026-09-07", "2026-10-04");
+        let instances = expand_event_instances(&[master, cancelled], "2026-09-07", "2026-10-04");
 
         let starts: Vec<String> = instances.iter().map(all_day_start).collect();
         assert_eq!(starts, vec!["2026-09-07", "2026-09-21", "2026-09-28"]);
@@ -420,11 +441,8 @@ mod tests {
         master.rrule = Some("RRULE:FREQ=DAILY;COUNT=3".into());
         master.exdates = Some(vec!["2026-09-02T09:00:00".into()]);
 
-        let instances = expand_event_instances(
-            &[master],
-            "2026-09-01T00:00:00Z",
-            "2026-09-03T23:59:59Z",
-        );
+        let instances =
+            expand_event_instances(&[master], "2026-09-01T00:00:00Z", "2026-09-03T23:59:59Z");
 
         let mut starts: Vec<String> = instances.iter().map(timed_start).collect();
         starts.sort();
@@ -442,11 +460,8 @@ mod tests {
         master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
         master.timezone = Some("Europe/London".into());
 
-        let instances = expand_event_instances(
-            &[master],
-            "2026-03-16T00:00:00Z",
-            "2026-04-06T23:59:59Z",
-        );
+        let instances =
+            expand_event_instances(&[master], "2026-03-16T00:00:00Z", "2026-04-06T23:59:59Z");
 
         let starts: Vec<String> = instances.iter().map(timed_start).collect();
         assert_eq!(
@@ -523,11 +538,8 @@ mod tests {
         let mut cancelled = event("evt-1", "2026-09-02T09:00:00Z", "2026-09-02T09:30:00Z");
         cancelled.status = Some(EventStatus::Cancelled);
 
-        let instances = expand_event_instances(
-            &[cancelled],
-            "2026-09-01T00:00:00Z",
-            "2026-09-03T23:59:59Z",
-        );
+        let instances =
+            expand_event_instances(&[cancelled], "2026-09-01T00:00:00Z", "2026-09-03T23:59:59Z");
 
         assert!(
             instances.is_empty(),
@@ -540,14 +552,14 @@ mod tests {
         let mut master = event("evt-1", "2026-09-02T08:00:00Z", "2026-09-02T08:30:00Z");
         master.rrule = Some("RRULE:FREQ=HOURLY;COUNT=4".into());
 
-        let instances = expand_event_instances(
-            &[master],
-            "2026-09-02T00:00:00Z",
-            "2026-09-02T23:59:59Z",
-        );
+        let instances =
+            expand_event_instances(&[master], "2026-09-02T00:00:00Z", "2026-09-02T23:59:59Z");
 
         assert_eq!(instances.len(), 4);
-        let keys: HashSet<&str> = instances.iter().map(|i| i.occurrence_key.as_str()).collect();
+        let keys: HashSet<&str> = instances
+            .iter()
+            .map(|i| i.occurrence_key.as_str())
+            .collect();
         assert_eq!(keys.len(), 4, "sub-daily instances need unique keys");
     }
 
@@ -564,5 +576,65 @@ mod tests {
 
         assert_eq!(instances.len(), 1);
         assert_eq!(all_day_start(&instances[0]), "2026-09-02");
+    }
+
+    fn occurrence_starts(instances: &[EventInstance]) -> Vec<&str> {
+        instances
+            .iter()
+            .map(|instance| instance.occurrence_start.as_str())
+            .collect()
+    }
+
+    fn weekly_kolkata_master() -> AppEvent {
+        let mut master = event("evt-1", "2026-10-19T11:00:00", "2026-10-19T12:00:00");
+        master.rrule = Some("RRULE:FREQ=WEEKLY".into());
+        master.timezone = Some("Asia/Kolkata".into());
+        master
+    }
+
+    const KOLKATA_RANGE: (&str, &str) = ("2026-10-19T00:00:00Z", "2026-10-26T23:59:59Z");
+
+    #[test]
+    fn a_timed_occurrence_reports_its_wall_clock_exclusion_value() {
+        let instances = expand_event_instances(
+            &[weekly_kolkata_master()],
+            KOLKATA_RANGE.0,
+            KOLKATA_RANGE.1,
+        );
+
+        assert_eq!(
+            occurrence_starts(&instances),
+            vec!["2026-10-19T11:00:00", "2026-10-26T11:00:00"],
+            "the exclusion value is the wall clock in the event's zone, not the UTC instant"
+        );
+    }
+
+    #[test]
+    fn excluding_a_reported_occurrence_start_removes_exactly_that_occurrence() {
+        let mut master = weekly_kolkata_master();
+        let reported = expand_event_instances(&[master.clone()], KOLKATA_RANGE.0, KOLKATA_RANGE.1);
+        master.exdates = Some(vec![reported[1].occurrence_start.clone()]);
+
+        let remaining = expand_event_instances(&[master], KOLKATA_RANGE.0, KOLKATA_RANGE.1);
+
+        assert_eq!(
+            occurrence_starts(&remaining),
+            vec!["2026-10-19T11:00:00"],
+            "deleting the second occurrence must leave the first one visible"
+        );
+    }
+
+    #[test]
+    fn an_all_day_occurrence_reports_its_date_exclusion_value() {
+        let mut master = event("evt-1", "2026-09-07", "2026-09-08");
+        master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
+        master.is_all_day = Some(true);
+
+        let instances = expand_event_instances(&[master], "2026-09-07", "2026-10-04");
+
+        assert_eq!(
+            occurrence_starts(&instances),
+            vec!["2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28"]
+        );
     }
 }

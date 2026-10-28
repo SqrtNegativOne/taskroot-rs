@@ -1,6 +1,7 @@
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
+import { STORE_UPDATED } from './events';
 import { createStaleGuard } from './asyncState.svelte';
 
 export type { AppError, AppErrorCode } from './errors';
@@ -55,7 +56,7 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         let isCleanedUp = false;
         
         void import('@tauri-apps/api/event').then(({ listen }) => {
-            void listen('store-updated', () => {
+            void listen(STORE_UPDATED, () => {
                 if (isCleanedUp) return;
                 const argsToUse = lastArgs ?? options.args;
                 if (argsToUse !== undefined || hasDispatched) {

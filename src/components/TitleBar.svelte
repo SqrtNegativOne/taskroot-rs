@@ -4,7 +4,7 @@
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { Routes } from '$lib/routes';
-    import SyncButton from './SyncButton.svelte';
+    import RefreshButton from './RefreshButton.svelte';
     import StageIndicator from './shell/StageIndicator.svelte';
     import MoreScreensDropdown from './shell/MoreScreensDropdown.svelte';
     import WindowControls from './shell/WindowControls.svelte';
@@ -31,6 +31,6 @@
     <div class="topbar-right"></div>
 
     <WindowControls {isMinitracker}>
-        <SyncButton />
+        <RefreshButton />
     </WindowControls>
 </header>

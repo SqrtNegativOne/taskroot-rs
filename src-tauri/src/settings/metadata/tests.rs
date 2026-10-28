@@ -1,4 +1,3 @@
-
 use super::*;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -33,10 +32,9 @@ fn schema_setting_ids() -> Vec<String> {
 
 fn is_select_of(meta: &SettingMeta, predicate: impl Fn(&Value) -> bool) -> bool {
     meta.kind == "select"
-        && meta
-            .options
-            .as_ref()
-            .is_some_and(|options| !options.is_empty() && options.iter().all(|o| predicate(&o.value)))
+        && meta.options.as_ref().is_some_and(|options| {
+            !options.is_empty() && options.iter().all(|o| predicate(&o.value))
+        })
 }
 
 #[test]
@@ -72,11 +70,10 @@ fn schema_places_every_setting_exactly_once() {
     let unique: BTreeSet<String> = ids.iter().cloned().collect();
     assert_eq!(unique.len(), ids.len(), "duplicate setting id in schema");
 
-    let mut expected: BTreeSet<String> = AppSettings::setting_metadata()
+    let expected: BTreeSet<String> = AppSettings::setting_metadata()
         .iter()
         .map(|meta| meta.id.clone())
         .collect();
-    expected.insert("clear_all_data".to_string());
 
     assert_eq!(unique, expected);
 }
@@ -86,7 +83,6 @@ fn every_setting_kind_is_known() {
     let kinds: Vec<String> = AppSettings::setting_metadata()
         .into_iter()
         .map(|meta| meta.kind)
-        .chain(CUSTOM_SETTINGS.iter().map(|_| "custom".to_string()))
         .collect();
 
     for kind in kinds {
@@ -107,14 +103,6 @@ fn every_setting_section_is_registered() {
             "setting '{}' references unknown section '{}'; add it to SETTING_SECTIONS",
             meta.id,
             meta.section
-        );
-    }
-    for custom in CUSTOM_SETTINGS {
-        assert!(
-            registered.contains(custom.section),
-            "custom setting '{}' references unknown section '{}'; add it to SETTING_SECTIONS",
-            custom.id,
-            custom.section
         );
     }
 }
@@ -213,7 +201,13 @@ fn numeric_select_options_keep_numeric_values() {
 fn metadata_strings() -> String {
     let mut out = String::new();
     for meta in AppSettings::setting_metadata() {
-        let _ = write!(out, "{} | {} | {}", meta.id, meta.label, meta.keywords.join(","));
+        let _ = write!(
+            out,
+            "{} | {} | {}",
+            meta.id,
+            meta.label,
+            meta.keywords.join(",")
+        );
         for option in meta.options.as_deref().unwrap_or_default() {
             let _ = write!(out, " | {}={}", option.value, option.label);
         }
@@ -235,7 +229,6 @@ clock_style | Clock Style | stopwatch,timer,counter,flowtime,flomodoro | \"flowt
 allow_stopwatch_without_task | Allow stopwatch use without selecting task | stopwatch,task,requirement,allow
 flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
 pause_minutes | Pause Duration (minutes) | pause,timer,hold
-sync_interval | Sync Interval (minutes) | sync,interval,poll,time
 keybinding_launcher | Open Launcher | keyboard,shortcut,launcher,open
 keybinding_open_settings | Open Settings | keyboard,shortcut,settings,open
 keybinding_restore_app | Restore App | keyboard,shortcut,restore,maximize,mini tracker,minitracker
