@@ -121,7 +121,8 @@ mod tests {
         let parsed2 = parse_sigils(input2);
         assert_eq!(parsed2.clean_title, "Just a normal task");
         assert_eq!(parsed2.properties.priority, None);
-        assert!(parsed2.properties.tags.is_empty());
+        let tags = &parsed2.properties.tags;
+        assert!(tags.is_empty(), "expected no tags, got {tags:?}");
         assert_eq!(parsed2.properties.duration, None);
         assert_eq!(parsed2.properties.day, None);
 

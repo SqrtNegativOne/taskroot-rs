@@ -1,8 +1,8 @@
 <script lang="ts">
-    let { activeTask, onOpenSelector } = $props<{
-        activeTask?: { title: string },
-        onOpenSelector: () => void
-    }>();
+    let { activeTask, onOpenSelector }: {
+        activeTask?: { title: string };
+        onOpenSelector: () => void;
+    } = $props();
 </script>
 
 {#if activeTask}

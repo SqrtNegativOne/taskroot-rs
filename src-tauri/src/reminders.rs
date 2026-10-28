@@ -218,7 +218,8 @@ mod tests {
         let mut item = task("2026-10-27T10:00:00", before(15), Some("UTC"));
         item.status = Some(AppTaskStatus::Done);
 
-        assert!(alarms_due(&[item], utc("2026-10-27T09:46:00Z")).is_empty());
+        let due = alarms_due(&[item], utc("2026-10-27T09:46:00Z"));
+        assert!(due.is_empty(), "expected no due alarms, got {due:?}");
     }
 
     #[test]

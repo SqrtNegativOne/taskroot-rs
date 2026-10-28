@@ -71,7 +71,7 @@ describe('PlanScreen task list', () => {
         });
         expect(notificationStore.notifications[0]?.message).toBe('Failed to update task: server down');
         expect(store.error).toBeNull();
-        expect(screen.queryByText('Buy milk')).not.toBeNull();
+        expect(screen.getByText('Buy milk')).toBeTruthy();
         expect(screen.queryByText(/Error loading data from backend/)).toBeNull();
     });
 });

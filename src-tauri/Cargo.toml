@@ -2,6 +2,9 @@
 name = "tauri-app"
 version = "0.1.0"
 description = "A Tauri App"
+# `cargo run` has two binaries to choose from; the GUI is the default, the
+# headless CLI stays available through `cargo run --bin taskroot`.
+default-run = "tauri-app"
 authors = ["you"]
 edition = "2021"
 

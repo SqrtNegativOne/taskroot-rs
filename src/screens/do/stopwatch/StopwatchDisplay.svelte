@@ -4,10 +4,10 @@
 
     const NOW_INTERVAL_MS = 250;
 
-    let { engine, onToggle } = $props<{
-        engine: StopwatchState,
-        onToggle: () => void
-    }>();
+    let { engine, onToggle }: {
+        engine: StopwatchState;
+        onToggle: () => void;
+    } = $props();
 
     const now = useNow(NOW_INTERVAL_MS);
 

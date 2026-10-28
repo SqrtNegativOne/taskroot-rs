@@ -529,7 +529,10 @@ mod tests {
             "2026-09-03T23:59:59Z",
         );
 
-        assert!(instances.is_empty());
+        assert!(
+            instances.is_empty(),
+            "expected no instances, got {instances:?}"
+        );
     }
 
     #[test]

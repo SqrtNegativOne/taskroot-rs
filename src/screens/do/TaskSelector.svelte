@@ -6,13 +6,13 @@
         onCloseSelector,
         tasks = [],
         onStartWithTask
-    } = $props<{
+    }: {
         selectorOpen: boolean;
         onCloseSelector: () => void;
         tasks?: AppTask[];
         activeTask?: AppTask;
         onStartWithTask: (taskId: string) => void;
-    }>();
+    } = $props();
 </script>
 
 {#if selectorOpen}

@@ -158,7 +158,8 @@ fn sync_collection_delta_has_a_token_and_no_changes() {
     let sync = parse_sync_collection(SYNC_DELTA, SQRT_CAL).unwrap();
 
     assert_eq!(sync.token.as_deref(), Some(SYNC_TOKEN));
-    assert!(sync.changes.is_empty());
+    let changes = &sync.changes;
+    assert!(changes.is_empty(), "expected no changes, got {changes:?}");
 }
 
 #[test]

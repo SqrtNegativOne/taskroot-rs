@@ -84,7 +84,8 @@ async fn sync_collection_sends_the_stored_token() {
         sync.token.as_deref(),
         Some("http://radicale.org/ns/sync/572734e7eac248e21146e7a7ff811067b02e20bb6f870c6826d4a1e33e559435")
     );
-    assert!(sync.changes.is_empty());
+    let changes = &sync.changes;
+    assert!(changes.is_empty(), "expected no changes, got {changes:?}");
 }
 
 #[tokio::test]
