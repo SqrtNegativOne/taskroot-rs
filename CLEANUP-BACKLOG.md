@@ -20,7 +20,7 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    `commands/` and `rg "screens::plan" src-tauri/src` matches nothing.
 
 2. **Delete `time_utils/`.** It contains one real file. Move `rrule_utils.rs` to
-   `domain/timing/recurrence.rs` and remove the folder. Update imports only.
+   `domain/timing/recurrence.rs` and remove the folder. Update imports only. **✅ done (afc6c5c)**
 
 3. **Split `store/ops.rs` by aggregate.** It is ~700 lines with three jobs: the loader,
    event writes (now including `EventScope` resolution) and task writes.
@@ -39,7 +39,7 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    `bin/taskroot.rs` becomes a thin `main` calling `tauri_app_lib::cli::run()`.
 
 5. **Split `ics/tests.rs`.** It is ~1100 lines. Split into `tests/{read,write,lines,alarms}.rs`
-   plus `fixtures.rs`. No production code changes.
+   plus `fixtures.rs`. No production code changes. **✅ done (b96e631)**
 
 6. **Resolve `DEEP_LINK`.** The backend emits it, but no frontend listener consumes it. Either
    wire the listener or delete the constant and emitter. Do not leave a dead event contract.
@@ -68,17 +68,20 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
 10. **Split `domain/mod.rs` (510 lines).** Ids, `AppEvent`, `AppTask`, filters and sigils in one
     file. Split into `domain/{ids,event,task,filters}.rs` and re-export from `domain/mod.rs`, so
     imports do not change. `event_timing.rs` stays put; it is the normalization boundary.
+    **✅ done (90ffed9)** (ids/event/task split + re-exports; `filters.rs` and `sigil.rs` kept
+    as files)
 
 11. **Disambiguate the four `events` modules.** Two mean IPC event names, two mean calendar
     events.
     - `src-tauri/src/events.rs` -> `ipc_events.rs`
     - `src/lib/events.ts` -> `src/lib/ipcEvents.ts`
     - `commands/events.rs` and `src/lib/domain/events.ts` keep their names; they really are about calendar events.
+    **✅ done (9070290)**
 
 12. **Rename the `sync` error code.** With the sync engine gone, `AppError::Sync` means "CalDAV
     or transport failure". Rename it to `remote` in `src-tauri/src/error.rs` and
     `src/lib/errors.ts`, and update the shape tests. Wire-contract change, but the surface is
-    small and the current name keeps suggesting a layer that no longer exists.
+    small and the current name keeps suggesting a layer that no longer exists. **✅ done (46b4aa2)**
 
 ## Frontend
 
@@ -101,10 +104,9 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    - Delete `DayLayoutEvent` in `layout.ts`; let `layoutEvents` accept and return `LaidEvent`.
    - Stop re-exporting constants from `types.ts`; import from `constants.ts` directly.
 
-4. **Delete the stub routes, do not parameterize them.** Remove
-   `routes/{docs,graph,launcher,recap,stats,wrap}`, `ComingSoon.svelte`,
-   `MoreScreensDropdown.svelte`, their `Routes.*` entries, and the `TitleBar` usage. Dead screens
-   do not need a shared title helper.
+4. ~~**Delete the stub routes, do not parameterize them.**~~ **Dropped — keep the stub routes**
+   (decided 2026-07-24; `routes/{docs,graph,launcher,recap,stats,wrap}`, `ComingSoon.svelte`,
+   `MoreScreensDropdown.svelte`, their `Routes.*` entries and the `TitleBar` usage all stay).
 
 5. **Unify the drag controllers.** After snapping is extracted, `eventDrag.svelte.ts` and
    `taskDrag.svelte.ts` duplicate the threshold → target tracking → `setDragState` →
