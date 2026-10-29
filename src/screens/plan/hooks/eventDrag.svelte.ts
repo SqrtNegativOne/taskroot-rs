@@ -1,15 +1,15 @@
 import type { EventInstance } from '../../../lib/domain';
 import { MS_PER_MINUTE } from '../../../lib/time';
-import { DRAG_THRESHOLD_PX, SNAP_MIN } from '../day-timeline/constants';
+import { DRAG_THRESHOLD_PX } from '../day-timeline/constants';
 import { createPointerGestureRecognizer } from '../day-timeline/hooks/pointerGesture.svelte';
 import type { DragState, DragStateTarget } from '../day-timeline/types';
 import {
     DEFAULT_DROP_DURATION_MINUTES,
-    MINUTES_PER_DAY,
     gridDayDropPayload,
     timelineDropPayload,
     type ReschedulePayload,
 } from '../date-grid/dropPayload';
+import { clampDuration } from '../snapping';
 import { dropTargetAt, suppressUpcomingClick } from '../date-grid/dropTarget';
 
 export interface EventDragControllerOptions {
@@ -23,7 +23,7 @@ function durationMinutes(instance: EventInstance): number {
     if (instance.timing.kind === 'allDay') return DEFAULT_DROP_DURATION_MINUTES;
     const span =
         new Date(instance.timing.end).getTime() - new Date(instance.timing.start).getTime();
-    return Math.min(MINUTES_PER_DAY, Math.max(SNAP_MIN, Math.round(span / MS_PER_MINUTE)));
+    return clampDuration(Math.round(span / MS_PER_MINUTE));
 }
 
 function payloadFor(

@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { HOURS_PER_DAY, MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
+    import { MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
     import type { DragState, LaidEvent } from '../types';
     import type { EventInstance, AppCalendar } from '../../../../lib/domain';
     import { isEventReadOnly } from '../../../../lib/domain';
     import { MS_PER_MINUTE, parseLocalYmd, sameDay, ymd } from '../../../../lib/time';
+    import { MINUTES_PER_DAY, snapPixels } from '../../snapping';
 
     import EventBlock from '../EventBlock.svelte';
     import TimeGridBackground from './TimeGridBackground.svelte';
@@ -65,10 +66,6 @@
 
     const trackPointerGesture = createPointerGestureRecognizer();
 
-    function snappedMinutesFromOffset(offsetPx: number) {
-        return Math.round(offsetPx / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-    }
-
     function previewRange(startMin: number, currentMin: number) {
         const s = Math.min(startMin, currentMin);
         const eMin = Math.max(startMin, currentMin);
@@ -83,19 +80,19 @@
 
         if (!containerRef) return;
         const rect = containerRef.getBoundingClientRect();
-        const startMin = snappedMinutesFromOffset(e.clientY - rect.top);
+        const startMin = snapPixels(e.clientY - rect.top);
         let active = false;
 
         trackPointerGesture({
             onMove: (ev) => {
                 active = true;
-                const moveMin = snappedMinutesFromOffset(ev.clientY - rect.top);
+                const moveMin = snapPixels(ev.clientY - rect.top);
                 createPreview = previewRange(startMin, moveMin);
             },
             onEnd: (ev) => {
                 createPreview = undefined;
                 const range = active
-                    ? previewRange(startMin, snappedMinutesFromOffset(ev.clientY - rect.top))
+                    ? previewRange(startMin, snapPixels(ev.clientY - rect.top))
                     : { start: startMin, end: startMin + MINUTES_IN_HOUR };
                 onAddEvent?.(date, range.start, range.end);
             },
@@ -119,7 +116,7 @@
         position: relative;
         flex: 1;
         min-width: 200px;
-        height: {HOURS_PER_DAY * MINUTES_IN_HOUR * PX_PER_MIN}px;
+        height: {MINUTES_PER_DAY * PX_PER_MIN}px;
         border-right: 1px solid var(--border-soft);
     "
     data-drop-kind="day-time"

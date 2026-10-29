@@ -2,8 +2,6 @@
     import {
         COMPACT_EVENT_HEIGHT_PX,
         DRAG_THRESHOLD_PX,
-        HOURS_PER_DAY,
-        MINUTES_IN_HOUR,
         PIXELS_PER_HOUR,
         PX_PER_MIN,
         SNAP_MIN,
@@ -11,6 +9,7 @@
     import type { EventInstance } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { formatHhMm } from '../../../lib/time';
+    import { MINUTES_PER_DAY, snapPixels } from '../snapping';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
@@ -52,10 +51,6 @@
         return Math.min(max, Math.max(min, value));
     }
 
-    function snappedDeltaMinutes(deltaPx: number) {
-        return Math.round(deltaPx / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
-    }
-
     function onResizeStart(edge: 'top' | 'bottom') {
         return (e: PointerEvent) => {
             e.stopPropagation();
@@ -66,9 +61,9 @@
 
             trackPointerGesture({
                 onMove: (ev) => {
-                    const dm = snappedDeltaMinutes(ev.clientY - startY);
+                    const dm = snapPixels(ev.clientY - startY);
                     if (edge === 'bottom') {
-                        const newEnd = clamp(startEnd + dm, startStart + SNAP_MIN, HOURS_PER_DAY * MINUTES_IN_HOUR);
+                        const newEnd = clamp(startEnd + dm, startStart + SNAP_MIN, MINUTES_PER_DAY);
                         onResize?.(event, startStart, newEnd);
                     } else {
                         const newStart = clamp(startStart + dm, 0, startEnd - SNAP_MIN);
@@ -103,9 +98,9 @@
                 moved = true;
 
                 finalDm = clamp(
-                    snappedDeltaMinutes(dy),
+                    snapPixels(dy),
                     -startStart,
-                    HOURS_PER_DAY * MINUTES_IN_HOUR - startEnd,
+                    MINUTES_PER_DAY - startEnd,
                 );
                 dragOffset = finalDm;
             },

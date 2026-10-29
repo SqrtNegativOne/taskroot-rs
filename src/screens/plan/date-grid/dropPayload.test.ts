@@ -3,11 +3,11 @@ import type { EventInstance } from '../../../lib/domain';
 import { MS_PER_MINUTE, ymd } from '../../../lib/time';
 import {
     DEFAULT_DROP_DURATION_MINUTES,
-    MINUTES_PER_DAY,
     gridDayDropPayload,
     snappedDropMinute,
     timelineDropPayload,
 } from './dropPayload';
+import { MINUTES_PER_DAY } from '../snapping';
 import { PX_PER_MIN, SNAP_MIN } from '../day-timeline/constants';
 
 function timed(id: string, start: Date, end: Date): EventInstance {

@@ -1,9 +1,9 @@
 import type { AppTask } from '../../../lib/domain';
-import { DRAG_THRESHOLD_PX, SNAP_MIN } from '../day-timeline/constants';
+import { DRAG_THRESHOLD_PX } from '../day-timeline/constants';
 import { createPointerGestureRecognizer } from '../day-timeline/hooks/pointerGesture.svelte';
 import type { DragState, DragStateTarget } from '../day-timeline/types';
-import { MINUTES_PER_DAY } from '../date-grid/dropPayload';
 import { dropTargetAt, suppressUpcomingClick } from '../date-grid/dropTarget';
+import { clampDuration } from '../snapping';
 
 /** Where a task dropped on a whole-day cell starts. */
 const GRID_DAY_START_MINUTE = 9 * 60;
@@ -26,7 +26,7 @@ export type TaskDragStart = (event: PointerEvent | MouseEvent, task: AppTask) =>
 
 function blockMinutes(task: AppTask, fallback: number): number {
     const minutes = task.est !== undefined && task.est > 0 ? task.est : fallback;
-    return Math.min(MINUTES_PER_DAY, Math.max(SNAP_MIN, minutes));
+    return clampDuration(minutes);
 }
 
 function slotFor(target: DragStateTarget, duration: number): TaskScheduleSlot | undefined {
