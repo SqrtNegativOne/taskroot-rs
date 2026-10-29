@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { getWeekNumber, isoWeeksInYear, isoWeekYear, startOfMonth, startOfWeek, ymd } from './time';
+import {
+    formatHhMm,
+    getWeekNumber,
+    isoWeeksInYear,
+    isoWeekYear,
+    parseLocalYmd,
+    startOfMonth,
+    startOfWeek,
+    ymd,
+} from './time';
+
+describe('parseLocalYmd', () => {
+    it('parses a date string at local midnight', () => {
+        const d = parseLocalYmd('2026-10-26');
+
+        expect(ymd(d)).toBe('2026-10-26');
+        expect(d.getHours()).toBe(0);
+        expect(d.getMinutes()).toBe(0);
+        expect(d.getSeconds()).toBe(0);
+    });
+});
+
+describe('formatHhMm', () => {
+    it('zero-pads hour and minute in 24-hour form', () => {
+        expect(formatHhMm(0)).toBe('00:00');
+        expect(formatHhMm(9 * 60 + 5)).toBe('09:05');
+        expect(formatHhMm(14 * 60 + 30)).toBe('14:30');
+        expect(formatHhMm(23 * 60 + 59)).toBe('23:59');
+    });
+
+    it('rounds a fractional minute before formatting', () => {
+        expect(formatHhMm(149.6)).toBe('02:30');
+    });
+});
 
 describe('startOfWeek', () => {
     it('returns Monday midnight of the containing week', () => {

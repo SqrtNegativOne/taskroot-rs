@@ -1,3 +1,5 @@
+export const MS_PER_MINUTE = 60_000;
+
 const MS_PER_DAY = 86_400_000;
 const MS_PER_WEEK = 604_800_000;
 
@@ -8,8 +10,21 @@ export function ymd(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
+/** Local midnight of a `YYYY-MM-DD` date string. */
+export function parseLocalYmd(value: string): Date {
+    return new Date(`${value}T00:00:00`);
+}
+
 export function minutesSinceMidnight(date: Date): number {
     return date.getHours() * 60 + date.getMinutes();
+}
+
+/** Zero-padded 24-hour clock time (`HH:MM`) from minutes since local midnight. */
+export function formatHhMm(mins: number): string {
+    const minute = Math.round(mins);
+    const h = Math.floor(minute / 60).toString().padStart(2, '0');
+    const m = (minute % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
 }
 
 export function addDays(date: Date, days: number): Date {

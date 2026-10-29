@@ -1,13 +1,8 @@
 <script lang="ts">
     import { PIXELS_PER_HOUR, PX_PER_MIN } from '../constants';
+    import { formatHhMm } from '../../../../lib/time';
 
     let { preview }: { preview: { start: number; end: number } } = $props();
-
-    function hhmmShort(mins: number) {
-        const h = Math.floor(mins / 60);
-        const m = Math.floor(mins % 60);
-        return `${h.toString()}:${m.toString().padStart(2, '0')}`;
-    }
 </script>
 
 <div
@@ -24,7 +19,7 @@
 >
     <div class="day-event-inner">
         <div class="day-event-time">
-            {hhmmShort(preview.start)} – {hhmmShort(preview.end)}
+            {formatHhMm(preview.start)} – {formatHhMm(preview.end)}
         </div>
         <div class="day-event-title">New Event...</div>
     </div>

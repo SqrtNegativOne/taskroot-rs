@@ -1,19 +1,14 @@
 import type { EventInstance } from '../../../lib/domain';
-import { addDays, dayDiff, ymd } from '../../../lib/time';
+import { addDays, dayDiff, MS_PER_MINUTE, parseLocalYmd, ymd } from '../../../lib/time';
 import { HOURS_PER_DAY, MINUTES_IN_HOUR, PX_PER_MIN, SNAP_MIN } from '../day-timeline/constants';
 
 export const DEFAULT_DROP_DURATION_MINUTES = 60;
-const MS_PER_MINUTE = 60_000;
 export const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
 
 export interface ReschedulePayload {
     startTime: string;
     endTime: string;
     isAllDay: boolean;
-}
-
-function parseYmd(value: string): Date {
-    return new Date(`${value}T00:00:00`);
 }
 
 /** Snap a pixel offset within a timeline column to a valid start minute. */
@@ -32,17 +27,17 @@ export function snappedDropMinute(offsetPx: number, durationMins: number): numbe
  */
 export function gridDayDropPayload(event: EventInstance, date: string): ReschedulePayload {
     if (event.timing.kind === 'allDay') {
-        const shift = dayDiff(parseYmd(date), parseYmd(event.timing.startDate));
+        const shift = dayDiff(parseLocalYmd(date), parseLocalYmd(event.timing.startDate));
         return {
             startTime: date,
-            endTime: ymd(addDays(parseYmd(event.timing.endDateExclusive), shift)),
+            endTime: ymd(addDays(parseLocalYmd(event.timing.endDateExclusive), shift)),
             isAllDay: true,
         };
     }
 
     const start = new Date(event.timing.start);
     const duration = new Date(event.timing.end).getTime() - start.getTime();
-    const newStart = parseYmd(date);
+    const newStart = parseLocalYmd(date);
     newStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
     return {
         startTime: newStart.toISOString(),
@@ -73,7 +68,7 @@ export function timelineDropPayload(
     // drop and its preview stay inside the column instead of overflowing.
     const duration = Math.min(Math.max(rawDuration, SNAP_MIN), MINUTES_PER_DAY);
 
-    const start = parseYmd(date);
+    const start = parseLocalYmd(date);
     start.setMinutes(minute);
     return {
         startTime: start.toISOString(),

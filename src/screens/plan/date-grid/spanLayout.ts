@@ -1,5 +1,5 @@
 import type { EventInstance } from '../../../lib/domain';
-import { addDays, dayDiff, ymd } from '../../../lib/time';
+import { addDays, dayDiff, parseLocalYmd, ymd } from '../../../lib/time';
 
 export const DAYS_IN_WEEK = 7;
 
@@ -24,10 +24,6 @@ export interface WeekSpanLayout {
 
 type WeekSegment = Omit<WeekSpan, 'instance' | 'occurrenceKey' | 'lane'>;
 
-function parseYmd(value: string): Date {
-    return new Date(`${value}T00:00:00`);
-}
-
 /**
  * Whether an instance is an all-day event covering more than one calendar day.
  *
@@ -36,7 +32,7 @@ function parseYmd(value: string): Date {
  */
 export function isMultiDayAllDay(event: EventInstance): boolean {
     if (event.timing.kind !== 'allDay') return false;
-    return dayDiff(parseYmd(event.timing.endDateExclusive), parseYmd(event.timing.startDate)) > 1;
+    return dayDiff(parseLocalYmd(event.timing.endDateExclusive), parseLocalYmd(event.timing.startDate)) > 1;
 }
 
 /** Clip a multi-day range to the week, or `undefined` when it does not overlap. */
@@ -47,16 +43,16 @@ function weekSegment(
 ): WeekSegment | undefined {
     if (instance.timing.kind !== 'allDay') return undefined;
     const { startDate, endDateExclusive } = instance.timing;
-    if (dayDiff(parseYmd(endDateExclusive), parseYmd(startDate)) <= 1) return undefined;
+    if (dayDiff(parseLocalYmd(endDateExclusive), parseLocalYmd(startDate)) <= 1) return undefined;
 
     const segStart = startDate > weekStartYmd ? startDate : weekStartYmd;
     const segEnd = endDateExclusive < weekEndYmd ? endDateExclusive : weekEndYmd;
     if (segStart >= segEnd) return undefined;
 
-    const startCol = dayDiff(parseYmd(segStart), parseYmd(weekStartYmd));
+    const startCol = dayDiff(parseLocalYmd(segStart), parseLocalYmd(weekStartYmd));
     return {
         startCol,
-        endColExclusive: startCol + dayDiff(parseYmd(segEnd), parseYmd(segStart)),
+        endColExclusive: startCol + dayDiff(parseLocalYmd(segEnd), parseLocalYmd(segStart)),
         continuesBefore: startDate < weekStartYmd,
         continuesAfter: endDateExclusive > weekEndYmd,
     };

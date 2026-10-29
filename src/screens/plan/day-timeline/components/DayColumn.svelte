@@ -3,7 +3,7 @@
     import type { DragState, LaidEvent } from '../types';
     import type { EventInstance, AppCalendar } from '../../../../lib/domain';
     import { isEventReadOnly } from '../../../../lib/domain';
-    import { sameDay, ymd } from '../../../../lib/time';
+    import { MS_PER_MINUTE, parseLocalYmd, sameDay, ymd } from '../../../../lib/time';
 
     import EventBlock from '../EventBlock.svelte';
     import TimeGridBackground from './TimeGridBackground.svelte';
@@ -45,17 +45,17 @@
     // Event handlers
     function handleResize(event: EventInstance, newStartMins: number, newEndMins: number) {
         if (readOnlyEventIds.has(event.id)) return;
-        const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
-        const newStartDt = new Date(cellStart + newStartMins * 60000);
-        const newEndDt = new Date(cellStart + newEndMins * 60000);
+        const cellStart = parseLocalYmd(cellDateStr).getTime();
+        const newStartDt = new Date(cellStart + newStartMins * MS_PER_MINUTE);
+        const newEndDt = new Date(cellStart + newEndMins * MS_PER_MINUTE);
         if (onResizeEvent) onResizeEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
     }
 
     function handleMove(event: EventInstance, newStartMins: number, newEndMins: number) {
         if (readOnlyEventIds.has(event.id)) return;
-        const cellStart = new Date(`${cellDateStr}T00:00:00`).getTime();
-        const newStartDt = new Date(cellStart + newStartMins * 60000);
-        const newEndDt = new Date(cellStart + newEndMins * 60000);
+        const cellStart = parseLocalYmd(cellDateStr).getTime();
+        const newStartDt = new Date(cellStart + newStartMins * MS_PER_MINUTE);
+        const newEndDt = new Date(cellStart + newEndMins * MS_PER_MINUTE);
         if (onMoveEvent) onMoveEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
     }
 

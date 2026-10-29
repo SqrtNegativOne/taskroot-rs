@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../../../lib/domain';
-import { ymd } from '../../../lib/time';
+import { MS_PER_MINUTE, ymd } from '../../../lib/time';
 import {
     DEFAULT_DROP_DURATION_MINUTES,
     MINUTES_PER_DAY,
@@ -9,8 +9,6 @@ import {
     timelineDropPayload,
 } from './dropPayload';
 import { PX_PER_MIN, SNAP_MIN } from '../day-timeline/constants';
-
-const MS_PER_MINUTE = 60_000;
 
 function timed(id: string, start: Date, end: Date): EventInstance {
     return {

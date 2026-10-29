@@ -1,4 +1,5 @@
 import type { EventInstance } from '../../../lib/domain';
+import { MS_PER_MINUTE } from '../../../lib/time';
 import { DRAG_THRESHOLD_PX, SNAP_MIN } from '../day-timeline/constants';
 import { createPointerGestureRecognizer } from '../day-timeline/hooks/pointerGesture.svelte';
 import type { DragState, DragStateTarget } from '../day-timeline/types';
@@ -10,8 +11,6 @@ import {
     type ReschedulePayload,
 } from '../date-grid/dropPayload';
 import { dropTargetAt, suppressUpcomingClick } from '../date-grid/dropTarget';
-
-const MS_PER_MINUTE = 60_000;
 
 export interface EventDragControllerOptions {
     setDragState: (state: DragState | undefined) => void;

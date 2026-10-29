@@ -10,6 +10,7 @@
     } from './constants';
     import type { EventInstance } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
+    import { formatHhMm } from '../../../lib/time';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
@@ -128,9 +129,6 @@
         });
     }
 
-    function pad2(n: number) {
-        return n.toString().padStart(2, '0');
-    }
 </script>
 
 {#snippet renderBlock(start: number, end: number, isGhost: boolean, isFloating: boolean)}
@@ -171,8 +169,7 @@
                 {title}
             </div>
             <div class="day-event-time">
-                {pad2(Math.floor(Math.round(start) / MINUTES_IN_HOUR))}:{pad2(Math.round(start) % MINUTES_IN_HOUR)} – 
-                {pad2(Math.floor(Math.round(end) / MINUTES_IN_HOUR))}:{pad2(Math.round(end) % MINUTES_IN_HOUR)}
+                {formatHhMm(start)} – {formatHhMm(end)}
             </div>
         </div>
         

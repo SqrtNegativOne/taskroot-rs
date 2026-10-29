@@ -1,14 +1,9 @@
 <script lang="ts">
     import { MINUTES_IN_HOUR, PX_PER_MIN } from '../constants';
     import type { DragStateTarget } from '../types';
+    import { formatHhMm } from '../../../../lib/time';
 
     let { target }: { target: DragStateTarget } = $props();
-
-    function hhmmShort(mins: number) {
-        const h = Math.floor(mins / 60);
-        const m = Math.floor(mins % 60);
-        return `${h.toString()}:${m.toString().padStart(2, '0')}`;
-    }
 </script>
 
 <div
@@ -19,6 +14,6 @@
     "
 >
     <span class="day-drop-preview-label">
-        ▸ {hhmmShort(target.minute ?? 0)} – {hhmmShort((target.minute ?? 0) + (target.duration ?? MINUTES_IN_HOUR))}
+        ▸ {formatHhMm(target.minute ?? 0)} – {formatHhMm((target.minute ?? 0) + (target.duration ?? MINUTES_IN_HOUR))}
     </span>
 </div>

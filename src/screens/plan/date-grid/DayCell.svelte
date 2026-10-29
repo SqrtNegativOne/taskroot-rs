@@ -2,7 +2,7 @@
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
     import { isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
-    import { sameDay, ymd } from '../../../lib/time';
+    import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
     const OPACITY_READ_ONLY = 0.6;
@@ -33,8 +33,7 @@
 
     function formatStartTime(ev: EventInstance) {
         if (ev.timing.kind !== 'timed') return 'All Day';
-        const d = new Date(ev.timing.start);
-        return `${d.getHours().toString()}:${d.getMinutes().toString().padStart(2, '0')}`;
+        return formatHhMm(minutesSinceMidnight(new Date(ev.timing.start)));
     }
 
     let isToday = $derived(sameDay(cell.date, today));

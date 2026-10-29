@@ -3,6 +3,7 @@
     import { persistedKeys } from '../../lib/persisted.svelte';
     import type { AppTask, AppCalendar, EventInstance, EventScope } from '../../lib/domain';
     import { buildNewEvent } from '../../lib/domain';
+    import { parseLocalYmd } from '../../lib/time';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
 
     import SplitPane from '../../components/SplitPane.svelte';
@@ -74,7 +75,7 @@
         setDragState: (ds) => { dragState = ds; },
         defaultDuration: () => store.settings?.default_task_duration || 30,
         onSchedule: (task, slot) => {
-            const event = buildNewEvent(new Date(`${slot.date}T00:00:00`), {
+            const event = buildNewEvent(parseLocalYmd(slot.date), {
                 startMinutes: slot.minute,
                 endMinutes: slot.minute + slot.duration,
                 calendars: calendarsQuery.data ?? [],
