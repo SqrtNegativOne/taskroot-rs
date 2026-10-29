@@ -4,10 +4,12 @@ use ts_rs::TS;
 pub mod event_timing;
 pub mod filters;
 pub mod sigil;
+pub mod timing;
 
 pub use event_timing::*;
 pub use filters::*;
 pub use sigil::*;
+pub use timing::*;
 
 // We implement TS manually for string newtypes instead of using derive(TS)
 // because ts-rs eager-parses serde attributes and warns about transparent/try_from,

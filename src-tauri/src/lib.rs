@@ -22,7 +22,6 @@ pub mod stopwatch;
 pub mod store;
 #[cfg(test)]
 pub mod test_support;
-pub mod time_utils;
 
 use error::AppError;
 

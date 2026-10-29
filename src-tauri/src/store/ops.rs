@@ -302,7 +302,7 @@ fn scoped_master(
     let mut updated = master.clone();
     if scope == EventScope::Following {
         if let Some(rrule) = master.rrule.as_deref() {
-            updated.rrule = Some(crate::time_utils::rrule_utils::truncate_before(
+            updated.rrule = Some(crate::domain::timing::truncate_before(
                 rrule,
                 occurrence,
                 master.timezone.as_deref(),

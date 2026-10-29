@@ -8,7 +8,7 @@
 use crate::domain::{
     wall_clock_to_utc, AppEvent, EventId, EventInstance, EventStatus, EventTiming,
 };
-use crate::time_utils::rrule_utils::{get_all_day_occurrences, get_occurrences};
+use crate::domain::timing::{get_all_day_occurrences, get_occurrences};
 use chrono::{DateTime, Days, NaiveDate, Utc};
 use chrono_tz::Tz as ChronoTz;
 use std::collections::HashSet;
