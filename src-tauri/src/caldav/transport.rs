@@ -241,12 +241,12 @@ impl CalDavClient {
         let response = builder
             .send()
             .await
-            .map_err(|error| AppError::Sync(format!("CalDAV request failed: {error}")))?;
+            .map_err(|error| AppError::Remote(format!("CalDAV request failed: {error}")))?;
         let status = response.status().as_u16();
         let etag = header_string(&response, ETAG);
         let location = header_string(&response, LOCATION);
         let body = response.text().await.map_err(|error| {
-            AppError::Sync(format!("CalDAV response could not be read: {error}"))
+            AppError::Remote(format!("CalDAV response could not be read: {error}"))
         })?;
 
         Ok(Response {
@@ -279,7 +279,7 @@ pub fn check_status(response: Response) -> Result<Response, AppError> {
             "The CalDAV resource changed on the server; re-fetch and retry (412)".to_string(),
         ),
         410 => AppError::Gone("The CalDAV resource or sync token is gone (410)".to_string()),
-        status => AppError::Sync(format!(
+        status => AppError::Remote(format!(
             "CalDAV request failed with status {status}: {}",
             snippet(&response.body)
         )),

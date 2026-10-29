@@ -125,7 +125,7 @@ async fn a_forbidden_response_is_a_sync_error_with_status_and_snippet() {
         .await
         .unwrap_err();
 
-    assert_eq!(error.code(), "sync");
+    assert_eq!(error.code(), "remote");
     let message = error.to_string();
     assert!(message.contains("403"), "message was: {message}");
     assert!(

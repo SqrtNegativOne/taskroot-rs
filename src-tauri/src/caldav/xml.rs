@@ -161,7 +161,7 @@ pub fn parse_current_user_principal(xml: &str, base_href: &str) -> Result<String
         };
         return Ok(resolve_href(base_href, &href));
     }
-    Err(AppError::Sync(
+    Err(AppError::Remote(
         "The server did not advertise a current-user-principal".to_string(),
     ))
 }
@@ -184,7 +184,7 @@ pub fn parse_calendar_home_set(xml: &str, base_href: &str) -> Result<String, App
         };
         return Ok(resolve_href(base_href, &href));
     }
-    Err(AppError::Sync(
+    Err(AppError::Remote(
         "The server did not advertise a calendar-home-set".to_string(),
     ))
 }
@@ -298,7 +298,7 @@ pub fn resolve_href(base_href: &str, href: &str) -> String {
 }
 
 fn parse_document(xml: &str) -> Result<Document<'_>, AppError> {
-    Document::parse(xml).map_err(|error| AppError::Sync(format!("Malformed CalDAV XML: {error}")))
+    Document::parse(xml).map_err(|error| AppError::Remote(format!("Malformed CalDAV XML: {error}")))
 }
 
 fn response_nodes<'a, 'input>(

@@ -209,7 +209,7 @@ async fn discover_principal(client: &CalDavClient) -> Result<String, AppError> {
                 Ok(body) => body,
                 Err(error @ AppError::Auth(_)) => return Err(error),
                 Err(root_error) => {
-                    return Err(AppError::Sync(format!(
+                    return Err(AppError::Remote(format!(
                         "CalDAV discovery failed at `{WELL_KNOWN_PATH}` ({well_known_error}) \
                          and at `/` ({root_error})"
                     )));
@@ -232,7 +232,7 @@ async fn principal_from_well_known(client: &CalDavClient) -> Result<String, AppE
             .await?;
         if response.is_redirect() {
             let Some(location) = response.location else {
-                return Err(AppError::Sync(
+                return Err(AppError::Remote(
                     "The CalDAV server redirected without a Location header".to_string(),
                 ));
             };
@@ -242,7 +242,7 @@ async fn principal_from_well_known(client: &CalDavClient) -> Result<String, AppE
         let response = check_status(response)?;
         return parse_current_user_principal(&response.body, &target);
     }
-    Err(AppError::Sync(
+    Err(AppError::Remote(
         "Too many redirects while discovering the CalDAV principal".to_string(),
     ))
 }

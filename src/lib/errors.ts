@@ -1,7 +1,7 @@
 export const BACKEND_ERROR_CODES = [
     'not-found',
     'auth',
-    'sync',
+    'remote',
     'invalid-input',
     'store',
     'conflict',

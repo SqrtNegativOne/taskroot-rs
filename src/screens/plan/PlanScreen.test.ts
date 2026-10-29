@@ -56,7 +56,7 @@ describe('PlanScreen task list', () => {
     });
 
     it('toasts a failed update instead of replacing the screen with a fatal error', async () => {
-        tauri.stubCommand('update_task', () => Promise.reject({ code: 'sync', message: 'server down' }));
+        tauri.stubCommand('update_task', () => Promise.reject({ code: 'remote', message: 'server down' }));
         render(PlanScreen);
 
         await screen.findByText('Buy milk');

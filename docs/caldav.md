@@ -58,7 +58,7 @@ Read-only collections refuse these edits with `invalid-input` before any request
    resource (exceptions live in the same file). Deleting an exception removes just that
    component.
 
-HTTP status mapping: `401 → auth`, `412 → conflict`, `410 → gone`, other non-2xx → `sync`.
+HTTP status mapping: `401 → auth`, `412 → conflict`, `410 → gone`, other non-2xx → `remote`.
 
 ## The three invariants
 

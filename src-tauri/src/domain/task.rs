@@ -130,7 +130,7 @@ pub struct AppTask {
     pub on_canvas: Option<bool>,
     #[ts(optional)]
     pub remote_id: Option<RemoteId>,
-    /// Collection href this task lives in, matching [`AppEvent`](super::event::AppEvent).
+    /// Collection href this task lives in, matching `AppEvent`.
     #[ts(optional)]
     #[query(label = "Collection")]
     pub remote_collection_id: Option<CollectionId>,

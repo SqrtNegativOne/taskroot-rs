@@ -7,7 +7,7 @@ import type { TaskPriority } from "./TaskPriority.generated";
 
 export type AppTask = { id: TaskId, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, parentTask?: TaskId, dependencies?: Array<TaskId>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: RemoteId, 
 /**
- * Collection href this task lives in, matching [`AppEvent`].
+ * Collection href this task lives in, matching `AppEvent`.
  */
 remoteCollectionId?: CollectionId, notes?: string, tabs?: string, 
 /**

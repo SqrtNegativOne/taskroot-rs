@@ -4,7 +4,7 @@ import { AppStore } from './store.svelte';
 import { notificationStore } from './notifications.svelte';
 import type { AppError } from './errors';
 
-const failure: AppError = { code: 'sync', message: 'server unreachable' };
+const failure: AppError = { code: 'remote', message: 'server unreachable' };
 
 describe('AppStore.mutate', () => {
     beforeEach(() => {

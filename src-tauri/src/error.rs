@@ -7,7 +7,7 @@ pub enum AppError {
     #[error("{0}")]
     Auth(String),
     #[error("{0}")]
-    Sync(String),
+    Remote(String),
     #[error("{0}")]
     InvalidInput(String),
     #[error("{0}")]
@@ -32,7 +32,7 @@ impl AppError {
         match self {
             Self::NotFound(_) => "not-found",
             Self::Auth(_) => "auth",
-            Self::Sync(_) => "sync",
+            Self::Remote(_) => "remote",
             Self::InvalidInput(_) => "invalid-input",
             Self::Store(_) => "store",
             Self::Conflict(_) => "conflict",
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_codes_map_to_kebab_case() {
         assert_eq!(AppError::Auth("x".into()).code(), "auth");
-        assert_eq!(AppError::Sync("x".into()).code(), "sync");
+        assert_eq!(AppError::Remote("x".into()).code(), "remote");
         assert_eq!(AppError::InvalidInput("x".into()).code(), "invalid-input");
         assert_eq!(AppError::Store("x".into()).code(), "store");
         assert_eq!(AppError::Conflict("x".into()).code(), "conflict");

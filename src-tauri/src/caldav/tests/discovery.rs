@@ -191,7 +191,7 @@ async fn a_redirect_loop_is_reported() {
         .await
         .unwrap_err();
 
-    assert_eq!(error.code(), "sync");
+    assert_eq!(error.code(), "remote");
     assert!(error.to_string().contains("Too many redirects"));
 }
 
