@@ -90,13 +90,13 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    - `dropPayload.ts::snappedDropMinute`
    - `EventBlock.svelte::snappedDeltaMinutes`
    - `DayColumn.svelte::snappedMinutesFromOffset`
-   - the duration clamping in `eventDrag.svelte.ts` / `taskDrag.svelte.ts`
+   - the duration clamping in `eventDrag.svelte.ts` / `taskDrag.svelte.ts` **✅ done (0d76261)**
 
 2. **One local-date/time helper set.** Extend `src/lib/time.ts` with `parseLocalYmd`,
    `formatHhMm`, `MS_PER_MINUTE`. Replace:
    - the two `parseYmd` definitions in `dropPayload.ts` and `spanLayout.ts`
    - `new Date(\`${ymd}T00:00:00\`)` in `PlanScreen.svelte` and `DayColumn.svelte`
-   - the six `padStart(2, '0')` clock formatters in `DayCell`, `EventBlock`, `CreationPreview`, `DropPreview`, `CurrentTimeLine`, `TimeGridBackground`
+   - the six `padStart(2, '0')` clock formatters in `DayCell`, `EventBlock`, `CreationPreview`, `DropPreview`, `CurrentTimeLine`, `TimeGridBackground` **✅ done (fc7bbd7)** (all unified to zero-padded `HH:MM`)
 
 3. **One constant/type home.**
    - Keep `DAYS_IN_WEEK` in `constants.ts`; remove the copy in `spanLayout.ts`.
