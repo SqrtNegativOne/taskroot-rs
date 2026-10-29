@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { safeInvoke } from '../../../lib/safeInvoke.svelte';
-import { SCREEN_EFFECT, STOPWATCH_UPDATED } from '../../../lib/events';
+import { SCREEN_EFFECT, STOPWATCH_UPDATED } from '../../../lib/ipcEvents';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
 import { useNow } from '../../../lib/useNow.svelte';

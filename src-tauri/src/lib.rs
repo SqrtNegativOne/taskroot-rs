@@ -12,7 +12,7 @@ pub mod caldav;
 pub mod commands;
 pub mod domain;
 pub mod error;
-pub mod events;
+pub mod ipc_events;
 pub mod ics;
 pub mod load;
 pub mod reminders;
@@ -188,7 +188,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             }
             for arg in &args {
                 if let Some(route) = extract_deep_link_route(arg) {
-                    let _ = app.emit(events::DEEP_LINK, route);
+                    let _ = app.emit(ipc_events::DEEP_LINK, route);
                 }
             }
         }))

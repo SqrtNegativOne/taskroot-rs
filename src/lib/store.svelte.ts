@@ -2,7 +2,7 @@ import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import { notify } from './notifications.svelte';
-import { STORE_UPDATED } from './events';
+import { STORE_UPDATED } from './ipcEvents';
 import type { AppTask, AppEvent, EventScope } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
 

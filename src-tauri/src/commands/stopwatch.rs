@@ -35,7 +35,7 @@ pub fn toggle_pause(app: tauri::AppHandle, pause_minutes: u64) -> Result<Stopwat
         }
         state.clone()
     })?;
-    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, &updated);
     Ok(updated)
 }
 
@@ -60,7 +60,7 @@ pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<Stopwat
         }
         state.clone()
     })?;
-    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, &updated);
     Ok(updated)
 }
 
@@ -90,7 +90,7 @@ pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppErro
 
         state.clone()
     })?;
-    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, &updated);
     Ok(updated)
 }
 
@@ -120,7 +120,7 @@ pub fn toggle_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
 
         state.clone()
     })?;
-    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, &updated);
     Ok(updated)
 }
 
@@ -138,6 +138,6 @@ pub fn reset_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError
         state.paused_until = None;
         state.clone()
     })?;
-    let _ = app.emit(crate::events::STOPWATCH_UPDATED, &updated);
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, &updated);
     Ok(updated)
 }

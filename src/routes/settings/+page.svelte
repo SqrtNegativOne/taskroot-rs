@@ -6,7 +6,7 @@
     import { describeAppError } from '$lib/errors';
     import { Routes } from '$lib/routes';
     import type { Account } from '$lib/bindings/Account.generated';
-    import { STORE_UPDATED } from '$lib/events';
+    import { STORE_UPDATED } from '$lib/ipcEvents';
     import SettingRow from './SettingRow.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
 

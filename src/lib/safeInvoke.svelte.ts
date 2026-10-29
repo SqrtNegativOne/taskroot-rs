@@ -1,7 +1,7 @@
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
-import { STORE_UPDATED } from './events';
+import { STORE_UPDATED } from './ipcEvents';
 import { createStaleGuard } from './asyncState.svelte';
 
 export type { AppError, AppErrorCode } from './errors';

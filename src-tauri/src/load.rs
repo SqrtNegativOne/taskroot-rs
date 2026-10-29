@@ -31,7 +31,7 @@ pub async fn load_all(app: &AppHandle) -> Result<(), AppError> {
     ops::full_load(&mut store, &client).await?;
     drop(store);
 
-    let _ = app.emit(crate::events::STORE_UPDATED, ());
+    let _ = app.emit(crate::ipc_events::STORE_UPDATED, ());
     Ok(())
 }
 

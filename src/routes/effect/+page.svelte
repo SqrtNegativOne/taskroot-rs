@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { listen, type UnlistenFn } from '@tauri-apps/api/event';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
-    import { SCREEN_EFFECT } from '$lib/events';
+    import { SCREEN_EFFECT } from '$lib/ipcEvents';
 
     const SWEEP_COLOR = '#00ffcc';
     const FLASH_COLOR = '#ffffff';
