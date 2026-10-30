@@ -8,15 +8,8 @@ export interface LaidEvent {
     lanes: number;
 }
 
-export {
-    MINUTES_IN_HOUR,
-    HOURS_PER_DAY,
-    PIXELS_PER_HOUR,
-    PX_PER_MIN,
-    SNAP_MIN,
-    COMPACT_EVENT_HEIGHT_PX,
-    DRAG_THRESHOLD_PX,
-} from './constants';
+/** A bucketed event before `layoutEvents` assigns it a lane. */
+export type UnlaidEvent = Omit<LaidEvent, 'lane' | 'lanes'>;
 
 export interface DragStateTarget {
     kind: string;

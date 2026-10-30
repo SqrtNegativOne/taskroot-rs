@@ -1,9 +1,8 @@
+import { instanceOccursOnDay } from '../../../lib/domain';
 import type { EventInstance } from '../../../lib/domain';
 import { minutesSinceMidnight, ymd } from '../../../lib/time';
-import { HOURS_PER_DAY, MINUTES_IN_HOUR } from './constants';
-import type { DayLayoutEvent } from './layout';
-
-const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
+import { MINUTES_PER_DAY } from '../snapping';
+import type { UnlaidEvent } from './types';
 
 function minutesIntoDay(time: Date, dayStart: Date, dayEnd: Date): number {
     if (time <= dayStart) return 0;
@@ -21,8 +20,8 @@ function minutesIntoDay(time: Date, dayStart: Date, dayEnd: Date): number {
 export function bucketEventsByDay(
     events: readonly EventInstance[],
     dates: readonly Date[],
-): Record<string, DayLayoutEvent[]> {
-    const bucketed: Record<string, DayLayoutEvent[]> = {};
+): Record<string, UnlaidEvent[]> {
+    const bucketed: Record<string, UnlaidEvent[]> = {};
 
     for (const ev of events) {
         if (ev.timing.kind !== 'timed') continue;
@@ -32,10 +31,10 @@ export function bucketEventsByDay(
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
 
         for (const date of dates) {
+            if (!instanceOccursOnDay(ev, date)) continue;
+
             const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-
-            if (start >= dayEnd || end <= dayStart) continue;
 
             const dateStr = ymd(date);
             bucketed[dateStr] ??= [];

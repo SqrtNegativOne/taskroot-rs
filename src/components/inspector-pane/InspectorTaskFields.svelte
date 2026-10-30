@@ -7,6 +7,7 @@
     import TagsInput from '../inputs/TagsInput.svelte';
     import TimeInput from '../inputs/TimeInput.svelte';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { activeCalendars } from '../../lib/queries';
 
     interface Props {
         task: AppTask;
@@ -16,7 +17,7 @@
 
     let { task, tasks, updateTask }: Props = $props();
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let listOptions = $derived.by(() => {
         const todos = (calendarsQuery.data ?? []).filter(c => c.component === 'VTODO');

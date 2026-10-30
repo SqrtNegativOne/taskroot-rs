@@ -1,6 +1,6 @@
 import { onMount } from 'svelte';
 import { SvelteDate } from 'svelte/reactivity';
-import { MINUTES_IN_HOUR } from '../types';
+import { MINUTES_IN_HOUR } from '../constants';
 
 export function useCurrentTime() {
     let nowMin = $state(0);

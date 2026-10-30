@@ -11,6 +11,7 @@
     import DayColumn from './components/DayColumn.svelte';
     import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { activeCalendars, eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
     import { store } from '../../../lib/store.svelte';
@@ -96,7 +97,7 @@
 
     function isEventReadOnlyById(id: string): boolean {
         return (eventsQuery.data ?? []).some(
-            (ev) => ev.id === id && isEventReadOnly(ev, activeCalendars),
+            (ev) => ev.id === id && isEventReadOnly(ev, calendars),
         );
     }
 
@@ -133,20 +134,16 @@
     import { layoutEvents } from './layout';
 
     let dateRange = $derived.by(() => {
-        if (dates.length === 0) return { start: '', end: '' };
-        return { start: ymd(dates[0]), end: ymd(dates[dates.length - 1]) };
+        if (dates.length === 0) return { startDate: '', endDate: '' };
+        return { startDate: ymd(dates[0]), endDate: ymd(dates[dates.length - 1]) };
     });
 
-    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () => ({
-        filters: eventFilters,
-        query: eventQuery,
-        startDate: dateRange.start,
-        endDate: dateRange.end
-    }), { debounceMs: 150 });
-    
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
+        eventInstances(dateRange, eventFilters, eventQuery), { debounceMs: 150 });
 
-    let activeCalendars = $derived(calendarsQuery.data ?? []);
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+
+    let calendars = $derived(calendarsQuery.data ?? []);
 
     let planLayout = $derived.by(() => {
         const layoutMap: Record<string, import('./types').LaidEvent[]> = {};
@@ -179,7 +176,7 @@
         <FilterButton
             bind:filters={eventFilters}
             columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? activeCalendars.map((c) => ({ label: c.summary || c.id, value: c.id })) : []}
+            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? calendars.map((c) => ({ label: c.summary || c.id, value: c.id })) : []}
             align="right"
         />
     {/snippet}
@@ -206,7 +203,7 @@
                     {onMoveEvent}
                     {onEventClick}
                     {onAddEvent}
-                    calendars={activeCalendars}
+                    calendars={calendars}
                     showTimeLabels={i === 0}
                 />
             {/each}

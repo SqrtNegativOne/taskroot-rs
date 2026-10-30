@@ -3,24 +3,11 @@
 use super::{storage, AppSettings};
 use crate::store::{persist, Store, StoreState};
 use serde_json::{json, Value};
-use std::path::PathBuf;
-
-fn scratch_dir(name: &str) -> PathBuf {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("settings-tests")
-        .join(format!("{name}-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).expect("create scratch dir");
-    dir
-}
-
-fn state(name: &str) -> StoreState {
-    StoreState::new(Store::load(scratch_dir(name)).expect("load store"))
-}
 
 #[tokio::test]
 async fn get_settings_returns_the_defaults_when_nothing_is_stored() {
-    let state = state("defaults");
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()).expect("load store"));
 
     assert_eq!(
         serde_json::to_value(storage::read_settings(&state).await.unwrap()).unwrap(),
@@ -30,8 +17,8 @@ async fn get_settings_returns_the_defaults_when_nothing_is_stored() {
 
 #[tokio::test]
 async fn update_setting_round_trips_through_the_json_file() {
-    let dir = scratch_dir("round-trip");
-    let state = StoreState::new(Store::load(dir.clone()).unwrap());
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()).unwrap());
 
     storage::write_setting(&state, "clock_style", &json!("counter"))
         .await
@@ -42,7 +29,7 @@ async fn update_setting_round_trips_through_the_json_file() {
         "counter"
     );
     assert_eq!(
-        persist::read_settings(&dir).clock_style,
+        persist::read_settings(dir.path()).clock_style,
         "counter",
         "the write must reach settings.json"
     );
@@ -50,20 +37,21 @@ async fn update_setting_round_trips_through_the_json_file() {
 
 #[tokio::test]
 async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() {
-    let dir = scratch_dir("reject");
-    let state = StoreState::new(Store::load(dir.clone()).unwrap());
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()).unwrap());
 
     let error = storage::write_setting(&state, "pause_minutes", &json!("15"))
         .await
         .unwrap_err();
 
     assert_eq!(error.code(), "invalid-input");
-    assert!(!dir.join("settings.json").exists());
+    assert!(!dir.path().join("settings.json").exists());
 }
 
 #[tokio::test]
 async fn ui_state_round_trips_and_is_absent_until_written() {
-    let state = state("ui");
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()).expect("load store"));
     let stored = json!([{ "column": "status", "value": ["done"] }]);
 
     assert_eq!(

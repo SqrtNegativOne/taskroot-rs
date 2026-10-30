@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../bindings/EventInstance.generated';
 import { instanceOccursOnDay } from './timing';
 
+// Pin the host zone so the DST edge cases below exercise real transitions on
+// any machine: 2026-11-01 is Chicago's 25-hour fall-back day, 2026-03-08 its
+// 23-hour spring-forward day.
+process.env.TZ = 'America/Chicago';
+
 function allDay(startDate: string, endDateExclusive: string): EventInstance {
     return {
         id: 'e1',
@@ -52,5 +57,27 @@ describe('instanceOccursOnDay', () => {
         expect(instanceOccursOnDay(call, new Date(2026, 8, 7))).toBe(true);
         expect(instanceOccursOnDay(call, new Date(2026, 8, 8))).toBe(true);
         expect(instanceOccursOnDay(call, new Date(2026, 8, 9))).toBe(false);
+    });
+
+    it('does not let a 25-hour fall-back day claim the next local day\'s early events', () => {
+        // 2026-11-01 runs 25 hours, so a +24h day end lands at 23:00 on
+        // 2026-11-02 and would wrongly include this event in the previous day.
+        const start = new Date(2026, 10, 2, 0, 30);
+        const end = new Date(2026, 10, 2, 1, 0);
+        const call = timed(start.toISOString(), end.toISOString());
+
+        expect(instanceOccursOnDay(call, new Date(2026, 10, 1))).toBe(false);
+        expect(instanceOccursOnDay(call, new Date(2026, 10, 2))).toBe(true);
+    });
+
+    it('does not let a 23-hour spring-forward day claim the next local day\'s early events', () => {
+        // 2026-03-08 runs 23 hours, so a +24h day end lands at 01:00 on
+        // 2026-03-09 and would wrongly include this event in the previous day.
+        const start = new Date(2026, 2, 9, 0, 30);
+        const end = new Date(2026, 2, 9, 1, 0);
+        const call = timed(start.toISOString(), end.toISOString());
+
+        expect(instanceOccursOnDay(call, new Date(2026, 2, 8))).toBe(false);
+        expect(instanceOccursOnDay(call, new Date(2026, 2, 9))).toBe(true);
     });
 });

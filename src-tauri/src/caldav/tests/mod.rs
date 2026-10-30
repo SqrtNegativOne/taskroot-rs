@@ -11,8 +11,6 @@ mod discovery;
 mod transport;
 mod xml;
 
-use std::path::{Path, PathBuf};
-
 use super::transport::{CalDavClient, HttpClient};
 
 pub(super) const ROOT_PROPFIND: &str = include_str!("../fixtures/root_propfind.xml");
@@ -25,17 +23,4 @@ pub(super) const UNAUTHORIZED: &str = include_str!("../fixtures/unauthorized_sta
 pub(super) fn test_client(server: &wiremock::MockServer) -> CalDavClient {
     let http = HttpClient::new().unwrap();
     CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap()
-}
-
-/// A unique, writable directory under `src-tauri/target/`.
-///
-/// The process sandbox denies writes outside the repository, and `%TEMP%` is
-/// not writable, so account tests must stay under `target/`.
-pub(super) fn scratch_dir(name: &str) -> PathBuf {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("caldav-tests")
-        .join(name);
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
 }

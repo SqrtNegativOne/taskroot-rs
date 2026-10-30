@@ -1,7 +1,6 @@
 import type { EventInstance } from '../../../lib/domain';
 import { addDays, dayDiff, parseLocalYmd, ymd } from '../../../lib/time';
-
-export const DAYS_IN_WEEK = 7;
+import { DAYS_IN_WEEK } from './constants';
 
 /** One week-clipped segment of a multi-day all-day instance. */
 export interface WeekSpan {

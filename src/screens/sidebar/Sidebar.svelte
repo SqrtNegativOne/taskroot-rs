@@ -7,6 +7,7 @@
     import type { AppCalendar } from '../../lib/domain';
     import { buildNewEvent } from '../../lib/domain';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { activeCalendars } from '../../lib/queries';
     import { createSidebarState, saveTabTop } from './state.svelte';
 
     let open = $state(false);
@@ -140,7 +141,7 @@
         });
     });
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     function onAddEvent(date: Date, startMins?: number, endMins?: number) {
         const newEvent = buildNewEvent(date, {

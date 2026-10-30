@@ -103,6 +103,7 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    - Import `MINUTES_PER_DAY` from `snapping.ts`; remove the copies in `dropPayload.ts`, `bucketing.ts`, and tests.
    - Delete `DayLayoutEvent` in `layout.ts`; let `layoutEvents` accept and return `LaidEvent`.
    - Stop re-exporting constants from `types.ts`; import from `constants.ts` directly.
+   **✅ done** (`UnlaidEvent` added to `day-timeline/types.ts`)
 
 4. ~~**Delete the stub routes, do not parameterize them.**~~ **Dropped — keep the stub routes**
    (decided 2026-07-24; `routes/{docs,graph,launcher,recap,stats,wrap}`, `ComingSoon.svelte`,
@@ -123,7 +124,8 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
    `DateGrid.svelte` and `DayTimeline.svelte`, and `get_active_calendars` in three components.
    Add `src/lib/queries.ts` exporting named builders (`eventInstances(range, filters)`,
    `allEvents()`, `activeCalendars()`) so command names and argument shapes have one home.
-   `commands/tests.rs` keeps guarding the contract.
+   `commands/tests.rs` keeps guarding the contract. **✅ done** (all eight
+   `get_active_calendars` call sites migrated)
 
 8. **Give the inspector a state module.** `InspectorPane.svelte` owns three queries, four
    mutation helpers, modal state and scope plumbing. Move them to
@@ -144,7 +146,8 @@ crate — lives in [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md). Finish this list 
 
 12. **Share the day-overlap rule.** `bucketEventsByDay` and `instanceOccursOnDay` both decide
     whether a timed instance overlaps a local day. Have bucketing call `instanceOccursOnDay` for
-    membership, then add only its minute math.
+    membership, then add only its minute math. **✅ done** (also fixed `timing.ts` to use the
+    wall-clock `d`..`d+1` boundary, so 23/25-hour DST days no longer leak; DST tests added)
 
 ## Dependencies
 
@@ -159,7 +162,8 @@ not touch I1–I3.
   `duration: Infinity` for errors so they stay until dismissed.
 - `tempfile` (already in the lockfile) — `tempfile::tempdir()` replaces the three
   hand-rolled `scratch_dir` helpers in `store/tests.rs`, `settings/tests.rs` and
-  `caldav/tests/mod.rs`, and stops leaving directories under `target/`.
+  `caldav/tests/mod.rs`, and stops leaving directories under `target/`. **✅ done** (the
+  remaining `scratch_dir` in `src-tauri/src/lib.rs` tests is out of scope)
 - `date-fns` (narrow) — the week/day math in `src/lib/time.ts` and its test; keep `ymd`
   hand-written (`format` is the package's heaviest entry point and pulls locale data for a
   fixed ISO pattern). Also fixes a real defect: `src/lib/domain/timing.ts:20` computes the

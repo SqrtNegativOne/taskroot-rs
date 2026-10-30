@@ -10,6 +10,7 @@
     import RecurringActionModal, { type RecurringMode } from '../RecurringActionModal.svelte';
 
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { activeCalendars, allEvents } from '../../lib/queries';
     import { store } from '../../lib/store.svelte';
 
     let {
@@ -21,8 +22,8 @@
     } = $props();
 
     const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters: [], sort: [], query: "" }));
-    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', () => ({ filters: [], query: "" }));
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const eventsQuery = useAutoQuery<AppEvent[]>('query_events', allEvents);
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let tasks = $derived(tasksQuery.data ?? []);
     let events = $derived(eventsQuery.data ?? []);

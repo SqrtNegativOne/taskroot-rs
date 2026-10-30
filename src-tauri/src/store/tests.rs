@@ -7,7 +7,6 @@ use crate::domain::{
     AppTask, AppTaskFilter, AppTaskFilterColumn, EventScope, FilterOperator, TaskId, TaskPriority,
 };
 use serde_json::json;
-use std::path::PathBuf;
 
 use crate::caldav::client::CalDavClient;
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
@@ -32,8 +31,9 @@ fn series_with_moved_occurrence() -> String {
     )
 }
 
-fn store_with_series(name: &str, raw: &str) -> Store {
-    let mut store = Store::load(scratch_dir(name)).unwrap();
+fn store_with_series(raw: &str) -> Store {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::load(dir.path().to_path_buf()).unwrap();
     store.calendars = vec![CalendarInfo {
         href: SERIES_COLLECTION.to_string(),
         display_name: "Cal".to_string(),
@@ -89,31 +89,23 @@ fn series_raw(store: &Store) -> &str {
     &store.resource_for_event("series").unwrap().raw
 }
 
-fn scratch_dir(name: &str) -> PathBuf {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("store-tests")
-        .join(format!("{name}-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).expect("create scratch dir");
-    dir
-}
-
 const EVENT_RAW: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:one\r\nDTSTART;VALUE=DATE:20261017\r\nDTEND;VALUE=DATE:20261018\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
 #[test]
 fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
-    let dir = scratch_dir("settings");
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path();
     let settings = crate::settings::AppSettings {
         clock_style: "counter".to_string(),
         ..crate::settings::AppSettings::default()
     };
-    persist::write_settings(&dir, &settings).unwrap();
+    persist::write_settings(dir, &settings).unwrap();
 
-    let loaded = persist::read_settings(&dir);
+    let loaded = persist::read_settings(dir);
     assert_eq!(loaded.clock_style, "counter");
 
-    std::fs::write(persist::settings_path(&dir), "not json").unwrap();
-    let fallback = persist::read_settings(&dir);
+    std::fs::write(persist::settings_path(dir), "not json").unwrap();
+    let fallback = persist::read_settings(dir);
     assert_eq!(
         serde_json::to_value(fallback).unwrap(),
         serde_json::to_value(crate::settings::AppSettings::default()).unwrap()
@@ -131,10 +123,11 @@ fn default_clock_style_is_flowtime() {
 
 #[test]
 fn a_settings_file_without_a_clock_style_uses_the_default() {
-    let dir = scratch_dir("clock-style-missing");
-    std::fs::write(persist::settings_path(&dir), "{}").unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path();
+    std::fs::write(persist::settings_path(dir), "{}").unwrap();
 
-    assert_eq!(persist::read_settings(&dir).clock_style, "flowtime");
+    assert_eq!(persist::read_settings(dir).clock_style, "flowtime");
 }
 
 #[test]
@@ -150,16 +143,17 @@ fn apply_setting_rejects_a_wrong_type_and_ignores_unknown_keys() {
 
 #[test]
 fn ui_state_round_trips_and_keeps_unknown_keys() {
-    let dir = scratch_dir("ui");
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path();
     let mut state = serde_json::Map::new();
     state.insert(
         "ui.date_grid.filters".to_string(),
         json!([{ "column": "status" }]),
     );
 
-    persist::write_ui_state(&dir, &state).unwrap();
+    persist::write_ui_state(dir, &state).unwrap();
 
-    let loaded = persist::read_ui_state(&dir);
+    let loaded = persist::read_ui_state(dir);
     assert_eq!(
         loaded.get("ui.date_grid.filters"),
         state.get("ui.date_grid.filters")
@@ -195,7 +189,8 @@ async fn full_load_replaces_the_store_with_the_server_contents() {
 
     let http = HttpClient::new().unwrap();
     let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
-    let mut store = Store::load(scratch_dir("full-load")).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::load(dir.path().to_path_buf()).unwrap();
     store
         .set_resource("/cal/stale.ics", "/cal/", None, EVENT_RAW)
         .unwrap();
@@ -221,7 +216,7 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("delete-this", SERIES_RAW);
+    let mut store = store_with_series(SERIES_RAW);
 
     ops::delete_event(
         &mut store,
@@ -251,7 +246,7 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("delete-following", &series_with_moved_occurrence());
+    let mut store = store_with_series(&series_with_moved_occurrence());
 
     ops::delete_event(
         &mut store,
@@ -283,7 +278,7 @@ async fn deleting_all_removes_the_whole_resource_when_an_exception_was_selected(
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("delete-all", &series_with_moved_occurrence());
+    let mut store = store_with_series(&series_with_moved_occurrence());
 
     ops::delete_event(
         &mut store,
@@ -303,7 +298,7 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("reschedule-this", SERIES_RAW);
+    let mut store = store_with_series(SERIES_RAW);
 
     ops::reschedule_event(
         &mut store,
@@ -346,7 +341,7 @@ async fn rescheduling_the_series_moves_the_master() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("reschedule-all", SERIES_RAW);
+    let mut store = store_with_series(SERIES_RAW);
 
     ops::reschedule_event(
         &mut store,
@@ -381,7 +376,7 @@ async fn moving_a_series_from_one_occurrence_is_refused() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("reschedule-following", SERIES_RAW);
+    let mut store = store_with_series(SERIES_RAW);
 
     let error = ops::reschedule_event(
         &mut store,
@@ -406,7 +401,7 @@ async fn deleting_this_on_a_non_recurring_event_deletes_it() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series("delete-this-plain", EVENT_RAW);
+    let mut store = store_with_series(EVENT_RAW);
 
     ops::delete_event(&mut store, &client, "one", EventScope::This, None)
         .await

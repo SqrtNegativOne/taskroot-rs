@@ -5,6 +5,7 @@
     import { buildNewEvent } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { activeCalendars } from '../../lib/queries';
 
     import SplitPane from '../../components/SplitPane.svelte';
     import TaskListPane from '../../components/tasklist/TaskListPane.svelte';
@@ -65,7 +66,7 @@
     }
     let inspectorState = $state<{ type: 'event' | 'task', id: string, occurrenceStart?: string } | undefined>(undefined);
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let defaultTaskCollection = $derived(
         calendarsQuery.data?.find((c) => c.component === 'VTODO' && c.writable)?.id

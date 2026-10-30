@@ -1,15 +1,9 @@
-import type { EventInstance } from '../../../lib/domain';
-
-export interface DayLayoutEvent {
-    event: EventInstance;
-    startMins: number;
-    endMins: number;
-}
+import type { LaidEvent, UnlaidEvent } from './types';
 
 // Simple overlap layout: assign each event to the earliest lane that's free.
-export function layoutEvents(events: DayLayoutEvent[]) {
+export function layoutEvents(events: UnlaidEvent[]): LaidEvent[] {
     const placed: { start: number; end: number; lane: number }[] = [];
-    const result: { event: EventInstance; startMins: number; endMins: number; lane: number; lanes?: number }[] = [];
+    const result: Omit<LaidEvent, 'lanes'>[] = [];
     
     for (const ev of events) {
         let lane = 0;

@@ -11,7 +11,7 @@ use crate::caldav::discovery::{
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::caldav::transport::HttpClient;
 
-use super::{scratch_dir, test_client, HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
+use super::{test_client, HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
 
 #[test]
 fn an_empty_server_url_is_the_loopback_default() {
@@ -252,7 +252,8 @@ async fn a_refresh_persists_the_list_the_server_actually_has() {
         .mount(&server)
         .await;
 
-    let dir = scratch_dir("refresh-collections");
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path();
     let mut account = Account {
         server_url: server.uri(),
         username: "me".to_string(),
@@ -260,13 +261,13 @@ async fn a_refresh_persists_the_list_the_server_actually_has() {
         home_href: "/me/".to_string(),
         calendars: Vec::new(),
     };
-    write_account(&dir, &account).expect("seed the account file");
+    write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(&dir, &test_client(&server), &mut account).await;
+    let calendars = refresh_collections(dir, &test_client(&server), &mut account).await;
 
     assert_eq!(calendars.len(), 2);
     assert_eq!(
-        read_account(&dir).unwrap().unwrap().calendars,
+        read_account(dir).unwrap().unwrap().calendars,
         calendars,
         "the fresh list must be written back, not just returned"
     );
@@ -286,7 +287,8 @@ async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
         component: CalendarComponent::VTodo,
         ..CalendarInfo::default()
     }];
-    let dir = scratch_dir("refresh-offline");
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path();
     let mut account = Account {
         server_url: server.uri(),
         username: "me".to_string(),
@@ -294,10 +296,10 @@ async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
         home_href: "/me/".to_string(),
         calendars: cached.clone(),
     };
-    write_account(&dir, &account).expect("seed the account file");
+    write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(&dir, &test_client(&server), &mut account).await;
+    let calendars = refresh_collections(dir, &test_client(&server), &mut account).await;
 
     assert_eq!(calendars, cached, "an offline start must still have lists");
-    assert_eq!(read_account(&dir).unwrap().unwrap().calendars, cached);
+    assert_eq!(read_account(dir).unwrap().unwrap().calendars, cached);
 }

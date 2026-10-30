@@ -9,6 +9,7 @@
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { activeCalendars } from '../../lib/queries';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
@@ -61,7 +62,7 @@
     let pastDueQuery = useAutoQuery<string[]>('get_past_due_task_ids', () => ({}));
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
     let listModalOpen = $state(false);
 
     const TASK_QUERY_DEBOUNCE_MS = 150;

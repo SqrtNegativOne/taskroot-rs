@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../../../lib/domain';
 import { ymd } from '../../../lib/time';
+import { MINUTES_PER_DAY } from '../snapping';
+import { MINUTES_IN_HOUR } from './constants';
 import { bucketEventsByDay } from './bucketing';
-
-const MINUTES_IN_HOUR = 60;
-const HOURS_PER_DAY = 24;
-const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
 
 function timed(id: string, start: Date, end: Date): EventInstance {
     return {

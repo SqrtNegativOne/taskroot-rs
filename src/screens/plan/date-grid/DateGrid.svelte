@@ -11,6 +11,7 @@
     import { useNow } from '../../../lib/useNow.svelte';
     
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { activeCalendars, eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
 
@@ -62,17 +63,13 @@
         return { startDate: ymd(start), endDate: ymd(end) };
     });
 
-    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () => ({
-        filters,
-        query,
-        startDate: dateGridRange.startDate,
-        endDate: dateGridRange.endDate
-    }), { debounceMs: 150 });
-    
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', () => ({}));
+    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
+        eventInstances(dateGridRange, filters, query), { debounceMs: 150 });
+
+    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let events = $derived(eventsQuery.data ?? []);
-    let activeCalendars = $derived(calendarsQuery.data ?? []);
+    let calendars = $derived(calendarsQuery.data ?? []);
 
     let isSingleWeek = $derived(view === DateGridView.OneWeek);
     let is3Weeks = $derived(view === DateGridView.ThreeWeeks);
@@ -154,7 +151,7 @@
         <FilterButton
             bind:filters
             columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? activeCalendars.map(c => ({ label: c.summary || c.id, value: c.id })) : []}
+            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? calendars.map(c => ({ label: c.summary || c.id, value: c.id })) : []}
             align="right"
         />
     {/snippet}
@@ -189,11 +186,11 @@
                             {onEventDragStart}
                             {onAddEvent}
                             {onEventClick}
-                            calendars={activeCalendars}
+                            calendars={calendars}
                         />
                     {/each}
                     {#each layout.spans as span (span.occurrenceKey)}
-                        {@const readOnly = isEventReadOnly(span.instance, activeCalendars)}
+                        {@const readOnly = isEventReadOnly(span.instance, calendars)}
                         <button
                             type="button"
                             class="cal-span"
