@@ -42,6 +42,13 @@ function resolveEventCalendar(
     return calendars.find((c) => c.id === collectionId) ?? fallback;
 }
 
+export function isRecurring(event: {
+    readonly rrule?: string;
+    readonly recurringEventId?: string;
+}): boolean {
+    return event.rrule !== undefined || event.recurringEventId !== undefined;
+}
+
 export function isCalendarReadOnly(
     calendar: { readonly writable?: boolean } | undefined,
 ): boolean {

@@ -13,13 +13,13 @@
 //! - [`client`] — `sync-collection`, `calendar-multiget`, `PUT`, `DELETE`,
 //!   `MKCALENDAR` and `PROPPATCH`.
 //! - [`calendars`] — collection lifecycle (create, rename, recolour, delete).
-//! - [`commands`] — the Tauri account commands.
+//! - [`connect`] — shared account/password/client session setup.
 //! - [`model`] — the discovered calendar metadata shared with the frontend.
 
 pub mod account;
 pub mod calendars;
 pub mod client;
-pub mod commands;
+pub mod connect;
 pub mod discovery;
 pub mod model;
 pub mod transport;

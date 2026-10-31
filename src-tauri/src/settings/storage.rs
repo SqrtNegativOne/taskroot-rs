@@ -10,7 +10,7 @@ use serde_json::Value;
 /// # Errors
 ///
 /// This read cannot fail; the signature mirrors the command boundary.
-pub(super) async fn read_settings(state: &StoreState) -> Result<AppSettings, AppError> {
+pub async fn read_settings(state: &StoreState) -> Result<AppSettings, AppError> {
     Ok(state.read(|store| store.settings.clone()).await)
 }
 
@@ -18,7 +18,7 @@ pub(super) async fn read_settings(state: &StoreState) -> Result<AppSettings, App
 ///
 /// Returns [`AppError::InvalidInput`] for a known key with a wrongly-typed
 /// value, or [`AppError::Store`] when the JSON file cannot be written.
-pub(super) async fn write_setting(
+pub async fn write_setting(
     state: &StoreState,
     key: &str,
     value: &Value,
@@ -33,7 +33,7 @@ pub(super) async fn write_setting(
 /// # Errors
 ///
 /// This read cannot fail; the signature mirrors the command boundary.
-pub(super) async fn read_ui_state(state: &StoreState, key: &str) -> Result<Value, AppError> {
+pub async fn read_ui_state(state: &StoreState, key: &str) -> Result<Value, AppError> {
     Ok(state
         .read(|store| store.ui_state.get(key).cloned().unwrap_or(Value::Null))
         .await)
@@ -42,7 +42,7 @@ pub(super) async fn read_ui_state(state: &StoreState, key: &str) -> Result<Value
 /// # Errors
 ///
 /// Returns [`AppError::Store`] when the UI-state file cannot be written.
-pub(super) async fn write_ui_state(
+pub async fn write_ui_state(
     state: &StoreState,
     key: &str,
     value: &Value,
@@ -55,6 +55,6 @@ pub(super) async fn write_ui_state(
 /// The whole UI-state map, used by tests and the dev inspector.
 #[cfg(test)]
 #[must_use]
-pub(super) async fn all_ui_state(state: &StoreState) -> Map<String, Value> {
+pub async fn all_ui_state(state: &StoreState) -> Map<String, Value> {
     state.read(|store| store.ui_state.clone()).await
 }

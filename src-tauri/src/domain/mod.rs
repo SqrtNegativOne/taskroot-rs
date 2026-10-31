@@ -2,6 +2,7 @@ pub mod event;
 pub mod event_timing;
 pub mod filters;
 pub mod ids;
+pub mod projection;
 pub mod sigil;
 pub mod task;
 pub mod timing;

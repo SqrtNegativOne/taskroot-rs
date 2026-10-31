@@ -1,14 +1,24 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { err, ok } from 'neverthrow';
+import { toast } from 'svelte-sonner';
 import { AppStore } from './store.svelte';
-import { notificationStore } from './notifications.svelte';
 import type { AppError } from './errors';
+
+vi.mock('svelte-sonner', () => ({
+    toast: {
+        error: vi.fn(),
+        success: vi.fn(),
+        info: vi.fn(),
+        custom: vi.fn(),
+    },
+    Toaster: vi.fn(),
+}));
 
 const failure: AppError = { code: 'remote', message: 'server unreachable' };
 
 describe('AppStore.mutate', () => {
     beforeEach(() => {
-        notificationStore.notifications = [];
+        vi.clearAllMocks();
     });
 
     it('returns the failure and emits an error notification', async () => {
@@ -17,10 +27,14 @@ describe('AppStore.mutate', () => {
         const result = await store.mutate('Failed to save', async () => err(failure));
 
         expect(result.isErr()).toBe(true);
-        expect(notificationStore.notifications).toHaveLength(1);
-        const notification = notificationStore.notifications[0];
-        expect(notification?.type).toBe('error');
-        expect(notification?.message).toBe('Failed to save: server unreachable');
+        expect(toast.custom).toHaveBeenCalledTimes(1);
+        expect(toast.custom).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                componentProps: { message: 'Failed to save: server unreachable' },
+                duration: Infinity,
+            }),
+        );
         expect(store.error).toBeNull();
     });
 
@@ -31,6 +45,6 @@ describe('AppStore.mutate', () => {
 
         expect(result.isOk()).toBe(true);
         if (result.isOk()) expect(result.value).toBe('saved');
-        expect(notificationStore.notifications).toHaveLength(0);
+        expect(toast.custom).not.toHaveBeenCalled();
     });
 });

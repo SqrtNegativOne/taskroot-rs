@@ -4,9 +4,13 @@
 // handler.
 #![allow(clippy::needless_pass_by_value)]
 
+pub mod calendars;
 pub mod events;
+pub mod plan;
 pub mod refresh;
+pub mod schema;
 pub mod session;
+pub mod settings;
 pub mod stopwatch;
 pub mod tasks;
 pub mod window;

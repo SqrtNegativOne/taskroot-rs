@@ -1,6 +1,6 @@
 # taskroot CLI
 
-<!-- Generated from the VERBS and OPTIONS tables in src-tauri/src/bin/taskroot.rs by `cargo nextest run`. Do not edit. -->
+<!-- Generated from the VERBS and OPTIONS tables in src-tauri/src/cli/help.rs by `cargo nextest run`. Do not edit. -->
 
 Headless Taskroot for agents and scripts: JSON on stdout, `AppError` text on
 stderr with a non-zero exit code.

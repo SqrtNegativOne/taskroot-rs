@@ -1,5 +1,5 @@
 import type { EventInstance } from '../bindings/EventInstance.generated';
-import { ymd } from '../time';
+import { addDays, ymd } from '../time';
 
 /**
  * Whether an instance is visible on the given local calendar day.
@@ -16,6 +16,6 @@ export function instanceOccursOnDay(event: EventInstance, date: Date): boolean {
         return timing.startDate <= day && timing.endDateExclusive > day;
     }
     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    const dayEnd = addDays(dayStart, 1);
     return new Date(timing.start) < dayEnd && new Date(timing.end) > dayStart;
 }

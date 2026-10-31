@@ -1,21 +1,21 @@
-//! Tauri commands for `CalDAV` account setup.
+//! Tauri commands for the `CalDAV` account and collection lifecycle.
 //!
-//! Discovery is the only network work here: `test_account` runs it without
-//! persisting anything and `connect_account` persists the account. The collection
-//! list is kept fresh at startup by `discovery::refresh_collections`, so there is
-//! no separate refresh command. Calendar data does not flow through these
-//! commands.
+//! Discovery is the only network work in the account commands: `test_account`
+//! runs it without persisting anything and `connect_account` persists the
+//! account. The collection list is kept fresh at startup by
+//! `discovery::refresh_collections`, so there is no separate refresh command.
+//! Calendar data does not flow through these commands.
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
+use crate::caldav::account::{self, Account};
+use crate::caldav::calendars;
+use crate::caldav::discovery::{self, Discovery};
+use crate::caldav::model::{CalendarComponent, CalendarInfo};
+use crate::caldav::transport::HttpClient;
 use crate::error::AppError;
-
-use super::account::{self, Account};
-use super::discovery::{self, Discovery};
-use super::model::{CalendarComponent, CalendarInfo};
-use super::transport::HttpClient;
 
 /// What the connect screen and the settings account card display.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, TS)]
@@ -173,7 +173,7 @@ pub async fn create_calendar(
     let client = crate::commands::session::client_for(&app).await?;
     let state = crate::commands::session::store_state(&app)?;
     let mut store = state.lock().await;
-    super::calendars::create(&dir, &client, &mut store, &display_name, component).await
+    calendars::create(&dir, &client, &mut store, &display_name, component).await
 }
 
 /// Rename a list.
@@ -192,7 +192,7 @@ pub async fn rename_calendar(
     let client = crate::commands::session::client_for(&app).await?;
     let state = crate::commands::session::store_state(&app)?;
     let mut store = state.lock().await;
-    super::calendars::rename(&dir, &client, &mut store, &href, &display_name).await
+    calendars::rename(&dir, &client, &mut store, &href, &display_name).await
 }
 
 /// Set or clear (`color: null`) a list's colour.
@@ -211,7 +211,7 @@ pub async fn set_calendar_color(
     let client = crate::commands::session::client_for(&app).await?;
     let state = crate::commands::session::store_state(&app)?;
     let mut store = state.lock().await;
-    super::calendars::set_color(&dir, &client, &mut store, &href, color).await
+    calendars::set_color(&dir, &client, &mut store, &href, color).await
 }
 
 /// Delete a list and every resource in it.
@@ -226,7 +226,7 @@ pub async fn delete_calendar(app: AppHandle, href: String) -> Result<(), AppErro
     let client = crate::commands::session::client_for(&app).await?;
     let state = crate::commands::session::store_state(&app)?;
     let mut store = state.lock().await;
-    super::calendars::delete(&dir, &client, &mut store, &href).await
+    calendars::delete(&dir, &client, &mut store, &href).await
 }
 
 fn http_client(app: &AppHandle) -> Result<HttpClient, AppError> {

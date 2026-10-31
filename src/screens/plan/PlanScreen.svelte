@@ -1,7 +1,7 @@
 <script lang="ts">
     import { store } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
-    import type { AppTask, AppCalendar, EventInstance, EventScope } from '../../lib/domain';
+    import type { AppTask, AppCalendar, EventInstance } from '../../lib/domain';
     import { buildNewEvent } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -15,55 +15,25 @@
     import DayTimeline from './day-timeline/DayTimeline.svelte';
     import { createEventDragController } from './hooks/eventDrag.svelte';
     import { createTaskDragController } from './hooks/taskDrag.svelte';
+    import { createReschedulePrompt } from './hooks/reschedule.svelte';
     import type { DragState } from './day-timeline/types';
     let dragState = $state<DragState | undefined>(undefined);
+
+    const reschedulePrompt = createReschedulePrompt();
 
     const startEventDrag = createEventDragController({
         setDragState: (ds) => { dragState = ds; },
         onReschedule: (event, payload) => {
-            requestMove(event, payload.startTime, payload.endTime, payload.isAllDay);
+            reschedulePrompt.request(
+                event,
+                payload.startTime,
+                payload.endTime,
+                payload.isAllDay,
+                'Failed to move event',
+            );
         },
     });
 
-    type PendingMove = {
-        instance: EventInstance;
-        startTime: string;
-        endTime: string;
-        isAllDay: boolean;
-    };
-
-    let pendingMove = $state<PendingMove | undefined>(undefined);
-    let moveModalOpen = $state(false);
-
-    function requestMove(instance: EventInstance, startTime: string, endTime: string, isAllDay: boolean) {
-        if (!instance.recurring) {
-            commitMove(instance, startTime, endTime, isAllDay, 'all');
-            return;
-        }
-        pendingMove = { instance, startTime, endTime, isAllDay };
-        moveModalOpen = true;
-    }
-
-    function commitMove(
-        instance: EventInstance,
-        startTime: string,
-        endTime: string,
-        isAllDay: boolean,
-        scope: EventScope,
-    ) {
-        void store.mutate('Failed to move event', () =>
-            store.rescheduleEvent(instance.id, startTime, endTime, isAllDay, scope, instance.occurrenceStart),
-        );
-    }
-
-    function handleMoveScope(scope: EventScope) {
-        moveModalOpen = false;
-        const pending = pendingMove;
-        pendingMove = undefined;
-        if (pending) {
-            commitMove(pending.instance, pending.startTime, pending.endTime, pending.isAllDay, scope);
-        }
-    }
     let inspectorState = $state<{ type: 'event' | 'task', id: string, occurrenceStart?: string } | undefined>(undefined);
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
@@ -190,11 +160,11 @@
         />
 
         <RecurringActionModal
-            isOpen={moveModalOpen}
+            isOpen={reschedulePrompt.isOpen}
             actionType="move"
             modes={['this', 'all']}
-            onConfirm={handleMoveScope}
-            onCancel={() => { moveModalOpen = false; pendingMove = undefined; }}
+            onConfirm={reschedulePrompt.confirm}
+            onCancel={reschedulePrompt.cancel}
         />
     {/if}
 </main>

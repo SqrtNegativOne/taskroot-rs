@@ -91,6 +91,14 @@ pub struct AppEvent {
     pub timezone: Option<String>,
 }
 
+impl AppEvent {
+    /// Whether this row is a recurrence master or one of its exceptions.
+    #[must_use]
+    pub const fn is_recurring(&self) -> bool {
+        self.rrule.is_some() || self.recurring_event_id.is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

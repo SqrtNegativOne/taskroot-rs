@@ -33,6 +33,59 @@ export function createStaleGuard(): StaleGuard {
     };
 }
 
+export interface Debouncer<T> {
+    /** Replaces the pending value and restarts the debounce timer. */
+    schedule: (value: T) => void;
+    /** Runs the callback with the pending value immediately, or does nothing when none is pending. */
+    flush: () => void;
+    /** Drops the pending value without running the callback. */
+    cancel: () => void;
+}
+
+/**
+ * Coalesces rapid values into a single delayed callback.
+ *
+ * Call `flush` on teardown when a pending value must not be lost, or `cancel`
+ * when it must not run at all.
+ */
+export function createDebouncer<T>(
+    callback: (value: T) => void,
+    debounceMs: number,
+): Debouncer<T> {
+    let pending: { value: T } | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    function clearTimer(): void {
+        if (timer === undefined) return;
+        clearTimeout(timer);
+        timer = undefined;
+    }
+
+    function flush(): void {
+        clearTimer();
+        if (pending === undefined) return;
+        const { value } = pending;
+        pending = undefined;
+        callback(value);
+    }
+
+    function schedule(value: T): void {
+        pending = { value };
+        clearTimer();
+        timer = setTimeout(() => {
+            timer = undefined;
+            flush();
+        }, debounceMs);
+    }
+
+    function cancel(): void {
+        clearTimer();
+        pending = undefined;
+    }
+
+    return { schedule, flush, cancel };
+}
+
 export interface DebouncedWriter<T> {
     /** Replaces the pending value and restarts the debounce timer. */
     schedule: (value: T) => void;
@@ -49,30 +102,8 @@ export function createDebouncedWriter<T>(
     write: (value: T) => void,
     debounceMs: number,
 ): DebouncedWriter<T> {
-    let pending: { value: T } | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    function flush(): void {
-        if (timer !== undefined) {
-            clearTimeout(timer);
-            timer = undefined;
-        }
-        if (pending === undefined) return;
-        const { value } = pending;
-        pending = undefined;
-        write(value);
-    }
-
-    function schedule(value: T): void {
-        pending = { value };
-        if (timer !== undefined) clearTimeout(timer);
-        timer = setTimeout(() => {
-            timer = undefined;
-            flush();
-        }, debounceMs);
-    }
-
-    return { schedule, flush };
+    const debouncer = createDebouncer(write, debounceMs);
+    return { schedule: debouncer.schedule, flush: debouncer.flush };
 }
 
 /**

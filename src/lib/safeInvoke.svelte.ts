@@ -1,8 +1,9 @@
+import { onDestroy } from 'svelte';
 import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
 import { STORE_UPDATED } from './ipcEvents';
-import { createStaleGuard } from './asyncState.svelte';
+import { createDebouncer, createStaleGuard } from './asyncState.svelte';
 
 export type { AppError, AppErrorCode } from './errors';
 export { describeAppError, normalizeAppError, unknownAppError } from './errors';
@@ -46,11 +47,22 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
 
     const guard = createStaleGuard();
     let hasDispatched = false;
-    let inflight: Promise<void> | undefined;
-    let debounceHandle: ReturnType<typeof setTimeout> | undefined;
-
     let lastArgs: InvokeArgs | undefined;
     let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
+    let resolveScheduled: (() => void) | undefined;
+
+    const debouncer = options.debounceMs === undefined
+        ? undefined
+        : createDebouncer<InvokeArgs | undefined>((args) => {
+            const resolve = resolveScheduled;
+            resolveScheduled = undefined;
+            const settled = dispatch(args);
+            if (resolve === undefined) {
+                void settled;
+                return;
+            }
+            void settled.finally(resolve);
+        }, options.debounceMs);
 
     $effect(() => {
         let isCleanedUp = false;
@@ -74,6 +86,13 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         };
     });
 
+    onDestroy(() => {
+        debouncer?.cancel();
+        guard.invalidate();
+        resolveScheduled?.();
+        resolveScheduled = undefined;
+    });
+
     async function dispatch(args: InvokeArgs | undefined): Promise<void> {
         lastArgs = args;
         hasDispatched = true;
@@ -81,36 +100,20 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         isLoading = true;
         error = undefined;
 
-        inflight = (async () => {
-            const result = await safeInvoke<T, E>(cmd, args ?? options.args);
-            if (!isCurrent()) return;
+        const result = await safeInvoke<T, E>(cmd, args ?? options.args);
+        if (!isCurrent()) return;
 
-            result.match(
-                (value) => {
-                    data = value;
-                    isLoading = false;
-                },
-                (errValue) => {
-                    error = errValue;
-                    isLoading = false;
-                }
-            );
-            if (result.isErr()) options.onError?.(result.error);
-        })();
-
-        await inflight;
-    }
-
-    function scheduleDispatch(args: InvokeArgs | undefined): Promise<void> {
-        if (debounceHandle !== undefined) clearTimeout(debounceHandle);
-        isLoading = true;
-
-        return new Promise<void>((resolve) => {
-            debounceHandle = setTimeout(() => {
-                debounceHandle = undefined;
-                void dispatch(args).finally(resolve);
-            }, options.debounceMs ?? 0);
-        });
+        result.match(
+            (value) => {
+                data = value;
+                isLoading = false;
+            },
+            (errValue) => {
+                error = errValue;
+                isLoading = false;
+            }
+        );
+        if (result.isErr()) options.onError?.(result.error);
     }
 
     /**
@@ -119,8 +122,16 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
      */
     async function execute(newArgs?: InvokeArgs): Promise<void> {
         lastArgs = newArgs;
-        if (options.debounceMs === undefined) return dispatch(newArgs);
-        return scheduleDispatch(newArgs);
+        if (debouncer === undefined) return dispatch(newArgs);
+
+        isLoading = true;
+        resolveScheduled?.();
+        resolveScheduled = undefined;
+        const settled = new Promise<void>((resolve) => {
+            resolveScheduled = resolve;
+        });
+        debouncer.schedule(newArgs);
+        return settled;
     }
 
     return {

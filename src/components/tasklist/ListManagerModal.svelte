@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Dialog } from 'bits-ui';
     import type { AppCalendar } from '../../lib/domain';
     import type { Result } from 'neverthrow';
     import type { AppError } from '../../lib/safeInvoke.svelte';
@@ -53,17 +54,22 @@
         }
         await run('Failed to delete list', () => store.deleteCalendar(calendar.id));
     }
+
+    function handleOpenChange(open: boolean): void {
+        if (!open) onClose();
+    }
 </script>
 
-{#if isOpen}
-    <div
-        style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 99999;"
-        role="presentation"
-        onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-        <div style="background: var(--bg-panel, #1e1e1e); padding: 20px 24px; border-radius: 8px; width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg);">
+<Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog.Portal>
+        <Dialog.Overlay
+            style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999;"
+        />
+        <Dialog.Content
+            style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-panel, #1e1e1e); padding: 20px 24px; border-radius: 8px; width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg); z-index: 100000;"
+        >
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Lists</h3>
+                <Dialog.Title level={3} style="margin: 0; font-size: 16px; font-weight: 600;">Lists</Dialog.Title>
                 <button class="icon-btn" onclick={onClose} aria-label="Close">✕</button>
             </div>
 
@@ -133,6 +139,6 @@
                     style="background: var(--accent, #3b82f6); border: none; color: #fff; border-radius: 4px; padding: 6px 14px; cursor: pointer;"
                 >Add</button>
             </div>
-        </div>
-    </div>
-{/if}
+        </Dialog.Content>
+    </Dialog.Portal>
+</Dialog.Root>

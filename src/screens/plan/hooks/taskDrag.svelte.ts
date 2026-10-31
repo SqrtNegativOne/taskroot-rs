@@ -1,9 +1,7 @@
 import type { AppTask } from '../../../lib/domain';
-import { DRAG_THRESHOLD_PX } from '../day-timeline/constants';
-import { createPointerGestureRecognizer } from '../day-timeline/hooks/pointerGesture.svelte';
 import type { DragState, DragStateTarget } from '../day-timeline/types';
-import { dropTargetAt, suppressUpcomingClick } from '../date-grid/dropTarget';
 import { clampDuration } from '../snapping';
+import { createDropDragController } from './dropDrag.svelte';
 
 /** Where a task dropped on a whole-day cell starts. */
 const GRID_DAY_START_MINUTE = 9 * 60;
@@ -45,42 +43,12 @@ function slotFor(target: DragStateTarget, duration: number): TaskScheduleSlot | 
 export function createTaskDragController(
     options: TaskDragControllerOptions,
 ): TaskDragStart {
-    const track = createPointerGestureRecognizer();
-
-    return (downEvent, task) => {
-        if (downEvent.button !== 0) return;
-        downEvent.preventDefault();
-
-        const startX = downEvent.clientX;
-        const startY = downEvent.clientY;
-        const duration = blockMinutes(
-            task,
-            options.defaultDuration?.() ?? DEFAULT_BLOCK_MINUTES,
-        );
-        let dragging = false;
-        let target: DragStateTarget | undefined;
-
-        track({
-            onMove: (move) => {
-                if (!dragging) {
-                    const moved = Math.hypot(move.clientX - startX, move.clientY - startY);
-                    if (moved < DRAG_THRESHOLD_PX) return;
-                    dragging = true;
-                }
-                target = dropTargetAt(move.clientX, move.clientY, duration);
-                options.setDragState({ task: { id: task.id }, target });
-            },
-            onEnd: () => {
-                options.setDragState(undefined);
-                if (!dragging) return;
-                suppressUpcomingClick();
-                if (!target) return;
-                const slot = slotFor(target, duration);
-                if (slot) options.onSchedule(task, slot);
-            },
-            onCancel: () => {
-                options.setDragState(undefined);
-            },
-        });
-    };
+    return createDropDragController<AppTask, TaskScheduleSlot>({
+        setDragState: options.setDragState,
+        dragState: (task) => ({ task: { id: task.id } }),
+        duration: (task) =>
+            blockMinutes(task, options.defaultDuration?.() ?? DEFAULT_BLOCK_MINUTES),
+        payloadFor: (task, target) => slotFor(target, blockMinutes(task, options.defaultDuration?.() ?? DEFAULT_BLOCK_MINUTES)),
+        onDrop: options.onSchedule,
+    });
 }

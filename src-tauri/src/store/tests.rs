@@ -10,26 +10,14 @@ use serde_json::json;
 
 use crate::caldav::client::CalDavClient;
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
-use crate::caldav::transport::HttpClient;
-use crate::screens::plan::expand_event_instances;
+use crate::domain::projection::expand_event_instances;
+use crate::test_support::caldav::start_server;
+use crate::test_support::ics::{all_day, series, with_exception};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const SERIES_HREF: &str = "/cal/series.ics";
 const SERIES_COLLECTION: &str = "/cal/";
-
-/// A weekly 11:00 Asia/Kolkata series, every occurrence 30 minutes long.
-const SERIES_RAW: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:series\r\nDTSTART;TZID=Asia/Kolkata:20261019T110000\r\nDTEND;TZID=Asia/Kolkata:20261019T113000\r\nRRULE:FREQ=WEEKLY\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
-
-/// The 2026-11-02 occurrence moved to 14:00.
-const MOVED_OCCURRENCE: &str = "BEGIN:VEVENT\r\nUID:series\r\nRECURRENCE-ID;TZID=Asia/Kolkata:20261102T110000\r\nDTSTART;TZID=Asia/Kolkata:20261102T140000\r\nDTEND;TZID=Asia/Kolkata:20261102T143000\r\nSUMMARY:Standup\r\nEND:VEVENT\r\n";
-
-fn series_with_moved_occurrence() -> String {
-    SERIES_RAW.replace(
-        "END:VCALENDAR\r\n",
-        &format!("{MOVED_OCCURRENCE}END:VCALENDAR\r\n"),
-    )
-}
 
 fn store_with_series(raw: &str) -> Store {
     let dir = tempfile::tempdir().unwrap();
@@ -47,7 +35,7 @@ fn store_with_series(raw: &str) -> Store {
 }
 
 async fn editing_server() -> (MockServer, CalDavClient) {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PUT"))
         .and(path(SERIES_HREF))
         .respond_with(ResponseTemplate::new(204).insert_header("ETag", "\"next\""))
@@ -57,8 +45,6 @@ async fn editing_server() -> (MockServer, CalDavClient) {
         .respond_with(ResponseTemplate::new(204))
         .mount(&server)
         .await;
-    let http = HttpClient::new().unwrap();
-    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
     (server, client)
 }
 
@@ -88,8 +74,6 @@ const OCTOBER_RANGE: (&str, &str) = ("2026-10-19T00:00:00Z", "2026-11-02T23:59:5
 fn series_raw(store: &Store) -> &str {
     &store.resource_for_event("series").unwrap().raw
 }
-
-const EVENT_RAW: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:one\r\nDTSTART;VALUE=DATE:20261017\r\nDTEND;VALUE=DATE:20261018\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
 #[test]
 fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
@@ -163,16 +147,16 @@ fn ui_state_round_trips_and_keeps_unknown_keys() {
 #[tokio::test]
 async fn full_load_replaces_the_store_with_the_server_contents() {
     use super::ops;
-    use crate::caldav::model::{CalendarComponent, CalendarInfo};
-    use crate::caldav::transport::{CalDavClient, HttpClient};
-    use wiremock::matchers::{body_string_contains, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::matchers::body_string_contains;
 
     const COLLECTION: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
 
-    let server = MockServer::start().await;
-    let raw = EVENT_RAW
-        .replace("UID:one", "UID:fresh")
+    let (server, client) = start_server().await;
+    let raw = all_day()
+        .replace(
+            "UID:dsh-20261017-first-day-of-durga@dsh-import",
+            "UID:fresh",
+        )
         .replace("\r\n", "\n");
     let body = format!(
         "<?xml version='1.0' encoding='utf-8'?><multistatus xmlns=\"DAV:\" \
@@ -187,12 +171,10 @@ async fn full_load_replaces_the_store_with_the_server_contents() {
         .mount(&server)
         .await;
 
-    let http = HttpClient::new().unwrap();
-    let client = CalDavClient::new(&http, &server.uri(), "me", "secret").unwrap();
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::load(dir.path().to_path_buf()).unwrap();
     store
-        .set_resource("/cal/stale.ics", "/cal/", None, EVENT_RAW)
+        .set_resource("/cal/stale.ics", "/cal/", None, all_day())
         .unwrap();
     store.calendars = vec![CalendarInfo {
         href: COLLECTION.to_string(),
@@ -204,10 +186,14 @@ async fn full_load_replaces_the_store_with_the_server_contents() {
     ops::full_load(&mut store, &client).await.unwrap();
 
     assert_eq!(store.resources.len(), 1, "stale resources are dropped");
-    assert!(store.event("one").is_none());
+    assert!(
+        store
+            .event("dsh-20261017-first-day-of-durga@dsh-import")
+            .is_none()
+    );
     assert_eq!(
         store.event("fresh").map(|event| event.title.as_str()),
-        Some("Standup")
+        Some("First Day of Durga")
     );
 }
 
@@ -216,7 +202,7 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(SERIES_RAW);
+    let mut store = store_with_series(series());
 
     ops::delete_event(
         &mut store,
@@ -246,7 +232,7 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(&series_with_moved_occurrence());
+    let mut store = store_with_series(&with_exception(series()));
 
     ops::delete_event(
         &mut store,
@@ -278,7 +264,7 @@ async fn deleting_all_removes_the_whole_resource_when_an_exception_was_selected(
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(&series_with_moved_occurrence());
+    let mut store = store_with_series(&with_exception(series()));
 
     ops::delete_event(
         &mut store,
@@ -298,7 +284,7 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(SERIES_RAW);
+    let mut store = store_with_series(series());
 
     ops::reschedule_event(
         &mut store,
@@ -341,7 +327,7 @@ async fn rescheduling_the_series_moves_the_master() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(SERIES_RAW);
+    let mut store = store_with_series(series());
 
     ops::reschedule_event(
         &mut store,
@@ -376,7 +362,7 @@ async fn moving_a_series_from_one_occurrence_is_refused() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(SERIES_RAW);
+    let mut store = store_with_series(series());
 
     let error = ops::reschedule_event(
         &mut store,
@@ -401,11 +387,17 @@ async fn deleting_this_on_a_non_recurring_event_deletes_it() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(EVENT_RAW);
+    let mut store = store_with_series(all_day());
 
-    ops::delete_event(&mut store, &client, "one", EventScope::This, None)
-        .await
-        .unwrap();
+    ops::delete_event(
+        &mut store,
+        &client,
+        "dsh-20261017-first-day-of-durga@dsh-import",
+        EventScope::This,
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(
         store.resources.is_empty(),

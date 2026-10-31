@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../../test/tauriMock';
-import type { AppEvent } from '../../lib/domain';
+import { makeEvent } from '../../test/factories';
 import InspectorPane from './InspectorPane.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
@@ -15,14 +15,14 @@ function invokedArgs(command: string): InvokeArgs | undefined {
     return tauri.invoke.mock.calls.find(([name]) => name === command)?.[1];
 }
 
-const master: AppEvent = {
+const master = makeEvent({
     id: 'master',
     title: 'Standup',
     startTime: '2026-10-19T11:00:00',
     endTime: '2026-10-19T11:30:00',
     rrule: 'RRULE:FREQ=WEEKLY',
     timezone: 'Asia/Kolkata',
-};
+});
 
 async function openDeleteModal(onClose = vi.fn()) {
     render(InspectorPane, {

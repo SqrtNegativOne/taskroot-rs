@@ -38,6 +38,7 @@ function saveSetting(key: string, value: unknown): void {
 interface PersistStateOptions {
     debounceMs?: number;
     isValid?: (value: unknown) => boolean;
+    onHydrated?: () => void;
 }
 
 /**
@@ -52,7 +53,7 @@ interface PersistStateOptions {
  * @param key Backend `ui_state` key
  * @param read Reads the current reactive value
  * @param write Applies a hydrated value back into component state
- * @param options Debounce window and an optional validator for stored data
+ * @param options Debounce window, an optional validator and a hydration hook
  */
 export function persistState<T>(
     key: string,
@@ -76,14 +77,14 @@ export function persistState<T>(
         },
         (stored) => {
             const present = stored !== null && stored !== undefined;
-            if (!present || !(options.isValid?.(stored) ?? true)) {
+            if (present && (options.isValid?.(stored) ?? true)) {
+                write(stored as T);
+                saved = serialize(stored);
+            } else {
                 saved = fallback;
-                hydrated = true;
-                return;
             }
-            write(stored as T);
-            saved = serialize(stored);
             hydrated = true;
+            options.onHydrated?.();
         },
     );
 

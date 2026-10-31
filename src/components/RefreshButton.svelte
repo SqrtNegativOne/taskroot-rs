@@ -1,7 +1,7 @@
 <script lang="ts">
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { describeAppError } from '$lib/errors';
-    import { notify } from '$lib/notifications.svelte';
+    import { notifyError } from '$lib/toast';
 
     let isRefreshing = $state(false);
 
@@ -11,7 +11,7 @@
         const result = await safeInvoke('refresh_data');
         isRefreshing = false;
         if (result.isErr()) {
-            notify(`Refresh failed: ${describeAppError(result.error)}`, 'error');
+            notifyError(`Refresh failed: ${describeAppError(result.error)}`);
         }
     }
 </script>

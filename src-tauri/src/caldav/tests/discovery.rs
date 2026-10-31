@@ -2,7 +2,7 @@
 //! `#[ignore]`d check against the real Radicale.
 
 use wiremock::matchers::{body_string_contains, header, method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate};
 
 use crate::caldav::account::{read_account, write_account, Account};
 use crate::caldav::discovery::{
@@ -10,8 +10,9 @@ use crate::caldav::discovery::{
 };
 use crate::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::caldav::transport::HttpClient;
+use crate::test_support::caldav::{start_http_server, start_server};
 
-use super::{test_client, HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
+use super::{HOME_PROPFIND, PRINCIPAL_PROPFIND, ROOT_PROPFIND};
 
 #[test]
 fn an_empty_server_url_is_the_loopback_default() {
@@ -97,7 +98,7 @@ fn unsupported_schemes_and_embedded_credentials_are_rejected() {
 
 #[tokio::test]
 async fn discovery_follows_the_well_known_redirect_and_persists_nothing() {
-    let server = MockServer::start().await;
+    let (server, http) = start_http_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/.well-known/caldav"))
         .respond_with(ResponseTemplate::new(301).insert_header("Location", "/"))
@@ -124,7 +125,6 @@ async fn discovery_follows_the_well_known_redirect_and_persists_nothing() {
         .mount(&server)
         .await;
 
-    let http = HttpClient::new().unwrap();
     let discovery = discover(&http, &server.uri(), "me", "secret")
         .await
         .unwrap();
@@ -144,7 +144,7 @@ async fn discovery_follows_the_well_known_redirect_and_persists_nothing() {
 
 #[tokio::test]
 async fn discovery_falls_back_to_the_root_when_well_known_fails() {
-    let server = MockServer::start().await;
+    let (server, http) = start_http_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/.well-known/caldav"))
         .respond_with(ResponseTemplate::new(404))
@@ -168,7 +168,6 @@ async fn discovery_falls_back_to_the_root_when_well_known_fails() {
         .mount(&server)
         .await;
 
-    let http = HttpClient::new().unwrap();
     let discovery = discover(&http, &server.uri(), "me", "secret")
         .await
         .unwrap();
@@ -179,14 +178,13 @@ async fn discovery_falls_back_to_the_root_when_well_known_fails() {
 
 #[tokio::test]
 async fn a_redirect_loop_is_reported() {
-    let server = MockServer::start().await;
+    let (server, http) = start_http_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/.well-known/caldav"))
         .respond_with(ResponseTemplate::new(301).insert_header("Location", "/.well-known/caldav"))
         .mount(&server)
         .await;
 
-    let http = HttpClient::new().unwrap();
     let error = discover(&http, &server.uri(), "me", "secret")
         .await
         .unwrap_err();
@@ -197,13 +195,12 @@ async fn a_redirect_loop_is_reported() {
 
 #[tokio::test]
 async fn bad_credentials_surface_as_auth() {
-    let server = MockServer::start().await;
+    let (server, http) = start_http_server().await;
     Mock::given(method("PROPFIND"))
         .respond_with(ResponseTemplate::new(401))
         .mount(&server)
         .await;
 
-    let http = HttpClient::new().unwrap();
     let error = discover(&http, &server.uri(), "me", "wrong")
         .await
         .unwrap_err();
@@ -244,7 +241,7 @@ async fn discovery_works_against_the_real_radicale() {
 
 #[tokio::test]
 async fn a_refresh_persists_the_list_the_server_actually_has() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/me/"))
         .and(header("depth", "1"))
@@ -263,7 +260,7 @@ async fn a_refresh_persists_the_list_the_server_actually_has() {
     };
     write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(dir, &test_client(&server), &mut account).await;
+    let calendars = refresh_collections(dir, &client, &mut account).await;
 
     assert_eq!(calendars.len(), 2);
     assert_eq!(
@@ -275,7 +272,7 @@ async fn a_refresh_persists_the_list_the_server_actually_has() {
 
 #[tokio::test]
 async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .respond_with(ResponseTemplate::new(503))
         .mount(&server)
@@ -298,7 +295,7 @@ async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
     };
     write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(dir, &test_client(&server), &mut account).await;
+    let calendars = refresh_collections(dir, &client, &mut account).await;
 
     assert_eq!(calendars, cached, "an offline start must still have lists");
     assert_eq!(read_account(dir).unwrap().unwrap().calendars, cached);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EventInstance } from '../bindings/EventInstance.generated';
+import type { EventInstance } from '../domain';
+import { makeInstance } from '../../test/factories';
 import { instanceOccursOnDay } from './timing';
 
 // Pin the host zone so the DST edge cases below exercise real transitions on
@@ -8,27 +9,19 @@ import { instanceOccursOnDay } from './timing';
 process.env.TZ = 'America/Chicago';
 
 function allDay(startDate: string, endDateExclusive: string): EventInstance {
-    return {
+    return makeInstance({
         id: 'e1',
-        occurrenceKey: `e1@${startDate}`,
-        occurrenceStart: startDate,
         title: 'Trip',
         timing: { kind: 'allDay', startDate, endDateExclusive },
-        recurring: false,
-        status: 'confirmed',
-    };
+    });
 }
 
 function timed(startIso: string, endIso: string): EventInstance {
-    return {
+    return makeInstance({
         id: 'e2',
-        occurrenceKey: `e2@${startIso}`,
-        occurrenceStart: startIso,
         title: 'Call',
         timing: { kind: 'timed', start: startIso, end: endIso, timezone: null },
-        recurring: false,
-        status: 'confirmed',
-    };
+    });
 }
 
 describe('instanceOccursOnDay', () => {

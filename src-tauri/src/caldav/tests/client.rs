@@ -2,17 +2,18 @@
 //! `MKCALENDAR`, backed by `wiremock`.
 
 use wiremock::matchers::{body_string_contains, method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate};
 
 use crate::caldav::model::CalendarComponent;
+use crate::test_support::caldav::start_server;
 
-use super::{test_client, MULTIGET};
+use super::MULTIGET;
 
 const SQRT_CAL: &str = "/me/2f07f5a4-5fc2-bc5c-b6de-31053f2b5d33/";
 
 #[tokio::test]
 async fn fetch_resources_runs_one_calendar_query() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("REPORT"))
         .and(path(SQRT_CAL))
         .and(body_string_contains("<c:calendar-query"))
@@ -20,10 +21,7 @@ async fn fetch_resources_runs_one_calendar_query() {
         .mount(&server)
         .await;
 
-    let resources = test_client(&server)
-        .fetch_resources(SQRT_CAL)
-        .await
-        .unwrap();
+    let resources = client.fetch_resources(SQRT_CAL).await.unwrap();
 
     assert_eq!(resources.len(), 1);
     assert!(resources[0]
@@ -34,7 +32,7 @@ async fn fetch_resources_runs_one_calendar_query() {
 
 #[tokio::test]
 async fn fetch_hrefs_asks_for_only_the_given_resources() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("REPORT"))
         .and(path(SQRT_CAL))
         .and(body_string_contains(
@@ -44,7 +42,7 @@ async fn fetch_hrefs_asks_for_only_the_given_resources() {
         .mount(&server)
         .await;
 
-    let resources = test_client(&server)
+    let resources = client
         .fetch_hrefs(SQRT_CAL, &[format!("{SQRT_CAL}dsh-routine-walk.ics")])
         .await
         .unwrap();
@@ -54,7 +52,7 @@ async fn fetch_hrefs_asks_for_only_the_given_resources() {
 
 #[tokio::test]
 async fn mkcalendar_creates_a_typed_collection() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("MKCALENDAR"))
         .and(path("/me/imported/"))
         .and(body_string_contains(
@@ -65,7 +63,7 @@ async fn mkcalendar_creates_a_typed_collection() {
         .mount(&server)
         .await;
 
-    test_client(&server)
+    client
         .mkcalendar(
             "/me/imported/",
             "Google Tasks (imported)",
@@ -77,7 +75,7 @@ async fn mkcalendar_creates_a_typed_collection() {
 
 #[tokio::test]
 async fn renaming_a_collection_proppatches_its_display_name() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPPATCH"))
         .and(path("/me/imported/"))
         .and(body_string_contains(
@@ -87,7 +85,7 @@ async fn renaming_a_collection_proppatches_its_display_name() {
         .mount(&server)
         .await;
 
-    test_client(&server)
+    client
         .set_display_name("/me/imported/", "Errands")
         .await
         .unwrap();
@@ -95,7 +93,7 @@ async fn renaming_a_collection_proppatches_its_display_name() {
 
 #[tokio::test]
 async fn clearing_a_collection_colour_removes_the_property() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPPATCH"))
         .and(path("/me/imported/"))
         .and(body_string_contains("<d:remove>"))
@@ -103,7 +101,7 @@ async fn clearing_a_collection_colour_removes_the_property() {
         .mount(&server)
         .await;
 
-    test_client(&server)
+    client
         .set_calendar_color("/me/imported/", None)
         .await
         .unwrap();
@@ -111,14 +109,14 @@ async fn clearing_a_collection_colour_removes_the_property() {
 
 #[tokio::test]
 async fn deleting_a_collection_sends_delete_and_accepts_404() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("DELETE"))
         .and(path("/me/imported/"))
         .respond_with(ResponseTemplate::new(404))
         .mount(&server)
         .await;
 
-    test_client(&server)
+    client
         .delete_collection("/me/imported/")
         .await
         .unwrap();

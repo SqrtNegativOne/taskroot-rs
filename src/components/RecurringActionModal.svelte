@@ -1,15 +1,12 @@
-<script module lang="ts">
-    export type RecurringMode = "this" | "following" | "all";
-</script>
-
 <script lang="ts">
+    import { Dialog } from 'bits-ui';
     import type { EventScope } from '../lib/domain';
 
     interface Props {
         isOpen: boolean;
         actionType: "edit" | "delete" | "move";
         /** Which choices to offer; a move cannot re-anchor a series from one occurrence. */
-        modes?: RecurringMode[];
+        modes?: EventScope[];
         onConfirm: (mode: EventScope) => void;
         onCancel: () => void;
     }
@@ -36,12 +33,23 @@
     function handleConfirm() {
         onConfirm(selectedMode);
     }
+
+    function handleOpenChange(open: boolean) {
+        if (!open) onCancel();
+    }
 </script>
 
-{#if isOpen}
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 99999;">
-        <div style="background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg);">
-            <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">{actionText} recurring event</h3>
+<Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog.Portal>
+        <Dialog.Overlay
+            style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 99999;"
+        />
+        <Dialog.Content
+            style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg); z-index: 100000;"
+        >
+            <Dialog.Title level={3} style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">
+                {actionText} recurring event
+            </Dialog.Title>
 
             <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
                 {#if modes.includes("this")}
@@ -78,6 +86,6 @@
                     OK
                 </button>
             </div>
-        </div>
-    </div>
-{/if}
+        </Dialog.Content>
+    </Dialog.Portal>
+</Dialog.Root>

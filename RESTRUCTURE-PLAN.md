@@ -223,7 +223,13 @@ This is deferred. Until then, the in-crate boundary is a convention backed by pr
 4. Rename `commands/` to `ipc/` once every handler lives there (the cleanup already moved `caldav/commands.rs`, the settings commands and the plan commands).
 5. Move calendar modules under `features/calendar/`. `domain/` becomes `features/calendar/domain/`, and `domain/projection` (from the cleanup) becomes `features/calendar/occurrences` so the CLI reaches it through the calendar façade instead of a domain module. Add `session`, make its submodules private, and re-export only the façade from `features/calendar/mod.rs`.
 6. Move `stopwatch` and `reminders` under `features/`, splitting pure state from Tauri adapters. `bootstrap` starts their runtimes.
-7. Split `bin/taskroot.rs` into `cli/`; make `cli` use `features::calendar::session` only.
+7. Split `bin/taskroot.rs` (~750 lines) into `cli/`; make `cli` use `features::calendar::session` only.
+   - `args.rs`: `Cli`, `Verb`, option parsing
+   - `session.rs`: data dir, account, `full_load`
+   - `commands/{tasks,events,calendars}.rs`: verb bodies
+   - `help.rs`: `VERBS`/`OPTIONS`, help text, `docs/cli.md`
+   - `output.rs`: JSON and `AppError` output
+   - `bin/taskroot.rs` becomes a thin `main` calling the library's `cli::run()`.
 8. Add per-feature `README.md` files and the folder-dependency test.
 9. Build `features/focus/` when the feature exists.
 

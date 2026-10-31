@@ -10,7 +10,7 @@
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
     import TitleBar from '../components/TitleBar.svelte';
-    import Notifications from '../components/Notifications.svelte';
+    import { Toaster } from 'svelte-sonner';
 
     import { listen, emit } from '@tauri-apps/api/event';
     import type { RouteId } from '$app/types';
@@ -145,7 +145,7 @@
 {/if}
 
 {#if !isEffect}
-    <Notifications />
+    <Toaster richColors position="bottom-right" />
 {/if}
 
 <style>

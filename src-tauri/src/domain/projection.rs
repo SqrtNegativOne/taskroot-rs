@@ -65,7 +65,7 @@ pub fn single_instance(event: &AppEvent) -> Option<EventInstance> {
         return None;
     }
     let timing = EventTiming::from_event(event)?;
-    let recurring = event.rrule.is_some() || event.recurring_event_id.is_some();
+    let recurring = event.is_recurring();
     let key = occurrence_key(&event.id, &timing);
     let start = canonical_start(&timing);
     Some(build_instance(event, timing, key, start, recurring))

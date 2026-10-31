@@ -1,8 +1,7 @@
-mod expand;
-
-pub use expand::{expand_event_instances, single_instance};
+//! Plan-screen queries: tasks, raw events and render-ready event instances.
 
 use crate::commands::session::store_state;
+use crate::domain::projection::{expand_event_instances, single_instance};
 use crate::domain::{AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort};
 use crate::error::AppError;
 use crate::store::query;
@@ -73,16 +72,4 @@ pub async fn query_event_instances(
 pub async fn get_event(app: tauri::AppHandle, id: String) -> Result<Option<AppEvent>, AppError> {
     let state = store_state(&app)?;
     Ok(state.read(|store| store.event(&id).cloned()).await)
-}
-
-#[tauri::command]
-#[must_use]
-pub fn get_task_schema() -> Vec<crate::domain::AppTaskColumnDef> {
-    crate::domain::AppTask::get_schema()
-}
-
-#[tauri::command]
-#[must_use]
-pub fn get_event_schema() -> Vec<crate::domain::AppEventColumnDef> {
-    crate::domain::AppEvent::get_schema()
 }

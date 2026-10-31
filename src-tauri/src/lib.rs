@@ -9,6 +9,7 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub mod caldav;
+pub mod cli;
 pub mod commands;
 pub mod domain;
 pub mod error;
@@ -16,7 +17,6 @@ pub mod ipc_events;
 pub mod ics;
 pub mod load;
 pub mod reminders;
-pub mod screens;
 pub mod settings;
 pub mod stopwatch;
 pub mod store;
@@ -209,12 +209,12 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             commands::events::reschedule_event,
             commands::events::get_active_calendars,
             commands::refresh::refresh_data,
-            screens::plan::query_tasks,
-            screens::plan::query_events,
-            screens::plan::query_event_instances,
-            screens::plan::get_event,
-            screens::plan::get_task_schema,
-            screens::plan::get_event_schema,
+            commands::plan::query_tasks,
+            commands::plan::query_events,
+            commands::plan::query_event_instances,
+            commands::plan::get_event,
+            commands::schema::get_task_schema,
+            commands::schema::get_event_schema,
             commands::window::window_restore_main,
             commands::window::show_minitracker,
             commands::window::hide_launcher,
@@ -229,20 +229,20 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             commands::stopwatch::toggle_pause,
             commands::stopwatch::adjust_pause,
             commands::stopwatch::reset_stopwatch,
-            settings::get_settings_schema,
-            settings::get_settings,
-            settings::get_ui_state,
-            settings::set_ui_state,
-            settings::update_setting,
-            caldav::commands::is_account_configured,
-            caldav::commands::get_account,
-            caldav::commands::test_account,
-            caldav::commands::connect_account,
-            caldav::commands::disconnect_account,
-            caldav::commands::create_calendar,
-            caldav::commands::rename_calendar,
-            caldav::commands::set_calendar_color,
-            caldav::commands::delete_calendar
+            commands::settings::get_settings_schema,
+            commands::settings::get_settings,
+            commands::settings::get_ui_state,
+            commands::settings::set_ui_state,
+            commands::settings::update_setting,
+            commands::calendars::is_account_configured,
+            commands::calendars::get_account,
+            commands::calendars::test_account,
+            commands::calendars::connect_account,
+            commands::calendars::disconnect_account,
+            commands::calendars::create_calendar,
+            commands::calendars::rename_calendar,
+            commands::calendars::set_calendar_color,
+            commands::calendars::delete_calendar
         ])
 }
 

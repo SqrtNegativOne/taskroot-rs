@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/svelte';
-import { createDebouncedWriter, createStaleGuard } from './asyncState.svelte';
+import { createDebouncedWriter, createDebouncer, createStaleGuard } from './asyncState.svelte';
 import HydrateHarness from './hydrateOnceHarness.svelte';
 
 describe('hydrateOnce', () => {
@@ -50,6 +50,24 @@ describe('createStaleGuard', () => {
         guard.invalidate();
 
         expect(current()).toBe(false);
+    });
+});
+
+describe('createDebouncer', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('drops a pending value when cancelled', () => {
+        vi.useFakeTimers();
+        const run = vi.fn();
+        const debouncer = createDebouncer(run, 10);
+
+        debouncer.schedule(1);
+        debouncer.cancel();
+
+        vi.advanceTimersByTime(10);
+        expect(run).not.toHaveBeenCalled();
     });
 });
 

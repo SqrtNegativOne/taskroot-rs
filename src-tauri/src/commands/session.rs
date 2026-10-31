@@ -2,8 +2,8 @@
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::caldav::account;
 use crate::caldav::client::CalDavClient;
+use crate::caldav::connect;
 use crate::caldav::model::CalendarInfo;
 use crate::caldav::transport::HttpClient;
 use crate::domain::{AppCalendar, CollectionId};
@@ -18,18 +18,13 @@ use crate::store::StoreState;
 /// [`AppError::Internal`] when the HTTP client or store was never initialized.
 pub(crate) async fn client_for(app: &AppHandle) -> Result<CalDavClient, AppError> {
     let dir = crate::app_data_dir(app)?;
-    let account = account::read_account(&dir)?
-        .ok_or_else(|| AppError::Auth("No CalDAV account is configured".to_string()))?;
-    let password = match account::load_password(&account.username) {
-        Ok(Some(password)) => password,
-        _ => std::env::var("TASKROOT_CalDAV_PASSWORD").map_err(|_| {
-            AppError::Auth("The CalDAV password is missing from the OS keychain".to_string())
-        })?,
-    };
     let http = app
         .try_state::<HttpClient>()
-        .ok_or_else(|| AppError::NotReady("The HTTP client is not initialized".to_string()))?;
-    CalDavClient::from_account(&http, &account, &password)
+        .ok_or_else(|| AppError::NotReady("The HTTP client is not initialized".to_string()))?
+        .inner()
+        .clone();
+    let (_account, client) = connect::connect(&dir, &http, None)?;
+    Ok(client)
 }
 
 /// # Errors

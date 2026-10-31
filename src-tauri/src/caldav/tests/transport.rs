@@ -1,15 +1,16 @@
 //! HTTP contract tests for the `CalDAV` transport, backed by `wiremock`.
 
 use wiremock::matchers::{body_string_contains, header, method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate};
 
 use crate::caldav::transport::CalDavRequest;
+use crate::test_support::caldav::start_server;
 
-use super::{test_client, MULTIGET, UNAUTHORIZED};
+use super::{MULTIGET, UNAUTHORIZED};
 
 #[tokio::test]
 async fn a_multiget_response_keeps_its_etag_and_body() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("REPORT"))
         .and(path("/me/cal/"))
         .and(header("depth", "1"))
@@ -22,7 +23,6 @@ async fn a_multiget_response_keeps_its_etag_and_body() {
         .mount(&server)
         .await;
 
-    let client = test_client(&server);
     let response = client
         .send(
             &CalDavRequest::report("/me/cal/")
@@ -40,7 +40,7 @@ async fn a_multiget_response_keeps_its_etag_and_body() {
 
 #[tokio::test]
 async fn requests_use_basic_auth() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/me/"))
         .and(header("authorization", "Basic bWU6c2VjcmV0"))
@@ -48,7 +48,6 @@ async fn requests_use_basic_auth() {
         .mount(&server)
         .await;
 
-    let client = test_client(&server);
     let response = client
         .send(
             &CalDavRequest::propfind("/me/")
@@ -63,13 +62,13 @@ async fn requests_use_basic_auth() {
 
 #[tokio::test]
 async fn unauthorized_maps_to_auth() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .respond_with(ResponseTemplate::new(401).set_body_string(UNAUTHORIZED))
         .mount(&server)
         .await;
 
-    let error = test_client(&server)
+    let error = client
         .send(&CalDavRequest::propfind("/").with_depth("0"))
         .await
         .unwrap_err();
@@ -79,13 +78,13 @@ async fn unauthorized_maps_to_auth() {
 
 #[tokio::test]
 async fn precondition_failed_maps_to_conflict() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PUT"))
         .respond_with(ResponseTemplate::new(412))
         .mount(&server)
         .await;
 
-    let error = test_client(&server)
+    let error = client
         .send(&CalDavRequest::put("/me/cal/a.ics", "BEGIN:VCALENDAR"))
         .await
         .unwrap_err();
@@ -95,13 +94,13 @@ async fn precondition_failed_maps_to_conflict() {
 
 #[tokio::test]
 async fn gone_maps_to_gone() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("REPORT"))
         .respond_with(ResponseTemplate::new(410))
         .mount(&server)
         .await;
 
-    let error = test_client(&server)
+    let error = client
         .send(&CalDavRequest::report("/me/cal/"))
         .await
         .unwrap_err();
@@ -111,7 +110,7 @@ async fn gone_maps_to_gone() {
 
 #[tokio::test]
 async fn a_forbidden_response_is_a_sync_error_with_status_and_snippet() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("REPORT"))
         .respond_with(
             ResponseTemplate::new(403)
@@ -120,7 +119,7 @@ async fn a_forbidden_response_is_a_sync_error_with_status_and_snippet() {
         .mount(&server)
         .await;
 
-    let error = test_client(&server)
+    let error = client
         .send(&CalDavRequest::report("/me/cal/"))
         .await
         .unwrap_err();
@@ -136,14 +135,14 @@ async fn a_forbidden_response_is_a_sync_error_with_status_and_snippet() {
 
 #[tokio::test]
 async fn a_redirect_is_available_to_discovery_through_send_raw() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/.well-known/caldav"))
         .respond_with(ResponseTemplate::new(301).insert_header("Location", "/"))
         .mount(&server)
         .await;
 
-    let response = test_client(&server)
+    let response = client
         .send_raw(&CalDavRequest::propfind("/.well-known/caldav").with_depth("0"))
         .await
         .unwrap();
@@ -154,7 +153,7 @@ async fn a_redirect_is_available_to_discovery_through_send_raw() {
 
 #[tokio::test]
 async fn creating_a_resource_sends_if_none_match_and_returns_the_etag() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PUT"))
         .and(path("/me/cal/a.ics"))
         .and(header("if-none-match", "*"))
@@ -164,7 +163,7 @@ async fn creating_a_resource_sends_if_none_match_and_returns_the_etag() {
         .mount(&server)
         .await;
 
-    let etag = test_client(&server)
+    let etag = client
         .put_resource(
             "/me/cal/a.ics",
             "BEGIN:VCALENDAR\nEND:VCALENDAR",
@@ -179,7 +178,7 @@ async fn creating_a_resource_sends_if_none_match_and_returns_the_etag() {
 
 #[tokio::test]
 async fn updating_a_resource_requires_and_sends_its_etag() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("PUT"))
         .and(path("/me/cal/a.ics"))
         .and(header("if-match", r#""old-etag""#))
@@ -187,7 +186,6 @@ async fn updating_a_resource_requires_and_sends_its_etag() {
         .mount(&server)
         .await;
 
-    let client = test_client(&server);
     let missing_etag = client
         .put_resource("/me/cal/a.ics", "BEGIN:VCALENDAR", None, false)
         .await
@@ -208,13 +206,13 @@ async fn updating_a_resource_requires_and_sends_its_etag() {
 
 #[tokio::test]
 async fn deleting_a_missing_resource_counts_as_success() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("DELETE"))
         .respond_with(ResponseTemplate::new(404))
         .mount(&server)
         .await;
 
-    test_client(&server)
+    client
         .delete_resource("/me/cal/gone.ics", None)
         .await
         .unwrap();
@@ -222,14 +220,14 @@ async fn deleting_a_missing_resource_counts_as_success() {
 
 #[tokio::test]
 async fn deleting_with_a_stale_etag_maps_to_conflict() {
-    let server = MockServer::start().await;
+    let (server, client) = start_server().await;
     Mock::given(method("DELETE"))
         .and(header("if-match", r#""stale""#))
         .respond_with(ResponseTemplate::new(412))
         .mount(&server)
         .await;
 
-    let error = test_client(&server)
+    let error = client
         .delete_resource("/me/cal/a.ics", Some(r#""stale""#))
         .await
         .unwrap_err();

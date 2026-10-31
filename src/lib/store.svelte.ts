@@ -1,7 +1,7 @@
 import { safeInvoke, type AppError } from './safeInvoke.svelte';
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
-import { notify } from './notifications.svelte';
+import { notifyError } from './toast';
 import { STORE_UPDATED } from './ipcEvents';
 import type { AppTask, AppEvent, EventScope } from './domain';
 import type { AppSettings } from './bindings/AppSettings.generated';
@@ -66,7 +66,7 @@ export class AppStore {
     ): Promise<Result<T, AppError>> {
         const result = await action();
         if (result.isErr()) {
-            notify(`${operation}: ${describeAppError(result.error)}`, 'error');
+            notifyError(`${operation}: ${describeAppError(result.error)}`);
         }
         return result;
     }

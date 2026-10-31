@@ -1,14 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { toast } from 'svelte-sonner';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { store } from '../../lib/store.svelte';
-import { notificationStore } from '../../lib/notifications.svelte';
 import PlanScreen from './PlanScreen.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
     const { mockTauriInvoke } = await import('../../test/tauriMock');
     return { invoke: mockTauriInvoke().invoke };
 });
+
+vi.mock('svelte-sonner', () => ({
+    toast: {
+        error: vi.fn(),
+        success: vi.fn(),
+        info: vi.fn(),
+        custom: vi.fn(),
+    },
+    Toaster: vi.fn(),
+}));
 
 const tauri = mockTauriInvoke();
 
@@ -21,9 +31,9 @@ const task = {
 describe('PlanScreen task list', () => {
     beforeEach(() => {
         tauri.reset();
+        vi.clearAllMocks();
         store.loaded = true;
         store.error = null;
-        notificationStore.notifications = [];
         tauri.stubCommandValue('query_tasks', [task]);
         tauri.stubCommandValue('get_past_due_task_ids', []);
         tauri.stubCommandValue('get_task_schema', []);
@@ -34,7 +44,6 @@ describe('PlanScreen task list', () => {
 
     afterEach(() => {
         cleanup();
-        notificationStore.notifications = [];
         store.loaded = false;
     });
 
@@ -67,9 +76,15 @@ describe('PlanScreen task list', () => {
         await fireEvent.click(circle!);
 
         await waitFor(() => {
-            expect(notificationStore.notifications).toHaveLength(1);
+            expect(toast.custom).toHaveBeenCalledTimes(1);
         });
-        expect(notificationStore.notifications[0]?.message).toBe('Failed to update task: server down');
+        expect(toast.custom).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                componentProps: { message: 'Failed to update task: server down' },
+                duration: Infinity,
+            }),
+        );
         expect(store.error).toBeNull();
         expect(screen.getByText('Buy milk')).toBeTruthy();
         expect(screen.queryByText(/Error loading data from backend/)).toBeNull();

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+    addDays,
+    dayDiff,
     formatHhMm,
     getWeekNumber,
     isoWeeksInYear,
     isoWeekYear,
     parseLocalYmd,
+    sameDay,
     startOfMonth,
     startOfWeek,
     ymd,
@@ -31,6 +34,30 @@ describe('formatHhMm', () => {
 
     it('rounds a fractional minute before formatting', () => {
         expect(formatHhMm(149.6)).toBe('02:30');
+    });
+});
+
+describe('addDays', () => {
+    it('advances the calendar date while keeping the local time of day', () => {
+        const next = addDays(new Date(2026, 11, 31, 9, 15), 1);
+
+        expect(ymd(next)).toBe('2027-01-01');
+        expect(next.getHours()).toBe(9);
+        expect(next.getMinutes()).toBe(15);
+    });
+});
+
+describe('dayDiff', () => {
+    it('counts calendar days rather than elapsed milliseconds', () => {
+        expect(dayDiff(new Date(2026, 10, 2, 0, 30), new Date(2026, 10, 1, 23, 30))).toBe(1);
+        expect(dayDiff(new Date(2026, 10, 1, 23, 30), new Date(2026, 10, 2, 0, 30))).toBe(-1);
+    });
+});
+
+describe('sameDay', () => {
+    it('compares the local calendar date', () => {
+        expect(sameDay(new Date(2026, 9, 26, 0, 1), new Date(2026, 9, 26, 23, 59))).toBe(true);
+        expect(sameDay(new Date(2026, 9, 26, 23, 59), new Date(2026, 9, 27, 0, 1))).toBe(false);
     });
 });
 

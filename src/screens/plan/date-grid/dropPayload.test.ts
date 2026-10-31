@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../../../lib/domain';
+import { makeInstance } from '../../../test/factories';
 import { MS_PER_MINUTE, ymd } from '../../../lib/time';
 import {
     DEFAULT_DROP_DURATION_MINUTES,
@@ -11,32 +12,19 @@ import { MINUTES_PER_DAY } from '../snapping';
 import { PX_PER_MIN, SNAP_MIN } from '../day-timeline/constants';
 
 function timed(id: string, start: Date, end: Date): EventInstance {
-    return {
+    return makeInstance({
         id,
-        occurrenceKey: `${id}@${start.toISOString()}`,
-        occurrenceStart: start.toISOString().slice(0, 19),
-        title: 'Event',
         timing: {
             kind: 'timed',
             start: start.toISOString(),
             end: end.toISOString(),
             timezone: null,
         },
-        recurring: false,
-        status: 'confirmed',
-    };
+    });
 }
 
 function allDay(id: string, startDate: string, endDateExclusive: string): EventInstance {
-    return {
-        id,
-        occurrenceKey: `${id}@${startDate}`,
-        occurrenceStart: startDate,
-        title: 'Event',
-        timing: { kind: 'allDay', startDate, endDateExclusive },
-        recurring: false,
-        status: 'confirmed',
-    };
+    return makeInstance({ id, timing: { kind: 'allDay', startDate, endDateExclusive } });
 }
 
 describe('snappedDropMinute', () => {
