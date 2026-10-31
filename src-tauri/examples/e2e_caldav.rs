@@ -11,13 +11,13 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use tauri_app_lib::caldav::client::CalDavClient;
-use tauri_app_lib::caldav::discovery;
-use tauri_app_lib::caldav::transport::HttpClient;
-use tauri_app_lib::domain::{
+use tauri_app_lib::features::calendar::CalDavClient;
+use tauri_app_lib::features::calendar::discovery;
+use tauri_app_lib::features::calendar::HttpClient;
+use tauri_app_lib::features::calendar::{
     AppEvent, AppTask, AppTaskStatus, Color, EventId, EventScope, EventStatus, TaskId, TaskPriority,
 };
-use tauri_app_lib::store::{model::Store, ops};
+use tauri_app_lib::features::calendar::{ops, Store};
 
 struct Args {
     server: String,
@@ -205,7 +205,7 @@ async fn preserve_apple_sort_order(
 async fn restart_and_compare(
     client: &CalDavClient,
     dir: &Path,
-    calendars: &[tauri_app_lib::caldav::model::CalendarInfo],
+    calendars: &[tauri_app_lib::features::calendar::CalendarInfo],
 ) -> Result<(), Box<dyn Error>> {
     let mut restarted = Store::load(dir.to_path_buf())?;
     restarted.calendars = calendars.to_vec();

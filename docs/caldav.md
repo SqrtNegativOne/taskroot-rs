@@ -165,9 +165,9 @@ task tree (`parent_task` ↔ `RELATED-TO;RELTYPE=PARENT`).
 
 ## Testing
 
-- `src-tauri/src/caldav/fixtures/` holds real Radicale XML responses (PROPFIND, multiget,
+- `src-tauri/src/features/calendar/caldav/fixtures/` holds real Radicale XML responses (PROPFIND, multiget,
   error bodies). Parsers are tested against those, not hand-written XML.
-- `src-tauri/src/ics/fixtures/` holds real resources: a Mozilla event with a historical
+- `src-tauri/src/features/calendar/ics/fixtures/` holds real resources: a Mozilla event with a historical
   `VTIMEZONE`/`EXDATE`/`RRULE`/`X-MOZ-GENERATION`, an all-day event, a tasks.org VTODO with
   `X-APPLE-SORT-ORDER`, and a tasks.org VTODO carrying `VTIMEZONE`, `DTSTART`, `GEO`,
   `RRULE`, `CATEGORIES` and a `VALARM`.

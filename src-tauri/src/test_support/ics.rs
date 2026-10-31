@@ -1,19 +1,19 @@
 //! ICS resources shared by the `CalDAV` and store tests.
 //!
-//! The bodies come from `src/ics/fixtures/`, so a test resource is a real
+//! The bodies come from `src/features/calendar/ics/fixtures/`, so a test resource is a real
 //! Radicale-style file instead of an inline string. [`with_exception`] appends
 //! the moved occurrence the store's recurrence tests need.
 
 /// The weekly 11:00 Asia/Kolkata series (`series.ics`).
 #[must_use]
 pub(crate) const fn series() -> &'static str {
-    include_str!("../ics/fixtures/series.ics")
+    include_str!("../features/calendar/ics/fixtures/series.ics")
 }
 
 /// The all-day holiday resource (`all-day-event.ics`).
 #[must_use]
 pub(crate) const fn all_day() -> &'static str {
-    include_str!("../ics/fixtures/all-day-event.ics")
+    include_str!("../features/calendar/ics/fixtures/all-day-event.ics")
 }
 
 /// The 2026-11-02 occurrence of [`series`], moved from 11:00 to 14:00.

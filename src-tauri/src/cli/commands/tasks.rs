@@ -2,12 +2,12 @@
 
 use chrono::{SecondsFormat, Utc};
 
-use crate::caldav::model::CalendarComponent;
-use crate::domain::{
+use crate::features::calendar::CalendarComponent;
+use crate::features::calendar::{
     AppTask, AppTaskStatus, CollectionId, TaskId, TaskPriority,
 };
 use crate::error::AppError;
-use crate::store::{ops, query};
+use crate::features::calendar::{ops, query};
 
 use super::super::args::Cli;
 use super::super::output::print_json;

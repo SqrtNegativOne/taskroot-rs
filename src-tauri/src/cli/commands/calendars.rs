@@ -1,6 +1,6 @@
 //! `lists` and `list-rm`.
 
-use crate::caldav::calendars;
+use crate::features::calendar::calendars;
 use crate::error::AppError;
 
 use super::super::args::Cli;

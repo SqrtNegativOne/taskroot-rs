@@ -1,9 +1,9 @@
 //! Event verbs: list, add, remove.
 
-use crate::caldav::model::CalendarComponent;
-use crate::domain::{AppEvent, CollectionId, EventId, EventScope, EventStatus};
+use crate::features::calendar::CalendarComponent;
+use crate::features::calendar::{AppEvent, CollectionId, EventId, EventScope, EventStatus};
 use crate::error::AppError;
-use crate::store::{ops, query};
+use crate::features::calendar::{ops, query};
 
 use super::super::args::Cli;
 use super::super::output::{plus_days, print_json, today};
@@ -21,7 +21,7 @@ pub async fn list_events(cli: &Cli) -> Result<(), AppError> {
     let end = cli
         .option("end")
         .map_or_else(|| plus_days(14), ToString::to_string);
-    print_json(&crate::domain::projection::expand_event_instances(
+    print_json(&crate::features::calendar::expand_event_instances(
         &events, &start, &end,
     ))
 }

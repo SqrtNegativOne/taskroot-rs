@@ -2,7 +2,7 @@
 
 use crate::error::AppError;
 use crate::settings::AppSettings;
-use crate::store::{persist, StoreState};
+use crate::features::calendar::{persist, StoreState};
 #[cfg(test)]
 use serde_json::Map;
 use serde_json::Value;

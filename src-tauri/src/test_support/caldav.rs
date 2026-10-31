@@ -3,7 +3,7 @@
 
 use wiremock::MockServer;
 
-use crate::caldav::transport::{CalDavClient, HttpClient};
+use crate::features::calendar::{CalDavClient, HttpClient};
 
 /// The credentials every mocked `CalDAV` request authenticates with.
 pub(crate) const TEST_USERNAME: &str = "me";

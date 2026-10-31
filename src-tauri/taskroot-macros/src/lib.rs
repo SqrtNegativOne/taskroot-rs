@@ -37,7 +37,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
 
         let mut is_sortable = false;
         let mut is_filterable = false;
-        let mut filter_type = quote! { crate::domain::FilterType::Text };
+        let mut filter_type = quote! { crate::features::calendar::domain::FilterType::Text };
         let mut label = field_name_str.clone();
         if let Some(r) = label.get_mut(0..1) {
             r.make_ascii_uppercase();
@@ -59,13 +59,13 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
                         let s: syn::LitStr = value.parse()?;
                         let ft = s.value();
                         if ft == "number" {
-                            filter_type = quote! { crate::domain::FilterType::Number };
+                            filter_type = quote! { crate::features::calendar::domain::FilterType::Number };
                         } else if ft.starts_with("enum:") {
                             let enum_name = syn::Ident::new(&ft[5..], proc_macro2::Span::call_site());
-                            filter_type = quote! { crate::domain::FilterType::Enum(#enum_name::all_values()) };
+                            filter_type = quote! { crate::features::calendar::domain::FilterType::Enum(#enum_name::all_values()) };
                         } else if ft.starts_with("relation:") {
                             let rel = &ft[9..];
-                            filter_type = quote! { crate::domain::FilterType::Relation(#rel.to_string()) };
+                            filter_type = quote! { crate::features::calendar::domain::FilterType::Relation(#rel.to_string()) };
                         }
                     }
                     Ok(())
@@ -107,7 +107,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         pub struct #col_def_name {
             pub id: #enum_name,
             pub label: String,
-            pub filter_type: crate::domain::FilterType,
+            pub filter_type: crate::features::calendar::domain::FilterType,
             pub sortable: bool,
         }
 
@@ -115,7 +115,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         #[ts(export, export_to = #filter_file)]
         pub struct #filter_name {
             pub column: Option<#enum_name>,
-            pub operator: Option<crate::domain::FilterOperator>,
+            pub operator: Option<crate::features::calendar::domain::FilterOperator>,
             #[ts(type = "unknown")]
             pub value: Option<serde_json::Value>,
         }
@@ -124,7 +124,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         #[ts(export, export_to = #sort_file)]
         pub struct #sort_name {
             pub column: Option<#enum_name>,
-            pub direction: Option<crate::domain::SortDirection>,
+            pub direction: Option<crate::features::calendar::domain::SortDirection>,
         }
 
         impl #name {

@@ -4,10 +4,10 @@ pub mod calendars;
 pub mod events;
 pub mod tasks;
 
-use crate::caldav::model::CalendarComponent;
-use crate::domain::AppTask;
+use crate::features::calendar::CalendarComponent;
+use crate::features::calendar::AppTask;
 use crate::error::AppError;
-use crate::store::Store;
+use crate::features::calendar::Store;
 
 pub(crate) fn find_task(store: &Store, needle: &str) -> Result<AppTask, AppError> {
     let mut matches: Vec<AppTask> = store
@@ -61,9 +61,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::caldav::model::CalendarInfo;
+    use crate::features::calendar::CalendarInfo;
     use crate::settings::AppSettings;
-    use crate::store::{Resource, ResourceItems};
+    use crate::features::calendar::{Resource, ResourceItems};
 
     fn store_with(task_ids: &[&str], calendars: Vec<CalendarInfo>) -> Store {
         let mut store = Store {

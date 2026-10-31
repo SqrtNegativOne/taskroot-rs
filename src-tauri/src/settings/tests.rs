@@ -1,7 +1,7 @@
 //! Store-backed settings command tests.
 
 use super::{storage, AppSettings};
-use crate::store::{persist, Store, StoreState};
+use crate::features::calendar::{persist, Store, StoreState};
 use serde_json::{json, Value};
 
 #[tokio::test]

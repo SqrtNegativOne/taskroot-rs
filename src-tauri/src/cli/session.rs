@@ -2,20 +2,10 @@
 
 use std::path::PathBuf;
 
-use crate::caldav::client::CalDavClient;
-use crate::caldav::connect;
-use crate::caldav::discovery;
-use crate::caldav::transport::HttpClient;
 use crate::error::AppError;
-use crate::store::{ops, Store};
+use crate::features::calendar::{Session, open as open_calendar};
 
 const APP_IDENTIFIER: &str = "com.arkma.tauri-app";
-
-pub struct Session {
-    pub dir: PathBuf,
-    pub store: Store,
-    pub client: CalDavClient,
-}
 
 /// Load the account, the keychain password and every collection.
 ///
@@ -23,14 +13,7 @@ pub struct Session {
 ///
 /// Propagates account, discovery and load failures.
 pub async fn open() -> Result<Session, AppError> {
-    let dir = data_dir()?;
-    let mut store = Store::load(dir.clone())?;
-    let http = HttpClient::new()?;
-    let (mut account, client) = connect::connect(&dir, &http, None)?;
-    let calendars = discovery::refresh_collections(&dir, &client, &mut account).await;
-    store.calendars.clone_from(&calendars);
-    ops::full_load(&mut store, &client).await?;
-    Ok(Session { dir, store, client })
+    open_calendar(data_dir()?).await
 }
 
 /// # Errors

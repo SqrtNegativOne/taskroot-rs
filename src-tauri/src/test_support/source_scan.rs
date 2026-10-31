@@ -1,15 +1,15 @@
 //! The Rust half of the IPC source contract used by the command-layer tests.
 //!
-//! The `generate_handler!` table in `lib.rs` and the `#[tauri::command]` signatures
+//! The `generate_handler!` table in `bootstrap/mod.rs` and the `#[tauri::command]` signatures
 //! under `src`, plus the file-walking helpers the sibling
 //! [`super::frontend_scan`] shares.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The command names listed by the `generate_handler!` table in `lib.rs`.
+/// The command names listed by the `generate_handler!` table in bootstrap.
 pub(crate) fn registered_commands() -> Vec<String> {
-    between(include_str!("../lib.rs"), "generate_handler![", ']')
+    between(include_str!("../bootstrap/mod.rs"), "generate_handler![", ']')
         .split(',')
         .filter_map(|entry| entry.rsplit("::").next())
         .map(|name| name.trim().to_string())

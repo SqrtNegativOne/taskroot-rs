@@ -13,6 +13,7 @@
 //! [`source_scan`] plus [`frontend_scan`] check the handler table against the
 //! frontend call sites.
 
+pub mod architecture;
 pub mod caldav;
 pub mod frontend_scan;
 pub mod ics;
