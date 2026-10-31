@@ -81,6 +81,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::schema::get_event_schema,
             ipc::window::window_restore_main,
             ipc::window::show_minitracker,
+            ipc::window::set_minitracker_visible,
             ipc::window::hide_launcher,
             ipc::window::show_screen_effect,
             ipc::window::hide_screen_effect,
@@ -124,6 +125,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let data_dir = platform::app_data_dir(&handle)?;
     let store = calendar::Store::load(data_dir)?;
+    platform::set_minitracker_visible(&handle, store.settings.mini_tracker_enabled);
     handle.manage(calendar::StoreState::new(store));
     ipc::session::start_load(handle.clone());
     reminders::start_reminder_engine(handle);

@@ -95,6 +95,14 @@ pub struct AppSettings {
     )]
     pub pause_minutes: i32,
     #[setting(
+        label = "Enable Mini Tracker",
+        description = "Show the floating stopwatch window on launch and allow opening it from the Do screen.",
+        keywords = ["stopwatch", "mini tracker", "minitracker", "window", "enable", "launch"],
+        kind = "checkbox",
+        section = "do_stopwatch"
+    )]
+    pub mini_tracker_enabled: bool,
+    #[setting(
         label = "Open Launcher",
         keywords = ["keyboard", "shortcut", "launcher", "open"],
         kind = "keybinding",
@@ -144,6 +152,7 @@ impl Default for AppSettings {
             allow_stopwatch_without_task: false,
             flowtime_break_divisor: 5,
             pause_minutes: 10,
+            mini_tracker_enabled: false,
             keybinding_launcher: "Meta+Shift+Space".to_string(),
             keybinding_open_settings: "Ctrl+,".to_string(),
             keybinding_restore_app: "Ctrl+Alt+R".to_string(),
@@ -152,4 +161,3 @@ impl Default for AppSettings {
         }
     }
 }
-

@@ -36,12 +36,21 @@ pub fn restore_main(app: &AppHandle) {
 }
 
 pub fn show_minitracker(app: &AppHandle) {
-    if let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) {
-        let _ = mini_win.show();
-        let _ = mini_win.unminimize();
-        let _ = mini_win.set_focus();
-        let _ = mini_win.set_always_on_top(true);
+    set_minitracker_visible(app, true);
+}
+
+pub fn set_minitracker_visible(app: &AppHandle, visible: bool) {
+    let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) else {
+        return;
+    };
+    if !visible {
+        let _ = mini_win.hide();
+        return;
     }
+    let _ = mini_win.show();
+    let _ = mini_win.unminimize();
+    let _ = mini_win.set_focus();
+    let _ = mini_win.set_always_on_top(true);
 }
 
 pub fn hide_launcher(app: &AppHandle) {

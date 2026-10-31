@@ -10,10 +10,12 @@
     import SettingRow from './SettingRow.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
 
+    const ACCOUNT_TAB_ID = 'account';
+
     let schema = $state<SettingsSchema | null>(null);
     let settings = $state<AppSettings | null>(null);
     let account = $state<Account | null>(null);
-    let activeTabId = $state('');
+    let activeTabId = $state(ACCOUNT_TAB_ID);
     let saveError = $state<string | null>(null);
     let accountError = $state<string | null>(null);
     let isRemovingAccount = $state(false);
@@ -31,7 +33,6 @@
         result.match(
             (loaded) => {
                 schema = loaded;
-                activeTabId = loaded.tabs[0]?.id ?? '';
             },
             (error) => console.error('Failed to load schema:', error)
         );
@@ -75,6 +76,12 @@
             saveError = `Could not save "${id}". The change was discarded.`;
             return;
         }
+        if (id === 'mini_tracker_enabled' && typeof value === 'boolean') {
+            const visibility = await safeInvoke('set_minitracker_visible', { visible: value });
+            if (visibility.isErr()) {
+                saveError = 'Could not update the mini tracker window.';
+            }
+        }
         const { emit } = await import('@tauri-apps/api/event');
         void emit(STORE_UPDATED);
         await loadSettings();
@@ -85,6 +92,12 @@
     {#if schema}
         <div class="sidebar">
             <nav>
+                <button
+                    class:active={activeTabId === ACCOUNT_TAB_ID}
+                    onclick={() => (activeTabId = ACCOUNT_TAB_ID)}
+                >
+                    Account
+                </button>
                 {#each schema.tabs as tab (tab.id)}
                     <button
                         class:active={activeTabId === tab.id}
@@ -97,56 +110,64 @@
         </div>
 
         <div class="content">
-            {#if account}
-                <section class="account-card">
-                    <div class="account-copy">
-                        <h2>CalDAV account</h2>
-                        <p class="account-server">{account.username} · {account.serverUrl}</p>
-                        <p class="account-detail">
-                            {account.calendars.length}
-                            {account.calendars.length === 1 ? 'calendar' : 'calendars'} ·
-                            home {account.homeHref}
-                        </p>
-                    </div>
-                    <button
-                        class="remove-account"
-                        onclick={removeAccount}
-                        disabled={isRemovingAccount}
-                    >
-                        {isRemovingAccount ? 'Removing…' : 'Remove account'}
-                    </button>
-                </section>
-            {/if}
-
-            {#if accountError}
-                <div class="save-error" role="alert">{accountError}</div>
-            {/if}
-
             {#if saveError}
                 <div class="save-error" role="alert">{saveError}</div>
             {/if}
 
-            {#each schema.tabs as tab (tab.id)}
-                {#if activeTabId === tab.id}
-                    <div class="tab-content">
-                        <h1>{tab.label}</h1>
-                        {#each tab.sections as section (section.name)}
-                            <section class="settings-section">
-                                <h2>{section.name}</h2>
-                                <div class="settings-list">
-                                    {#each section.settings as item (item.id)}
-                                        <SettingRow
-                                            {item}
-                                            value={settings?.[item.id]}
-                                            onchange={(value: SettingValue) => handleSettingChange(item.id, value)}
-                                        />
-                                    {/each}
-                                </div>
-                            </section>
-                        {/each}
-                    </div>
-                {/if}
-            {/each}
+            {#if activeTabId === ACCOUNT_TAB_ID}
+                <div class="tab-content">
+                    <h1>Account</h1>
+
+                    {#if accountError}
+                        <div class="save-error" role="alert">{accountError}</div>
+                    {/if}
+
+                    {#if account}
+                        <section class="account-card">
+                            <div class="account-copy">
+                                <h2>CalDAV account</h2>
+                                <p class="account-server">{account.username} · {account.serverUrl}</p>
+                                <p class="account-detail">
+                                    {account.calendars.length}
+                                    {account.calendars.length === 1 ? 'calendar' : 'calendars'} ·
+                                    home {account.homeHref}
+                                </p>
+                            </div>
+                            <button
+                                class="remove-account"
+                                onclick={removeAccount}
+                                disabled={isRemovingAccount}
+                            >
+                                {isRemovingAccount ? 'Removing…' : 'Remove account'}
+                            </button>
+                        </section>
+                    {:else}
+                        <p class="account-empty">No account connected.</p>
+                    {/if}
+                </div>
+            {:else}
+                {#each schema.tabs as tab (tab.id)}
+                    {#if activeTabId === tab.id}
+                        <div class="tab-content">
+                            <h1>{tab.label}</h1>
+                            {#each tab.sections as section (section.name)}
+                                <section class="settings-section">
+                                    <h2>{section.name}</h2>
+                                    <div class="settings-list">
+                                        {#each section.settings as item (item.id)}
+                                            <SettingRow
+                                                {item}
+                                                value={settings?.[item.id]}
+                                                onchange={(value: SettingValue) => handleSettingChange(item.id, value)}
+                                            />
+                                        {/each}
+                                    </div>
+                                </section>
+                            {/each}
+                        </div>
+                    {/if}
+                {/each}
+            {/if}
         </div>
     {:else}
         <div class="loading">Loading settings...</div>
@@ -200,6 +221,11 @@
         margin: 4px 0 0;
         font-size: 12px;
         color: var(--fg-dim);
+    }
+
+    .account-empty {
+        color: var(--fg-dim);
+        font-size: 14px;
     }
 
     .remove-account {

@@ -13,6 +13,11 @@ pub fn show_minitracker(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+pub fn set_minitracker_visible(app: tauri::AppHandle, visible: bool) {
+    platform::set_minitracker_visible(&app, visible);
+}
+
+#[tauri::command]
 pub fn hide_launcher(app: tauri::AppHandle) {
     platform::hide_launcher(&app);
 }

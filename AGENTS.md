@@ -31,7 +31,7 @@ Planning docs live at the repository root: [CLEANUP-BACKLOG.md](CLEANUP-BACKLOG.
 ## Project Structure
 - `src/`: SvelteKit frontend codebase.
   - `src/routes/`: SvelteKit routing (`+layout.svelte`, `+page.svelte`). The single SPA branches on the Tauri window label (`main`, `launcher`, `minitracker`, `sidebar`, `effect`) inside `+layout.svelte`. `src/routes/effect/` is the transparent, click-through full-screen phase-transition overlay.
-  - `src/routes/settings/`: Settings screen split into `schema.ts` (typed schema consuming the generated `AppSettings` type) and `SettingRow.svelte`.
+  - `src/routes/settings/`: Settings screen split into `schema.ts` (typed schema consuming the generated `AppSettings` type) and `SettingRow.svelte`. A frontend-only Account tab is rendered before the schema tabs and holds the CalDAV account card.
   - `src/lib/`: Shared logic and Svelte runes:
     - `store.svelte.ts`: Primary store. Mutations return `neverthrow` `Result`s, await the backend command, then emit `store-updated` so live queries re-fetch. Wrap user-triggered mutations in `store.mutate(operation, action)` so failures surface as error notifications; `store.error` is reserved for fatal load/bootstrap failures. `init()` is idempotent (one cached bootstrap promise) and reads `get_settings` once on mount.
     - `safeInvoke.svelte.ts`: `safeInvoke` (`ResultAsync` wrapper over `invoke`) and the `useTauriQuery` rune (stale-guard via request IDs, optional `debounceMs`).
@@ -81,7 +81,7 @@ Planning docs live at the repository root: [CLEANUP-BACKLOG.md](CLEANUP-BACKLOG.
 - **Multi-Window Architecture**: Five windows are declared in `tauri.conf.json`:
   - **Main Window** (`main`): The primary Svelte app; hides to tray on close.
   - **Launcher Window** (`launcher`): A spotlight-like command palette triggered via the global-shortcut plugin.
-  - **Mini Tracker Window** (`minitracker`): A minimal window for tracking time. It runs independently but reads state from the Rust backend.
+  - **Mini Tracker Window** (`minitracker`): A minimal window for tracking time. It runs independently but reads state from the Rust backend. It starts hidden unless the `mini_tracker_enabled` setting is on; toggling that setting hides/shows it through `set_minitracker_visible`.
   - **Sidebar Window** (`sidebar`): A transparent, always-on-top companion pane anchored beside the main window.
   - **Effect Window** (`effect`): A hidden transparent, always-on-top, click-through fullscreen overlay that plays the phase-transition screen effect. `show_screen_effect`/`hide_screen_effect` drive it and the `SCREEN_EFFECT` event restarts its canvas animation.
   All of them render the same SPA, branched by window label in `+layout.svelte`.

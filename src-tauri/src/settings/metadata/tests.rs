@@ -229,6 +229,7 @@ clock_style | Clock Style | stopwatch,timer,counter,flowtime,flomodoro | \"flowt
 allow_stopwatch_without_task | Allow stopwatch use without selecting task | stopwatch,task,requirement,allow
 flowtime_break_divisor | Flowtime Break Divisor | flowtime,break,divisor,rest
 pause_minutes | Pause Duration (minutes) | pause,timer,hold
+mini_tracker_enabled | Enable Mini Tracker | stopwatch,mini tracker,minitracker,window,enable,launch
 keybinding_launcher | Open Launcher | keyboard,shortcut,launcher,open
 keybinding_open_settings | Open Settings | keyboard,shortcut,settings,open
 keybinding_restore_app | Restore App | keyboard,shortcut,restore,maximize,mini tracker,minitracker

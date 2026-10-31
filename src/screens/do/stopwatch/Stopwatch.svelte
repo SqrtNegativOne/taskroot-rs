@@ -148,9 +148,11 @@
             onToggle={() => { void toggleStopwatch(); }}
         />
         <div style="position: absolute; right: 0; top: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-            <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-top: 8px; margin-right: 8px;" title="Open Mini Tracker">
-                Mini Tracker
-            </button>
+            {#if store.settings?.mini_tracker_enabled}
+                <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-top: 8px; margin-right: 8px;" title="Open Mini Tracker">
+                    Mini Tracker
+                </button>
+            {/if}
             {#if store.settings?.clock_style === 'flowtime'}
                 <button onclick={() => { void stopwatchState.toggleBreak(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-right: 8px;" title="Toggle Break">
                     {stopwatchState.isBreak ? 'End Break' : 'Take Break'}
