@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppCalendar } from './domain';
 import {
     buildNewEvent,
+    calendarsForComponent,
     computeFilterDefaults,
     isAppTaskStatus,
     isCalendarReadOnly,
@@ -77,6 +78,22 @@ describe('isCalendarReadOnly', () => {
         expect(isCalendarReadOnly({ writable: true })).toBe(false);
         expect(isCalendarReadOnly({ writable: undefined })).toBe(false);
         expect(isCalendarReadOnly(undefined)).toBe(false);
+    });
+});
+
+describe('calendarsForComponent', () => {
+    const calendars: AppCalendar[] = [
+        { id: 'cal-work', summary: 'Work', writable: true, component: 'VEVENT' },
+        { id: 'cal-tasks', summary: 'Tasks', writable: true, component: 'VTODO' },
+        { id: 'cal-holidays', summary: 'Holidays', writable: false, component: 'VEVENT' },
+    ];
+
+    it('keeps every calendar of the requested component, writable or not', () => {
+        expect(calendarsForComponent(calendars, 'VEVENT').map((c) => c.id)).toEqual([
+            'cal-work',
+            'cal-holidays',
+        ]);
+        expect(calendarsForComponent(calendars, 'VTODO').map((c) => c.id)).toEqual(['cal-tasks']);
     });
 });
 

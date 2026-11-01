@@ -4,7 +4,7 @@
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
-    import { instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
+    import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
     import { addDays, getWeekNumber, isoWeeksInYear, isoWeekYear, startOfMonth, startOfWeek, ymd } from '../../../lib/time';
@@ -69,7 +69,7 @@
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let events = $derived(eventsQuery.data ?? []);
-    let calendars = $derived(calendarsQuery.data ?? []);
+    let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let isSingleWeek = $derived(view === DateGridView.OneWeek);
     let is3Weeks = $derived(view === DateGridView.ThreeWeeks);

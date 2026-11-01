@@ -51,12 +51,7 @@
         <FilterSortRow onremove={() => removeFilter(i)} removeTitle="Remove filter">
             <select
                 value={f.column}
-                onchange={(e) => {
-                    const val = e.currentTarget.value;
-                    if (val === 'status' || val === 'priority' || val === 'tag') {
-                        updateFilter(i, { column: val, value: [] });
-                    }
-                }}
+                onchange={(e) => updateFilter(i, { column: e.currentTarget.value, value: [] })}
                 style="flex: 0 0 auto; width: 110px;"
                 class="form-select"
             >

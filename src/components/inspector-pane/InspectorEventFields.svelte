@@ -2,7 +2,7 @@
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
     import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
-    import { isCalendarReadOnly } from '../../lib/domain';
+    import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
     import { getFormattedDate, getFormattedTime } from './format';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TimeInput from '../inputs/TimeInput.svelte';
@@ -17,7 +17,7 @@
     let { event, tasks, updateEvent, readOnly = false }: Props = $props();
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
-    let calendars = $derived(calendarsQuery.data ?? []);
+    let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let calendarOptions = $derived.by(() => {
         const writable = calendars.filter((c) => !isCalendarReadOnly(c));

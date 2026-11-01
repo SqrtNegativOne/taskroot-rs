@@ -8,6 +8,7 @@
     import TimeInput from '../inputs/TimeInput.svelte';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
+    import { calendarsForComponent } from '../../lib/domain';
 
     interface Props {
         task: AppTask;
@@ -20,7 +21,7 @@
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let listOptions = $derived.by(() => {
-        const todos = (calendarsQuery.data ?? []).filter(c => c.component === 'VTODO');
+        const todos = calendarsForComponent(calendarsQuery.data ?? [], 'VTODO');
         const current = todos.find(c => c.id === task.remoteCollectionId);
         const selectable = current && !current.writable
             ? [...todos.filter(c => c.writable), current]

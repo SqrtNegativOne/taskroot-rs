@@ -5,7 +5,7 @@
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import { computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
+    import { calendarsForComponent, computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -78,6 +78,10 @@
     let sortColumns = $derived(schema.filter(c => c.sortable).map(c => ({ id: c.id, label: c.label })));
 
     function getFilterValues(colId: string): {label: string, value: string}[] {
+        if (colId === 'remotecollectionid') {
+            return calendarsForComponent(calendarsQuery.data ?? [], 'VTODO')
+                .map(c => ({ label: c.summary || c.id, value: c.id }));
+        }
         const col = schema.find(c => c.id === colId);
         if (col && typeof col.filter_type === 'object' && 'Enum' in col.filter_type) {
             return col.filter_type.Enum.map(v => ({ label: v, value: v }));

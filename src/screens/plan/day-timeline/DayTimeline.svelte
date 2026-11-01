@@ -4,7 +4,7 @@
     import type { DragState } from './types';
     import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
     import type { EventInstance, AppCalendar } from '../../../lib/domain';
-    import { isEventReadOnly } from '../../../lib/domain';
+    import { calendarsForComponent, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineHeader from './components/TimelineHeader.svelte';
@@ -106,7 +106,7 @@
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
-    let calendars = $derived(calendarsQuery.data ?? []);
+    let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let planLayout = $derived.by(() => {
         const layoutMap: Record<string, import('./types').LaidEvent[]> = {};

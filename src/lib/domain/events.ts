@@ -55,11 +55,19 @@ export function isCalendarReadOnly(
     return calendar?.writable === false;
 }
 
+/** The calendars that store one component kind (events or tasks). */
+export function calendarsForComponent<T extends CalendarLike>(
+    calendars: readonly T[],
+    component: CalendarComponent,
+): T[] {
+    return calendars.filter((calendar) => calendar.component === component);
+}
+
 function writableEventCalendar(
     calendars: readonly CalendarLike[],
 ): CalendarLike | undefined {
-    return calendars.find(
-        (calendar) => calendar.component === 'VEVENT' && !isCalendarReadOnly(calendar),
+    return calendarsForComponent(calendars, 'VEVENT').find(
+        (calendar) => !isCalendarReadOnly(calendar),
     );
 }
 
