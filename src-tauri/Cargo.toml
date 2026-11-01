@@ -24,7 +24,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 taskroot-macros = { path = "./taskroot-macros" }
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

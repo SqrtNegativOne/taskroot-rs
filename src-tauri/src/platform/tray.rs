@@ -16,15 +16,13 @@ pub fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn Error>> {
     let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
     let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
 
-    let mut tray_builder = tauri::tray::TrayIconBuilder::new()
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))?;
+
+    let tray = tauri::tray::TrayIconBuilder::with_id("taskroot")
+        .icon(icon)
+        .tooltip("Taskroot")
         .menu(&menu)
-        .show_menu_on_left_click(false);
-
-    if let Some(icon) = app.default_window_icon() {
-        tray_builder = tray_builder.icon(icon.clone());
-    }
-
-    let _tray = tray_builder
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => restore_main(app),
             "exit" => app.exit(0),
@@ -46,6 +44,20 @@ pub fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn Error>> {
             }
         })
         .build(app)?;
+
+    tray.set_visible(true)?;
+    if cfg!(debug_assertions) {
+        let handle = app.handle().clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            if let Some(tray) = handle.tray_by_id("taskroot") {
+                let modified = tray.set_tooltip(Some("Taskroot"));
+                eprintln!("[tray] modify={modified:?} rect={:?}", tray.rect());
+            } else {
+                eprintln!("[tray] tray_by_id returned None");
+            }
+        });
+    }
 
     Ok(())
 }
