@@ -85,6 +85,7 @@ Planning docs live at the repository root: [CLEANUP-BACKLOG.md](CLEANUP-BACKLOG.
   - **Sidebar Window** (`sidebar`): A transparent, always-on-top companion pane anchored beside the main window.
   - **Effect Window** (`effect`): A hidden transparent, always-on-top, click-through fullscreen overlay that plays the phase-transition screen effect. `show_screen_effect`/`hide_screen_effect` drive it and the `SCREEN_EFFECT` event restarts its canvas animation.
   All of them render the same SPA, branched by window label in `+layout.svelte`.
+  Every window sets `dragDropEnabled: false` in `tauri.conf.json`: on Windows Tauri replaces WebView2's drag-drop handler with its own OLE drop target, which swallows in-page HTML5 drag events. Nothing in the app consumes `DragDropEvent`, so the handler is pure loss — with it disabled, in-page HTML5 drag-and-drop (e.g. reordering rows in the sort menu) works.
 - **Cross-Window State**: There is no dedicated inter-window wiring module. Window-specific state (stopwatch) lives in Rust and is shared across windows through Tauri commands (`get_stopwatch_state`, `toggle_stopwatch`, `toggle_break`, `toggle_pause`, `adjust_pause`, `reset_stopwatch`) plus backend-emitted events consumed via `listen` with the `src/lib/ipcEvents.ts` constants.
 
 ## Style (Important)
