@@ -17,5 +17,5 @@
             {formatHhMm(time.value)}
         </span>
     {/if}
-    <div class="day-now-line" style={!showLabels ? "left: 8px;" : ""}></div>
+    <div class="day-now-line"></div>
 </div>

@@ -26,6 +26,6 @@
             </span>
         {/if}
         <div class="day-hour-line"></div>
-        <div class="day-hour-half" style={!showLabels ? "left: 8px;" : ""}></div>
+        <div class="day-hour-half"></div>
     </div>
 {/each}

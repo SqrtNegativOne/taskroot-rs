@@ -24,7 +24,7 @@
     }: {
         dragState?: DragState;
         onEventClick?: (ev: EventInstance) => void;
-        onAddEvent?: (d: Date, start: number, end: number) => void;
+        onAddEvent?: (d: Date, start: number, end: number) => Promise<string | undefined>;
         variant?: 'plan' | 'sidebar';
     } = $props();
 

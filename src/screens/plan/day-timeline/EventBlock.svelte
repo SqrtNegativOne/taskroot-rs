@@ -2,7 +2,6 @@
     import {
         COMPACT_EVENT_HEIGHT_PX,
         DRAG_THRESHOLD_PX,
-        PIXELS_PER_HOUR,
         PX_PER_MIN,
         SNAP_MIN,
     } from './constants';
@@ -14,7 +13,6 @@
 
     const MIN_EVENT_HEIGHT_PX = 18;
     const SHORT_EVENT_DURATION_MINS = 30;
-    const DEFAULT_LABEL_OFFSET_PX = PIXELS_PER_HOUR;
 
     let {
         event,
@@ -26,7 +24,6 @@
         onMove,
         onEventClick,
         readOnly = false,
-        labelOffset = DEFAULT_LABEL_OFFSET_PX,
     }: {
         event: EventInstance;
         startMins: number;
@@ -37,7 +34,6 @@
         onMove?: (event: EventInstance, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
         readOnly?: boolean;
-        labelOffset?: number;
     } = $props();
 
     let dragOffset = $state<number | undefined>(undefined);
@@ -143,8 +139,8 @@
         style="
             top: {top}px;
             height: {Math.max(height, MIN_EVENT_HEIGHT_PX)}px;
-            left: calc({labelOffset}px + ((100% - {labelOffset}px) / {lanes}) * {lane});
-            width: calc(((100% - {labelOffset}px) / {lanes}) - 2px);
+            --event-lane: {lane};
+            --event-lanes: {lanes};
             {eventColorVars(event.color)}
         "
         onpointerdown={isGhost ? undefined : onBodyDown}

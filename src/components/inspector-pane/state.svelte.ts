@@ -4,11 +4,9 @@ import { activeCalendars, allEvents } from '../../lib/queries';
 import { useAutoQuery } from '../../lib/safeInvoke.svelte';
 import { store } from '../../lib/store.svelte';
 
-export interface InspectorTarget {
-    type: 'task' | 'event';
-    id: string;
-    occurrenceStart?: string;
-}
+export type InspectorTarget =
+    | { type: 'task'; id: string; draft?: AppTask }
+    | { type: 'event'; id: string; occurrenceStart?: string; draft?: AppEvent };
 
 /** Reactive inspector state: queries, the selected item, mutations and the recurring-delete scope prompt. */
 export class InspectorPaneState {
@@ -35,12 +33,14 @@ export class InspectorPaneState {
 
     get currentTask(): AppTask | undefined {
         const target = this.getTarget();
-        return target?.type === 'task' ? this.tasks.find((task) => task.id === target.id) : undefined;
+        if (target?.type !== 'task') return undefined;
+        return this.taskFor(target.id);
     }
 
     get currentEvent(): AppEvent | undefined {
         const target = this.getTarget();
-        return target?.type === 'event' ? this.events.find((event) => event.id === target.id) : undefined;
+        if (target?.type !== 'event') return undefined;
+        return this.eventFor(target.id);
     }
 
     get currentItem(): AppTask | AppEvent | undefined {
@@ -56,14 +56,30 @@ export class InspectorPaneState {
         return event !== undefined && isEventReadOnly(event, this.calendarsQuery.data ?? []);
     }
 
+    /** The stored task, falling back to the draft carried by the target until the query catches up. */
+    private taskFor(id: string): AppTask | undefined {
+        const found = this.tasks.find((task) => task.id === id);
+        if (found !== undefined) return found;
+        const target = this.getTarget();
+        return target?.type === 'task' && target.id === id ? target.draft : undefined;
+    }
+
+    /** The stored event, falling back to the draft carried by the target until the query catches up. */
+    private eventFor(id: string): AppEvent | undefined {
+        const found = this.events.find((event) => event.id === id);
+        if (found !== undefined) return found;
+        const target = this.getTarget();
+        return target?.type === 'event' && target.id === id ? target.draft : undefined;
+    }
+
     updateTask = (id: string, update: (task: AppTask) => AppTask): void => {
-        const current = this.tasks.find((task) => task.id === id);
+        const current = this.taskFor(id);
         if (!current) return;
         void store.mutate('Failed to update task', () => store.updateTask(update(current)));
     };
 
     updateEvent = (id: string, update: (event: AppEvent) => AppEvent): void => {
-        const current = this.events.find((event) => event.id === id);
+        const current = this.eventFor(id);
         if (!current) return;
         void store.mutate('Failed to update event', () => store.updateEvent(update(current)));
     };
@@ -100,7 +116,8 @@ export class InspectorPaneState {
         if (!event) return;
         if (isRecurring(event)) {
             this.eventPendingAction = event;
-            this.eventPendingStart = this.getTarget()?.occurrenceStart;
+            const target = this.getTarget();
+            this.eventPendingStart = target?.type === 'event' ? target.occurrenceStart : undefined;
             this.recurringModalOpen = true;
             return;
         }

@@ -43,10 +43,10 @@ function resolveEventCalendar(
 }
 
 export function isRecurring(event: {
-    readonly rrule?: string;
-    readonly recurringEventId?: string;
+    readonly rrule?: string | null;
+    readonly recurringEventId?: string | null;
 }): boolean {
-    return event.rrule !== undefined || event.recurringEventId !== undefined;
+    return event.rrule != null || event.recurringEventId != null;
 }
 
 export function isCalendarReadOnly(

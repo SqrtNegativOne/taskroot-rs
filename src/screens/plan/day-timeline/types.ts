@@ -8,6 +8,12 @@ export interface LaidEvent {
     lanes: number;
 }
 
+/** The minute range of a creation ghost before it becomes a stored event. */
+export interface CreationRange {
+    start: number;
+    end: number;
+}
+
 /** A bucketed event before `layoutEvents` assigns it a lane. */
 export type UnlaidEvent = Omit<LaidEvent, 'lane' | 'lanes'>;
 

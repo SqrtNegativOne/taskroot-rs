@@ -6,6 +6,7 @@
     import { parseLocalYmd } from '../../lib/time';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
+    import type { InspectorTarget } from '../../components/inspector-pane/state.svelte';
 
     import SplitPane from '../../components/SplitPane.svelte';
     import TaskListPane from '../../components/tasklist/TaskListPane.svelte';
@@ -34,7 +35,7 @@
         },
     });
 
-    let inspectorState = $state<{ type: 'event' | 'task', id: string, occurrenceStart?: string } | undefined>(undefined);
+    let inspectorState = $state<InspectorTarget | undefined>(undefined);
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
@@ -53,10 +54,11 @@
                 title: task.title,
                 taskId: task.id,
             });
+            inspectorState = { type: 'event', id: event.id, draft: event };
             void store
                 .mutate('Failed to schedule task', () => store.addEvent(event))
                 .then((result) => {
-                    if (result.isOk()) inspectorState = { type: 'event', id: event.id };
+                    if (result.isErr() && inspectorState?.id === event.id) inspectorState = undefined;
                 });
         },
     });
@@ -69,8 +71,9 @@
             remoteCollectionId: defaultTaskCollection,
             ...defaults
         };
+        inspectorState = { type: 'task', id: newTask.id, draft: newTask };
         const result = await store.mutate('Failed to create task', () => store.addTask(newTask));
-        if (result.isOk()) inspectorState = { type: 'task', id: newTask.id };
+        if (result.isErr() && inspectorState?.id === newTask.id) inspectorState = undefined;
     }
 
     function onDeleteTask(id: string) {
@@ -78,14 +81,21 @@
         if (inspectorState?.id === id) inspectorState = undefined;
     }
 
-    async function onAddEvent(date: Date, startMins?: number, endMins?: number) {
+    async function onAddEvent(
+        date: Date,
+        startMins?: number,
+        endMins?: number,
+    ): Promise<string | undefined> {
         const newEvent = buildNewEvent(date, {
             startMinutes: startMins,
             endMinutes: endMins,
             calendars: calendarsQuery.data ?? [],
         });
+        inspectorState = { type: 'event', id: newEvent.id, draft: newEvent };
         const result = await store.mutate('Failed to create event', () => store.addEvent(newEvent));
-        if (result.isOk()) inspectorState = { type: 'event', id: newEvent.id };
+        if (result.isOk()) return newEvent.id;
+        if (inspectorState?.id === newEvent.id) inspectorState = undefined;
+        return undefined;
     }
 
     function onEventClick(ev: EventInstance) {

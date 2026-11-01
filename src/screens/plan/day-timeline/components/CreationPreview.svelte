@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { PIXELS_PER_HOUR, PX_PER_MIN } from '../constants';
+    import { PX_PER_MIN } from '../constants';
     import { formatHhMm } from '../../../../lib/time';
 
     let { preview }: { preview: { start: number; end: number } } = $props();
@@ -10,8 +10,6 @@
     style="
         top: {preview.start * PX_PER_MIN}px;
         height: {(preview.end - preview.start) * PX_PER_MIN}px;
-        left: {PIXELS_PER_HOUR}px;
-        width: calc(100% - {PIXELS_PER_HOUR + 2}px);
         opacity: 0.5;
         pointer-events: none;
         z-index: 10;

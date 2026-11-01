@@ -143,13 +143,15 @@
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
-    function onAddEvent(date: Date, startMins?: number, endMins?: number) {
+    function onAddEvent(date: Date, startMins?: number, endMins?: number): Promise<string | undefined> {
         const newEvent = buildNewEvent(date, {
             startMinutes: startMins,
             endMinutes: endMins,
             calendars: calendarsQuery.data ?? [],
         });
-        void store.mutate('Failed to create event', () => store.addEvent(newEvent));
+        return store
+            .mutate('Failed to create event', () => store.addEvent(newEvent))
+            .then((result) => (result.isOk() ? newEvent.id : undefined));
     }
 </script>
 

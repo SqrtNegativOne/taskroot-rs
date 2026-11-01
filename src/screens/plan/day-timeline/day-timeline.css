@@ -35,7 +35,7 @@
   }
   .day-hour-line { display: none; }
   .day-hour-half {
-    position: absolute; left: 56px; right: 0;
+    position: absolute; left: var(--day-label-offset, 56px); right: 0;
     top: 50%;
     border-top: 1px dashed var(--border-soft);
     opacity: 0.6;
@@ -59,22 +59,25 @@
     font-variant-numeric: tabular-nums;
   }
   .day-now-line {
-    position: absolute; left: 44px; right: 0; top: 0;
+    position: absolute; left: var(--day-label-offset, 56px); right: 0; top: 0;
     border-top: 1px solid var(--accent);
     box-shadow: 0 0 8px var(--accent-glow);
   }
 
   .day-event {
+    --event-lane: 0;
+    --event-lanes: 1;
     position: absolute;
+    left: calc(var(--day-label-offset, 56px) + ((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) * var(--event-lane));
+    width: calc(((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) - 24px);
     background: var(--ev-bg, var(--bg-surface));
-    border: 1px solid var(--border-strong);
+    border: 0;
     border-left: 3px solid var(--ev-color, var(--fg-dimmer));
     padding: 4px 8px 0 8px;
     overflow: hidden;
     cursor: grab;
-    transition: border-color 80ms, background 80ms;
+    transition: background 80ms;
   }
-  .day-event:hover { border-color: var(--accent-line); }
   .day-event.ev-plan {
     background: var(--ev-bg, linear-gradient(180deg, var(--bg-surface-hover), var(--bg-surface)));
     border-left-color: var(--ev-color, var(--accent));
@@ -88,12 +91,11 @@
   .day-event.pri-bar-2 { border-left-color: #b59864; }
   .day-event.pri-bar-3 { border-left-color: #c47e68; }
   .day-event.pri-bar-4 { border-left-color: #c96b7f; }
-  .day-event.is-done { opacity: 0.75; border: 1px dashed var(--border); background: var(--bg-surface-hover); border-left: 2px solid var(--border); }
+  .day-event.is-done { opacity: 0.75; background: var(--bg-surface-hover); border-left-color: var(--border); }
   .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
-  .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-style: dashed; background: transparent !important; }
+  .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-left-style: dashed; background: transparent !important; }
   .day-event.is-readonly { opacity: 0.6; cursor: default; }
-  .day-event.is-readonly:hover { border-color: var(--border-strong); }
-  .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-color: var(--accent); opacity: 0.95; cursor: grabbing; }
+  .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0.95; cursor: grabbing; }
   .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
   .day-event-time {
     font-size: 0.74em;
@@ -149,7 +151,7 @@
 
   .day-drop-preview {
     position: absolute;
-    left: 56px;
+    left: var(--day-label-offset, 56px);
     right: 0;
     border: 1px dashed var(--accent);
     background: var(--accent-soft);

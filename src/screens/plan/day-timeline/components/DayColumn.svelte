@@ -1,6 +1,6 @@
 <script lang="ts">
     import { MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
-    import type { DragState, LaidEvent } from '../types';
+    import type { CreationRange, DragState, LaidEvent } from '../types';
     import type { EventInstance, AppCalendar } from '../../../../lib/domain';
     import { isEventReadOnly } from '../../../../lib/domain';
     import { MS_PER_MINUTE, parseLocalYmd, sameDay, ymd } from '../../../../lib/time';
@@ -32,7 +32,7 @@
         onResizeEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onMoveEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
-        onAddEvent?: (d: Date, start: number, end: number) => void;
+        onAddEvent?: (d: Date, start: number, end: number) => Promise<string | undefined>;
         calendars?: AppCalendar[];
         showTimeLabels?: boolean;
     } = $props();
@@ -62,14 +62,31 @@
 
     // Grid creation logic
     let containerRef = $state<HTMLDivElement | null>(null);
-    let createPreview = $state<{ start: number; end: number } | undefined>(undefined);
+    let createPreview = $state<CreationRange | undefined>(undefined);
+    // Layout of `laid` when the created event was submitted; the ghost stays up
+    // until the post-mutation query refresh replaces it with the real block.
+    // `$state.raw` keeps the exact reference so identity comparison works.
+    let createBaseline = $state.raw<LaidEvent[] | undefined>(undefined);
 
     const trackPointerGesture = createPointerGestureRecognizer();
 
-    function previewRange(startMin: number, currentMin: number) {
+    function previewRange(startMin: number, currentMin: number): CreationRange {
         const s = Math.min(startMin, currentMin);
         const eMin = Math.max(startMin, currentMin);
         return { start: s, end: eMin === s ? s + SNAP_MIN : eMin };
+    }
+
+    function defaultCreateRange(startMin: number): CreationRange {
+        return { start: startMin, end: startMin + MINUTES_IN_HOUR };
+    }
+
+    async function finishCreate(range: CreationRange, baseline: LaidEvent[]) {
+        const id = await onAddEvent?.(date, range.start, range.end);
+        if (id !== undefined && !laid.some((l) => l.event.id === id)) {
+            createBaseline = baseline;
+            return;
+        }
+        createPreview = undefined;
     }
 
     function onGridPointerDown(e: PointerEvent) {
@@ -83,6 +100,9 @@
         const startMin = snapPixels(e.clientY - rect.top);
         let active = false;
 
+        createBaseline = undefined;
+        createPreview = defaultCreateRange(startMin);
+
         trackPointerGesture({
             onMove: (ev) => {
                 active = true;
@@ -90,17 +110,26 @@
                 createPreview = previewRange(startMin, moveMin);
             },
             onEnd: (ev) => {
-                createPreview = undefined;
+                const baseline = laid;
                 const range = active
                     ? previewRange(startMin, snapPixels(ev.clientY - rect.top))
-                    : { start: startMin, end: startMin + MINUTES_IN_HOUR };
-                onAddEvent?.(date, range.start, range.end);
+                    : defaultCreateRange(startMin);
+                createPreview = range;
+                void finishCreate(range, baseline);
             },
             onCancel: () => {
+                createBaseline = undefined;
                 createPreview = undefined;
             },
         });
     }
+
+    $effect(() => {
+        const baseline = createBaseline;
+        if (baseline === undefined || laid === baseline) return;
+        createBaseline = undefined;
+        createPreview = undefined;
+    });
 
     let dropPreview = $derived(
         dragState?.target?.kind === 'day-time' && dragState.target.date === cellDateStr
@@ -113,6 +142,7 @@
     class="day-grid"
     bind:this={containerRef}
     style="
+        --day-label-offset: {showTimeLabels ? PIXELS_PER_HOUR : 0}px;
         position: relative;
         flex: 1;
         min-width: 200px;
@@ -144,7 +174,6 @@
             onResize={handleResize}
             onMove={handleMove}
             {onEventClick}
-            labelOffset={showTimeLabels ? PIXELS_PER_HOUR : 8}
         />
     {/each}
 
