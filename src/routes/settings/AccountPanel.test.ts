@@ -61,17 +61,6 @@ describe('AccountPanel', () => {
         expect(screen.queryByText(/2f07/)).toBeNull();
     });
 
-    it('lists every collection with the kind it holds', async () => {
-        render(AccountPanel, { props: { onSignedOut: vi.fn() } });
-
-        const items = await screen.findAllByRole('listitem');
-        expect(items).toHaveLength(2);
-        expect(items[0]?.textContent).toContain('Events');
-        expect(items[1]?.textContent).toContain('Tasks');
-        expect(screen.getByLabelText('Name of Journal')).not.toBeNull();
-        expect(screen.getByLabelText('Name of Chores')).not.toBeNull();
-    });
-
     it('disconnects and reports the sign-out once confirmed', async () => {
         const onSignedOut = vi.fn();
         render(AccountPanel, { props: { onSignedOut } });

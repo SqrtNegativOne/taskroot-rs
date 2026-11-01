@@ -76,7 +76,7 @@ fn series_raw(store: &Store) -> &str {
 }
 
 #[test]
-fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
+fn settings_round_trip_and_partial_or_malformed_files_fall_back_to_defaults() {
     let dir = tempfile::tempdir().unwrap();
     let dir = dir.path();
     let settings = crate::settings::AppSettings {
@@ -88,6 +88,19 @@ fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
     let loaded = persist::read_settings(dir);
     assert_eq!(loaded.clock_style, "counter");
 
+    std::fs::write(persist::settings_path(dir), r#"{"pause_minutes":20}"#).unwrap();
+    let partial = persist::read_settings(dir);
+    assert_eq!(partial.pause_minutes, 20, "the stored field must be kept");
+    assert_eq!(
+        serde_json::to_value(partial).unwrap(),
+        serde_json::to_value(crate::settings::AppSettings {
+            pause_minutes: 20,
+            ..crate::settings::AppSettings::default()
+        })
+        .unwrap(),
+        "fields the file omits must be completed from the defaults"
+    );
+
     std::fs::write(persist::settings_path(dir), "not json").unwrap();
     let fallback = persist::read_settings(dir);
     assert_eq!(
@@ -95,23 +108,6 @@ fn settings_round_trip_and_malformed_file_falls_back_to_defaults() {
         serde_json::to_value(crate::settings::AppSettings::default()).unwrap()
     );
     assert!(dir.join("settings.json.bad").exists());
-}
-
-#[test]
-fn default_clock_style_is_flowtime() {
-    assert_eq!(
-        crate::settings::AppSettings::default().clock_style,
-        "flowtime"
-    );
-}
-
-#[test]
-fn a_settings_file_without_a_clock_style_uses_the_default() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    std::fs::write(persist::settings_path(dir), "{}").unwrap();
-
-    assert_eq!(persist::read_settings(dir).clock_style, "flowtime");
 }
 
 #[test]

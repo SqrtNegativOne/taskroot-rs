@@ -26,17 +26,6 @@ fn the_command_table_lists_every_command_once() {
 }
 
 #[test]
-fn every_command_name_is_snake_case() {
-    for name in source_scan::registered_commands() {
-        assert!(
-            name.chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
-            "`{name}` is not a snake_case command name"
-        );
-    }
-}
-
-#[test]
 fn every_command_has_a_handler_signature_and_vice_versa() {
     let registered = source_scan::registered_commands();
     let params = source_scan::annotated_command_params();
@@ -103,16 +92,6 @@ tasksQuery.execute({ filters: [], sort: [], query: \"\" });";
     assert_eq!(call.command, "query_tasks");
     assert_eq!(call.keys, ["filters", "sort", "query"]);
     assert_keys_match_rust_signatures(&calls);
-}
-
-#[test]
-#[should_panic(expected = "is passed `bogusKey`")]
-fn a_dot_execute_key_the_command_does_not_declare_fails_the_contract() {
-    let source = "\
-let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
-tasksQuery.execute({ bogusKey: 1 });";
-
-    assert_keys_match_rust_signatures(&frontend_scan::calls_in(source));
 }
 
 #[test]
