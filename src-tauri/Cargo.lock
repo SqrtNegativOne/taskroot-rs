@@ -4498,6 +4498,7 @@ dependencies = [
  "tokio",
  "ts-rs",
  "uuid",
+ "windows",
  "wiremock",
 ]
 

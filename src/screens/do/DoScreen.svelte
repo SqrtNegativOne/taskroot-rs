@@ -2,19 +2,16 @@
     import Collapsible from '../../components/Collapsible.svelte';
     import Stopwatch from './stopwatch/Stopwatch.svelte';
 
-    import { useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
+    import { taskListQueryArgs } from '../../lib/taskList.svelte';
     import type { AppTask } from '../../lib/domain';
 
     let isBreak = $state(false);
     let showRestOverride = $state(false);
 
-    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(tasksQuery.data ?? []);
-
-    $effect(() => {
-        void tasksQuery.execute({ filters: [], sort: [], query: "" });
-    });
 
     function handleBreakStatusChange(status: boolean) {
         isBreak = status;

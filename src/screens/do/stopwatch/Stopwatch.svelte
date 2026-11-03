@@ -8,7 +8,8 @@
     import type { AppTaskStatus } from '../../../lib/domain';
     import './stopwatch.css';
 
-    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import { useAutoQuery, useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import { taskListQueryArgs } from '../../../lib/taskList.svelte';
     import type { AppTask } from '../../../lib/domain';
 
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
@@ -17,15 +18,18 @@
     let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
-    let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
-    let tasks = $derived(tasksQuery.data ?? []);
+    let allTasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let allTasks = $derived(allTasksQuery.data ?? []);
 
     $effect(() => {
         if (!store.loaded) return;
-        void tasksQuery.execute({ filters: [], sort: [], query: "" });
+        void allTasksQuery.execute({ filters: [], sort: [], query: "" });
     });
 
-    let activeTask = $derived(tasks.find((task) => task.status === 'doing'));
+    let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
+    let selectableTasks = $derived(listQuery.data ?? []);
+
+    let activeTask = $derived(allTasks.find((task) => task.status === 'doing'));
 
     // If no active task and we require one, open the selector
     $effect(() => {
@@ -40,13 +44,13 @@
     });
 
     async function updateTaskStatus(taskId: string, status: AppTaskStatus): Promise<void> {
-        const task = tasks.find(t => t.id === taskId);
+        const task = allTasks.find(t => t.id === taskId);
         if (!task) return;
         await store.mutate('Failed to update task status', () => store.updateTask({ ...task, status }));
     }
 
     async function setActiveTask(taskId: string): Promise<void> {
-        for (const task of tasks) {
+        for (const task of allTasks) {
             if (task.id === taskId) {
                 await updateTaskStatus(task.id, 'doing');
             } else if (task.status === 'doing') {
@@ -170,7 +174,7 @@
         <TaskSelector
             selectorOpen={selectorOpen}
             onCloseSelector={() => selectorOpen = false}
-            {tasks}
+            tasks={selectableTasks}
             activeTask={activeTask}
             onStartWithTask={(taskId: string) => { void setActiveTask(taskId); }}
         />

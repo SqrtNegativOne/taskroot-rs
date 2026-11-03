@@ -11,5 +11,5 @@ pub use tray::build_tray;
 pub use windows::{
     WindowLabel, configure_effect_window, handle_window_event, hide_launcher, hide_screen_effect,
     quit_app, resize_launcher, restore_main, set_minitracker_visible, show_minitracker,
-    show_screen_effect, toggle_launcher_window,
+    show_screen_effect, start_minitracker_topmost_guard, toggle_launcher_window,
 };

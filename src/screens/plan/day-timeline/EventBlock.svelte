@@ -2,6 +2,7 @@
     import {
         COMPACT_EVENT_HEIGHT_PX,
         DRAG_THRESHOLD_PX,
+        EVENT_INSET_PX,
         PX_PER_MIN,
         SNAP_MIN,
     } from './constants';
@@ -123,9 +124,10 @@
 </script>
 
 {#snippet renderBlock(start: number, end: number, isGhost: boolean, isFloating: boolean)}
-    {@const top = start * PX_PER_MIN}
-    {@const height = (end - start) * PX_PER_MIN}
-    {@const compact = height < COMPACT_EVENT_HEIGHT_PX}
+    {@const slotHeight = (end - start) * PX_PER_MIN}
+    {@const top = start * PX_PER_MIN + EVENT_INSET_PX}
+    {@const height = Math.max(slotHeight - 2 * EVENT_INSET_PX, MIN_EVENT_HEIGHT_PX)}
+    {@const compact = slotHeight < COMPACT_EVENT_HEIGHT_PX}
     {@const isShort = (end - start) <= SHORT_EVENT_DURATION_MINS}
     
     <div
@@ -138,7 +140,7 @@
         class:is-readonly={readOnly}
         style="
             top: {top}px;
-            height: {Math.max(height, MIN_EVENT_HEIGHT_PX)}px;
+            height: {height}px;
             --event-lane: {lane};
             --event-lanes: {lanes};
             {eventColorVars(event.color)}

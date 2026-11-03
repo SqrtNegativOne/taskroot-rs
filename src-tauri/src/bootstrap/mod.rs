@@ -126,6 +126,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = platform::app_data_dir(&handle)?;
     let store = calendar::Store::load(data_dir)?;
     platform::set_minitracker_visible(&handle, store.settings.mini_tracker_enabled);
+    platform::start_minitracker_topmost_guard(&handle);
     handle.manage(calendar::StoreState::new(store));
     ipc::session::start_load(handle.clone());
     reminders::start_reminder_engine(handle);

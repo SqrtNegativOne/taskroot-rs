@@ -15,6 +15,7 @@
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import FilterButton from '../../../components/FilterButton.svelte';
     import { createReschedulePrompt } from '../hooks/reschedule.svelte';
+    import { attachDaySnap } from './scrollSnap';
 
     let {
         dragState,
@@ -127,10 +128,16 @@
     let scrollRef = $state<HTMLDivElement | null>(null);
     const AUTO_SCROLL_LEAD_MINUTES = 120;
     onMount(() => {
-        if (scrollRef) {
-            const scrollMins = Math.max(0, minutesSinceMidnight(new Date()) - AUTO_SCROLL_LEAD_MINUTES);
-            scrollRef.scrollTop = scrollMins * PX_PER_MIN;
-        }
+        if (!scrollRef) return;
+        const scrollMins = Math.max(0, minutesSinceMidnight(new Date()) - AUTO_SCROLL_LEAD_MINUTES);
+        scrollRef.scrollTop = scrollMins * PX_PER_MIN;
+        return attachDaySnap(scrollRef);
+    });
+
+    const dayHeaderFormat = new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
     });
 </script>
 
@@ -155,21 +162,30 @@
     />
 
     <div class="day-scroll" bind:this={scrollRef}>
-        <div style="display: flex; flex-direction: row; width: 100%;">
-            {#each dates as d, i (ymd(d))}
-                <DayColumn
-                    date={d}
-                    {today}
-                    laid={planLayout[ymd(d)] ?? []}
-                    {dragState}
-                    {onResizeEvent}
-                    {onMoveEvent}
-                    {onEventClick}
-                    {onAddEvent}
-                    calendars={calendars}
-                    showTimeLabels={i === 0}
-                />
-            {/each}
+        <div class="day-cols">
+            <div class="day-head">
+                {#each dates as d (ymd(d))}
+                    <div class="day-head-cell" class:is-today={sameDay(d, today)} data-day={ymd(d)}>
+                        {dayHeaderFormat.format(d)}
+                    </div>
+                {/each}
+            </div>
+            <div class="day-row">
+                {#each dates as d, i (ymd(d))}
+                    <DayColumn
+                        date={d}
+                        {today}
+                        laid={planLayout[ymd(d)] ?? []}
+                        {dragState}
+                        {onResizeEvent}
+                        {onMoveEvent}
+                        {onEventClick}
+                        {onAddEvent}
+                        calendars={calendars}
+                        showTimeLabels={i === 0}
+                    />
+                {/each}
+            </div>
         </div>
     </div>
 

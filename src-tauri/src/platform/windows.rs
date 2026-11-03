@@ -51,6 +51,98 @@ pub fn set_minitracker_visible(app: &AppHandle, visible: bool) {
     let _ = mini_win.unminimize();
     let _ = mini_win.set_focus();
     let _ = mini_win.set_always_on_top(true);
+    #[cfg(target_os = "windows")]
+    {
+        square_window_corners(&mini_win);
+        force_topmost(&mini_win);
+    }
+}
+
+/// Keeps the visible mini tracker above the Windows taskbar.
+///
+/// Windows keeps the taskbar above ordinary topmost windows after it is
+/// activated, so the guard reasserts the bar's place at the top of the topmost
+/// band. The screen-effect overlay is left above it.
+pub fn start_minitracker_topmost_guard(app: &AppHandle) {
+    #[cfg(target_os = "windows")]
+    {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(750)).await;
+                keep_minitracker_on_top(&app);
+            }
+        });
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = app;
+}
+
+#[cfg(target_os = "windows")]
+fn keep_minitracker_on_top(app: &AppHandle) {
+    let effect_visible = app
+        .get_webview_window(WindowLabel::Effect.as_str())
+        .is_some_and(|window| matches!(window.is_visible(), Ok(true)));
+    if effect_visible {
+        return;
+    }
+
+    let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) else {
+        return;
+    };
+    if matches!(mini_win.is_visible(), Ok(true)) {
+        force_topmost(&mini_win);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn force_topmost(window: &tauri::WebviewWindow) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    // SAFETY: `hwnd` is a live window owned by Tauri. The flags keep its size,
+    // position and focus unchanged; only the z-order is raised.
+    unsafe {
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn square_window_corners(window: &tauri::WebviewWindow) {
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DwmSetWindowAttribute,
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let preference = DWMWCP_DONOTROUND;
+    let size = u32::try_from(std::mem::size_of_val(&preference)).unwrap_or_default();
+    if size == 0 {
+        return;
+    }
+    // SAFETY: `hwnd` is live and `preference` outlives the call; Windows either
+    // applies the preference or returns an error on older Windows versions.
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            std::ptr::from_ref(&preference).cast(),
+            size,
+        );
+    }
 }
 
 pub fn hide_launcher(app: &AppHandle) {

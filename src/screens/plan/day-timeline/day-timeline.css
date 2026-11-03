@@ -12,6 +12,35 @@
     scrollbar-width: thin;
   }
 
+  .day-cols { display: flex; flex-direction: column; min-width: min-content; }
+  .day-head {
+    position: sticky;
+    /* Chrome pins sticky boxes to the scrollport's content edge, so back off the
+       scroller's 4px top padding to sit flush with the viewport (flow keeps it). */
+    top: -4px;
+    z-index: 7;
+    display: flex;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .day-head-cell {
+    flex: 1;
+    min-width: 200px;
+    border-right: 1px solid var(--border-soft);
+    padding: 5px 8px;
+    text-align: center;
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    background: var(--bg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .day-head-cell.is-today { color: var(--accent); }
+  .day-row { display: flex; flex-direction: row; width: 100%; }
+
   .day-grid {
     position: relative;
     width: 100%;
@@ -73,6 +102,7 @@
     background: var(--ev-bg, var(--bg-surface));
     border: 0;
     border-left: 3px solid var(--ev-color, var(--fg-dimmer));
+    border-radius: 6px;
     padding: 4px 8px 0 8px;
     overflow: hidden;
     cursor: grab;

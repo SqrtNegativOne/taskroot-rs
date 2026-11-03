@@ -153,10 +153,6 @@
     data-drop-date={cellDateStr}
     onpointerdown={onGridPointerDown}
 >
-    <div style="position: absolute; top: -32px; left: 0; right: 0; text-align: center; font-weight: bold; font-size: 0.9em; color: {isToday ? 'var(--accent)' : 'var(--fg)'}; padding-bottom: 8px;">
-        {Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(date)}
-    </div>
-
     <TimeGridBackground {isToday} showLabels={showTimeLabels} />
     
     {#if isToday}

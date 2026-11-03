@@ -1,12 +1,11 @@
 <script lang="ts">
-    import type { AppTaskFilter } from '../../lib/bindings/AppTaskFilter.generated';
     import TaskRow from './TaskRow.svelte';
     import ListManagerModal from './ListManagerModal.svelte';
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
     import SearchBar from '../SearchBar.svelte';
     import { calendarsForComponent, computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
-    import { persistState, persistedKeys } from '../../lib/persisted.svelte';
+    import { taskListQueryArgs, taskListState } from '../../lib/taskList.svelte';
     import './tasklist.css';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
@@ -15,8 +14,6 @@
 
     let {
         onUpdateTask,
-        filters = $bindable([{ column: 'status', operator: 'is not', value: ['done'] }]),
-        sort = $bindable([] as import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[]),
         onDragStart,
         activeDragId,
         onAddTask,
@@ -25,8 +22,6 @@
         footer,
     }: {
         onUpdateTask?: (task: AppTask) => void;
-        filters?: AppTaskFilter[];
-        sort?: import('../../lib/bindings/AppTaskSort.generated').AppTaskSort[];
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
         activeDragId?: string;
         onAddTask: (defaults?: Partial<AppTask>) => void;
@@ -42,19 +37,6 @@
         if (task) onUpdateTask?.(transform(task));
     }
 
-    persistState(
-        persistedKeys.taskListFilters,
-        () => filters,
-        (stored) => { filters = stored; },
-        { isValid: Array.isArray },
-    );
-    persistState(
-        persistedKeys.taskListSort,
-        () => sort,
-        (stored) => { sort = stored; },
-        { isValid: Array.isArray },
-    );
-
     function deleteTask(id: string) {
         if (onDeleteTask) onDeleteTask(id);
     }
@@ -69,7 +51,7 @@
 
     import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
 
-    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters, sort, query }), { debounceMs: TASK_QUERY_DEBOUNCE_MS });
+    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ ...taskListQueryArgs(), query }), { debounceMs: TASK_QUERY_DEBOUNCE_MS });
     let schemaQuery = useAutoQuery<AppTaskColumnDef[]>('get_task_schema', () => ({}));
     
     let schema = $derived(schemaQuery.data ?? []);
@@ -132,7 +114,7 @@
     });
 
     function handleAddTask() {
-        const rawDefaults = computeFilterDefaults(filters);
+        const rawDefaults = computeFilterDefaults(taskListState.filters);
         const safeDefaults: Partial<AppTask> = {
             status: rawDefaults.status,
             priority: rawDefaults.priority,
@@ -154,8 +136,8 @@
             />
         </div>
         <div class="task-pane-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
-            <FilterButton bind:filters columns={filterColumns} getValuesForColumn={getFilterValues} />
-            <SortButton bind:sort sortOptions={sortColumns} />
+            <FilterButton bind:filters={taskListState.filters} columns={filterColumns} getValuesForColumn={getFilterValues} />
+            <SortButton bind:sort={taskListState.sort} sortOptions={sortColumns} />
             <button
                 style="margin-left: auto; background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
                 title="Manage lists"
