@@ -36,6 +36,7 @@
                     class="menu-trigger-button"
                     class:is-active={active || open}
                     {title}
+                    aria-label={title}
                 >
                     {@render trigger()}
                     {#if badge > 0}

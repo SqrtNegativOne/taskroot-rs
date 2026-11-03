@@ -7,7 +7,7 @@ import {
     startOfWeek as startOfWeekFns,
 } from 'date-fns';
 
-export { addDays, startOfMonth } from 'date-fns';
+export { addDays, addMonths, startOfMonth } from 'date-fns';
 
 export const MS_PER_MINUTE = 60_000;
 

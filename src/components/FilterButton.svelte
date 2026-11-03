@@ -1,4 +1,5 @@
 <script lang="ts" generics="F extends { column?: string | null, operator?: string | null, value?: unknown }">
+    import type { Snippet } from 'svelte';
     import FloatingMenu from './FloatingMenu.svelte';
     import FilterSortRow from './FilterSortRow.svelte';
     import MultiSelect from './inputs/MultiSelect.svelte';
@@ -8,11 +9,15 @@
         columns = [],
         getValuesForColumn = (_col: string): {label: string, value: string}[] => [],
         align = "left",
+        extraFilters,
+        extraFilterCount = 0,
     }: {
         filters?: F[];
         columns?: {id: string, label: string}[];
         getValuesForColumn?: (col: string) => {label: string, value: string}[];
         align?: "left" | "right";
+        extraFilters?: Snippet;
+        extraFilterCount?: number;
     } = $props();
 
     function addFilter() {
@@ -36,14 +41,16 @@
     align={align}
     minWidth="460px"
     title="Filter"
-    active={filters.length > 0}
-    badge={filters.length}
+    active={filters.length + extraFilterCount > 0}
+    badge={filters.length + extraFilterCount}
     addLabel="Add filter"
     onadd={addFilter}
 >
     {#snippet trigger()}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
     {/snippet}
+
+    {@render extraFilters?.()}
 
     {#each filters as f, i (i)}
         {@const column = f.column ?? ''}

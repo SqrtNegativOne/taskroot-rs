@@ -3,7 +3,7 @@
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
     import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
-    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, AppEventFilter } from '../../../lib/domain';
     import { calendarsForComponent, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
@@ -13,7 +13,7 @@
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
     import { activeCalendars, eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
-    import FilterButton from '../../../components/FilterButton.svelte';
+    import EventFilterButton from '../../../components/EventFilterButton.svelte';
     import { createReschedulePrompt } from '../hooks/reschedule.svelte';
     import { attachDaySnap } from './scrollSnap';
 
@@ -65,7 +65,7 @@
         );
     }
 
-    let eventFilters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
+    let eventFilters = $state<AppEventFilter[]>([]);
     let eventQuery = $state('');
     let timelineDate = $state(new Date());
     let today = $state(new Date());
@@ -143,12 +143,7 @@
 
 <section class="day-pane">
     {#snippet filterMenu()}
-        <FilterButton
-            bind:filters={eventFilters}
-            columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? calendars.map((c) => ({ label: c.summary || c.id, value: c.id })) : []}
-            align="right"
-        />
+        <EventFilterButton bind:filters={eventFilters} {calendars} />
     {/snippet}
 
     <TimelineHeader

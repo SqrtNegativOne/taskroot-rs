@@ -11,6 +11,7 @@ export const persistedKeys = {
     taskListFilters: 'ui.task_list.filters',
     taskListSort: 'ui.task_list.sort',
     dateGridFilters: 'ui.date_grid.filters',
+    dateGridVisibility: 'ui.date_grid.visibility',
     dateGridView: 'ui.date_grid.view',
     dayTimelineFilters: 'ui.day_timeline.filters',
     dayTimelineNumDays: 'ui.day_timeline.num_days',

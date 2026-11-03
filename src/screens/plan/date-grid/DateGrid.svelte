@@ -3,17 +3,19 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, AppEventFilter } from '../../../lib/domain';
     import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
-    import { addDays, getWeekNumber, isoWeeksInYear, isoWeekYear, startOfMonth, startOfWeek, ymd } from '../../../lib/time';
+    import { getWeekNumber, isoWeeksInYear, isoWeekYear, ymd } from '../../../lib/time';
+    import { buildDateGrid, shiftDateGridAnchor, type GridCell } from './dates';
+    import { isEventVisible, isEventVisibility, type EventVisibility } from '../../../lib/eventVisibility';
     import { useNow } from '../../../lib/useNow.svelte';
     
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
     import { activeCalendars, eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
-    import FilterButton from '../../../components/FilterButton.svelte';
+    import EventFilterButton from '../../../components/EventFilterButton.svelte';
 
     let {
         dragState,
@@ -29,13 +31,18 @@
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let anchor = $state(new Date());
-    let filters = $state<import('../../../lib/bindings/AppEventFilter.generated').AppEventFilter[]>([]);
+    let filters = $state<AppEventFilter[]>([]);
+    let visibility = $state<EventVisibility>({ hideRecurring: false, hideTimed: false });
     let query = $state('');
     const now = useNow(60_000);
     let today = $derived(new Date(now.ms));
 
-    const DAYS_IN_CALENDAR_GRID = 42;
-    const DAYS_IN_THREE_WEEKS = 21;
+    persistState(
+        persistedKeys.dateGridVisibility,
+        () => visibility,
+        (stored) => { visibility = stored; },
+        { isValid: isEventVisibility },
+    );
 
     persistState(
         persistedKeys.dateGridFilters,
@@ -50,25 +57,15 @@
         { isValid: (stored): stored is DateGridView => Object.values(DateGridView).includes(stored as DateGridView) },
     );
 
-    let dateGridRange = $derived.by(() => {
-        const start = view === DateGridView.Month
-            ? startOfWeek(startOfMonth(anchor))
-            : startOfWeek(anchor);
-        const dayCount = view === DateGridView.OneWeek
-            ? DAYS_IN_WEEK
-            : view === DateGridView.ThreeWeeks
-                ? DAYS_IN_THREE_WEEKS
-                : DAYS_IN_CALENDAR_GRID;
-        const end = addDays(start, dayCount);
-        return { startDate: ymd(start), endDate: ymd(end) };
-    });
+    let grid = $derived(buildDateGrid(anchor, view));
+    let cells = $derived(grid.cells);
 
     const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
-        eventInstances(dateGridRange, filters, query), { debounceMs: 150 });
+        eventInstances(grid.range, filters, query), { debounceMs: 150 });
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
-    let events = $derived(eventsQuery.data ?? []);
+    let events = $derived((eventsQuery.data ?? []).filter(event => isEventVisible(event, visibility)));
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let isSingleWeek = $derived(view === DateGridView.OneWeek);
@@ -89,29 +86,9 @@
         return `${prefix}${MONTHS[a.getMonth()]} ${a.getDate().toString()} – ${MONTHS[b.getMonth()]} ${b.getDate().toString()}, ${b.getFullYear().toString()}`;
     }
 
-    let cells = $derived.by(() => {
-        if (view === DateGridView.OneWeek || view === DateGridView.ThreeWeeks) {
-            const start = startOfWeek(anchor);
-            const length = view === DateGridView.OneWeek ? DAYS_IN_WEEK : DAYS_IN_THREE_WEEKS;
-            return Array.from({ length }, (_, i) => ({
-                date: addDays(start, i),
-                outOfMonth: false,
-            }));
-        }
-        const start = startOfWeek(startOfMonth(anchor));
-        const out = [];
-        for (let i = 0; i < DAYS_IN_CALENDAR_GRID; i++) {
-            const d = addDays(start, i);
-            out.push({ date: d, outOfMonth: d.getMonth() !== anchor.getMonth() });
-        }
-        return out;
-    });
-
-    type GridCell = { date: Date; outOfMonth: boolean };
-
     let weeks = $derived.by(() => {
         const rows: GridCell[][] = [];
-        for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+        for (let i = 0; i < cells.length; i += DAYS_IN_WEEK) rows.push(cells.slice(i, i + DAYS_IN_WEEK));
         return rows;
     });
 
@@ -132,28 +109,13 @@
         : `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear().toString()}`);
 
     function shift(n: number) {
-        if (isSingleWeek) {
-            anchor = addDays(anchor, DAYS_IN_WEEK * n);
-            return;
-        }
-        if (is3Weeks) {
-            anchor = addDays(anchor, DAYS_IN_THREE_WEEKS * n);
-            return;
-        }
-        const d = new Date(anchor);
-        d.setMonth(d.getMonth() + n);
-        anchor = d;
+        anchor = shiftDateGridAnchor(anchor, view, n);
     }
 </script>
 
 <section class="date-grid-pane">
     {#snippet filterMenu()}
-        <FilterButton
-            bind:filters
-            columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
-            getValuesForColumn={(col: string) => col === 'remotecollectionid' ? calendars.map(c => ({ label: c.summary || c.id, value: c.id })) : []}
-            align="right"
-        />
+        <EventFilterButton bind:filters bind:visibility {calendars} />
     {/snippet}
 
     <CalendarHeader
