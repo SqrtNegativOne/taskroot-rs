@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy } from 'svelte';
+    import { onDestroy, untrack } from 'svelte';
     import { createDebouncedWriter } from '../../lib/asyncState.svelte';
 
     interface Props {
@@ -10,8 +10,7 @@
 
     let { value, onchange, disabled = false }: Props = $props();
 
-    let element = $state<HTMLTextAreaElement | null>(null);
-    let localValue = $state(value);
+    let localValue = $state(untrack(() => value));
     let focused = $state(false);
 
     const writer = createDebouncedWriter<string>((next) => onchange(next), 400);
@@ -20,7 +19,7 @@
         if (!focused && value !== localValue) localValue = value;
     });
 
-    function autoGrow(node: HTMLTextAreaElement) {
+    function autoGrow(node: HTMLTextAreaElement, _value: string) {
         function resize(): void {
             node.style.height = 'auto';
             node.style.height = `${node.scrollHeight}px`;
@@ -46,7 +45,6 @@
 </script>
 
 <textarea
-    bind:this={element}
     bind:value={localValue}
     use:autoGrow={localValue}
     {disabled}

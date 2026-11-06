@@ -37,7 +37,7 @@ describe('inspector calendar options', () => {
             },
         });
 
-        await fireEvent.click(await screen.findByRole('button', { name: /Event Calendar/ }));
+        await fireEvent.click(await screen.findByRole('button', { name: 'Calendar' }));
 
         expect(screen.getByRole('button', { name: 'Event Calendar' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Task List' })).toBeNull();
@@ -58,7 +58,7 @@ describe('inspector calendar options', () => {
             },
         });
 
-        await fireEvent.click(await screen.findByRole('button', { name: /Task List/ }));
+        await fireEvent.click(await screen.findByRole('button', { name: 'List' }));
 
         expect(screen.getByRole('button', { name: 'Task List' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Event Calendar' })).toBeNull();

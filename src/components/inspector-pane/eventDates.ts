@@ -63,14 +63,26 @@ export function eventEndDate(event: Pick<AppEvent, 'startTime' | 'endTime'>): st
 export function toAllDay(event: AppEvent): EventDateFields {
     const start = datePart(event.startTime) ?? ymd(new Date());
     const end = datePart(event.endTime);
-    const endExclusive = end && end > start ? end : shiftDay(start, 1);
-    return { startTime: start, endTime: endExclusive, isAllDay: true };
+
+    if (eventIsAllDay(event)) {
+        const endExclusive = end && end > start ? end : shiftDay(start, 1);
+        return { startTime: start, endTime: endExclusive, isAllDay: true };
+    }
+
+    const endTime = timePart(event.endTime) ?? DEFAULT_START_TIME;
+    const inclusiveEnd = end && end > start ? end : start;
+    const lastDay = endTime === '00:00' && inclusiveEnd > start
+        ? shiftDay(inclusiveEnd, -1)
+        : inclusiveEnd;
+    return { startTime: start, endTime: shiftDay(lastDay, 1), isAllDay: true };
 }
 
 export function toTimed(event: AppEvent): EventDateFields {
     const startDate = datePart(event.startTime) ?? ymd(new Date());
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endDate = datePart(event.endTime) ?? startDate;
+    const endDate = eventIsAllDay(event)
+        ? eventEndDateInclusive(event) ?? startDate
+        : datePart(event.endTime) ?? startDate;
     const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
 
     if (!isBefore(startDate, startTime, endDate, endTime)) {

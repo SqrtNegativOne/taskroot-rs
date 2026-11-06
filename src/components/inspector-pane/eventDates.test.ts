@@ -64,6 +64,17 @@ describe('all-day and timed conversion', () => {
         expect(timed.endTime.slice(0, 10)).toBe('2026-11-07');
     });
 
+    it('keeps the covered days when a multi-day event becomes timed and back', () => {
+        const timed = toTimed(allDayEvent('2026-11-05', '2026-11-08'));
+        expect(timed.startTime).toBe('2026-11-05T09:00:00');
+        expect(timed.endTime).toBe('2026-11-07T10:00:00');
+        expect(toAllDay(makeEvent({ ...timed }))).toEqual({
+            startTime: '2026-11-05',
+            endTime: '2026-11-08',
+            isAllDay: true,
+        });
+    });
+
     it('repairs a same-instant timed event when becoming timed', () => {
         const timed = toTimed(makeEvent({ startTime: '2026-11-05', endTime: '2026-11-05' }));
         expect(timed.endTime > timed.startTime).toBe(true);
@@ -114,14 +125,15 @@ describe('moving end', () => {
         expect(withEndDate(event, '2026-11-01').endTime).toBe('2026-11-06');
     });
 
-    it('rolls a timed end to the next day when it would precede the start', () => {
+    it('keeps a timed end on the same day when it still follows the start', () => {
         const event = timedEvent('2026-11-05T09:00:00', '2026-11-05T10:00:00');
         expect(withEndDate(event, '2026-11-05')).toEqual({
             startTime: '2026-11-05T09:00:00',
-            endTime: '2026-11-06T10:00:00',
+            endTime: '2026-11-05T10:00:00',
             isAllDay: false,
         });
     });
+
 
     it('rolls a timed end time to the next day when it would precede the start', () => {
         const event = timedEvent('2026-11-05T09:00:00', '2026-11-05T10:00:00');
