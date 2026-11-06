@@ -1,147 +1,201 @@
 <script lang="ts">
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { activeCalendars } from '../../lib/queries';
-    import type { AppEvent, AppTask, AppCalendar } from '../../lib/domain';
+    import type { AppCalendar, AppEvent, AppTask, EventStatus } from '../../lib/domain';
     import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
-    import { getFormattedDate, getFormattedTime } from './format';
+    import { activeCalendars } from '../../lib/queries';
+    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { getFormattedTime } from './format';
+    import {
+        eventEndDate,
+        eventEndDateInclusive,
+        eventIsAllDay,
+        eventStartDate,
+        toAllDay,
+        toTimed,
+        withEndDate,
+        withEndTime,
+        withStartDate,
+        withStartTime,
+        type EventDateFields,
+    } from './eventDates';
+    import DateField from './DateField.svelte';
+    import InspectorField from './InspectorField.svelte';
+    import MetaFooter from './MetaFooter.svelte';
+    import RecurrenceEditor from './RecurrenceEditor.svelte';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TimeInput from '../inputs/TimeInput.svelte';
+    import ToggleSwitch from '../inputs/ToggleSwitch.svelte';
 
     interface Props {
         event: AppEvent;
         tasks: AppTask[];
-        updateEvent: (id: string, e: (e: AppEvent) => AppEvent) => void;
+        updateEvent: (id: string, update: (event: AppEvent) => AppEvent) => void;
         readOnly?: boolean;
     }
 
     let { event, tasks, updateEvent, readOnly = false }: Props = $props();
 
+    const EVENT_STATUSES = ['confirmed', 'tentative', 'cancelled'] as const;
+
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let calendarOptions = $derived.by(() => {
-        const writable = calendars.filter((c) => !isCalendarReadOnly(c));
-        const current = calendars.find((c) => c.id === event.remoteCollectionId);
-        // Keep the event's own read-only calendar in the list so the disabled
-        // picker still shows its name instead of the raw id.
-        const selectable =
-            current && isCalendarReadOnly(current) ? [...writable, current] : writable;
+        const writable = calendars.filter((calendar) => !isCalendarReadOnly(calendar));
+        const current = calendars.find((calendar) => calendar.id === event.remoteCollectionId);
+        const selectable = current && isCalendarReadOnly(current)
+            ? [...writable, current]
+            : writable;
         return [
-            { label: '-- No calendar --', value: '' },
-            ...selectable.map((c) => ({
-                label: c.summary || c.id,
-                value: c.id,
-                ...(c.color ? { color: c.color } : {}),
+            { label: 'No calendar', value: '' },
+            ...selectable.map((calendar) => ({
+                label: calendar.summary || calendar.id,
+                value: calendar.id,
+                ...(calendar.color ? { color: calendar.color } : {}),
             })),
         ];
     });
 
-    function updateEventDate(field: 'startTime' | 'endTime', dateStr: string): void {
-        if (!event[field]) return;
-        const timeStr = event[field].split('T')[1] ?? '00:00:00';
-        updateEvent(event.id, (e) => ({ ...e, [field]: `${dateStr}T${timeStr}` }));
+    let allDay = $derived(eventIsAllDay(event));
+    let startDate = $derived(eventStartDate(event) ?? '');
+    let timedEndDate = $derived(eventEndDate(event) ?? startDate);
+    let endDate = $derived(allDay ? (eventEndDateInclusive(event) ?? startDate) : timedEndDate);
+
+    function isEventStatus(value: string): value is EventStatus {
+        return EVENT_STATUSES.some((status) => status === value);
     }
 
-    function updateEventTime(field: 'startTime' | 'endTime', timeStr: string): void {
-        if (!event[field]) return;
-        const dateStr = event[field].split('T')[0];
-        updateEvent(event.id, (e) => ({ ...e, [field]: `${dateStr}T${timeStr}:00` }));
+    function applyDates(change: (current: AppEvent) => EventDateFields): void {
+        updateEvent(event.id, (current) => ({ ...current, ...change(current) }));
     }
 
-    function handleAttachmentChange(value: string): void {
-        updateEvent(event.id, (e) => ({ ...e, taskId: value || undefined }));
+    function handleAllDayChange(checked: boolean): void {
+        applyDates((current) => (checked ? toAllDay(current) : toTimed(current)));
+    }
+
+    function handleStatusChange(value: string): void {
+        if (!isEventStatus(value)) return;
+        updateEvent(event.id, (current) => ({ ...current, status: value }));
     }
 
     function handleCalendarChange(value: string): void {
-        const calendar = calendars.find((c) => c.id === value);
-        updateEvent(event.id, (e) => ({
-            ...e,
+        const calendar = calendars.find((candidate) => candidate.id === value);
+        updateEvent(event.id, (current) => ({
+            ...current,
             remoteCollectionId: value || undefined,
-            color: calendar?.color ?? e.color,
+            color: calendar?.color ?? current.color,
         }));
     }
 
-    function handleRruleChange(value: string): void {
-        updateEvent(event.id, (e) => ({ ...e, rrule: value || undefined }));
+    function handleAttachmentChange(value: string): void {
+        updateEvent(event.id, (current) => ({ ...current, taskId: value || undefined }));
+    }
+
+    function handleRecurrenceChange(value: string | undefined): void {
+        updateEvent(event.id, (current) => ({ ...current, rrule: value }));
     }
 </script>
 
-<div class="inspector-field">
-    <label for={`cal-${event.id}`}>Calendar</label>
+<InspectorField icon="calendar_month" label="Calendar" disabled={readOnly}>
     <SelectInput
         value={event.remoteCollectionId ?? ''}
         onchange={handleCalendarChange}
-        disabled={readOnly}
         options={calendarOptions}
+        variant="bare"
+        disabled={readOnly}
+        ariaLabel="Calendar"
     />
-</div>
+</InspectorField>
 
-<div class="inspector-field">
-    <label for={`attach-${event.id}`}>Task Attachment</label>
+<InspectorField icon="check_circle" label="Status" disabled={readOnly}>
+    <SelectInput
+        value={event.status ?? 'confirmed'}
+        onchange={handleStatusChange}
+        options={[
+            { label: 'Confirmed', value: 'confirmed' },
+            { label: 'Tentative', value: 'tentative' },
+            { label: 'Cancelled', value: 'cancelled' },
+        ]}
+        variant="bare"
+        disabled={readOnly}
+        ariaLabel="Status"
+    />
+</InspectorField>
+
+<InspectorField icon="schedule" label="All day" disabled={readOnly}>
+    <div class="inspector-inline inspector-inline-between">
+        <span class="inspector-readonly-value">{allDay ? 'All day' : 'Timed'}</span>
+        <ToggleSwitch
+            checked={allDay}
+            onchange={handleAllDayChange}
+            ariaLabel="All day event"
+            disabled={readOnly}
+        />
+    </div>
+</InspectorField>
+
+<InspectorField icon="play_circle" label="Starts" disabled={readOnly}>
+    <div class="inspector-inline">
+        <DateField
+            value={startDate}
+            placeholder="No date"
+            ariaLabel="Start date"
+            disabled={readOnly}
+            onchange={(value) => applyDates((current) => withStartDate(current, value))}
+        />
+        {#if !allDay}
+            <TimeInput
+                value={getFormattedTime(event.startTime)}
+                onchange={(value) => applyDates((current) => withStartTime(current, value))}
+                variant="bare"
+                disabled={readOnly}
+                ariaLabel="Start time"
+            />
+        {/if}
+    </div>
+</InspectorField>
+
+<InspectorField icon="stop_circle" label="Ends" disabled={readOnly}>
+    <div class="inspector-inline">
+        <DateField
+            value={endDate}
+            placeholder="Same day"
+            ariaLabel={allDay ? 'End date (inclusive)' : 'End date'}
+            disabled={readOnly}
+            min={startDate}
+            onchange={(value) => applyDates((current) => withEndDate(current, value))}
+        />
+        {#if !allDay}
+            <TimeInput
+                value={getFormattedTime(event.endTime)}
+                onchange={(value) => applyDates((current) => withEndTime(current, value))}
+                variant="bare"
+                disabled={readOnly}
+                ariaLabel="End time"
+            />
+        {/if}
+    </div>
+</InspectorField>
+
+<InspectorField icon="repeat" label="Repeat" disabled={readOnly}>
+    <RecurrenceEditor
+        value={event.rrule}
+        onchange={handleRecurrenceChange}
+        disabled={readOnly}
+    />
+</InspectorField>
+
+<InspectorField icon="link" label="Attached task" disabled={readOnly}>
     <SelectInput
         value={event.taskId ?? ''}
         onchange={handleAttachmentChange}
-        disabled={readOnly}
         options={[
-            { label: '-- No task attached --', value: '' },
-            ...tasks.map(t => ({ label: t.title, value: t.id }))
+            { label: 'No task attached', value: '' },
+            ...tasks.map(t => ({ label: t.title, value: t.id })),
         ]}
-    />
-</div>
-
-<div class="inspector-field inspector-field-group">
-    <label for={`rrule-${event.id}`}>Repeat (RRULE)</label>
-    <input
-        id={`rrule-${event.id}`}
-        type="text"
-        placeholder="Custom RRULE (e.g. FREQ=WEEKLY)"
-        value={event.rrule ?? ''}
+        variant="bare"
         disabled={readOnly}
-        onchange={(e) => handleRruleChange(e.currentTarget.value)}
-        style="cursor: {readOnly ? 'not-allowed' : 'text'}; opacity: {readOnly ? 0.5 : 1};"
+        ariaLabel="Attached task"
     />
-</div>
+</InspectorField>
 
-<div class="inspector-field-group">
-    <label for={`start-d-${event.id}`}>Start</label>
-    <div style="display: flex; gap: 8px;">
-        <input
-            id={`start-d-${event.id}`}
-            type="date"
-            class="inspector-date-input"
-            value={getFormattedDate(event.startTime)}
-            disabled={readOnly}
-            onchange={(e) => updateEventDate('startTime', e.currentTarget.value)}
-        />
-        {#if event.startTime.includes('T')}
-            <TimeInput
-                class="inspector-date-input"
-                value={getFormattedTime(event.startTime)}
-                disabled={readOnly}
-                onchange={(val: string) => updateEventTime('startTime', val)}
-            />
-        {/if}
-    </div>
-</div>
-
-<div class="inspector-field-group" style="margin-top: 8px;">
-    <label for={`end-d-${event.id}`}>End</label>
-    <div style="display: flex; gap: 8px;">
-        <input
-            id={`end-d-${event.id}`}
-            type="date"
-            class="inspector-date-input"
-            value={getFormattedDate(event.endTime)}
-            disabled={readOnly}
-            onchange={(e) => updateEventDate('endTime', e.currentTarget.value)}
-        />
-        {#if event.endTime.includes('T')}
-            <TimeInput
-                class="inspector-date-input"
-                value={getFormattedTime(event.endTime)}
-                disabled={readOnly}
-                onchange={(val: string) => updateEventTime('endTime', val)}
-            />
-        {/if}
-    </div>
-</div>
+<MetaFooter created={event.added} modified={event.updatedAt} />

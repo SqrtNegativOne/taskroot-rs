@@ -80,6 +80,9 @@ pub struct AppEvent {
     pub status: Option<EventStatus>,
     #[ts(optional)]
     pub updated_at: Option<String>,
+    /// The `CREATED` timestamp (falling back to `DTSTAMP`), ISO 8601.
+    #[ts(optional)]
+    pub added: Option<String>,
     #[ts(optional)]
     pub color: Option<Color>,
     #[ts(optional)]
@@ -120,6 +123,7 @@ mod tests {
             original_start_time: None,
             status: Some(EventStatus::Confirmed),
             updated_at: Some("2026-08-26T07:31:42Z".into()),
+            added: Some("2026-08-26T07:00:00Z".into()),
             color: None,
             etag: None,
             is_all_day: None,

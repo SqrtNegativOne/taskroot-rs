@@ -1,4 +1,5 @@
 import type { EventInstance } from '../bindings/EventInstance.generated';
+import type { TaskDateInstance } from '../bindings/TaskDateInstance.generated';
 import { addDays, ymd } from '../time';
 
 /**
@@ -18,4 +19,20 @@ export function instanceOccursOnDay(event: EventInstance, date: Date): boolean {
     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const dayEnd = addDays(dayStart, 1);
     return new Date(timing.start) < dayEnd && new Date(timing.end) > dayStart;
+}
+
+/**
+ * Whether a task's `start`/`due` marker falls on the given local calendar day.
+ *
+ * Date-only markers are floating dates; timed markers compare their UTC instant
+ * against the local day boundaries, exactly like timed events.
+ */
+export function taskDateOccursOnDay(marker: TaskDateInstance, date: Date): boolean {
+    const timing = marker.timing;
+    if (timing.kind === 'allDay') return timing.date === ymd(date);
+
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayEnd = addDays(dayStart, 1);
+    const start = new Date(timing.start);
+    return start >= dayStart && start < dayEnd;
 }

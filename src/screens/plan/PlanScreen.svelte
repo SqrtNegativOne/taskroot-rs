@@ -150,6 +150,9 @@
                                 onEventDragStart={startEventDrag}
                                 {onAddEvent}
                                 {onEventClick}
+                                onTaskClick={(marker) => {
+                                    inspectorState = { type: 'task', id: marker.taskId };
+                                }}
                             />
                         {/snippet}
 

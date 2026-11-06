@@ -14,13 +14,30 @@
         class?: string;
         style?: string;
         disabled?: boolean;
+        variant?: 'default' | 'bare';
+        ariaLabel?: string;
     }
 
-    let { value, onchange, options, class: className = '', style = '', disabled = false }: Props = $props();
+    let {
+        value,
+        onchange,
+        options,
+        class: className = '',
+        style = '',
+        disabled = false,
+        variant = 'default',
+        ariaLabel,
+    }: Props = $props();
 
     let open = $state(false);
     let ref: HTMLDivElement | null = $state(null);
     let selectedOption = $derived(options.find(o => o.value === value));
+
+    const buttonStyle = $derived(
+        variant === 'bare'
+            ? `min-height: 24px; display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; font-family: inherit; font-size: inherit; padding: 2px 0; cursor: ${disabled ? 'not-allowed' : 'pointer'}; opacity: ${disabled ? 0.5 : 1};`
+            : `padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-app); color: var(--fg); cursor: ${disabled ? 'not-allowed' : 'pointer'}; opacity: ${disabled ? 0.5 : 1}; min-height: 24px; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; font-family: inherit; font-size: inherit;`,
+    );
 
     function handleClickOutside(e: PointerEvent) {
         if (ref && !(e.target instanceof Node && ref.contains(e.target))) {
@@ -44,8 +61,10 @@
     <button
         type="button"
         class="selector-input"
+        class:is-bare={variant === 'bare'}
         {disabled}
-        style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-app); color: var(--fg); cursor: {disabled ? 'not-allowed' : 'pointer'}; opacity: {disabled ? 0.5 : 1}; min-height: 24px; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; font-family: inherit; font-size: inherit;"
+        aria-label={ariaLabel}
+        style={buttonStyle}
         onclick={() => { if (!disabled) open = !open; }}
     >
         {#if selectedOption?.color}
@@ -81,3 +100,14 @@
         </div>
     {/if}
 </div>
+
+<style>
+    .selector-input.is-bare {
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+    }
+    .selector-input.is-bare:hover:not(:disabled) {
+        color: var(--fg);
+    }
+</style>

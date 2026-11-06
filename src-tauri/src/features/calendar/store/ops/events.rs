@@ -341,6 +341,7 @@ fn exception_for(
         original_start_time: Some(occurrence.to_string()),
         status: master.status.clone(),
         updated_at: None,
+        added: None,
         color: master.color.clone(),
         etag: None,
         is_all_day: Some(is_all_day),

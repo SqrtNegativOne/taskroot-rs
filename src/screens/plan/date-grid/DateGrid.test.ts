@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../../test/tauriMock';
-import { makeInstance } from '../../../test/factories';
+import { makeInstance, makeTaskDateInstance } from '../../../test/factories';
 import { addDays, startOfWeek, ymd } from '../../../lib/time';
 import { persistedKeys } from '../../../lib/persisted.svelte';
 import type { AppCalendar } from '../../../lib/domain';
@@ -126,5 +126,58 @@ describe('DateGrid visibility filters', () => {
         const { recurring, timed } = await openFilters();
         expect(recurring).toHaveProperty('checked', false);
         expect(timed).toHaveProperty('checked', false);
+    });
+});
+
+describe('DateGrid task dates', () => {
+    beforeEach(() => {
+        tauri.reset();
+        const start = startOfWeek(new Date());
+        const startDate = ymd(start);
+        tauri.stubCommandValue('get_active_calendars', calendars);
+        tauri.stubCommandValue('get_ui_state', undefined);
+        tauri.stubCommandValue('query_event_instances', []);
+        tauri.stubCommandValue('query_task_dates', [
+            makeTaskDateInstance({
+                taskId: 'rent',
+                kind: 'start',
+                title: 'Pay rent',
+                timing: { kind: 'allDay', date: startDate },
+            }),
+            makeTaskDateInstance({
+                taskId: 'rent',
+                kind: 'due',
+                title: 'Pay rent',
+                timing: { kind: 'allDay', date: startDate },
+            }),
+            makeTaskDateInstance({
+                taskId: 'call',
+                kind: 'due',
+                title: 'Call mom',
+                timing: { kind: 'allDay', date: ymd(addDays(start, 1)) },
+            }),
+        ]);
+    });
+
+    afterEach(() => { cleanup(); });
+
+    it('renders a start and due marker even when they land on the same day', async () => {
+        const onTaskClick = vi.fn();
+        render(DateGrid, { onTaskClick });
+
+        expect(await screen.findAllByText('Pay rent')).toHaveLength(2);
+        expect(screen.getAllByText('Start')).toHaveLength(1);
+        expect(screen.getAllByText('Due')).toHaveLength(2);
+        expect(screen.getByText('Call mom')).toBeTruthy();
+    });
+
+    it('opens the task when a marker is clicked', async () => {
+        const onTaskClick = vi.fn();
+        render(DateGrid, { onTaskClick });
+
+        await fireEvent.click((await screen.findAllByText('Pay rent'))[0]);
+
+        expect(onTaskClick).toHaveBeenCalledTimes(1);
+        expect(onTaskClick.mock.calls[0][0]).toMatchObject({ taskId: 'rent', kind: 'start' });
     });
 });

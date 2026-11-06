@@ -46,6 +46,7 @@ pub async fn add_event(cli: &Cli) -> Result<(), AppError> {
         original_start_time: None,
         status: Some(EventStatus::Confirmed),
         updated_at: None,
+        added: None,
         color: None,
         etag: None,
         is_all_day: Some(cli.has("all-day")),

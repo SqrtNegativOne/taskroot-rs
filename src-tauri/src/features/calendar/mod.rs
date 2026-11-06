@@ -17,6 +17,10 @@ pub(crate) mod occurrences;
 pub(crate) mod session;
 #[allow(unreachable_pub)]
 pub(crate) mod store;
+#[allow(unreachable_pub)]
+pub(crate) mod task_dates;
+#[allow(unreachable_pub)]
+pub(crate) mod window;
 
 pub use caldav::client::CalDavClient;
 pub use caldav::model::{CalendarComponent, CalendarInfo};
@@ -32,3 +36,4 @@ pub use occurrences::{expand_event_instances, single_instance};
 pub use session::{Session, app_calendar, open};
 pub use store::persist;
 pub use store::{Resource, ResourceItems, Store, StoreState, ops, query};
+pub use task_dates::expand_task_dates;

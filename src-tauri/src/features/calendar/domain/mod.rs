@@ -4,6 +4,7 @@ pub mod filters;
 pub mod ids;
 pub mod sigil;
 pub mod task;
+pub mod task_timing;
 pub mod timing;
 
 pub use event::*;
@@ -12,4 +13,5 @@ pub use filters::*;
 pub use ids::*;
 pub use sigil::*;
 pub use task::*;
+pub use task_timing::*;
 pub use timing::*;

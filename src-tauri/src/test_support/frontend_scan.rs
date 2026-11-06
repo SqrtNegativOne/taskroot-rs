@@ -185,6 +185,10 @@ fn object_members(body: &str) -> Vec<String> {
 }
 
 fn record_member(keys: &mut Vec<String>, member: &str) {
+    let member = member.trim();
+    if member.starts_with("...") {
+        return;
+    }
     let key = member.split(':').next().unwrap_or_default().trim();
     if !key.is_empty() {
         keys.push(key.to_string());

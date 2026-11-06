@@ -9,19 +9,11 @@ use crate::features::calendar::domain::{
     wall_clock_to_utc, AppEvent, EventId, EventInstance, EventStatus, EventTiming,
 };
 use crate::features::calendar::domain::timing::{get_all_day_occurrences, get_occurrences};
-use chrono::{DateTime, Days, NaiveDate, Utc};
+use crate::features::calendar::window::RenderWindow;
+use chrono::Days;
 use chrono_tz::Tz as ChronoTz;
 use std::collections::HashSet;
 use std::str::FromStr;
-
-/// Requested render window. Date-only boundaries are interpreted in the host's
-/// local calendar (the user's timezone); instants are used as-is.
-struct RenderRange {
-    start_instant: DateTime<Utc>,
-    end_instant: DateTime<Utc>,
-    start_date: NaiveDate,
-    end_date_inclusive: NaiveDate,
-}
 
 /// Expand mirrored event rows into instances overlapping the requested range.
 #[must_use]
@@ -30,7 +22,7 @@ pub fn expand_event_instances(
     range_start_iso: &str,
     range_end_iso: &str,
 ) -> Vec<EventInstance> {
-    let Some(range) = normalize_range(range_start_iso, range_end_iso) else {
+    let Some(range) = RenderWindow::from_iso(range_start_iso, range_end_iso) else {
         return Vec::new();
     };
     let exceptions = collect_exception_keys(events);
@@ -74,7 +66,7 @@ pub fn single_instance(event: &AppEvent) -> Option<EventInstance> {
 fn push_override(
     event: &AppEvent,
     timing: EventTiming,
-    range: &RenderRange,
+    range: &RenderWindow,
     instances: &mut Vec<EventInstance>,
 ) {
     if !overlaps(&timing, range) {
@@ -105,7 +97,7 @@ fn expand_recurring(
     event: &AppEvent,
     rrule: &str,
     timing: EventTiming,
-    range: &RenderRange,
+    range: &RenderWindow,
     exceptions: &HashSet<String>,
     instances: &mut Vec<EventInstance>,
 ) {
@@ -267,7 +259,7 @@ fn normalize_exception(original: &str, timezone: Option<&str>) -> String {
         .map_or_else(|| original.to_string(), |instant| instant.to_rfc3339())
 }
 
-fn overlaps(timing: &EventTiming, range: &RenderRange) -> bool {
+fn overlaps(timing: &EventTiming, range: &RenderWindow) -> bool {
     match timing {
         EventTiming::AllDay {
             start_date,
@@ -279,45 +271,10 @@ fn overlaps(timing: &EventTiming, range: &RenderRange) -> bool {
     }
 }
 
-fn normalize_range(range_start_iso: &str, range_end_iso: &str) -> Option<RenderRange> {
-    let start_instant = parse_boundary_instant(range_start_iso, false)?;
-    let end_instant = parse_boundary_instant(range_end_iso, true)?;
-    let start_date = parse_boundary_date(range_start_iso)?;
-    let end_date_inclusive = parse_boundary_date(range_end_iso)?;
-    Some(RenderRange {
-        start_instant,
-        end_instant,
-        start_date,
-        end_date_inclusive,
-    })
-}
-
-fn parse_boundary_date(iso: &str) -> Option<NaiveDate> {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
-        return Some(dt.with_timezone(&chrono::Local).date_naive());
-    }
-    NaiveDate::parse_from_str(iso, "%Y-%m-%d").ok()
-}
-
-fn parse_boundary_instant(iso: &str, end_of_day: bool) -> Option<DateTime<Utc>> {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
-        return Some(dt.with_timezone(&Utc));
-    }
-    let date = NaiveDate::parse_from_str(iso, "%Y-%m-%d").ok()?;
-    let time = if end_of_day {
-        chrono::NaiveTime::from_hms_opt(23, 59, 59)?
-    } else {
-        chrono::NaiveTime::from_hms_opt(0, 0, 0)?
-    };
-    date.and_time(time)
-        .and_local_timezone(chrono::Local)
-        .single()
-        .map(|dt| dt.with_timezone(&Utc))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
     use crate::features::calendar::domain::EventId;
     use chrono::Datelike;
 
@@ -337,6 +294,7 @@ mod tests {
             original_start_time: None,
             status: Some(EventStatus::Confirmed),
             updated_at: None,
+            added: None,
             color: None,
             etag: None,
             is_all_day: None,

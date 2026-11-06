@@ -1,8 +1,10 @@
 //! Plan-screen queries: tasks, raw events and render-ready event instances.
 
 use crate::ipc::session::store_state;
-use crate::features::calendar::{expand_event_instances, single_instance};
-use crate::features::calendar::{AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort};
+use crate::features::calendar::{expand_event_instances, expand_task_dates, single_instance};
+use crate::features::calendar::{
+    AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort, TaskDateInstance,
+};
 use crate::error::AppError;
 use crate::features::calendar::query;
 
@@ -61,6 +63,22 @@ pub async fn query_event_instances(
         (Some(start), Some(end)) => Ok(expand_event_instances(&events, &start, &end)),
         _ => Ok(events.iter().filter_map(single_instance).collect()),
     }
+}
+
+/// Return task start/due markers inside a local date window.
+///
+/// # Errors
+///
+/// Returns an error if the store is not initialized.
+#[tauri::command]
+pub async fn query_task_dates(
+    app: tauri::AppHandle,
+    start_date: String,
+    end_date: String,
+) -> Result<Vec<TaskDateInstance>, AppError> {
+    let state = store_state(&app)?;
+    let tasks = state.read(crate::features::calendar::Store::tasks).await;
+    Ok(expand_task_dates(&tasks, &start_date, &end_date))
 }
 
 /// Fetch one raw event by id (used to reschedule instances back onto the master).

@@ -1,4 +1,4 @@
-import type { AppEvent, EventInstance, EventTiming } from '../lib/domain';
+import type { AppEvent, EventInstance, EventTiming, TaskDateInstance } from '../lib/domain';
 
 type TimedTiming = Extract<EventTiming, { kind: 'timed' }>;
 
@@ -88,6 +88,21 @@ export function makeEvent(overrides: Partial<AppEvent> = {}): AppEvent {
         title: 'Event',
         startTime: '2026-09-07T09:00:00',
         endTime: '2026-09-07T10:00:00',
+        ...overrides,
+    };
+}
+
+export function makeTaskDateInstance(
+    overrides: Partial<TaskDateInstance> = {},
+): TaskDateInstance {
+    const taskId = overrides.taskId ?? 'task-1';
+    const kind = overrides.kind ?? 'due';
+    return {
+        taskId,
+        kind,
+        occurrenceKey: `${taskId}@${kind}`,
+        title: 'Task',
+        timing: { kind: 'allDay', date: '2026-09-07' },
         ...overrides,
     };
 }

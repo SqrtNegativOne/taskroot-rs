@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { EventInstance, AppCalendar } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, TaskDateInstance } from '../../../lib/domain';
     import { isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
@@ -12,28 +12,47 @@
         today,
         nowMs,
         events,
+        taskDates = [],
         isSingleWeek,
         dragState,
         onEventDragStart,
         onAddEvent,
         onEventClick,
+        onTaskClick,
         calendars = [],
+        taskCalendars = [],
     }: {
         cell: { date: Date; outOfMonth: boolean };
         today: Date;
         nowMs: number;
         events: EventInstance[];
+        taskDates?: TaskDateInstance[];
         isSingleWeek: boolean;
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
+        onTaskClick?: (marker: TaskDateInstance) => void;
         calendars?: AppCalendar[];
+        taskCalendars?: AppCalendar[];
     } = $props();
 
     function formatStartTime(ev: EventInstance) {
         if (ev.timing.kind !== 'timed') return 'All Day';
         return formatHhMm(minutesSinceMidnight(new Date(ev.timing.start)));
+    }
+
+    function taskKindLabel(marker: TaskDateInstance) {
+        return marker.kind === 'due' ? 'Due' : 'Start';
+    }
+
+    function formatTaskTime(marker: TaskDateInstance) {
+        if (marker.timing.kind !== 'timed') return '';
+        return formatHhMm(minutesSinceMidnight(new Date(marker.timing.start)));
+    }
+
+    function taskColor(marker: TaskDateInstance): string | undefined {
+        return taskCalendars.find((calendar) => calendar.id === marker.calendarId)?.color;
     }
 
     let isToday = $derived(sameDay(cell.date, today));
@@ -76,7 +95,7 @@
     onwheel={handleWheel}
     ondblclick={(e) => {
         if (!(e.target instanceof HTMLElement)) return;
-        if (e.target.closest(".day-cell-event")) return;
+        if (e.target.closest(".day-cell-event, .day-cell-task")) return;
         if (onAddEvent) onAddEvent(cell.date);
     }}
 >
@@ -120,6 +139,26 @@
                         {/if}
                         {title}
                     </span>
+                </div>
+            {/each}
+            {#each taskDates as marker (marker.occurrenceKey)}
+                {@const isDone = marker.status === 'done'}
+                {@const taskTime = formatTaskTime(marker)}
+                <div
+                    class="day-cell-task"
+                    class:is-done={isDone}
+                    class:is-due={marker.kind === 'due'}
+                    style={eventColorVars(taskColor(marker))}
+                    onclick={(e) => {
+                        e.stopPropagation();
+                        onTaskClick?.(marker);
+                    }}
+                >
+                    <span class="day-cell-task-kind">{taskKindLabel(marker)}</span>
+                    {#if taskTime}
+                        <span class="day-cell-task-time">{taskTime}</span>
+                    {/if}
+                    <span class="day-cell-task-title">{marker.title}</span>
                 </div>
             {/each}
         </div>

@@ -113,7 +113,8 @@ fn is_all_day(event: &AppEvent) -> bool {
     event.is_all_day.unwrap_or(false) || is_date_only(&event.start_time)
 }
 
-fn is_date_only(value: &str) -> bool {
+/// Whether a canonical date/time string is a floating `YYYY-MM-DD` date.
+pub(crate) fn is_date_only(value: &str) -> bool {
     value.len() == YMD_LENGTH && !value.contains('T') && !value.contains(' ')
 }
 
@@ -176,6 +177,7 @@ mod tests {
             original_start_time: None,
             status: Some(EventStatus::Confirmed),
             updated_at: None,
+            added: None,
             color: None,
             etag: None,
             is_all_day: None,

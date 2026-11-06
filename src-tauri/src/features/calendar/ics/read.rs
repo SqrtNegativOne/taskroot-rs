@@ -240,6 +240,9 @@ fn event_from_component(component: &Component<'_>) -> Result<AppEvent, AppError>
         original_start_time,
         status: property(component, "STATUS").and_then(event_status),
         updated_at: property(component, "LAST-MODIFIED").and_then(iso_value),
+        added: property(component, "CREATED")
+            .and_then(iso_value)
+            .or_else(|| property(component, "DTSTAMP").and_then(iso_value)),
         color: text_property(component, "COLOR").and_then(|value| Color::try_from(value).ok()),
         etag: None,
         is_all_day: Some(is_all_day),

@@ -1,5 +1,5 @@
 import type { AppCalendar, AppEvent, AppTask, EventScope } from '../../lib/domain';
-import { isEventReadOnly, isRecurring } from '../../lib/domain';
+import { isCalendarReadOnly, isEventReadOnly, isRecurring } from '../../lib/domain';
 import { activeCalendars, allEvents } from '../../lib/queries';
 import { useAutoQuery } from '../../lib/safeInvoke.svelte';
 import { store } from '../../lib/store.svelte';
@@ -52,8 +52,14 @@ export class InspectorPaneState {
     }
 
     get isReadOnly(): boolean {
+        const calendars = this.calendarsQuery.data ?? [];
         const event = this.currentEvent;
-        return event !== undefined && isEventReadOnly(event, this.calendarsQuery.data ?? []);
+        if (event !== undefined) return isEventReadOnly(event, calendars);
+
+        const task = this.currentTask;
+        if (task === undefined) return false;
+        const calendar = calendars.find((candidate) => candidate.id === task.remoteCollectionId);
+        return calendar !== undefined && isCalendarReadOnly(calendar);
     }
 
     /** The stored task, falling back to the draft carried by the target until the query catches up. */

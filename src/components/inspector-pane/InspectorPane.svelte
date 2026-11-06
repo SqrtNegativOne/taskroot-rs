@@ -1,10 +1,12 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import './inspector.css';
-    import InspectorTaskFields from './InspectorTaskFields.svelte';
-    import InspectorEventFields from './InspectorEventFields.svelte';
+    import Icon from '../Icon.svelte';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
-    import TitleInput from '../inputs/TitleInput.svelte';
+    import InspectorEventFields from './InspectorEventFields.svelte';
+    import InspectorField from './InspectorField.svelte';
+    import InspectorTaskFields from './InspectorTaskFields.svelte';
+    import InspectorTitle from './InspectorTitle.svelte';
     import RecurringActionModal from '../RecurringActionModal.svelte';
     import { createInspectorState, type InspectorTarget } from './state.svelte';
 
@@ -27,14 +29,26 @@
     let paneRef = $state<HTMLElement | null>(null);
 
     onMount(() => {
-        function handleClickOutside(e: PointerEvent) {
+        function handlePointerDown(e: PointerEvent) {
             if (inspector.recurringModalOpen) return;
             if (inspectorState && paneRef && e.target instanceof Node && !paneRef.contains(e.target)) {
                 onClose();
             }
         }
-        document.addEventListener('pointerdown', handleClickOutside);
-        return () => { document.removeEventListener('pointerdown', handleClickOutside); };
+
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key !== 'Escape' || inspector.recurringModalOpen) return;
+            if (!currentItem) return;
+            e.preventDefault();
+            onClose();
+        }
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     });
 </script>
 
@@ -42,44 +56,62 @@
     bind:this={paneRef}
     class="inspector-pane"
     class:is-open={currentItem !== undefined}
+    aria-hidden={currentItem === undefined}
 >
     {#if currentItem}
         <header class="inspector-hd">
-            <TitleInput
+            <span class="inspector-kind" aria-hidden="true">
+                <Icon name={isCurrentTask ? 'task_alt' : 'event'} size={16} />
+                {isCurrentTask ? 'Task' : 'Event'}
+            </span>
+            <InspectorTitle
                 value={currentItem.title}
                 onchange={inspector.handleTitleChange}
                 disabled={isReadOnly}
-                class="inspector-title-input"
             />
-            <button class="icon-btn" onclick={onClose}>✕</button>
         </header>
 
         <div class="inspector-body">
-            <div class="inspector-field">
+            <InspectorField icon="notes" label="Description" multiline>
                 <DescriptionInput
                     value={currentTask ? currentTask.notes : currentEvent?.description}
                     onchange={inspector.handleDescriptionChange}
                     disabled={isReadOnly}
-                    class="inspector-desc-input"
                 />
-            </div>
+            </InspectorField>
 
             {#if currentTask}
-                <InspectorTaskFields task={currentTask} tasks={inspector.tasks} updateTask={inspector.updateTask} />
+                <InspectorTaskFields
+                    task={currentTask}
+                    tasks={inspector.tasks}
+                    updateTask={inspector.updateTask}
+                    readOnly={isReadOnly}
+                />
             {:else if currentEvent}
-                <InspectorEventFields event={currentEvent} tasks={inspector.tasks} updateEvent={inspector.updateEvent} readOnly={isReadOnly} />
+                <InspectorEventFields
+                    event={currentEvent}
+                    tasks={inspector.tasks}
+                    updateEvent={inspector.updateEvent}
+                    readOnly={isReadOnly}
+                />
             {/if}
 
-            <div class="inspector-actions" style="margin-top: 24px;">
-                <button class="btn-danger" onclick={inspector.handleDelete} disabled={isReadOnly} style={isReadOnly ? 'opacity: 0.5; cursor: not-allowed;' : ''}>
-                    Delete {isCurrentTask ? 'Task' : 'Event'}
+            <footer class="inspector-actions">
+                <button
+                    type="button"
+                    class="inspector-delete"
+                    onclick={inspector.handleDelete}
+                    disabled={isReadOnly}
+                >
+                    <Icon name="delete" size={16} />
+                    Delete {isCurrentTask ? 'task' : 'event'}
                 </button>
                 {#if isReadOnly}
-                    <p style="margin: 8px 0 0; font-size: 12px; color: var(--fg-dim);">
-                        This event is in a read-only calendar.
+                    <p class="inspector-readonly-note">
+                        This item is in a read-only calendar.
                     </p>
                 {/if}
-            </div>
+            </footer>
         </div>
     {/if}
 </div>

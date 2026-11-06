@@ -89,6 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         original_start_time: None,
         status: Some(EventStatus::Confirmed),
         updated_at: None,
+        added: None,
         color: Color::try_from("#4285f4".to_string()).ok(),
         etag: None,
         is_all_day: Some(false),

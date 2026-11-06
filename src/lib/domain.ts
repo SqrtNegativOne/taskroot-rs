@@ -23,6 +23,11 @@ export type { PlanDayLayout } from './bindings/PlanDayLayout.generated';
 export type { SortDirection } from './bindings/SortDirection.generated';
 export type { StopwatchState } from './bindings/StopwatchState.generated';
 export type { Tag } from './bindings/Tag.generated';
+export type { TaskAlarmAnchor } from './bindings/TaskAlarmAnchor.generated';
+export type { TaskAlarmTrigger } from './bindings/TaskAlarmTrigger.generated';
+export type { TaskDateInstance } from './bindings/TaskDateInstance.generated';
+export type { TaskDateKind } from './bindings/TaskDateKind.generated';
+export type { TaskDateTiming } from './bindings/TaskDateTiming.generated';
 export type { TaskPriority } from './bindings/TaskPriority.generated';
 export type { WindowLabel } from './bindings/WindowLabel.generated';
 

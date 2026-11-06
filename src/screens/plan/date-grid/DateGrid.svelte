@@ -3,8 +3,8 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { EventInstance, AppCalendar, AppEventFilter } from '../../../lib/domain';
-    import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, AppEventFilter, TaskDateInstance } from '../../../lib/domain';
+    import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
     import { eventColorVars } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
     import { getWeekNumber, isoWeeksInYear, isoWeekYear, ymd } from '../../../lib/time';
@@ -13,7 +13,7 @@
     import { useNow } from '../../../lib/useNow.svelte';
     
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
-    import { activeCalendars, eventInstances } from '../../../lib/queries';
+    import { activeCalendars, eventInstances, taskDates } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
 
@@ -22,11 +22,13 @@
         onEventDragStart,
         onAddEvent,
         onEventClick,
+        onTaskClick,
     }: {
         dragState?: import('../day-timeline/types').DragState;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
+        onTaskClick?: (marker: TaskDateInstance) => void;
     } = $props();
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
@@ -63,10 +65,15 @@
     const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
         eventInstances(grid.range, filters, query), { debounceMs: 150 });
 
+    const taskDatesQuery = useAutoQuery<TaskDateInstance[]>('query_task_dates', () =>
+        taskDates(grid.range), { debounceMs: 150 });
+
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
     let events = $derived((eventsQuery.data ?? []).filter(event => isEventVisible(event, visibility)));
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
+    let taskCalendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VTODO'));
+    let taskMarkers = $derived(taskDatesQuery.data ?? []);
 
     let isSingleWeek = $derived(view === DateGridView.OneWeek);
     let is3Weeks = $derived(view === DateGridView.ThreeWeeks);
@@ -102,6 +109,10 @@
 
     function cellEvents(date: Date): EventInstance[] {
         return events.filter((e) => instanceOccursOnDay(e, date) && !isMultiDayAllDay(e));
+    }
+
+    function cellTaskDates(date: Date): TaskDateInstance[] {
+        return taskMarkers.filter((marker) => taskDateOccursOnDay(marker, date));
     }
 
     let titleLabel = $derived(isStrip
@@ -143,12 +154,15 @@
                             {today}
                             nowMs={now.ms}
                             events={cellEvents(c.date)}
+                            taskDates={cellTaskDates(c.date)}
                             {isSingleWeek}
                             {dragState}
                             {onEventDragStart}
                             {onAddEvent}
                             {onEventClick}
+                            {onTaskClick}
                             calendars={calendars}
+                            {taskCalendars}
                         />
                     {/each}
                     {#each layout.spans as span (span.occurrenceKey)}
