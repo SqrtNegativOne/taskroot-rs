@@ -24,4 +24,9 @@ occurrenceStart: string, title: string, description?: string, timing: EventTimin
 /**
  * True when this instance came from a recurrence rule.
  */
-recurring: boolean, rrule?: string, calendarId?: CollectionId, color?: Color, status: EventStatus, taskId?: TaskId, };
+recurring: boolean, 
+/**
+ * The rule of the series this occurrence belongs to (the master's rule
+ * for a moved exception); `None` for a one-off event.
+ */
+rrule?: string, calendarId?: CollectionId, color?: Color, status: EventStatus, taskId?: TaskId, };

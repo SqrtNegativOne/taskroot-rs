@@ -10,7 +10,7 @@
 
 Taskroot is a desktop task management app focusing on planning, executing, and resting. It is built as a Svelte 5 application running on a native Tauri v2 Rust backend.
 
-Planning docs live at the repository root: [CLEANUP-BACKLOG.md](CLEANUP-BACKLOG.md) is the in-place cleanup list (current layout) and [RESTRUCTURE-PLAN.md](RESTRUCTURE-PLAN.md) is the target layout. They are backlogs, not a description of the current tree; this file describes the code as it is.
+Planning docs live at the repository root: [TODO.md](TODO.md) is the inspector/iCalendar backlog (missing standard properties and the `X-TASKROOT-*` removal plan). It is a backlog, not a description of the current tree; this file describes the code as it is.
 
 ## Tech Stack
 - **Package Manager**: Bun (`bun`). Used for package management and running frontend scripts.
@@ -39,7 +39,7 @@ Planning docs live at the repository root: [CLEANUP-BACKLOG.md](CLEANUP-BACKLOG.
     - `toast.ts`: `notifyError(message)` wraps `svelte-sonner`'s `toast.custom` with the click-to-copy `CopyableToast` and `duration: Infinity`; the `<Toaster>` is mounted in `+layout.svelte` in every window except `effect`. Use it for transient operation failures instead of `store.error`.
     - `ipcEvents.ts`: TypeScript mirrors of the backend event-name constants in `src-tauri/src/ipc_events.rs`.
     - `eventColor.ts`: Shared event-accent presentation (`eventColorVars`) emitting the `--ev-color`/`--ev-bg` custom properties both the date grid and day timeline consume, so their colors cannot diverge.
-    - `eventVisibility.ts`: Typed hide-recurring/hide-timed presentation choices, their persisted-state validator, and the predicate over projected `EventInstance`s. The date grid applies it before both inline-event bucketing and spanning-bar layout; it never filters raw recurrence rows before expansion.
+    - `eventVisibility.ts`: Typed hide-frequent-recurrence/hide-timed presentation choices, their persisted-state validator, and the predicate over projected `EventInstance`s. The date grid applies it before both inline-event bucketing and spanning-bar layout; it never filters raw recurrence rows before expansion. Frequent recurrence is parsed from `instance.rrule` (sub-weekly `FREQ`), so monthly/yearly series stay visible and moved exceptions inherit the master rule.
     - `time.ts`: Local-date/time helpers (`ymd`, `parseLocalYmd`, `formatHhMm`, `startOfWeek`, `startOfMonth`, `getWeekNumber`, `isoWeeksInYear`, `isoWeekYear`, `addDays`, `addMonths`, `dayDiff`, `sameDay`, `MS_PER_MINUTE`), delegating week/day arithmetic to narrow `date-fns` imports. Never use `toISOString()` for day bucketing (it shifts to UTC).
     - `queries.ts`: Named builders for backend query arguments (`eventInstances(range, filters, query)`, `allEvents()`, `activeCalendars()`), so command names and argument shapes have one home. Keep the builders thin; `ipc/tests.rs` still guards the wire contract.
     - `useNow.svelte.ts`: Shared reactive `now` primitive (one interval, cleaned up automatically); use it instead of ad-hoc rAF loops.

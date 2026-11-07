@@ -18,7 +18,7 @@
 
     const calendarOptions = $derived(calendarsForComponent(calendars, 'VEVENT')
         .map(calendar => ({ label: calendar.summary || calendar.id, value: calendar.id })));
-    const visibilityCount = $derived(Number(visibility?.hideRecurring ?? false) + Number(visibility?.hideTimed ?? false));
+    const visibilityCount = $derived(Number(visibility?.hideFrequentRecurring ?? false) + Number(visibility?.hideTimed ?? false));
 </script>
 
 <FilterButton
@@ -32,8 +32,8 @@
         {#if visibility}
             <div class="event-visibility-filters">
                 <label>
-                    <input type="checkbox" bind:checked={visibility.hideRecurring} />
-                    Hide recurring events
+                    <input type="checkbox" bind:checked={visibility.hideFrequentRecurring} />
+                    Hide daily or weekly recurring events
                 </label>
                 <label>
                     <input type="checkbox" bind:checked={visibility.hideTimed} />

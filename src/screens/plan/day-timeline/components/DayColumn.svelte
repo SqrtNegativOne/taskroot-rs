@@ -167,6 +167,7 @@
             {lane}
             {lanes}
             readOnly={readOnlyEventIds.has(event.id)}
+            {calendars}
             onResize={handleResize}
             onMove={handleMove}
             {onEventClick}

@@ -142,6 +142,7 @@
   .day-cell-event {
     font-size: 0.74em;
     line-height: 1.25;
+    min-height: 1.25em;
     padding: 1px 4px 1px 5px;
     color: white;
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));

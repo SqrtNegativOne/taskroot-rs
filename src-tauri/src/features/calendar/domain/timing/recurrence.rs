@@ -427,6 +427,41 @@ mod tests {
     }
 
     #[test]
+    fn a_yearly_all_day_series_occurs_in_a_later_year() {
+        let start = NaiveDate::from_ymd_opt(2026, 1, 19).unwrap();
+        let range_start = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
+        let range_end = NaiveDate::from_ymd_opt(2027, 1, 31).unwrap();
+        let occ = get_all_day_occurrences(
+            "RRULE:FREQ=YEARLY",
+            start,
+            None,
+            &[],
+            range_start,
+            range_end,
+        )
+        .unwrap();
+        assert_eq!(occ, vec![NaiveDate::from_ymd_opt(2027, 1, 19).unwrap()]);
+    }
+
+    #[test]
+    fn a_yearly_timed_series_occurs_in_a_later_year() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 19, 9, 0, 0).unwrap();
+        let range_start = Utc.with_ymd_and_hms(2027, 1, 1, 0, 0, 0).unwrap();
+        let range_end = Utc.with_ymd_and_hms(2027, 1, 31, 23, 59, 59).unwrap();
+        let occ = get_occurrences(
+            "RRULE:FREQ=YEARLY",
+            &start,
+            None,
+            &[],
+            &range_start,
+            &range_end,
+        )
+        .unwrap();
+        assert_eq!(occ.len(), 1);
+        assert_eq!(occ[0].format("%Y-%m-%d").to_string(), "2027-01-19");
+    }
+
+    #[test]
     fn truncating_before_an_all_day_occurrence_ends_on_the_previous_day() {
         let rrule =
             truncate_before("RRULE:FREQ=WEEKLY;BYDAY=MO", "2026-10-26", Some("Asia/Kolkata"))

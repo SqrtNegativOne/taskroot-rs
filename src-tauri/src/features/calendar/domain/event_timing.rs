@@ -146,6 +146,8 @@ pub struct EventInstance {
     pub timing: EventTiming,
     /// True when this instance came from a recurrence rule.
     pub recurring: bool,
+    /// The rule of the series this occurrence belongs to (the master's rule
+    /// for a moved exception); `None` for a one-off event.
     #[ts(optional)]
     pub rrule: Option<String>,
     #[ts(optional)]

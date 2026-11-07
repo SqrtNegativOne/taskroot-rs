@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { AppCalendar, AppEvent, AppTask, EventStatus } from '../../lib/domain';
     import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
+    import { resolveEventColor } from '../../lib/eventColor';
     import { activeCalendars } from '../../lib/queries';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { getFormattedTime } from './format';
@@ -60,6 +61,14 @@
     let timedEndDate = $derived(eventEndDate(event) ?? startDate);
     let endDate = $derived(allDay ? (eventEndDateInclusive(event) ?? startDate) : timedEndDate);
 
+    let currentCalendar = $derived(
+        calendars.find((calendar) => calendar.id === event.remoteCollectionId),
+    );
+    let effectiveColor = $derived(resolveEventColor(event, calendars));
+    let colorLabel = $derived(
+        event.color ? 'Custom' : currentCalendar?.color ? 'From calendar' : 'Default',
+    );
+
     function isEventStatus(value: string): value is EventStatus {
         return EVENT_STATUSES.some((status) => status === value);
     }
@@ -78,12 +87,18 @@
     }
 
     function handleCalendarChange(value: string): void {
-        const calendar = calendars.find((candidate) => candidate.id === value);
         updateEvent(event.id, (current) => ({
             ...current,
             remoteCollectionId: value || undefined,
-            color: calendar?.color ?? current.color,
         }));
+    }
+
+    function handleColorChange(value: string): void {
+        updateEvent(event.id, (current) => ({ ...current, color: value }));
+    }
+
+    function handleColorClear(): void {
+        updateEvent(event.id, (current) => ({ ...current, color: undefined }));
     }
 
     function handleAttachmentChange(value: string): void {
@@ -104,6 +119,32 @@
         disabled={readOnly}
         ariaLabel="Calendar"
     />
+</InspectorField>
+
+<InspectorField icon="palette" label="Colour" disabled={readOnly}>
+    <div class="inspector-inline inspector-inline-between">
+        <div class="inspector-color-field">
+            <input
+                type="color"
+                class="inspector-color-input"
+                value={effectiveColor?.slice(0, 7) ?? '#888888'}
+                disabled={readOnly}
+                aria-label="Event colour"
+                onchange={(e) => handleColorChange(e.currentTarget.value)}
+            />
+            <span class="inspector-readonly-value">{colorLabel}</span>
+        </div>
+        {#if event.color && !readOnly}
+            <button
+                type="button"
+                class="inspector-clear"
+                aria-label="Clear event colour"
+                onclick={handleColorClear}
+            >
+                <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+            </button>
+        {/if}
+    </div>
 </InspectorField>
 
 <InspectorField icon="check_circle" label="Status" disabled={readOnly}>

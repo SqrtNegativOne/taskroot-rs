@@ -5,7 +5,7 @@
     import DayCell from './DayCell.svelte';
     import type { EventInstance, AppCalendar, AppEventFilter, TaskDateInstance } from '../../../lib/domain';
     import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
-    import { eventColorVars } from '../../../lib/eventColor';
+    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
     import { getWeekNumber, isoWeeksInYear, isoWeekYear, ymd } from '../../../lib/time';
     import { buildDateGrid, shiftDateGridAnchor, type GridCell } from './dates';
@@ -34,7 +34,7 @@
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let anchor = $state(new Date());
     let filters = $state<AppEventFilter[]>([]);
-    let visibility = $state<EventVisibility>({ hideRecurring: false, hideTimed: false });
+    let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false });
     let query = $state('');
     const now = useNow(60_000);
     let today = $derived(new Date(now.ms));
@@ -175,13 +175,13 @@
                             class:is-readonly={readOnly}
                             class:is-dragging={dragState?.event?.id === span.instance.id}
                             tabindex={span.continuesBefore ? -1 : 0}
-                            title={span.instance.title}
+                            title={span.instance.title || 'Untitled'}
                             style="
                                 --start-col: {span.startCol};
                                 --span-cols: {span.endColExclusive - span.startCol};
                                 --lane: {span.lane};
                                 cursor: {readOnly ? 'default' : 'grab'};
-                                {eventColorVars(span.instance.color)}
+                                {eventColorVars(resolveEventColor(span.instance, calendars))}
                             "
                             onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, span.instance)}
                             onclick={(e) => {
@@ -189,7 +189,7 @@
                                 onEventClick?.(span.instance);
                             }}
                         >
-                            {span.instance.title}
+                            {span.instance.title || 'Untitled'}
                         </button>
                     {/each}
                 </div>

@@ -6,8 +6,8 @@
         PX_PER_MIN,
         SNAP_MIN,
     } from './constants';
-    import type { EventInstance } from '../../../lib/domain';
-    import { eventColorVars } from '../../../lib/eventColor';
+    import type { AppCalendar, EventInstance } from '../../../lib/domain';
+    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
     import { formatHhMm } from '../../../lib/time';
     import { MINUTES_PER_DAY, snapPixels } from '../snapping';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
@@ -25,6 +25,7 @@
         onMove,
         onEventClick,
         readOnly = false,
+        calendars = [],
     }: {
         event: EventInstance;
         startMins: number;
@@ -35,6 +36,7 @@
         onMove?: (event: EventInstance, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
         readOnly?: boolean;
+        calendars?: AppCalendar[];
     } = $props();
 
     let dragOffset = $state<number | undefined>(undefined);
@@ -143,7 +145,7 @@
             height: {height}px;
             --event-lane: {lane};
             --event-lanes: {lanes};
-            {eventColorVars(event.color)}
+            {eventColorVars(resolveEventColor(event, calendars))}
         "
         onpointerdown={isGhost ? undefined : onBodyDown}
     >

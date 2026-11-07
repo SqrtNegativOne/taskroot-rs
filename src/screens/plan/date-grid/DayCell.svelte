@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { EventInstance, AppCalendar, TaskDateInstance } from '../../../lib/domain';
     import { isEventReadOnly } from '../../../lib/domain';
-    import { eventColorVars } from '../../../lib/eventColor';
+    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
     import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
 
     const OPACITY_FADED = 0.4;
@@ -118,7 +118,7 @@
                     style="
                         cursor: {readOnly ? 'default' : 'grab'};
                         opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
-                        {eventColorVars(ev.color)}
+                        {eventColorVars(resolveEventColor(ev, calendars))}
                     "
                     onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, ev)}
                     onclick={(e) => {
@@ -137,7 +137,7 @@
                                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                             </svg>
                         {/if}
-                        {title}
+                        {title || 'Untitled'}
                     </span>
                 </div>
             {/each}

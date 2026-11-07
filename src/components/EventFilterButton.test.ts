@@ -22,7 +22,7 @@ describe('EventFilterButton', () => {
     });
 
     it('keeps the Filter button accessible by name when its badge is active', () => {
-        render(EventFilterButton, { props: { calendars, visibility: { hideRecurring: true, hideTimed: true } } });
+        render(EventFilterButton, { props: { calendars, visibility: { hideFrequentRecurring: true, hideTimed: true } } });
         expect(screen.getByRole('button', { name: 'Filter' })).toBeTruthy();
     });
 });

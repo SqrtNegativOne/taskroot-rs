@@ -21,7 +21,7 @@ const calendars: AppCalendar[] = [
 async function openFilters() {
     await fireEvent.click(screen.getByTitle('Filter'));
     return {
-        recurring: screen.getByRole('checkbox', { name: 'Hide recurring events' }),
+        recurring: screen.getByRole('checkbox', { name: 'Hide daily or weekly recurring events' }),
         timed: screen.getByRole('checkbox', { name: 'Hide timed events' }),
     };
 }
@@ -42,9 +42,10 @@ describe('DateGrid visibility filters', () => {
         tauri.stubCommandValue('query_event_instances', [
             makeInstance({ id: 'all-day', title: 'One-off all day', timing: { kind: 'allDay', startDate, endDateExclusive } }),
             makeInstance({ id: 'timed', title: 'One-off timed', timing }),
-            makeInstance({ id: 'repeat', title: 'Recurring timed', recurring: true, timing }),
-            makeInstance({ id: 'exception', title: 'Moved exception', recurring: true, timing }),
-            makeInstance({ id: 'span', title: 'Recurring span', recurring: true, timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 3)) } }),
+            makeInstance({ id: 'repeat', title: 'Recurring timed', recurring: true, rrule: 'RRULE:FREQ=DAILY', timing }),
+            makeInstance({ id: 'exception', title: 'Moved exception', recurring: true, rrule: 'RRULE:FREQ=WEEKLY', timing }),
+            makeInstance({ id: 'span', title: 'Recurring span', recurring: true, rrule: 'RRULE:FREQ=WEEKLY', timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 3)) } }),
+            makeInstance({ id: 'yearly', title: 'Yearly event', recurring: true, rrule: 'RRULE:FREQ=YEARLY', timing }),
         ]);
     });
 
@@ -56,6 +57,7 @@ describe('DateGrid visibility filters', () => {
         expect(screen.getByText('One-off timed')).toBeTruthy();
         expect(screen.getByText('Recurring timed')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Recurring span' })).toBeTruthy();
+        expect(screen.getByText('Yearly event')).toBeTruthy();
         const { recurring, timed } = await openFilters();
         expect(recurring).toHaveProperty('checked', false);
         expect(timed).toHaveProperty('checked', false);
@@ -65,7 +67,7 @@ describe('DateGrid visibility filters', () => {
         expect(screen.queryByRole('checkbox', { name: 'Task List' })).toBeNull();
     });
 
-    it('hides recurring occurrences, exceptions and spanning bars, and can restore them', async () => {
+    it('hides daily and weekly recurring occurrences, exceptions and spanning bars, but keeps less frequent series', async () => {
         render(DateGrid);
         await screen.findByText('Recurring timed');
         const { recurring } = await openFilters();
@@ -73,6 +75,7 @@ describe('DateGrid visibility filters', () => {
         expect(screen.queryByText('Recurring timed')).toBeNull();
         expect(screen.queryByText('Moved exception')).toBeNull();
         expect(screen.queryByRole('button', { name: 'Recurring span' })).toBeNull();
+        expect(screen.getByText('Yearly event')).toBeTruthy();
         expect(screen.getByText('One-off timed')).toBeTruthy();
         expect(screen.getByText('One-off all day')).toBeTruthy();
         await fireEvent.click(recurring);
@@ -106,7 +109,7 @@ describe('DateGrid visibility filters', () => {
         await fireEvent.click(timed);
         mounted.unmount();
         await waitFor(() => {
-            expect(stored.get(persistedKeys.dateGridVisibility)).toEqual({ hideRecurring: false, hideTimed: true });
+            expect(stored.get(persistedKeys.dateGridVisibility)).toEqual({ hideFrequentRecurring: false, hideTimed: true });
         });
         render(DateGrid);
         await screen.findByText('One-off all day');
@@ -119,13 +122,36 @@ describe('DateGrid visibility filters', () => {
 
     it('ignores malformed stored visibility instead of accidentally hiding events', async () => {
         tauri.stubCommand('get_ui_state', args => args?.key === persistedKeys.dateGridVisibility
-            ? { hideRecurring: 'false', hideTimed: true }
+            ? { hideFrequentRecurring: 'false', hideTimed: true }
             : undefined);
         render(DateGrid);
         await screen.findByText('One-off timed');
         const { recurring, timed } = await openFilters();
         expect(recurring).toHaveProperty('checked', false);
         expect(timed).toHaveProperty('checked', false);
+    });
+});
+
+describe('DateGrid event titles', () => {
+    beforeEach(() => {
+        tauri.reset();
+        const start = startOfWeek(new Date());
+        tauri.stubCommandValue('get_active_calendars', calendars);
+        tauri.stubCommandValue('get_ui_state', undefined);
+        tauri.stubCommandValue('query_event_instances', [
+            makeInstance({
+                id: 'unnamed',
+                title: '',
+                timing: { kind: 'allDay', startDate: ymd(start), endDateExclusive: ymd(addDays(start, 1)) },
+            }),
+        ]);
+    });
+
+    afterEach(() => { cleanup(); });
+
+    it('labels an unnamed event instead of rendering an empty box', async () => {
+        render(DateGrid);
+        expect(await screen.findByText('Untitled')).toBeTruthy();
     });
 });
 

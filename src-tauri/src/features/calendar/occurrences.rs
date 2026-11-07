@@ -12,7 +12,7 @@ use crate::features::calendar::domain::timing::{get_all_day_occurrences, get_occ
 use crate::features::calendar::window::RenderWindow;
 use chrono::Days;
 use chrono_tz::Tz as ChronoTz;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 /// Expand mirrored event rows into instances overlapping the requested range.
@@ -26,6 +26,7 @@ pub fn expand_event_instances(
         return Vec::new();
     };
     let exceptions = collect_exception_keys(events);
+    let series_rules = collect_series_rules(events);
 
     let mut instances = Vec::new();
     for event in events {
@@ -37,7 +38,7 @@ pub fn expand_event_instances(
         };
 
         if event.recurring_event_id.is_some() {
-            push_override(event, timing, &range, &mut instances);
+            push_override(event, timing, &range, &series_rules, &mut instances);
         } else if let Some(rrule) = &event.rrule {
             expand_recurring(event, rrule, timing, &range, &exceptions, &mut instances);
         } else if overlaps(&timing, &range) {
@@ -67,6 +68,7 @@ fn push_override(
     event: &AppEvent,
     timing: EventTiming,
     range: &RenderWindow,
+    series_rules: &HashMap<EventId, String>,
     instances: &mut Vec<EventInstance>,
 ) {
     if !overlaps(&timing, range) {
@@ -90,7 +92,11 @@ fn push_override(
         .original_start_time
         .clone()
         .unwrap_or_else(|| canonical_start(&timing));
-    instances.push(build_instance(event, timing, key, start, true));
+    let mut instance = build_instance(event, timing, key, start, true);
+    if instance.rrule.is_none() {
+        instance.rrule = series_rules.get(&master).cloned();
+    }
+    instances.push(instance);
 }
 
 fn expand_recurring(
@@ -199,6 +205,13 @@ fn build_instance(
         status: event.status.clone().unwrap_or(EventStatus::Confirmed),
         task_id: event.task_id.clone(),
     }
+}
+
+fn collect_series_rules(events: &[AppEvent]) -> HashMap<EventId, String> {
+    events
+        .iter()
+        .filter_map(|event| Some((event.id.clone(), event.rrule.clone()?)))
+        .collect()
 }
 
 fn collect_exception_keys(events: &[AppEvent]) -> HashSet<String> {
@@ -488,6 +501,32 @@ mod tests {
                 "2026-09-03T09:00:00+00:00",
             ],
             "the moved occurrence replaces the original slot exactly once"
+        );
+    }
+
+    #[test]
+    fn a_moved_occurrence_reports_the_master_rule() {
+        let mut master = event("evt-1", "2026-09-01T09:00:00Z", "2026-09-01T09:30:00Z");
+        master.rrule = Some("RRULE:FREQ=DAILY;COUNT=3".into());
+
+        let mut moved = event("evt-2", "2026-09-02T14:00:00Z", "2026-09-02T14:30:00Z");
+        moved.recurring_event_id = Some(EventId::from("evt-1"));
+        moved.original_start_time = Some("2026-09-02T09:00:00Z".into());
+
+        let instances = expand_event_instances(
+            &[master, moved],
+            "2026-09-01T00:00:00Z",
+            "2026-09-03T23:59:59Z",
+        );
+
+        let moved_instance = instances
+            .iter()
+            .find(|instance| instance.id == EventId::from("evt-2"))
+            .unwrap();
+        assert_eq!(
+            moved_instance.rrule.as_deref(),
+            Some("RRULE:FREQ=DAILY;COUNT=3"),
+            "an exception inherits the series rule so presentation can classify it"
         );
     }
 
