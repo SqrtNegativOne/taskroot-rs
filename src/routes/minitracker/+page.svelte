@@ -56,6 +56,9 @@
     }
 
     let isDimmed = $state(false);
+    let leftShiftDown = false;
+    let rightShiftDown = false;
+    let shiftBreakFired = false;
     let baseAlpha = $state(0.8);
     let menuBarHeight = $state(DEFAULT_BAR_HEIGHT);
     let barElement: HTMLDivElement | undefined = $state();
@@ -231,10 +234,53 @@
         return false;
     }
 
+    function handleTransportShortcut(e: KeyboardEvent): boolean {
+        if (e.code !== 'Space') return false;
+        e.preventDefault();
+        void stopwatchState.toggle();
+        return true;
+    }
+
+    function handleShiftKeyDown(e: KeyboardEvent): boolean {
+        if (e.code === 'ShiftLeft') {
+            leftShiftDown = true;
+        } else if (e.code === 'ShiftRight') {
+            rightShiftDown = true;
+        } else {
+            return false;
+        }
+
+        if (leftShiftDown && rightShiftDown && !shiftBreakFired) {
+            shiftBreakFired = true;
+            e.preventDefault();
+            void stopwatchState.toggleBreak();
+        }
+        return true;
+    }
+
+    function handleShiftKeyUp(e: KeyboardEvent): void {
+        if (e.code === 'ShiftLeft') {
+            leftShiftDown = false;
+        } else if (e.code === 'ShiftRight') {
+            rightShiftDown = false;
+        } else {
+            return;
+        }
+        shiftBreakFired = false;
+    }
+
+    function resetShiftState(): void {
+        leftShiftDown = false;
+        rightShiftDown = false;
+        shiftBreakFired = false;
+    }
+
     onMount(() => {
         void getCurrentWindow().setAlwaysOnTop(true);
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (handleShiftKeyDown(e)) return;
+
             if (isTypingTarget(e.target)) {
                 handleEscape(e);
                 return;
@@ -246,17 +292,23 @@
                 void runShortcut(shortcut.action);
                 return;
             }
-            if (handleEscape(e) || handlePauseShortcut(e)) return;
+            if (handleEscape(e) || handlePauseShortcut(e) || handleTransportShortcut(e)) return;
+        };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            handleShiftKeyUp(e);
         };
         const handleBlur = () => {
+            resetShiftState();
             void controller.closeMenu();
         };
 
         window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('blur', handleBlur);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('blur', handleBlur);
         };
     });
