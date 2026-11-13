@@ -199,7 +199,7 @@ fn timed_exdates(exdates: &[String], tz: rrule::Tz, named: bool) -> Vec<String> 
         .iter()
         .filter_map(|value| {
             let datetime = NaiveDateTime::parse_from_str(
-                value.strip_suffix('Z').unwrap_or(value),
+                value.trim_suffix('Z'),
                 DTO_DATE_TIME,
             )
             .or_else(|_| {

@@ -110,7 +110,7 @@ fn nested_component_lines(raw: &str) -> Vec<String> {
     for line in content_lines(raw) {
         if line.starts_with("END:") {
             if enclosing >= 3 {
-                lines.push(line.clone());
+                lines.push(line);
             }
             enclosing = enclosing.saturating_sub(1);
             continue;

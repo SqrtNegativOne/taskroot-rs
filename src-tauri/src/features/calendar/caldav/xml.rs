@@ -217,7 +217,7 @@ pub fn parse_collections(xml: &str, home_href: &str) -> Result<Vec<CalendarInfo>
         };
         calendars.push(CalendarInfo {
             href,
-            display_name: prop(&props, "displayname").map(text).unwrap_or_default(),
+            display_name: prop(&props, "displayname").map_or_default(text),
             color: prop(&props, "calendar-color")
                 .map(text)
                 .filter(|color| color.starts_with('#')),

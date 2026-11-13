@@ -1,2 +1,7 @@
 [alias]
 c = "clippy"
+
+[registry]
+# Supply-chain cooldown: the resolver ignores versions published more recently
+# than this unless they are already in Cargo.lock (Rust 1.100, RFC 3923).
+global-min-publish-age = "7 days"

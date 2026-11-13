@@ -158,7 +158,7 @@ pub fn parse_date_text(
             .map(DateValue::Date);
     }
     let utc = raw.ends_with('Z');
-    let stamp = raw.strip_suffix('Z').unwrap_or(raw);
+    let stamp = raw.trim_suffix('Z');
     let naive = NaiveDateTime::parse_from_str(stamp, ICAL_DATE_TIME).ok()?;
     Some(DateValue::Timed {
         naive,
@@ -483,7 +483,7 @@ fn alarm_trigger(trigger: &Property<'_>) -> Option<TaskAlarmTrigger> {
 }
 
 fn is_date_time(raw: &str) -> bool {
-    let stamp = raw.strip_suffix('Z').unwrap_or(raw);
+    let stamp = raw.trim_suffix('Z');
     NaiveDateTime::parse_from_str(stamp, ICAL_DATE_TIME).is_ok()
 }
 

@@ -61,21 +61,18 @@ pub struct Store {
 impl Store {
     /// Load settings and UI state; the resource map starts empty and is filled
     /// from Radicale by the caller.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the data directory cannot be read.
-    pub fn load(data_dir: PathBuf) -> Result<Self, AppError> {
+    #[must_use]
+    pub fn load(data_dir: PathBuf) -> Self {
         let settings = persist::read_settings(&data_dir);
         let ui_state = persist::read_ui_state(&data_dir);
-        Ok(Self {
+        Self {
             data_dir,
             resources: BTreeMap::new(),
             calendars: Vec::new(),
             settings,
             ui_state,
             revision: 0,
-        })
+        }
     }
 
     /// A monotonically changing marker for the current resource map.

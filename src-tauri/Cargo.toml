@@ -79,6 +79,9 @@ panic = "deny"
 exit = "deny"
 as_conversions = "deny"
 
+[lints.cargo]
+unused_dependencies = "warn"
+
 [dev-dependencies]
 proptest = "1.6.0"
 tempfile = "3"

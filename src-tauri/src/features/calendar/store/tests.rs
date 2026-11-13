@@ -21,7 +21,7 @@ const SERIES_COLLECTION: &str = "/cal/";
 
 fn store_with_series(raw: &str) -> Store {
     let dir = tempfile::tempdir().unwrap();
-    let mut store = Store::load(dir.path().to_path_buf()).unwrap();
+    let mut store = Store::load(dir.path().to_path_buf());
     store.calendars = vec![CalendarInfo {
         href: SERIES_COLLECTION.to_string(),
         display_name: "Cal".to_string(),
@@ -168,7 +168,7 @@ async fn full_load_replaces_the_store_with_the_server_contents() {
         .await;
 
     let dir = tempfile::tempdir().unwrap();
-    let mut store = Store::load(dir.path().to_path_buf()).unwrap();
+    let mut store = Store::load(dir.path().to_path_buf());
     store
         .set_resource("/cal/stale.ics", "/cal/", None, all_day())
         .unwrap();

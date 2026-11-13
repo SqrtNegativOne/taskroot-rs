@@ -83,7 +83,7 @@ impl Document {
         let mut lines = Vec::new();
         let mut current: Option<RawLine> = None;
         for piece in pieces {
-            let content = piece.strip_suffix('\r').unwrap_or(piece);
+            let content = piece.trim_suffix('\r');
             if let Some(continuation) = content.strip_prefix([' ', '\t']) {
                 if let Some(open) = current.as_mut() {
                     open.text.push_str(continuation);
@@ -209,11 +209,7 @@ impl Document {
             })
             .collect::<Vec<_>>();
         for (position, index) in matching.iter().copied().enumerate() {
-            let current = self
-                .lines
-                .get(index)
-                .map(RawLine::as_str)
-                .unwrap_or_default();
+            let current = self.lines.get(index).map_or_default(RawLine::as_str);
             match spec.values.get(position) {
                 Some(value) if value == current => {}
                 Some(value) => {
@@ -521,7 +517,7 @@ mod tests {
                 if index == 0 {
                     line.clone()
                 } else {
-                    line.strip_prefix(' ').unwrap_or(line).to_string()
+                    line.trim_prefix(' ').to_string()
                 }
             })
             .collect();

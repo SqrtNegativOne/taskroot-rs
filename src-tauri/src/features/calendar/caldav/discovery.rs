@@ -261,8 +261,8 @@ async fn fetch_propfind(client: &CalDavClient, href: &str, body: &str) -> Result
 fn normalized_host(url: &Url) -> Option<String> {
     let host = url.host_str()?;
     Some(
-        host.trim_start_matches('[')
-            .trim_end_matches(']')
+        host.trim_prefix('[')
+            .trim_suffix(']')
             .to_ascii_lowercase(),
     )
 }

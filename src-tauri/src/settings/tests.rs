@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 #[tokio::test]
 async fn get_settings_returns_the_defaults_when_nothing_is_stored() {
     let dir = tempfile::tempdir().unwrap();
-    let state = StoreState::new(Store::load(dir.path().to_path_buf()).expect("load store"));
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
 
     assert_eq!(
         serde_json::to_value(storage::read_settings(&state).await.unwrap()).unwrap(),
@@ -18,7 +18,7 @@ async fn get_settings_returns_the_defaults_when_nothing_is_stored() {
 #[tokio::test]
 async fn update_setting_round_trips_through_the_json_file() {
     let dir = tempfile::tempdir().unwrap();
-    let state = StoreState::new(Store::load(dir.path().to_path_buf()).unwrap());
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
 
     storage::write_setting(&state, "clock_style", &json!("counter"))
         .await
@@ -38,7 +38,7 @@ async fn update_setting_round_trips_through_the_json_file() {
 #[tokio::test]
 async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() {
     let dir = tempfile::tempdir().unwrap();
-    let state = StoreState::new(Store::load(dir.path().to_path_buf()).unwrap());
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
 
     let error = storage::write_setting(&state, "pause_minutes", &json!("15"))
         .await
@@ -51,7 +51,7 @@ async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() 
 #[tokio::test]
 async fn ui_state_round_trips_and_is_absent_until_written() {
     let dir = tempfile::tempdir().unwrap();
-    let state = StoreState::new(Store::load(dir.path().to_path_buf()).expect("load store"));
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
     let stored = json!([{ "column": "status", "value": ["done"] }]);
 
     assert_eq!(
