@@ -1,6 +1,6 @@
   /* ── Month calendar ─────────────────────────────────────────────────── */
 
-  .date-grid-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .date-grid-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; font-size: calc(14px * var(--font-scale, 1)); }
   .cal-grid {
     flex: 1; min-height: 0;
     display: flex; flex-direction: column;
@@ -47,12 +47,13 @@
     background: var(--bg);
     transition: background 80ms;
   }
-  .day-cell:hover { background: var(--bg-highlight); }
+  .day-cell:hover { background: var(--bg-surface-hover); }
   .day-cell.is-past .day-cell-num { color: var(--fg-dim); }
   .day-cell.is-out { background: var(--bg); }
-  .day-cell.is-out:hover { background: var(--bg-highlight); }
+  .day-cell.is-out:hover { background: var(--bg-surface-hover); }
   .day-cell.is-out .day-cell-num { color: var(--fg-dimmest); }
   .day-cell.is-today { background: var(--bg-highlight); }
+  .day-cell.is-today:hover { background: var(--bg-surface-hover); }
   .day-cell.is-today .day-cell-num { 
     background: #e81123; 
     color: white; 
@@ -125,6 +126,7 @@
     background: var(--ev-bg, var(--bg-surface));
     color: white;
     font: inherit;
+    font-family: var(--sans);
     font-size: 0.74em;
     line-height: var(--span-h, 18px);
     text-align: left;
@@ -138,8 +140,15 @@
   .cal-span:hover { filter: brightness(1.15); }
   .cal-span.is-readonly { opacity: 0.6; cursor: default; }
   .cal-span.is-dragging { opacity: 0.4; }
+  .cal-span.is-selected,
+  .day-cell-event.is-selected {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+    filter: brightness(1.15);
+  }
   .cal-cells.dragging .cal-span { pointer-events: none; }
   .day-cell-event {
+    font-family: var(--sans);
     font-size: 0.74em;
     line-height: 1.25;
     min-height: 1.25em;
@@ -163,7 +172,7 @@
   .day-cell-event.pri-bar-2 { border-left-color: #b59864; }
   .day-cell-event.pri-bar-3 { border-left-color: #c47e68; }
   .day-cell-event.pri-bar-4 { border-left-color: #c96b7f; }
-  .day-cell-event-time { color: white; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .day-cell-event-time { color: white; flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
   .day-cell-task {
     font-size: 0.74em;

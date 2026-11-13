@@ -19,6 +19,7 @@
         onAddTask,
         onDeleteTask,
         onTaskClick,
+        selectedTaskId,
         footer,
     }: {
         onUpdateTask?: (task: AppTask) => void;
@@ -27,6 +28,7 @@
         onAddTask: (defaults?: Partial<AppTask>) => void;
         onDeleteTask?: (id: string) => void;
         onTaskClick?: (task: AppTask) => void;
+        selectedTaskId?: string;
         footer?: import('svelte').Snippet;
     } = $props();
 
@@ -178,6 +180,7 @@
                         {updateTask}
                         {deleteTask}
                         isPastDue={pastDueTaskIds.has(item.task.id)}
+                        selected={item.task.id === selectedTaskId}
                         {onTaskClick}
                     />
                 </div>

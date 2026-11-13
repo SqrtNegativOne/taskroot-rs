@@ -19,12 +19,14 @@
 
     let {
         dragState,
+        selectedEventId,
         onEventDragStart,
         onAddEvent,
         onEventClick,
         onTaskClick,
     }: {
         dragState?: import('../day-timeline/types').DragState;
+        selectedEventId?: string;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
@@ -80,17 +82,12 @@
     let isStrip = $derived(isSingleWeek || is3Weeks);
 
     const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const DOW_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-    function weekRangeLabel(a: Date, b: Date) {
+    function weekLabel(a: Date) {
         const week = getWeekNumber(a);
         const totalWeeks = isoWeeksInYear(isoWeekYear(a));
-        const prefix = `Week #${week.toString()}/${totalWeeks.toString()} `;
-        if (a.getMonth() === b.getMonth()) {
-            return `${prefix}${MONTHS_LONG[a.getMonth()]} ${a.getDate().toString()}–${b.getDate().toString()}, ${a.getFullYear().toString()}`;
-        }
-        return `${prefix}${MONTHS[a.getMonth()]} ${a.getDate().toString()} – ${MONTHS[b.getMonth()]} ${b.getDate().toString()}, ${b.getFullYear().toString()}`;
+        return `Week #${week.toString()}/${totalWeeks.toString()} ${MONTHS_LONG[anchor.getMonth()]}`;
     }
 
     let weeks = $derived.by(() => {
@@ -116,7 +113,7 @@
     }
 
     let titleLabel = $derived(isStrip
-        ? weekRangeLabel(cells[0].date, cells[cells.length - 1].date)
+        ? weekLabel(cells[0].date)
         : `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear().toString()}`);
 
     function shift(n: number) {
@@ -157,6 +154,7 @@
                             taskDates={cellTaskDates(c.date)}
                             {isSingleWeek}
                             {dragState}
+                            {selectedEventId}
                             {onEventDragStart}
                             {onAddEvent}
                             {onEventClick}
@@ -174,6 +172,7 @@
                             class:cont-after={span.continuesAfter}
                             class:is-readonly={readOnly}
                             class:is-dragging={dragState?.event?.id === span.instance.id}
+                            class:is-selected={span.instance.id === selectedEventId}
                             tabindex={span.continuesBefore ? -1 : 0}
                             title={span.instance.title || 'Untitled'}
                             style="

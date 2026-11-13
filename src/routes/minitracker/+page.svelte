@@ -315,7 +315,7 @@
 
     const handleDoubleClick = async (e: MouseEvent) => {
         if (isInteractiveTarget(e.target)) return;
-        await safeInvoke('quit_app');
+        await safeInvoke('window_restore_main');
     };
 </script>
 

@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import './inspector.css';
-    import Icon from '../Icon.svelte';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
     import InspectorEventFields from './InspectorEventFields.svelte';
     import InspectorField from './InspectorField.svelte';
@@ -23,7 +22,6 @@
     const currentTask = $derived(inspector.currentTask);
     const currentEvent = $derived(inspector.currentEvent);
     const currentItem = $derived(inspector.currentItem);
-    const isCurrentTask = $derived(inspector.isCurrentTask);
     const isReadOnly = $derived(inspector.isReadOnly);
 
     let paneRef = $state<HTMLElement | null>(null);
@@ -60,10 +58,6 @@
 >
     {#if currentItem}
         <header class="inspector-hd">
-            <span class="inspector-kind" aria-hidden="true">
-                <Icon name={isCurrentTask ? 'task_alt' : 'event'} size={16} />
-                {isCurrentTask ? 'Task' : 'Event'}
-            </span>
             <InspectorTitle
                 value={currentItem.title}
                 onchange={inspector.handleTitleChange}
@@ -86,6 +80,7 @@
                     tasks={inspector.tasks}
                     updateTask={inspector.updateTask}
                     readOnly={isReadOnly}
+                    onDelete={inspector.handleDelete}
                 />
             {:else if currentEvent}
                 <InspectorEventFields
@@ -93,25 +88,15 @@
                     tasks={inspector.tasks}
                     updateEvent={inspector.updateEvent}
                     readOnly={isReadOnly}
+                    onDelete={inspector.handleDelete}
                 />
             {/if}
 
-            <footer class="inspector-actions">
-                <button
-                    type="button"
-                    class="inspector-delete"
-                    onclick={inspector.handleDelete}
-                    disabled={isReadOnly}
-                >
-                    <Icon name="delete" size={16} />
-                    Delete {isCurrentTask ? 'task' : 'event'}
-                </button>
-                {#if isReadOnly}
-                    <p class="inspector-readonly-note">
-                        This item is in a read-only calendar.
-                    </p>
-                {/if}
-            </footer>
+            {#if isReadOnly}
+                <p class="inspector-readonly-note">
+                    This item is in a read-only calendar.
+                </p>
+            {/if}
         </div>
     {/if}
 </div>

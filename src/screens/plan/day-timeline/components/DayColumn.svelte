@@ -18,6 +18,7 @@
         today,
         laid,
         dragState,
+        selectedEventId,
         onResizeEvent,
         onMoveEvent,
         onEventClick,
@@ -29,6 +30,7 @@
         today: Date;
         laid: LaidEvent[];
         dragState?: DragState;
+        selectedEventId?: string;
         onResizeEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onMoveEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
@@ -166,6 +168,7 @@
             {endMins}
             {lane}
             {lanes}
+            selected={event.id === selectedEventId}
             readOnly={readOnlyEventIds.has(event.id)}
             {calendars}
             onResize={handleResize}

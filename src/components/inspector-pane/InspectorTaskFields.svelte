@@ -24,9 +24,10 @@
         tasks: AppTask[];
         updateTask: (id: string, update: (task: AppTask) => AppTask) => void;
         readOnly?: boolean;
+        onDelete?: () => void;
     }
 
-    let { task, tasks, updateTask, readOnly = false }: Props = $props();
+    let { task, tasks, updateTask, readOnly = false, onDelete }: Props = $props();
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
 
@@ -274,4 +275,4 @@
     </InspectorField>
 {/if}
 
-<MetaFooter created={task.added} modified={task.updatedAt} />
+<MetaFooter created={task.added} modified={task.updatedAt} onDelete={onDelete} deleteLabel="Delete task" deleteDisabled={readOnly} />

@@ -103,7 +103,7 @@
     }
 </script>
 
-<main class="main" style="position: relative; height: 100vh; display: flex; flex-direction: column;">
+<main class="main" style="position: relative; display: flex; flex-direction: column;">
 
     {#if store.error}
         <div style="padding: 20px; color: var(--tag-red); font-family: monospace;">
@@ -125,6 +125,7 @@
                         onDragStart={startTaskDrag}
                         {onAddTask}
                         {onDeleteTask}
+                        selectedTaskId={inspectorState?.type === 'task' ? inspectorState.id : undefined}
                         onUpdateTask={(task: AppTask) => {
                             void store.mutate('Failed to update task', () => store.updateTask(task));
                         }}
@@ -147,6 +148,7 @@
                         {#snippet pane1()}
                             <DateGrid
                                 {dragState}
+                                selectedEventId={inspectorState?.type === 'event' ? inspectorState.id : undefined}
                                 onEventDragStart={startEventDrag}
                                 {onAddEvent}
                                 {onEventClick}
@@ -159,6 +161,7 @@
                         {#snippet pane2()}
                             <DayTimeline
                                 {dragState}
+                                selectedEventId={inspectorState?.type === 'event' ? inspectorState.id : undefined}
                                 {onEventClick}
                                 {onAddEvent}
                             />

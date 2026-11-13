@@ -15,6 +15,7 @@
         taskDates = [],
         isSingleWeek,
         dragState,
+        selectedEventId,
         onEventDragStart,
         onAddEvent,
         onEventClick,
@@ -29,6 +30,7 @@
         taskDates?: TaskDateInstance[];
         isSingleWeek: boolean;
         dragState?: import('../day-timeline/types').DragState;
+        selectedEventId?: string;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
@@ -115,6 +117,7 @@
                 <div
                     class="day-cell-event"
                     class:is-readonly={readOnly}
+                    class:is-selected={ev.id === selectedEventId}
                     style="
                         cursor: {readOnly ? 'default' : 'grab'};
                         opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};

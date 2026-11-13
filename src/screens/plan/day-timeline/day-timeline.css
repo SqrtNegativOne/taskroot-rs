@@ -1,6 +1,6 @@
   /* ── Day calendar ───────────────────────────────────────────────────── */
 
-  .day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; font-size: calc(14px * var(--font-scale, 1)); }
   .day-pane-stats {
     font-size: 0.85em; color: var(--fg-dim);
     font-variant-numeric: tabular-nums;
@@ -96,6 +96,7 @@
   .day-event {
     --event-lane: 0;
     --event-lanes: 1;
+    font-family: var(--sans);
     position: absolute;
     left: calc(var(--day-label-offset, 56px) + ((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) * var(--event-lane));
     width: calc(((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) - 24px);
@@ -125,9 +126,15 @@
   .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
   .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-left-style: dashed; background: transparent !important; }
   .day-event.is-readonly { opacity: 0.6; cursor: default; }
+  .day-event.is-selected {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+    filter: brightness(1.1);
+  }
   .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0.95; cursor: grabbing; }
   .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
   .day-event-time {
+    font-family: var(--mono);
     font-size: 0.74em;
     color: white;
     font-variant-numeric: tabular-nums;
@@ -169,15 +176,7 @@
     z-index: 2;
   }
   .day-event-handle-top { top: 0; }
-  .day-event-handle-bottom {
-    bottom: 0;
-    text-align: center;
-    color: var(--fg-dimmer);
-    line-height: 6px;
-    font-size: 0.6em;
-  }
-  .day-event:hover .day-event-handle-bottom { color: var(--fg-dim); }
-  .day-event-handle-grip { letter-spacing: -2px; }
+  .day-event-handle-bottom { bottom: 0; }
 
   .day-drop-preview {
     position: absolute;

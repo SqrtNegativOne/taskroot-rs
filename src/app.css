@@ -38,8 +38,8 @@
     --p2:                oklch(71.07% 0.0404 161.92);
     --p3:                oklch(50.27% 0.0251 83.20);
     --font-scale: 1;
-    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    --sans: 'Inter', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   }
 
   * { box-sizing: border-box; }

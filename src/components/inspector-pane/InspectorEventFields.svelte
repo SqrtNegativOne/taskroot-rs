@@ -31,9 +31,10 @@
         tasks: AppTask[];
         updateEvent: (id: string, update: (event: AppEvent) => AppEvent) => void;
         readOnly?: boolean;
+        onDelete?: () => void;
     }
 
-    let { event, tasks, updateEvent, readOnly = false }: Props = $props();
+    let { event, tasks, updateEvent, readOnly = false, onDelete }: Props = $props();
 
     const EVENT_STATUSES = ['confirmed', 'tentative', 'cancelled'] as const;
 
@@ -239,4 +240,4 @@
     />
 </InspectorField>
 
-<MetaFooter created={event.added} modified={event.updatedAt} />
+<MetaFooter created={event.added} modified={event.updatedAt} onDelete={onDelete} deleteLabel="Delete event" deleteDisabled={readOnly} />

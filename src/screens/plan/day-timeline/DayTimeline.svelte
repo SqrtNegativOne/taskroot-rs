@@ -19,11 +19,13 @@
 
     let {
         dragState,
+        selectedEventId,
         onEventClick,
         onAddEvent,
         variant = 'plan',
     }: {
         dragState?: DragState;
+        selectedEventId?: string;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => Promise<string | undefined>;
         variant?: 'plan' | 'sidebar';
@@ -172,6 +174,7 @@
                         {today}
                         laid={planLayout[ymd(d)] ?? []}
                         {dragState}
+                        {selectedEventId}
                         {onResizeEvent}
                         {onMoveEvent}
                         {onEventClick}

@@ -13,6 +13,7 @@
   overflow: hidden;
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--sans);
 }
 
 .inspector-pane.is-open {
@@ -21,21 +22,6 @@
 
 .inspector-hd {
   padding: 18px 20px 12px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.inspector-kind {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--fg-dim);
-  font-size: 0.72em;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.inspector-kind .material-symbols-outlined {
-  font-size: 16px;
 }
 
 .inspector-title-input {
@@ -51,11 +37,15 @@
   background: transparent;
   color: var(--fg);
   font-family: inherit;
-  font-size: 1.35em;
-  font-weight: 500;
+  font-size: 1.45em;
+  font-weight: 400;
   line-height: 1.3;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.inspector-title-input:focus-visible {
+  outline: none;
 }
 
 .inspector-title-input::placeholder {
@@ -292,8 +282,7 @@
   flex-direction: column;
   gap: 4px;
   margin-top: 16px;
-  padding: 12px 8px 0;
-  border-top: 1px dashed var(--border);
+  padding: 0 8px;
   color: var(--fg-dimmer);
   font-size: 0.8em;
 }
@@ -308,42 +297,34 @@
   font-size: 14px;
 }
 
-.inspector-actions {
-  margin-top: 18px;
-  padding: 12px 8px 0;
-  border-top: 1px dashed var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inspector-delete {
+.inspector-meta-delete {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--p0);
-  border-radius: 6px;
-  background: oklch(67.24% 0.1308 38.76 / 0.1);
-  color: var(--p0);
+  align-self: flex-start;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg-dimmer);
   font: inherit;
   cursor: pointer;
-  transition: background 0.1s ease;
+  transition: color 0.1s ease;
 }
 
-.inspector-delete:hover:not(:disabled) {
-  background: var(--p0-hover);
+.inspector-meta-delete:hover:not(:disabled) {
+  color: var(--p0);
 }
 
-.inspector-delete:disabled {
-  opacity: 0.5;
+.inspector-meta-delete:disabled {
   cursor: not-allowed;
 }
 
+.inspector-meta-delete .material-symbols-outlined {
+  font-size: 14px;
+}
+
 .inspector-readonly-note {
-  margin: 0;
+  margin: 12px 8px 0;
   color: var(--fg-dim);
   font-size: 0.82em;
 }

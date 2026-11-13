@@ -21,6 +21,7 @@
         endMins,
         lane,
         lanes,
+        selected,
         onResize,
         onMove,
         onEventClick,
@@ -32,6 +33,7 @@
         endMins: number;
         lane: number;
         lanes: number;
+        selected?: boolean;
         onResize?: (event: EventInstance, start: number, end: number) => void;
         onMove?: (event: EventInstance, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
@@ -140,6 +142,7 @@
         class:is-ghost={isGhost}
         class:is-floating={isFloating}
         class:is-readonly={readOnly}
+        class:is-selected={selected && !isGhost}
         style="
             top: {top}px;
             height: {height}px;
@@ -173,9 +176,7 @@
             tabindex="-1"
             class="day-event-handle day-event-handle-bottom"
             onpointerdown={isGhost || readOnly ? undefined : onResizeStart('bottom')}
-        >
-            <span class="day-event-handle-grip">═</span>
-        </div>
+        ></div>
     </div>
 {/snippet}
 

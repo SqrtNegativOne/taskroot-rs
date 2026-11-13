@@ -10,6 +10,7 @@
         updateTask,
         deleteTask,
         isPastDue,
+        selected,
         onTaskClick,
     }: {
         task: AppTask;
@@ -18,6 +19,7 @@
         updateTask: (id: string, transform: (task: AppTask) => AppTask) => void;
         deleteTask: (id: string) => void;
         isPastDue?: boolean;
+        selected?: boolean;
         onTaskClick?: (task: AppTask) => void;
     } = $props();
 
@@ -75,6 +77,7 @@
     class="task-row"
     class:is-dragging={dragging}
     class:is-done={task.status === "done"}
+    class:is-selected={selected}
     onpointerdown={handlePointerDown}
     onclick={(e) => {
         if (e.target instanceof Element && (

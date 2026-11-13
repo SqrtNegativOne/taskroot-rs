@@ -132,6 +132,14 @@
         transition: background-color 0.15s ease;
     }
 
+    /* Keep the divider grabbable even when a pane is collapsed and the divider
+       sits flush with the container edge, where overflow would clip its band. */
+    .split-pane-divider::after {
+        content: '';
+        position: absolute;
+        inset: -8px;
+    }
+
     .split-pane-divider:hover,
     .split-pane-divider.dragging {
         background-color: var(--accent, #3b82f6);
