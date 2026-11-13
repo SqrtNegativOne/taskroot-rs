@@ -121,7 +121,6 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(calendar::HttpClient::new()?);
     let handle = app.handle().clone();
 
-    platform::configure_effect_window(app);
     platform::build_tray(app)?;
 
     let data_dir = platform::app_data_dir(&handle)?;

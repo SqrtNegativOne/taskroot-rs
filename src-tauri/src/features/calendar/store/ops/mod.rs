@@ -13,7 +13,7 @@ mod load;
 mod tasks;
 
 pub use events::{create_event, delete_event, reschedule_event, update_event, Reschedule};
-pub use load::full_load;
+pub use load::{apply_full_load, fetch_collections, full_load, FetchedCollection};
 pub use tasks::{create_task, delete_task, past_due_task_ids, update_task};
 
 use crate::features::calendar::caldav::client::CalDavClient;

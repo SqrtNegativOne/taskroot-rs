@@ -21,6 +21,7 @@
       },
       {
         "label": "launcher",
+        "create": false,
         "dragDropEnabled": false,
         "title": "Launcher",
         "width": 640,
@@ -34,6 +35,7 @@
       },
       {
         "label": "minitracker",
+        "create": false,
         "dragDropEnabled": false,
         "title": "Mini Tracker",
         "width": 340,
@@ -68,6 +70,7 @@
       },
       {
         "label": "effect",
+        "create": false,
         "dragDropEnabled": false,
         "title": "Effect",
         "width": 100,

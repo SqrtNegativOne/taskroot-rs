@@ -72,6 +72,7 @@ mod tests {
             calendars,
             settings: AppSettings::default(),
             ui_state: serde_json::Map::new(),
+            revision: 0,
         };
         for id in task_ids {
             store.resources.insert(

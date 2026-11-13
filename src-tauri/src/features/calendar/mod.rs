@@ -31,7 +31,7 @@ pub use ics::{
     create_event_resource, create_task_resource, delete_event_component, delete_task_component,
     read_event_resource, read_task_resource, write_event_resource, write_task_resource,
 };
-pub use load::load_into;
+pub use load::{apply, fetch_into, load_into, Fetched};
 pub use occurrences::{expand_event_instances, single_instance};
 pub use session::{Session, app_calendar, open};
 pub use store::persist;

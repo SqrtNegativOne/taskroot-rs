@@ -52,6 +52,10 @@ pub struct Store {
     pub calendars: Vec<CalendarInfo>,
     pub settings: AppSettings,
     pub ui_state: serde_json::Map<String, serde_json::Value>,
+    /// Changes whenever the resource map changes. A load that fetched outside
+    /// the lock compares this before applying its snapshot, so it cannot
+    /// overwrite an edit that landed while it was waiting on the network.
+    pub(crate) revision: u64,
 }
 
 impl Store {
@@ -70,7 +74,24 @@ impl Store {
             calendars: Vec::new(),
             settings,
             ui_state,
+            revision: 0,
         })
+    }
+
+    /// A monotonically changing marker for the current resource map.
+    #[must_use]
+    pub const fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    const fn bump_revision(&mut self) {
+        self.revision = self.revision.wrapping_add(1);
+    }
+
+    /// Drop every resource, recording the change for in-flight loads.
+    pub fn clear_resources(&mut self) {
+        self.resources.clear();
+        self.bump_revision();
     }
 
     /// Replace (or insert) one resource and re-parse its components.
@@ -96,11 +117,14 @@ impl Store {
                 items,
             },
         );
+        self.bump_revision();
         Ok(())
     }
 
     pub fn remove_resource(&mut self, href: &str) {
-        self.resources.remove(href);
+        if self.resources.remove(href).is_some() {
+            self.bump_revision();
+        }
     }
 
     #[must_use]
