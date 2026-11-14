@@ -1,6 +1,9 @@
 import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
+import type { TaskPriority } from '../bindings/TaskPriority.generated';
 
 const TASK_STATUSES: readonly string[] = ['todo', 'next-up', 'doing', 'done', 'cancelled'];
+
+export const DEFAULT_TASK_PRIORITY: TaskPriority = 2;
 
 export function isAppTaskStatus(s: unknown): s is AppTaskStatus {
     return typeof s === 'string' && TASK_STATUSES.includes(s);

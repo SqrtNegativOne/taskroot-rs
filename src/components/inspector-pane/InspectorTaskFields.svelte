@@ -6,7 +6,7 @@
         TaskAlarmTrigger,
     } from '../../lib/domain';
     import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
-    import { calendarsForComponent } from '../../lib/domain';
+    import { calendarsForComponent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
     import { activeCalendars } from '../../lib/queries';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { formatTimestamp, getFormattedDate, getFormattedTime, withDate, withTime } from './format';
@@ -148,7 +148,7 @@
     <NumberInput
         min={0}
         max={4}
-        value={task.priority ?? 2}
+        value={task.priority ?? DEFAULT_TASK_PRIORITY}
         onchange={handlePriorityChange}
         variant="bare"
         disabled={readOnly}

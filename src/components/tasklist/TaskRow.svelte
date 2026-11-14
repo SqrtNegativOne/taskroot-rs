@@ -1,6 +1,6 @@
 <script lang="ts">
     import TaskCircle from '../TaskCircle.svelte';
-    import type { AppTask } from '../../lib/domain';
+    import { isRecurring, type AppTask } from '../../lib/domain';
     import { ymd } from '../../lib/time';
 
     let {
@@ -69,6 +69,7 @@
 
     let hasNotes = $derived(!!task.notes && task.notes.trim() !== "");
     let hasTags = $derived(!!task.tags && task.tags.length > 0);
+    let isTaskRecurring = $derived(isRecurring({ rrule: task.rrule }));
     let est = $derived(task.est ?? 0);
     let hasEst = $derived(est > 0);
 </script>
@@ -101,6 +102,9 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--p0); flex-shrink: 0;">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
+            {/if}
+            {#if isTaskRecurring}
+                <span class="task-row-recurring-icon" title="Recurring task">↻</span>
             {/if}
             <span class="task-row-title">{task.title}{#if hasNotes}<span class="task-row-notes-icon" title="Has a description"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h9"/></svg></span>{/if}</span>
             {#if task.status === "next-up"}

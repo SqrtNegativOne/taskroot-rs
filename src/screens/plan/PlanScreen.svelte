@@ -2,7 +2,7 @@
     import { store } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
     import type { AppTask, AppCalendar, EventInstance } from '../../lib/domain';
-    import { buildNewEvent } from '../../lib/domain';
+    import { buildNewEvent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
@@ -67,9 +67,10 @@
         const newTask: AppTask = {
             id: crypto.randomUUID(),
             title: 'New Task',
-            status: 'todo',
             remoteCollectionId: defaultTaskCollection,
-            ...defaults
+            ...defaults,
+            status: defaults?.status ?? 'todo',
+            priority: defaults?.priority ?? DEFAULT_TASK_PRIORITY,
         };
         inspectorState = { type: 'task', id: newTask.id, draft: newTask };
         const result = await store.mutate('Failed to create task', () => store.addTask(newTask));

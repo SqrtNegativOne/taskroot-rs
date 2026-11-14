@@ -143,6 +143,11 @@
     flex: 1; color: var(--fg);
     white-space: pre-wrap; word-wrap: break-word;
   }
+  .task-row-recurring-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    color: var(--fg-dim);
+  }
   .task-row-notes-icon {
     display: inline-block;
     margin-left: 5px;
