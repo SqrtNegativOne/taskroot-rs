@@ -10,10 +10,10 @@ Rely on a standard iCalendar property wherever one exists. Remove the custom
 fallbacks instead of maintaining two representations.
 
 - [ ] `X-TASKROOT-STATUS` -> standard `STATUS`
-  - `todo` -> `NEEDS-ACTION`, `doing` -> `IN-PROCESS`, `done` -> `COMPLETED`;
-    add `CANCELLED`.
-  - `next-up` has no standard equivalent. Decide whether to drop it or keep one
-    documented custom value.
+  - `todo` -> `NEEDS-ACTION`, `doing` -> `IN-PROCESS`, `done` -> `COMPLETED`,
+    `cancelled` -> `CANCELLED` are now read and written.
+  - `next-up` has no standard equivalent and is the only custom value still
+    written. Decide whether to drop it or keep one documented custom value.
 - [ ] `X-TASKROOT-DEPENDENCIES` -> one `RELATED-TO;RELTYPE=DEPENDS-ON` line per
       dependency.
 - [ ] `X-TASKROOT-EST` -> `ESTIMATED-DURATION` (RFC 9074).
@@ -44,27 +44,24 @@ RELATED-TO;RELTYPE=PARENT, RRULE, VALARM, COMPLETED, CREATED, LAST-MODIFIED.
 - [ ] REQUEST-STATUS
 - [ ] SEQUENCE (display)
 - [ ] PERCENT-COMPLETE (partial progress, not just 0/100)
-- [ ] STATUS `IN-PROCESS` / `CANCELLED`
 - [ ] `RELATED-TO` reltypes other than PARENT
 - [ ] RFC 7986 COLOR / IMAGE
 
 ## VEVENT (event inspector) - missing standard properties
 
-Currently: SUMMARY, DESCRIPTION, STATUS, DTSTART, DTEND, RRULE, COLOR, CREATED,
-LAST-MODIFIED.
+Currently: SUMMARY, DESCRIPTION, STATUS, PRIORITY, CATEGORIES, DTSTART, DTEND,
+RRULE, COLOR, CREATED, LAST-MODIFIED.
 
 - [ ] LOCATION
 - [ ] GEO
 - [ ] CLASS
 - [ ] TRANSP
-- [ ] PRIORITY
 - [ ] URL
 - [ ] ORGANIZER / ATTENDEE
 - [ ] CONTACT
 - [ ] RESOURCES
 - [ ] COMMENT
 - [ ] ATTACH
-- [ ] CATEGORIES
 - [ ] RDATE
 - [ ] DURATION
 - [ ] REQUEST-STATUS

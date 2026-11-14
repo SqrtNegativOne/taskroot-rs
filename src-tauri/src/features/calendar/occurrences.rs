@@ -299,6 +299,8 @@ mod tests {
             task_id: None,
             title: "Event".into(),
             description: None,
+            priority: None,
+            tags: None,
             start_time: start.into(),
             end_time: end.into(),
             rrule: None,

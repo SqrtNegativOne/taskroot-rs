@@ -64,8 +64,8 @@ HTTP status mapping: `401 → auth`, `412 → conflict`, `410 → gone`, other n
 
 **I1 — `PUT` replaces the entire resource.** Never serialise an `AppEvent`/`AppTask` and
 send it. Start from the resource body and change only the properties Taskroot owns
-(`SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `RRULE`/`EXDATE`, `STATUS`, `COLOR`, plus the
-VTODO mapping below). Everything else stays byte-identical: `VTIMEZONE`, `ATTENDEE`, unknown
+(`SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`, `CATEGORIES`, `RRULE`/`EXDATE`,
+`STATUS`, `COLOR`, plus the VTODO mapping below). Everything else stays byte-identical: `VTIMEZONE`, `ATTENDEE`, unknown
 `X-*` properties, component order. A `VALARM` is written only when the task's reminder list
 changed; otherwise it stays byte-identical too.
 
@@ -119,6 +119,12 @@ the clicked `occurrenceStart`:
 The canonical `occurrenceStart` shapes are the same ones `exdates` uses, so the values a
 projection returns can be written straight back.
 
+## VEVENT mapping
+
+`PRIORITY` and `CATEGORIES` map to `AppEvent.priority`/`AppEvent.tags` using the same
+conventions as VTODO: priorities use the tasks.org bucket scale and `CATEGORIES` holds
+tag names only. A missing priority or an empty tag list emits no line.
+
 ## VTODO mapping
 
 | Taskroot | VTODO | Rule |
@@ -130,7 +136,7 @@ projection returns can be written straight back.
 | `start` | `DTSTART` | tasks.org's start ("hide until"); date-only stays `YYYY-MM-DD` |
 | `due` | `DUE` | preserve the raw value; date-only stays `YYYY-MM-DD` |
 | `timezone` | `TZID` of `DUE`, else of `DTSTART` | `DUE` wins when a resource mixes zones; a `…Z` value reads as `UTC` so its instant survives the write |
-| `status` | `STATUS` + `COMPLETED` + `PERCENT-COMPLETE` | only completion syncs; `Todo`/`NextUp`/`Doing` travel in `X-TASKROOT-STATUS` |
+| `status` | `STATUS` + `COMPLETED` + `PERCENT-COMPLETE` | `Todo`/`NextUp` -> `NEEDS-ACTION`, `Doing` -> `IN-PROCESS`, `Done` -> `COMPLETED`, `Cancelled` -> `CANCELLED`; the workflow value (including `next-up`) also travels in `X-TASKROOT-STATUS` |
 | `completed_at` | `COMPLETED` | kept across edits, so retitling a finished task does not move its completion time |
 | `priority` | `PRIORITY` | `None→` omitted, `Low→7`, `Medium→5`, `High→3`, `Urgent→1`; reverse `1–2→Urgent`, `3–4→High`, `5→Medium`, `6–9→Low`, `0→None` |
 | `tags` | `CATEGORIES` | names only; colours stay local keyed by name |

@@ -16,7 +16,7 @@ use super::{require_component, resolve_list};
 pub async fn list_events(cli: &Cli) -> Result<(), AppError> {
     let session = open().await?;
     let search = cli.option("search").unwrap_or_default();
-    let events = query::query_events(&session.store.events(), &[], search);
+    let events = query::query_events(&session.store.events(), &[], &[], search);
     let start = cli.option("start").map_or_else(today, ToString::to_string);
     let end = cli
         .option("end")
@@ -38,6 +38,11 @@ pub async fn add_event(cli: &Cli) -> Result<(), AppError> {
         task_id: None,
         title: cli.require_option("title")?.to_string(),
         description: cli.option("notes").map(ToString::to_string),
+        priority: cli
+            .option("priority")
+            .map(super::tasks::parse_priority)
+            .transpose()?,
+        tags: None,
         start_time: cli.require_option("start")?.to_string(),
         end_time: cli.require_option("end")?.to_string(),
         rrule: cli.option("rrule").map(ToString::to_string),

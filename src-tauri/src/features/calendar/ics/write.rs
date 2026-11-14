@@ -326,6 +326,14 @@ fn event_specs(event: &AppEvent) -> Vec<PropertySpec> {
             date_line("DTEND", &event.end_time, all_day, zone),
         ),
         PropertySpec::new(
+            OwnedKind::Name("PRIORITY"),
+            priority_lines(event.priority.as_ref()),
+        ),
+        PropertySpec::new(
+            OwnedKind::Name("CATEGORIES"),
+            category_lines(event.tags.as_deref()),
+        ),
+        PropertySpec::new(
             OwnedKind::Name("RRULE"),
             rrule_lines(event.rrule.as_deref()),
         ),
@@ -385,7 +393,7 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
             OwnedKind::Name("STATUS"),
             vec![format!(
                 "STATUS:{}",
-                if done { "COMPLETED" } else { "NEEDS-ACTION" }
+                task_status_value(task.status.as_ref())
             )],
         ),
         PropertySpec::optional(
@@ -715,12 +723,26 @@ const fn priority_value(priority: Option<&TaskPriority>) -> u32 {
     }
 }
 
+/// The standard `VTODO` `STATUS` value for the task's workflow state.
+///
+/// `NextUp` has no standard equivalent, so it maps to `NEEDS-ACTION` and keeps
+/// its marker in `X-TASKROOT-STATUS`.
+const fn task_status_value(status: Option<&AppTaskStatus>) -> &'static str {
+    match status {
+        Some(AppTaskStatus::Doing) => "IN-PROCESS",
+        Some(AppTaskStatus::Done) => "COMPLETED",
+        Some(AppTaskStatus::Cancelled) => "CANCELLED",
+        Some(AppTaskStatus::Todo | AppTaskStatus::NextUp) | None => "NEEDS-ACTION",
+    }
+}
+
 const fn workflow_value(status: Option<&AppTaskStatus>) -> &'static str {
     match status {
         Some(AppTaskStatus::NextUp) => "next-up",
         Some(AppTaskStatus::Doing) => "doing",
         Some(AppTaskStatus::Done) => "done",
-        _ => "todo",
+        Some(AppTaskStatus::Cancelled) => "cancelled",
+        Some(AppTaskStatus::Todo) | None => "todo",
     }
 }
 

@@ -3,7 +3,7 @@
 use crate::ipc::session::store_state;
 use crate::features::calendar::{expand_event_instances, expand_task_dates, single_instance};
 use crate::features::calendar::{
-    AppEvent, AppEventFilter, AppTask, AppTaskFilter, AppTaskSort, TaskDateInstance,
+    AppEvent, AppEventFilter, AppEventSort, AppTask, AppTaskFilter, AppTaskSort, TaskDateInstance,
 };
 use crate::error::AppError;
 use crate::features::calendar::query;
@@ -33,11 +33,12 @@ pub async fn query_tasks(
 pub async fn query_events(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
+    sort: Vec<AppEventSort>,
     query: String,
 ) -> Result<Vec<AppEvent>, AppError> {
     let state = store_state(&app)?;
     Ok(state
-        .read(|store| query::query_events(&store.events(), &filters, &query))
+        .read(|store| query::query_events(&store.events(), &filters, &sort, &query))
         .await)
 }
 
@@ -50,13 +51,14 @@ pub async fn query_events(
 pub async fn query_event_instances(
     app: tauri::AppHandle,
     filters: Vec<AppEventFilter>,
+    sort: Vec<AppEventSort>,
     query: String,
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<Vec<crate::features::calendar::EventInstance>, AppError> {
     let state = store_state(&app)?;
     let events = state
-        .read(|store| query::query_events(&store.events(), &filters, &query))
+        .read(|store| query::query_events(&store.events(), &filters, &sort, &query))
         .await;
 
     match (start_date, end_date) {

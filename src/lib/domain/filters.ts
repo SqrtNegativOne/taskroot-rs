@@ -15,7 +15,7 @@ export interface FilterDefaults {
 }
 
 const FALLBACKS: Record<string, readonly (string | number)[]> = {
-    status: ['todo', 'next-up', 'doing', 'done'],
+    status: ['todo', 'next-up', 'doing', 'done', 'cancelled'],
     priority: [1, 2, 3, 4, 0],
 };
 

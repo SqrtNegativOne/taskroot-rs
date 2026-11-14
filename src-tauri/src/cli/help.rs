@@ -69,7 +69,7 @@ pub const OPTIONS: &[(&str, &str)] = &[
     ("--due D", "task due date"),
     ("--start D, --end E", "task start date; event start and end"),
     ("--priority P", "0-4, or none/low/medium/high/urgent"),
-    ("--status S", "todo, next-up, doing or done"),
+    ("--status S", "todo, next-up, doing, done or cancelled"),
     ("--tz ZONE", "IANA zone for timed values"),
     (
         "--list NAME",

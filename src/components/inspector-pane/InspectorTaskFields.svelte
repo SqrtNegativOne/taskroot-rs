@@ -65,7 +65,7 @@
         (task.dependencies ?? []).map((id) => tasks.find((candidate) => candidate.id === id)?.title ?? id),
     );
 
-    const STATUSES = ['todo', 'doing', 'next-up', 'done'] as const;
+    const STATUSES = ['todo', 'doing', 'next-up', 'done', 'cancelled'] as const;
 
     function isAppTaskStatus(value: string): value is AppTaskStatus {
         return STATUSES.some((status) => status === value);
@@ -136,6 +136,7 @@
             { label: 'Doing', value: 'doing' },
             { label: 'Next Up', value: 'next-up' },
             { label: 'Done', value: 'done' },
+            { label: 'Cancelled', value: 'cancelled' },
         ]}
         variant="bare"
         disabled={readOnly}

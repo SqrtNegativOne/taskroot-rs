@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     std::fs::create_dir_all(&dir)?;
 
-    let mut store = Store::load(dir.clone())?;
+    let mut store = Store::load(dir.clone());
     store.calendars = discovered.calendars.clone();
     ops::full_load(&mut store, &client).await?;
     println!("loaded {} resources from Radicale", store.resources.len());
@@ -81,6 +81,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         task_id: None,
         title: "Taskroot E2E event".to_string(),
         description: Some("created by the migration E2E check".to_string()),
+        priority: None,
+        tags: None,
         start_time: "2026-12-01T10:00:00".to_string(),
         end_time: "2026-12-01T11:00:00".to_string(),
         rrule: None,
@@ -208,7 +210,7 @@ async fn restart_and_compare(
     dir: &Path,
     calendars: &[tauri_app_lib::features::calendar::CalendarInfo],
 ) -> Result<(), Box<dyn Error>> {
-    let mut restarted = Store::load(dir.to_path_buf())?;
+    let mut restarted = Store::load(dir.to_path_buf());
     restarted.calendars = calendars.to_vec();
     ops::full_load(&mut restarted, client).await?;
 

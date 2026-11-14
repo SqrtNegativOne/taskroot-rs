@@ -232,6 +232,8 @@ fn event_from_component(component: &Component<'_>) -> Result<AppEvent, AppError>
         task_id: text_property(component, "X-TASKROOT-TASK-ID").map(TaskId::from),
         title: text_property(component, "SUMMARY").unwrap_or_default(),
         description: text_property(component, "DESCRIPTION"),
+        priority: property(component, "PRIORITY").and_then(priority_value),
+        tags: read_categories(component),
         start_time,
         end_time,
         rrule: joined_property(component, "RRULE"),
@@ -352,15 +354,19 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
 }
 
 fn read_task_status(component: &Component<'_>) -> AppTaskStatus {
-    if property(component, "STATUS")
-        .is_some_and(|property| property.val.as_str().eq_ignore_ascii_case("COMPLETED"))
-    {
-        return AppTaskStatus::Done;
+    if let Some(status) = property(component, "STATUS").map(|property| property.val.as_str()) {
+        match status.to_ascii_uppercase().as_str() {
+            "COMPLETED" => return AppTaskStatus::Done,
+            "CANCELLED" => return AppTaskStatus::Cancelled,
+            "IN-PROCESS" => return AppTaskStatus::Doing,
+            _ => {}
+        }
     }
     match text_property(component, "X-TASKROOT-STATUS").as_deref() {
         Some("next-up") => AppTaskStatus::NextUp,
         Some("doing") => AppTaskStatus::Doing,
         Some("done") => AppTaskStatus::Done,
+        Some("cancelled") => AppTaskStatus::Cancelled,
         _ => AppTaskStatus::Todo,
     }
 }

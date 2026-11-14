@@ -4,7 +4,7 @@ use ts_rs::TS;
 
 use crate::features::calendar::caldav::model::CalendarComponent;
 
-use super::{Color, CollectionId, EventId, RemoteId, TaskId};
+use super::{Color, CollectionId, EventId, RemoteId, Tag, TaskId, TaskPriority};
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../../src/lib/bindings/EventStatus.generated.ts")]
@@ -65,6 +65,12 @@ pub struct AppEvent {
     pub title: String,
     #[ts(optional)]
     pub description: Option<String>,
+    #[ts(optional)]
+    #[query(sortable, filter_type = "number")]
+    pub priority: Option<TaskPriority>,
+    #[ts(optional)]
+    #[query(filter_type = "relation:task_tags")]
+    pub tags: Option<Vec<Tag>>,
     pub start_time: String,
     pub end_time: String,
     #[ts(optional)]
@@ -115,6 +121,8 @@ mod tests {
             task_id: None,
             title: "Meeting".into(),
             description: None,
+            priority: None,
+            tags: None,
             start_time: "2026-08-12T10:00:00".into(),
             end_time: "2026-08-12T11:00:00".into(),
             rrule: None,

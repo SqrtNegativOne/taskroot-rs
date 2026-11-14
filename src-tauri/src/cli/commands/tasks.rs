@@ -188,13 +188,14 @@ fn parse_task_status(value: &str) -> Result<AppTaskStatus, AppError> {
         "next-up" | "nextup" | "next" => Ok(AppTaskStatus::NextUp),
         "doing" | "in-progress" => Ok(AppTaskStatus::Doing),
         "done" | "completed" => Ok(AppTaskStatus::Done),
+        "cancelled" | "canceled" => Ok(AppTaskStatus::Cancelled),
         other => Err(AppError::InvalidInput(format!(
-            "unknown status `{other}` (todo, next-up, doing, done)"
+            "unknown status `{other}` (todo, next-up, doing, done, cancelled)"
         ))),
     }
 }
 
-fn parse_priority(value: &str) -> Result<TaskPriority, AppError> {
+pub(crate) fn parse_priority(value: &str) -> Result<TaskPriority, AppError> {
     match value {
         "0" | "none" => Ok(TaskPriority::None),
         "1" | "low" => Ok(TaskPriority::Low),

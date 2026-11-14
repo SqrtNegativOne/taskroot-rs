@@ -4,8 +4,8 @@
 //! still describes which columns the frontend may filter and sort by.
 
 use crate::features::calendar::domain::{
-    AppEvent, AppEventFilter, AppEventFilterColumn, AppTask, AppTaskFilter, AppTaskFilterColumn,
-    AppTaskSort, EventStatus, FilterOperator, SortDirection, TaskPriority,
+    AppEvent, AppEventFilter, AppEventFilterColumn, AppEventSort, AppTask, AppTaskFilter,
+    AppTaskFilterColumn, AppTaskSort, EventStatus, FilterOperator, SortDirection, Tag, TaskPriority,
 };
 use std::cmp::Ordering;
 
@@ -31,15 +31,18 @@ pub fn query_tasks(
 pub fn query_events(
     events: &[AppEvent],
     filters: &[AppEventFilter],
+    sorts: &[AppEventSort],
     search: &str,
 ) -> Vec<AppEvent> {
     let needle = search.trim().to_lowercase();
-    events
+    let mut result: Vec<AppEvent> = events
         .iter()
         .filter(|event| event_matches_filters(event, filters))
         .filter(|event| event_matches_search(event, &needle))
         .cloned()
-        .collect()
+        .collect();
+    result.sort_by(|a, b| compare_events(a, b, sorts));
+    result
 }
 
 fn task_matches_filters(task: &AppTask, filters: &[AppTaskFilter]) -> bool {
@@ -160,6 +163,17 @@ fn event_column_matches(
             .status
             .as_ref()
             .is_some_and(|status| event_status_name(status) == value_as_string(value)),
+        AppEventFilterColumn::Priority => {
+            let value = value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()));
+            value.is_some_and(|number| number == priority_number(event.priority.as_ref()))
+        }
+        AppEventFilterColumn::Tags => event.tags.as_ref().is_some_and(|tags| {
+            let needle = value_as_string(value).to_lowercase();
+            tags.iter()
+                .any(|tag| tag.name.to_lowercase().contains(&needle))
+        }),
         AppEventFilterColumn::Remotecollectionid => event
             .remote_collection_id
             .as_ref()
@@ -203,6 +217,45 @@ fn event_matches_search(event: &AppEvent, needle: &str) -> bool {
             .description
             .as_ref()
             .is_some_and(|description| description.to_lowercase().contains(needle))
+        || event.tags.as_ref().is_some_and(|tags| {
+            tags.iter()
+                .any(|tag| tag.name.to_lowercase().contains(needle))
+        })
+}
+
+fn compare_events(a: &AppEvent, b: &AppEvent, sorts: &[AppEventSort]) -> Ordering {
+    for sort in sorts {
+        let Some(column) = &sort.column else {
+            continue;
+        };
+        let ordering = compare_event_column(a, b, column);
+        let ordering = match sort.direction {
+            Some(SortDirection::Desc) => ordering.reverse(),
+            _ => ordering,
+        };
+        if ordering != Ordering::Equal {
+            return ordering;
+        }
+    }
+    a.id.as_str().cmp(b.id.as_str())
+}
+
+fn compare_event_column(a: &AppEvent, b: &AppEvent, column: &AppEventFilterColumn) -> Ordering {
+    match column {
+        AppEventFilterColumn::Title => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
+        AppEventFilterColumn::Status => {
+            event_status_rank(a.status.as_ref()).cmp(&event_status_rank(b.status.as_ref()))
+        }
+        AppEventFilterColumn::Priority => {
+            priority_number(a.priority.as_ref()).cmp(&priority_number(b.priority.as_ref()))
+        }
+        AppEventFilterColumn::Tags => {
+            tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref()))
+        }
+        AppEventFilterColumn::Remotecollectionid => {
+            event_collection_id(a).cmp(event_collection_id(b))
+        }
+    }
 }
 
 fn compare_tasks(a: &AppTask, b: &AppTask, sorts: &[AppTaskSort]) -> Ordering {
@@ -242,7 +295,7 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
             .as_deref()
             .unwrap_or("9999")
             .cmp(b.due.as_deref().unwrap_or("9999")),
-        AppTaskFilterColumn::Tags => tag_names(a).cmp(&tag_names(b)),
+        AppTaskFilterColumn::Tags => tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref())),
         AppTaskFilterColumn::Remotecollectionid => collection_id(a).cmp(collection_id(b)),
     }
 }
@@ -253,8 +306,15 @@ fn collection_id(task: &AppTask) -> &str {
         .map_or("", |id| id.as_str())
 }
 
-fn tag_names(task: &AppTask) -> String {
-    task.tags.as_ref().map_or_else(String::new, |tags| {
+fn event_collection_id(event: &AppEvent) -> &str {
+    event
+        .remote_collection_id
+        .as_ref()
+        .map_or("", |id| id.as_str())
+}
+
+fn tag_names(tags: Option<&[Tag]>) -> String {
+    tags.map_or_else(String::new, |tags| {
         tags.iter()
             .map(|tag| tag.name.as_str())
             .collect::<Vec<_>>()
@@ -268,7 +328,17 @@ const fn status_rank(status: Option<&crate::features::calendar::domain::AppTaskS
         Some(crate::features::calendar::domain::AppTaskStatus::NextUp) => 1,
         Some(crate::features::calendar::domain::AppTaskStatus::Doing) => 2,
         Some(crate::features::calendar::domain::AppTaskStatus::Done) => 3,
-        None => 4,
+        Some(crate::features::calendar::domain::AppTaskStatus::Cancelled) => 4,
+        None => 5,
+    }
+}
+
+const fn event_status_rank(status: Option<&EventStatus>) -> u8 {
+    match status {
+        Some(EventStatus::Confirmed) => 0,
+        Some(EventStatus::Tentative) => 1,
+        Some(EventStatus::Cancelled) => 2,
+        None => 3,
     }
 }
 
@@ -288,6 +358,7 @@ const fn status_name(status: &crate::features::calendar::domain::AppTaskStatus) 
         crate::features::calendar::domain::AppTaskStatus::NextUp => "next-up",
         crate::features::calendar::domain::AppTaskStatus::Doing => "doing",
         crate::features::calendar::domain::AppTaskStatus::Done => "done",
+        crate::features::calendar::domain::AppTaskStatus::Cancelled => "cancelled",
     }
 }
 
@@ -420,5 +491,90 @@ mod tests {
         let matched = query_tasks(&tasks, &[], &[], "errand");
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].id.as_str(), "a");
+    }
+
+    fn event(id: &str, title: &str) -> AppEvent {
+        AppEvent {
+            id: id.into(),
+            remote_id: None,
+            remote_collection_id: None,
+            task_id: None,
+            title: title.to_string(),
+            description: None,
+            priority: None,
+            tags: None,
+            start_time: "2026-09-07T09:00:00".to_string(),
+            end_time: "2026-09-07T10:00:00".to_string(),
+            rrule: None,
+            exdates: None,
+            recurring_event_id: None,
+            original_start_time: None,
+            status: Some(EventStatus::Confirmed),
+            updated_at: None,
+            added: None,
+            color: None,
+            etag: None,
+            is_all_day: Some(false),
+            timezone: None,
+        }
+    }
+
+    #[test]
+    fn event_priority_and_tag_filters_match() {
+        let mut urgent = event("a", "Urgent");
+        urgent.priority = Some(TaskPriority::Urgent);
+        urgent.tags = Some(vec![Tag {
+            id: "t".into(),
+            name: "work".into(),
+            color: None,
+        }]);
+        let events = vec![urgent, event("b", "Plain")];
+
+        let priority = query_events(
+            &events,
+            &[AppEventFilter {
+                column: Some(AppEventFilterColumn::Priority),
+                operator: Some(FilterOperator::Is),
+                value: Some(json!(4)),
+            }],
+            &[],
+            "",
+        );
+        assert_eq!(priority.len(), 1);
+        assert_eq!(priority[0].id.as_str(), "a");
+
+        let tags = query_events(
+            &events,
+            &[AppEventFilter {
+                column: Some(AppEventFilterColumn::Tags),
+                operator: Some(FilterOperator::Is),
+                value: Some(json!(["work"])),
+            }],
+            &[],
+            "",
+        );
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].id.as_str(), "a");
+    }
+
+    #[test]
+    fn event_priority_sort_is_numeric() {
+        let mut urgent = event("a", "Urgent");
+        urgent.priority = Some(TaskPriority::Urgent);
+        let mut low = event("b", "Low");
+        low.priority = Some(TaskPriority::Low);
+        let events = vec![urgent, low, event("c", "None")];
+
+        let sorted = query_events(
+            &events,
+            &[],
+            &[AppEventSort {
+                column: Some(AppEventFilterColumn::Priority),
+                direction: Some(SortDirection::Desc),
+            }],
+            "",
+        );
+        let ids: Vec<&str> = sorted.iter().map(|event| event.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b", "c"]);
     }
 }

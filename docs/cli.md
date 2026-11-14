@@ -35,7 +35,7 @@ bun run cli -- <verb>
 | `--due D` | task due date |
 | `--start D, --end E` | task start date; event start and end |
 | `--priority P` | 0-4, or none/low/medium/high/urgent |
-| `--status S` | todo, next-up, doing or done |
+| `--status S` | todo, next-up, doing, done or cancelled |
 | `--tz ZONE` | IANA zone for timed values |
 | `--list NAME` | target list; on task-set this moves the task |
 | `--clear-due, --clear-start` | drop a date |

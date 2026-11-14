@@ -33,7 +33,10 @@ pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
     let mut due = Vec::new();
 
     for task in tasks {
-        if task.status == Some(AppTaskStatus::Done) {
+        if matches!(
+            task.status,
+            Some(AppTaskStatus::Done | AppTaskStatus::Cancelled)
+        ) {
             continue;
         }
         for (index, trigger) in task.alarms.iter().flatten().enumerate() {
@@ -157,12 +160,14 @@ mod tests {
     }
 
     #[test]
-    fn a_completed_task_never_reminds() {
-        let mut item = task("2026-10-27T10:00:00", before(15), Some("UTC"));
-        item.status = Some(AppTaskStatus::Done);
+    fn a_completed_or_cancelled_task_never_reminds() {
+        for status in [AppTaskStatus::Done, AppTaskStatus::Cancelled] {
+            let mut item = task("2026-10-27T10:00:00", before(15), Some("UTC"));
+            item.status = Some(status);
 
-        let due = alarms_due(&[item], utc("2026-10-27T09:46:00Z"));
-        assert!(due.is_empty(), "expected no due alarms, got {due:?}");
+            let due = alarms_due(&[item], utc("2026-10-27T09:46:00Z"));
+            assert!(due.is_empty(), "expected no due alarms, got {due:?}");
+        }
     }
 
     #[test]

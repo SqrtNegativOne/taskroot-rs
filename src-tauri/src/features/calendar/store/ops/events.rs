@@ -333,6 +333,8 @@ fn exception_for(
         task_id: master.task_id.clone(),
         title: master.title.clone(),
         description: master.description.clone(),
+        priority: master.priority.clone(),
+        tags: master.tags.clone(),
         start_time,
         end_time,
         rrule: None,

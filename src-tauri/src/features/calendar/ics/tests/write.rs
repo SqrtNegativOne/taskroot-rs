@@ -26,6 +26,39 @@ fn event_round_trip_is_byte_identical() {
 }
 
 #[test]
+fn event_priority_and_categories_round_trip() {
+    let raw = fixture(MOZILLA);
+    let mut event = read_one(&raw);
+    event.priority = Some(TaskPriority::High);
+    event.tags = Some(vec![
+        Tag {
+            id: "garden".to_string(),
+            name: "Garden".to_string(),
+            color: None,
+        },
+        Tag {
+            id: "home".to_string(),
+            name: "Home".to_string(),
+            color: None,
+        },
+    ]);
+
+    let written = write_event_resource(&raw, &event).unwrap();
+
+    assert_only_owned_changed(&raw, &written, EVENT_PROPERTIES);
+    assert!(written.contains("PRIORITY:3"));
+    assert!(written.contains("CATEGORIES:Garden,Home"));
+    let reread = read_one(&written);
+    assert_eq!(reread.priority, Some(TaskPriority::High));
+    assert_eq!(
+        reread
+            .tags
+            .map(|tags| tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>()),
+        Some(vec!["Garden".to_string(), "Home".to_string()])
+    );
+}
+
+#[test]
 fn an_event_task_link_survives_a_write_and_can_be_cleared() {
     let raw = fixture(MOZILLA);
     let mut event = read_one(&raw);
@@ -256,6 +289,27 @@ fn reopening_a_task_clears_the_completion_properties() {
     assert!(reopened.contains("X-TASKROOT-STATUS:next-up"));
     assert!(!reopened.contains("COMPLETED"));
     assert!(!reopened.contains("PERCENT-COMPLETE"));
+}
+
+#[test]
+fn in_process_and_cancelled_write_standard_status() {
+    let raw = fixture(TASK);
+    let mut task = read_task(&raw);
+
+    task.status = Some(AppTaskStatus::Doing);
+    let in_process = write_task_resource(&raw, &task).unwrap();
+    assert!(in_process.contains("STATUS:IN-PROCESS"));
+    assert_eq!(read_task(&in_process).status, Some(AppTaskStatus::Doing));
+
+    task.status = Some(AppTaskStatus::Cancelled);
+    let cancelled = write_task_resource(&in_process, &task).unwrap();
+    assert!(cancelled.contains("STATUS:CANCELLED"));
+    assert!(!cancelled.contains("STATUS:IN-PROCESS"));
+    assert!(!cancelled.contains("COMPLETED"));
+    assert_eq!(
+        read_task(&cancelled).status,
+        Some(AppTaskStatus::Cancelled)
+    );
 }
 
 #[test]

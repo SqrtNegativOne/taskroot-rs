@@ -19,12 +19,28 @@
     const calendarOptions = $derived(calendarsForComponent(calendars, 'VEVENT')
         .map(calendar => ({ label: calendar.summary || calendar.id, value: calendar.id })));
     const visibilityCount = $derived(Number(visibility?.hideFrequentRecurring ?? false) + Number(visibility?.hideTimed ?? false));
+
+    const filterColumns = [
+        { id: 'remotecollectionid', label: 'Calendar' },
+        { id: 'title', label: 'Title' },
+        { id: 'status', label: 'Status' },
+        { id: 'priority', label: 'Priority' },
+        { id: 'tags', label: 'Tags' },
+    ];
+    const statusOptions = ['confirmed', 'tentative', 'cancelled']
+        .map(value => ({ label: value, value }));
+
+    function valuesForColumn(column: string): { label: string; value: string }[] {
+        if (column === 'remotecollectionid') return calendarOptions;
+        if (column === 'status') return statusOptions;
+        return [];
+    }
 </script>
 
 <FilterButton
     bind:filters
-    columns={[{ id: 'remotecollectionid', label: 'Calendar' }]}
-    getValuesForColumn={(column) => column === 'remotecollectionid' ? calendarOptions : []}
+    columns={filterColumns}
+    getValuesForColumn={valuesForColumn}
     {align}
     extraFilterCount={visibilityCount}
 >

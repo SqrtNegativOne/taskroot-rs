@@ -50,6 +50,13 @@ fn all_day_event_stays_a_floating_date() {
     assert_eq!(event.rrule, None);
     assert_eq!(event.exdates, None);
     assert_eq!(event.description, None);
+    assert_eq!(event.priority, None);
+    assert_eq!(
+        event
+            .tags
+            .map(|tags| tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>()),
+        Some(vec!["Holiday".to_string()])
+    );
 }
 
 #[test]

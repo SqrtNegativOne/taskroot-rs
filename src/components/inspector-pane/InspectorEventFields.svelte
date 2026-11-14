@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { AppCalendar, AppEvent, AppTask, EventStatus } from '../../lib/domain';
+    import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
     import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
     import { resolveEventColor } from '../../lib/eventColor';
     import { activeCalendars } from '../../lib/queries';
@@ -18,6 +19,8 @@
         withStartTime,
         type EventDateFields,
     } from './eventDates';
+    import NumberInput from '../inputs/NumberInput.svelte';
+    import TagsInput from '../inputs/TagsInput.svelte';
     import DateField from './DateField.svelte';
     import InspectorField from './InspectorField.svelte';
     import MetaFooter from './MetaFooter.svelte';
@@ -82,9 +85,19 @@
         applyDates((current) => (checked ? toAllDay(current) : toTimed(current)));
     }
 
+    function isTaskPriority(value: number): value is TaskPriority {
+        return Number.isInteger(value) && value >= 0 && value <= 4;
+    }
+
     function handleStatusChange(value: string): void {
         if (!isEventStatus(value)) return;
         updateEvent(event.id, (current) => ({ ...current, status: value }));
+    }
+
+    function handlePriorityChange(value: number): void {
+        const clamped = Math.max(0, Math.min(4, value));
+        if (!isTaskPriority(clamped)) return;
+        updateEvent(event.id, (current) => ({ ...current, priority: clamped }));
     }
 
     function handleCalendarChange(value: string): void {
@@ -160,6 +173,33 @@
         variant="bare"
         disabled={readOnly}
         ariaLabel="Status"
+    />
+</InspectorField>
+
+<InspectorField icon="flag" label="Priority" disabled={readOnly}>
+    <NumberInput
+        min={0}
+        max={4}
+        value={event.priority ?? 0}
+        onchange={handlePriorityChange}
+        variant="bare"
+        disabled={readOnly}
+        ariaLabel="Priority"
+    />
+</InspectorField>
+
+<InspectorField icon="sell" label="Tags" disabled={readOnly}>
+    <TagsInput
+        id={`event-tags-${event.id}`}
+        tags={event.tags ? event.tags.map(t => t.name) : []}
+        onchange={(newTags: string[]) => {
+            updateEvent(event.id, (current) => ({
+                ...current,
+                tags: newTags.map((name: string) => ({ id: crypto.randomUUID(), name })),
+            }));
+        }}
+        variant="bare"
+        ariaLabel="Tags"
     />
 </InspectorField>
 

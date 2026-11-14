@@ -17,6 +17,8 @@ pub(super) const EVENT_PROPERTIES: &[&str] = &[
     "DESCRIPTION",
     "DTSTART",
     "DTEND",
+    "PRIORITY",
+    "CATEGORIES",
     "RRULE",
     "EXDATE",
     "STATUS",

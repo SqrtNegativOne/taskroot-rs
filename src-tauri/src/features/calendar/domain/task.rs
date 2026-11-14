@@ -16,6 +16,7 @@ pub enum AppTaskStatus {
     NextUp,
     Doing,
     Done,
+    Cancelled,
 }
 
 impl AppTaskStatus {
@@ -26,6 +27,7 @@ impl AppTaskStatus {
             "next-up".into(),
             "doing".into(),
             "done".into(),
+            "cancelled".into(),
         ]
     }
 }
