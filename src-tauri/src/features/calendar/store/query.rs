@@ -127,6 +127,7 @@ fn task_column_matches(
         }),
         AppTaskFilterColumn::Start => date_text_matches(task.start.as_deref(), value, operator),
         AppTaskFilterColumn::Due => date_text_matches(task.due.as_deref(), value, operator),
+        AppTaskFilterColumn::Added => date_text_matches(task.added.as_deref(), value, operator),
         AppTaskFilterColumn::Remotecollectionid => task
             .remote_collection_id
             .as_ref()
@@ -295,6 +296,11 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
             .as_deref()
             .unwrap_or("9999")
             .cmp(b.due.as_deref().unwrap_or("9999")),
+        AppTaskFilterColumn::Added => a
+            .added
+            .as_deref()
+            .unwrap_or("9999")
+            .cmp(b.added.as_deref().unwrap_or("9999")),
         AppTaskFilterColumn::Tags => tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref())),
         AppTaskFilterColumn::Remotecollectionid => collection_id(a).cmp(collection_id(b)),
     }
@@ -476,6 +482,27 @@ mod tests {
         );
         let ids: Vec<&str> = sorted.iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, vec!["a", "c", "b"]);
+    }
+
+    #[test]
+    fn created_sort_uses_added_timestamp_not_id() {
+        let mut older = task("z-older", "Older");
+        older.added = Some("2024-01-01T00:00:00Z".into());
+        let mut newer = task("a-newer", "Newer");
+        newer.added = Some("2025-01-01T00:00:00Z".into());
+        let tasks = vec![newer, older];
+
+        let sorted = query_tasks(
+            &tasks,
+            &[],
+            &[AppTaskSort {
+                column: Some(AppTaskFilterColumn::Added),
+                direction: Some(SortDirection::Asc),
+            }],
+            "",
+        );
+        let ids: Vec<&str> = sorted.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["z-older", "a-newer"]);
     }
 
     #[test]

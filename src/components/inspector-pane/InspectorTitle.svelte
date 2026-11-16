@@ -32,6 +32,12 @@
         writer.schedule(localValue);
     }
 
+    function handleKeydown(event: KeyboardEvent) {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        (event.currentTarget as HTMLTextAreaElement).blur();
+    }
+
     function handleFocus() {
         focused = true;
     }
@@ -54,6 +60,7 @@
     aria-label="Title"
     spellcheck="false"
     oninput={handleInput}
+    onkeydown={handleKeydown}
     onfocus={handleFocus}
     onblur={handleBlur}
 ></textarea>

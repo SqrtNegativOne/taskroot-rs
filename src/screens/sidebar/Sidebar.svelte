@@ -10,6 +10,10 @@
     import { activeCalendars } from '../../lib/queries';
     import { createSidebarState, saveTabTop } from './state.svelte';
 
+    const TAB_WIDTH = 18;
+    const TAB_HEIGHT = 52;
+    const PANEL_WIDTH = 328;
+
     let open = $state(false);
     let windowIsSmall = $state(true);
     const sidebar = createSidebarState();
@@ -33,13 +37,13 @@
         if (screenW === 0 || screenH === 0) return;
         const appWindow = getCurrentWindow();
         if (isOpen) {
-            const widthPhysical = Math.round(354 * sf); // 350 + 4px buffer
+            const widthPhysical = Math.round((TAB_WIDTH + PANEL_WIDTH) * sf);
             const posX = screenX + screenW - widthPhysical;
             await appWindow.setPosition(new PhysicalPosition(posX, screenY));
             await appWindow.setSize(new PhysicalSize(widthPhysical, screenH));
         } else {
-            const widthPhysical = Math.round(26 * sf); // 22 + 4px buffer
-            const heightPhysical = Math.round(64 * sf);
+            const widthPhysical = Math.round(TAB_WIDTH * sf);
+            const heightPhysical = Math.round(TAB_HEIGHT * sf);
             const posX = screenX + screenW - widthPhysical;
             const posY = Math.round(screenY + (sidebar.tabTop * sf));
             await appWindow.setPosition(new PhysicalPosition(posX, posY));
@@ -82,7 +86,7 @@
         const delta = e.screenY - dragStartScreenY;
         let newTabTop = dragStartTabTop + delta;
         
-        const maxTop = (screenH / sf) - 64;
+        const maxTop = (screenH / sf) - TAB_HEIGHT;
         if (newTabTop < 0) newTabTop = 0;
         if (newTabTop > maxTop) newTabTop = maxTop;
         
@@ -90,7 +94,7 @@
 
         if (windowIsSmall) {
             // update OS window position live
-            const widthPhysical = Math.round(26 * sf);
+            const widthPhysical = Math.round(TAB_WIDTH * sf);
             const posX = screenX + screenW - widthPhysical;
             const posY = Math.round(screenY + (sidebar.tabTop * sf));
             void getCurrentWindow().setPosition(new PhysicalPosition(posX, posY));
@@ -135,7 +139,7 @@
 
     $effect(() => {
         if (!sidebar.hydrated || !monitorReady) return;
-        sidebar.tabTop = sidebar.storedTabTop ?? (screenH / sf - 64) / 2;
+        sidebar.tabTop = sidebar.storedTabTop ?? (screenH / sf - TAB_HEIGHT) / 2;
         untrack(() => {
             void updateWindowBounds(open);
         });
@@ -155,7 +159,11 @@
     }
 </script>
 
-<div class="widget" class:open>
+<div
+    class="widget"
+    class:open
+    style="--tab-width: {TAB_WIDTH}px; --tab-height: {TAB_HEIGHT}px; --panel-width: {PANEL_WIDTH}px;"
+>
     <button 
         class="tab"
         style="margin-top: {windowIsSmall ? 0 : sidebar.tabTop}px;"
@@ -207,13 +215,12 @@
         overflow: hidden;
         width: 100%;
         justify-content: flex-end;
-        padding-right: 4px;
     }
 
     .tab {
         align-self: flex-start;
-        width: 22px;
-        height: 64px;
+        width: var(--tab-width);
+        height: var(--tab-height);
         background: rgba(12, 12, 10, 0.75);
         border: 1px solid var(--border);
         border-right: none;
@@ -224,7 +231,7 @@
         cursor: pointer;
         pointer-events: auto;
         color: var(--fg-muted);
-        font-size: 14px;
+        font-size: 13px;
         transition: color 150ms, background 150ms;
         flex-shrink: 0;
     }
@@ -249,7 +256,7 @@
         position: relative;
     }
     .open .panel {
-        width: 328px; /* 350 total - 22 tab */
+        width: var(--panel-width);
         border-left: 1px solid var(--border);
         pointer-events: auto;
     }

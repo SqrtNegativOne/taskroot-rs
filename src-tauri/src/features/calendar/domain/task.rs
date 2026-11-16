@@ -103,7 +103,7 @@ pub enum TaskAlarmTrigger {
 #[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
-    #[query(sortable, label = "Created")]
+    #[query(label = "ID")]
     pub id: TaskId,
     #[query(sortable)]
     pub title: String,
@@ -123,6 +123,7 @@ pub struct AppTask {
     #[ts(optional)]
     pub est: Option<i32>,
     #[ts(optional)]
+    #[query(sortable, filter_type = "text", label = "Created")]
     pub added: Option<String>,
     #[ts(optional)]
     pub canvas_x: Option<f64>,
