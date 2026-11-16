@@ -1,8 +1,8 @@
 # TODO
 
-Backlog for the inspector and iCalendar work. The inspector currently exposes only
-a subset of RFC 5545; this file lists the gap. It is a backlog, not a commitment
-to every field.
+Backlog for the inspector, iCalendar and stopwatch work. The inspector currently
+exposes only a subset of RFC 5545; this file lists the gap. It is a backlog, not
+a commitment to every field.
 
 ## Priority: replace non-standard `X-TASKROOT-*` properties
 
@@ -67,6 +67,12 @@ RRULE, COLOR, CREATED, LAST-MODIFIED.
 - [ ] REQUEST-STATUS
 - [ ] SEQUENCE (display)
 - [ ] RFC 7986 IMAGE / CONFERENCE
+
+## Stopwatch
+
+- [ ] History screen for `stopwatch-history.json`: group completed work and
+      break segments by day and label, show totals, and let the user inspect the
+      raw segments. The backend already appends every finished segment.
 
 ## Notes
 

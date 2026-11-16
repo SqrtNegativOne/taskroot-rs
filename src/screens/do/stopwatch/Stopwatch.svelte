@@ -17,6 +17,7 @@
     let selectorOpen = $state(false);
     let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
+    const breakDivisor = $derived(store.settings?.flowtime_break_divisor ?? 5);
 
     let allTasksQuery = useTauriQuery<AppTask[]>('query_tasks');
     let allTasks = $derived(allTasksQuery.data ?? []);
@@ -50,6 +51,7 @@
     }
 
     async function setActiveTask(taskId: string): Promise<void> {
+        const selected = allTasks.find((task) => task.id === taskId);
         for (const task of allTasks) {
             if (task.id === taskId) {
                 await updateTaskStatus(task.id, 'doing');
@@ -59,7 +61,10 @@
         }
         selectorOpen = false;
 
-        if (!stopwatchState.running) {
+        if (selected !== undefined) {
+            await stopwatchState.setLabel(selected.title, 'task');
+        }
+        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
             await stopwatchState.toggle();
         }
     }
@@ -158,7 +163,7 @@
                 </button>
             {/if}
             {#if store.settings?.clock_style === 'flowtime'}
-                <button onclick={() => { void stopwatchState.toggleBreak(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-right: 8px;" title="Toggle Break">
+                <button onclick={() => { void stopwatchState.toggleBreak(breakDivisor); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-right: 8px;" title="Toggle Break">
                     {stopwatchState.isBreak ? 'End Break' : 'Take Break'}
                 </button>
             {/if}

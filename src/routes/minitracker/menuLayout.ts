@@ -19,8 +19,8 @@ export interface MenuLayout {
     readonly windowY: number;
 }
 
-function desiredMenuHeight(rowCount: number): number {
-    const content = MENU_SEARCH_HEIGHT + rowCount * MENU_ROW_HEIGHT + MENU_CHROME_HEIGHT;
+function desiredMenuHeight(rowCount: number, extraContentHeight: number): number {
+    const content = MENU_SEARCH_HEIGHT + extraContentHeight + rowCount * MENU_ROW_HEIGHT + MENU_CHROME_HEIGHT;
     return Math.min(MENU_MAX_HEIGHT, Math.max(MENU_MIN_HEIGHT, content));
 }
 
@@ -29,8 +29,9 @@ export function computeMenuLayout(
     rowCount: number,
     workArea: WorkArea | null,
     barHeight = DEFAULT_BAR_HEIGHT,
+    extraContentHeight = 0,
 ): MenuLayout {
-    const desired = desiredMenuHeight(rowCount);
+    const desired = desiredMenuHeight(rowCount, extraContentHeight);
     const availableBelow = workArea === null ? desired : workArea.bottom - barY - barHeight;
     const availableAbove = workArea === null ? desired : barY - workArea.top;
     const placement = availableBelow < desired && availableAbove > availableBelow ? 'up' : 'down';

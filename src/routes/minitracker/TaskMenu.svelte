@@ -1,21 +1,27 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import type { AppTask } from '../../lib/domain';
 
     let {
         tasks,
         activeTask,
+        customLabel,
         onSelect,
         onStop,
+        onSetCustom,
         onToggleDone,
     }: {
         tasks: AppTask[];
         activeTask?: AppTask;
+        customLabel?: string;
         onSelect: (taskId: string) => void;
         onStop: () => void;
+        onSetCustom: (label: string) => void;
         onToggleDone: (task: AppTask) => void;
     } = $props();
 
     let search = $state('');
+    let custom = $state(untrack(() => customLabel ?? ''));
 
     let visibleTasks = $derived.by(() => {
         const needle = search.trim().toLowerCase();
@@ -42,6 +48,31 @@
             autofocus
         />
     </div>
+
+    <form
+        class="custom-form"
+        onsubmit={(event) => {
+            event.preventDefault();
+            onSetCustom(custom);
+        }}
+    >
+        <input
+            type="text"
+            placeholder="Or type your own label..."
+            aria-label="Custom label"
+            bind:value={custom}
+        />
+        <button type="submit" class="custom-submit" disabled={custom.trim() === ''}>Track</button>
+        {#if customLabel}
+            <button
+                type="button"
+                class="custom-clear"
+                aria-label="Clear custom label"
+                title="Clear custom label"
+                onclick={() => onSetCustom('')}
+            >×</button>
+        {/if}
+    </form>
 
     {#if activeTask}
         <button type="button" role="menuitem" class="selected-row" onclick={onStop} title="Stop working on this task">
@@ -125,6 +156,71 @@
 
     .menu-search input::placeholder {
         color: rgba(255, 255, 255, 0.4);
+    }
+
+    .custom-form {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .custom-form input {
+        flex: 1;
+        min-width: 0;
+        box-sizing: border-box;
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 0;
+        outline: none;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+    }
+
+    .custom-form input:focus {
+        border-color: rgba(255, 255, 255, 0.34);
+    }
+
+    .custom-form input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .custom-submit,
+    .custom-clear {
+        flex: none;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .custom-submit {
+        height: 31px;
+        padding: 0 12px;
+    }
+
+    .custom-submit:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .custom-clear {
+        width: 31px;
+        height: 31px;
+        padding: 0;
+        font-size: 16px;
+        line-height: 1;
+    }
+
+    .custom-submit:hover:not(:disabled),
+    .custom-clear:hover {
+        background: rgba(255, 255, 255, 0.16);
     }
 
     .menu-list {

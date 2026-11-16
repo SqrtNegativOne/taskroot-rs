@@ -92,8 +92,10 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::stopwatch::get_stopwatch_state,
             ipc::stopwatch::toggle_stopwatch,
             ipc::stopwatch::toggle_break,
+            ipc::stopwatch::complete_break,
             ipc::stopwatch::toggle_pause,
             ipc::stopwatch::adjust_pause,
+            ipc::stopwatch::set_stopwatch_label,
             ipc::stopwatch::reset_stopwatch,
             ipc::settings::get_settings_schema,
             ipc::settings::get_settings,
@@ -114,9 +116,6 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
 
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
-    app.manage(stopwatch::StopwatchManager(std::sync::Mutex::new(
-        stopwatch::StopwatchState::default(),
-    )));
     app.manage(reminders::ReminderState::default());
     app.manage(calendar::HttpClient::new()?);
     let handle = app.handle().clone();
@@ -124,6 +123,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     platform::build_tray(app)?;
 
     let data_dir = platform::app_data_dir(&handle)?;
+    app.manage(stopwatch::StopwatchManager::load(&data_dir));
     let store = calendar::Store::load(data_dir);
     platform::set_minitracker_visible(&handle, store.settings.mini_tracker_enabled);
     platform::start_minitracker_topmost_guard(&handle);

@@ -110,9 +110,6 @@
             {#if task.status === "next-up"}
                 <span class="status-pill status-nextup">next up</span>
             {/if}
-            {#if task.status === "doing"}
-                <span class="status-pill status-doing">DOING</span>
-            {/if}
             <div class="task-row-actions">
                 <button
                     onclick={(e) => {

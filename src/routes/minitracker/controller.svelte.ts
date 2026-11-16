@@ -67,7 +67,7 @@ export function createMinitrackerController(options: ControllerOptions) {
     let isSettingPosition = false;
     let wantsToSetPosition = false;
 
-    async function openMenu(rowCount: number, barSize: BarSize): Promise<void> {
+    async function openMenu(rowCount: number, barSize: BarSize, extraContentHeight: number): Promise<void> {
         const appWindow = getCurrentWindow();
         const [position, factor, monitor] = await Promise.all([
             appWindow.outerPosition(),
@@ -77,7 +77,7 @@ export function createMinitrackerController(options: ControllerOptions) {
 
         menuAnchor = { x: position.x / factor, y: position.y / factor };
         menuBarSize = barSize;
-        const layout = computeMenuLayout(menuAnchor.y, rowCount, workAreaOf(monitor), barSize.height);
+        const layout = computeMenuLayout(menuAnchor.y, rowCount, workAreaOf(monitor), barSize.height, extraContentHeight);
         menuPlacement = layout.placement;
         menuOpen = true;
 
@@ -94,8 +94,8 @@ export function createMinitrackerController(options: ControllerOptions) {
         await appWindow.setPosition(new LogicalPosition(menuAnchor.x, menuAnchor.y));
     }
 
-    function toggleMenu(rowCount: number, barSize: BarSize): void {
-        void (menuOpen ? closeMenu() : openMenu(rowCount, barSize));
+    function toggleMenu(rowCount: number, barSize: BarSize, extraContentHeight = 0): void {
+        void (menuOpen ? closeMenu() : openMenu(rowCount, barSize, extraContentHeight));
     }
 
     async function pointerDown(event: PointerEvent): Promise<void> {

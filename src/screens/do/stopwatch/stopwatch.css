@@ -49,6 +49,8 @@
 .stopwatch-display:hover .sw-digits { opacity: 0.6; }
 .stopwatch-display.is-running .sw-digits { color: var(--fg, #fff); }
 .stopwatch-display.is-running:hover .sw-digits { opacity: 0.6; }
+.stopwatch-display.is-breaking .sw-digits { color: #2ecc71; }
+.stopwatch-display.is-stopped .sw-digits { color: #e74c3c; }
 .stopwatch-display.is-paused .sw-digits {
   font-size: clamp(44px, 9vw, 120px);
   color: var(--fg-muted);

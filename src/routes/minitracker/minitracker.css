@@ -76,7 +76,15 @@ body,
 }
 
 .minitracker-task.has-task {
-    color: rgba(255, 255, 255, 0.88);
+    border-left-color: rgba(234, 179, 8, 0.55);
+    background: rgba(234, 179, 8, 0.16);
+    color: #fff;
+}
+
+.minitracker-task.has-custom {
+    border-left-color: rgba(96, 165, 250, 0.55);
+    background: rgba(96, 165, 250, 0.16);
+    color: #fff;
 }
 
 .minitracker-task:hover,

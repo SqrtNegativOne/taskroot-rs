@@ -20,7 +20,21 @@
                 showPlayIcon: false
             };
         }
-        const { m } = splitTime(engine.currentMs);
+        if (engine.isBreak) {
+            const value = engine.isCountdown ? engine.breakRemainingMs : engine.breakElapsedMs;
+            const { m, s } = splitTime(value);
+            return {
+                primaryText: `${m}:${s}`,
+                showPlayIcon: false
+            };
+        }
+        if (engine.isStopped) {
+            return {
+                primaryText: '00:00',
+                showPlayIcon: false
+            };
+        }
+        const { m } = splitTime(engine.workMs);
         return {
             primaryText: m,
             showPlayIcon: engine.isPristine
@@ -32,9 +46,11 @@
     type="button"
     aria-label="Toggle stopwatch"
     class="stopwatch-display"
-    class:is-running={engine.running}
+    class:is-running={engine.phase === 'running'}
     class:is-pristine={engine.isPristine}
     class:is-paused={engine.isPaused}
+    class:is-breaking={engine.phase === 'breaking'}
+    class:is-stopped={engine.phase === 'stopped'}
     onclick={onToggle}
     title="Click to start/stop"
 >

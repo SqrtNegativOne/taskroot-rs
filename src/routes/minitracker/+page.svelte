@@ -18,8 +18,13 @@
     import { DEFAULT_BAR_HEIGHT } from './menuLayout';
     import './minitracker.css';
 
-    const RUNNING_COLOR_HEX = '#ffffff';
-    const IDLE_COLOR_HEX = '#71717a';
+    const PHASE_COLORS = {
+        paused: '#808080',
+        running: '#ffffff',
+        breaking: '#2ecc71',
+        stopped: '#e74c3c',
+    } as const;
+    const CUSTOM_FORM_HEIGHT = 45;
 
     type ShortcutAction = 'toggleDimmed' | 'restoreMainWindow';
 
@@ -55,6 +60,7 @@
         return typeof candidate.x === 'number' && typeof candidate.y === 'number';
     }
 
+    const breakDivisor = $derived(store.settings?.flowtime_break_divisor ?? 5);
     let isDimmed = $state(false);
     let leftShiftDown = false;
     let rightShiftDown = false;
@@ -128,14 +134,22 @@
 
     let timeParts = $derived(splitTime(currentMs));
 
-    let textColor = $derived(
-        stopwatchState.running && !stopwatchState.isPaused ? RUNNING_COLOR_HEX : IDLE_COLOR_HEX,
+    let textColor = $derived(PHASE_COLORS[stopwatchState.phase]);
+    let customLabel = $derived(
+        stopwatchState.labelSource === 'custom' ? stopwatchState.label : undefined,
+    );
+    let hasCustomLabel = $derived(customLabel !== undefined && customLabel !== '');
+    let hasTaskLabel = $derived(activeTask !== undefined && !hasCustomLabel);
+    let barLabel = $derived(
+        hasCustomLabel ? (customLabel ?? '') : (activeTask?.title ?? 'select task'),
     );
 
     const barTitle = $derived(
-        activeTask
-            ? `Tracking ${activeTask.title}. Drag the clock to move, click the task name to switch. Double-click to quit.`
-            : 'No active task. Drag the clock to move, click the task name to choose one. Double-click to quit.',
+        hasTaskLabel
+            ? `Tracking ${activeTask?.title ?? ''}. Drag the clock to move, click the label to switch. Double-click to quit.`
+            : hasCustomLabel
+                ? `Tracking ${customLabel ?? ''}. Drag the clock to move, click the label to change it. Double-click to quit.`
+                : 'No active label. Drag the clock to move, click the label to choose a task or type your own. Double-click to quit.',
     );
 
     async function handleToggleMenu(): Promise<void> {
@@ -149,10 +163,11 @@
 
         menuBarHeight = rect.height;
         await reloadTaskListState();
-        controller.toggleMenu(tasks.length + (activeTask ? 1 : 0), {
-            width: rect.width,
-            height: rect.height,
-        });
+        controller.toggleMenu(
+            tasks.length + (activeTask ? 1 : 0),
+            { width: rect.width, height: rect.height },
+            CUSTOM_FORM_HEIGHT,
+        );
     }
 
     async function setTaskStatus(task: AppTask, status: AppTaskStatus): Promise<void> {
@@ -178,7 +193,27 @@
             }
         }
 
-        if (!stopwatchState.running) {
+        await stopwatchState.setLabel(selected.title, 'task');
+        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
+            await stopwatchState.toggle();
+        }
+    }
+
+    async function setCustomLabel(text: string): Promise<void> {
+        const trimmed = text.trim();
+        await controller.closeMenu();
+
+        for (const task of allTasks) {
+            if (task.status === 'doing') await setTaskStatus(task, 'todo');
+        }
+
+        if (trimmed === '') {
+            await stopwatchState.setLabel(null, 'unset');
+            return;
+        }
+
+        await stopwatchState.setLabel(trimmed, 'custom');
+        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
             await stopwatchState.toggle();
         }
     }
@@ -190,13 +225,22 @@
         await controller.closeMenu();
         await setTaskStatus(task, 'todo');
         await stopClock();
+        await stopwatchState.setLabel(null, 'unset');
     }
 
     async function toggleDone(task: AppTask): Promise<void> {
         const next: AppTaskStatus = task.status === 'done' ? 'todo' : 'done';
         await setTaskStatus(task, next);
-        if (next === 'done' && task.status === 'doing') await stopClock();
+        if (next === 'done' && task.status === 'doing') {
+            await stopClock();
+            await stopwatchState.setLabel(null, 'unset');
+        }
     }
+
+    $effect(() => {
+        if (activeTask === undefined || stopwatchState.labelSource !== 'unset') return;
+        void stopwatchState.setLabel(activeTask.title, 'task');
+    });
 
     async function runShortcut(action: ShortcutAction) {
         if (action === 'toggleDimmed') {
@@ -253,7 +297,7 @@
         if (leftShiftDown && rightShiftDown && !shiftBreakFired) {
             shiftBreakFired = true;
             e.preventDefault();
-            void stopwatchState.toggleBreak();
+            void stopwatchState.toggleBreak(breakDivisor);
         }
         return true;
     }
@@ -347,13 +391,14 @@
         <button
             type="button"
             class="minitracker-task"
-            class:has-task={activeTask !== undefined}
-            aria-label={activeTask ? `Current task: ${activeTask.title}` : 'Select a task'}
+            class:has-task={hasTaskLabel}
+            class:has-custom={hasCustomLabel}
+            aria-label={hasCustomLabel ? `Tracking: ${customLabel ?? ''}` : hasTaskLabel ? `Current task: ${activeTask?.title ?? ''}` : 'Select a task or type a label'}
             aria-expanded={controller.menuOpen}
-            title={activeTask ? activeTask.title : 'Select a task'}
+            title={barLabel}
             onclick={() => void handleToggleMenu()}
         >
-            {activeTask?.title ?? 'select task'}
+            {barLabel}
         </button>
     </div>
 
@@ -361,8 +406,10 @@
         <TaskMenu
             {tasks}
             {activeTask}
+            customLabel={hasCustomLabel ? customLabel : undefined}
             onSelect={(taskId) => void selectTask(taskId)}
             onStop={() => void stopWorking()}
+            onSetCustom={(label) => void setCustomLabel(label)}
             onToggleDone={(task) => void toggleDone(task)}
         />
     {/if}

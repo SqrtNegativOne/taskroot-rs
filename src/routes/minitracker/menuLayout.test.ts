@@ -22,6 +22,16 @@ describe('computeMenuLayout', () => {
         });
     });
 
+    it('reserves room for extra form content when choosing a side', () => {
+        expect(computeMenuLayout(700, 2, WORK_AREA).placement).toBe('down');
+        expect(computeMenuLayout(700, 2, WORK_AREA, DEFAULT_BAR_HEIGHT, 300)).toEqual({
+            placement: 'up',
+            menuHeight: 340,
+            windowHeight: 340 + DEFAULT_BAR_HEIGHT,
+            windowY: 360,
+        });
+    });
+
     it('clamps the menu to the space below when neither side fits fully', () => {
         const layout = computeMenuLayout(840, 20, { top: 780, bottom: 900 });
 

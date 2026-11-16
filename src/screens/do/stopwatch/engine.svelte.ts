@@ -2,7 +2,11 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { safeInvoke } from '../../../lib/safeInvoke.svelte';
 import { SCREEN_EFFECT, STOPWATCH_UPDATED } from '../../../lib/ipcEvents';
-import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
+import type {
+    StopwatchLabelSource,
+    StopwatchPhase,
+    StopwatchState as StopwatchSnapshot,
+} from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
 import { useNow } from '../../../lib/useNow.svelte';
 
@@ -13,13 +17,48 @@ $effect.root(() => {
     now = useNow();
 });
 
+const TRANSITION_SOUNDS: Record<ClockPhase, Partial<Record<ClockPhase, string>>> = {
+    work: { break: 'work_to_break.wav' },
+    break: { work: 'break_to_work.wav' },
+};
+
+const BREAK_OVER_SOUND = 'wine-glass-alarm.ogg';
+const ERROR_SOUND = 'windows-xp-error.mp3';
+
+const soundCache = new Map<string, HTMLAudioElement>();
+
+function isMainWindow(): boolean {
+    return getCurrentWindow().label === 'main';
+}
+
+function playSound(file: string): void {
+    if (!isMainWindow()) return;
+    let audio = soundCache.get(file);
+    if (audio === undefined) {
+        audio = new Audio(`/sounds/${file}`);
+        soundCache.set(file, audio);
+    }
+    audio.currentTime = 0;
+    void audio.play().catch(() => { /* autoplay or decode failures are non-fatal */ });
+}
+
+async function triggerScreenEffect(): Promise<void> {
+    if (!isMainWindow()) return;
+    const result = await safeInvoke('show_screen_effect');
+    if (result.isErr()) return;
+    const { emit } = await import('@tauri-apps/api/event');
+    void emit(SCREEN_EFFECT);
+}
+
 export class StopwatchState {
-    elapsed = $state(0);
-    runningSince = $state<number | undefined>(undefined);
-    isBreak = $state(false);
-    breakElapsed = $state(0);
-    breakRunningSince = $state<number | undefined>(undefined);
+    phase = $state<StopwatchPhase>('paused');
+    workElapsed = $state(0);
+    workRunningSince = $state<number | undefined>(undefined);
+    breakDuration = $state(0);
+    breakStartedAt = $state<number | undefined>(undefined);
     pausedUntil = $state<number | undefined>(undefined);
+    label = $state<string | undefined>(undefined);
+    labelSource = $state<StopwatchLabelSource>('unset');
 
     private unlisten: (() => void) | undefined;
     private connection: Promise<void> | undefined;
@@ -51,16 +90,26 @@ export class StopwatchState {
     }
 
     updateFromPayload(payload: StopwatchSnapshot): void {
-        this.elapsed = payload.elapsed;
-        this.runningSince = payload.runningSince ?? undefined;
-        this.isBreak = payload.isBreak;
-        this.breakElapsed = payload.breakElapsed;
-        this.breakRunningSince = payload.breakRunningSince ?? undefined;
+        this.phase = payload.phase;
+        this.workElapsed = payload.workElapsed;
+        this.workRunningSince = payload.workRunningSince ?? undefined;
+        this.breakDuration = payload.breakDuration;
+        this.breakStartedAt = payload.breakStartedAt ?? undefined;
         this.pausedUntil = payload.pausedUntil ?? undefined;
+        this.label = payload.label ?? undefined;
+        this.labelSource = payload.labelSource;
     }
 
     get running() {
-        return this.runningSince !== undefined;
+        return this.phase === 'running';
+    }
+
+    get isBreak() {
+        return this.phase === 'breaking';
+    }
+
+    get isStopped() {
+        return this.phase === 'stopped';
     }
 
     get isCountdown() {
@@ -79,36 +128,66 @@ export class StopwatchState {
         return this.isBreak ? 'break' : 'work';
     }
 
-    get currentMs() {
-        if (!store.loaded || !store.settings) return 0;
-        const style = store.settings.clock_style;
-
-        const nowMs = now.ms;
-        if (this.isBreak) {
-            const breakTaken = this.breakElapsed + (this.breakRunningSince !== undefined ? nowMs - this.breakRunningSince : 0);
-            if (style === 'flowtime') {
-                const totalWork = this.elapsed; // For simplicity, only completed work chunks count. If you want ongoing work to count, it requires more complex math.
-                const breakDivisor = store.settings.flowtime_break_divisor || 5;
-                const breakEarned = totalWork / breakDivisor;
-                return Math.max(0, breakEarned - breakTaken); 
-            }
-            return breakTaken;
+    get workMs(): number {
+        if (this.phase !== 'running') return this.workElapsed;
+        if (this.workRunningSince !== undefined) {
+            return this.workElapsed + Math.max(0, now.ms - this.workRunningSince);
         }
-        
-        return this.elapsed + (this.running ? nowMs - (this.runningSince ?? 0) : 0);
+        if (this.pausedUntil !== undefined && now.ms >= this.pausedUntil) {
+            return this.workElapsed + (now.ms - this.pausedUntil);
+        }
+        return this.workElapsed;
+    }
+
+    get breakElapsedMs(): number {
+        if (!this.isBreak || this.breakStartedAt === undefined) return 0;
+        return Math.max(0, now.ms - this.breakStartedAt);
+    }
+
+    get breakRemainingMs(): number {
+        return Math.max(0, this.breakDuration - this.breakElapsedMs);
+    }
+
+    get currentMs(): number {
+        if (this.isPaused) return this.pauseRemainingMs;
+        if (this.isBreak) return this.isCountdown ? this.breakRemainingMs : this.breakElapsedMs;
+        if (this.isStopped) return 0;
+        return this.workMs;
     }
 
     get isPristine() {
-        return this.currentMs === 0 && !this.running && !this.isBreak && !this.isPaused;
+        return this.phase === 'paused' && this.workMs === 0 && !this.isPaused;
+    }
+
+    private applyError(): void {
+        playSound(ERROR_SOUND);
     }
 
     async toggle(): Promise<void> {
         const result = await safeInvoke<StopwatchSnapshot>('toggle_stopwatch');
+        if (result.isErr()) {
+            this.applyError();
+            return;
+        }
+        this.updateFromPayload(result.value);
+    }
+
+    async toggleBreak(breakDivisor: number): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('toggle_break', { breakDivisor });
+        if (result.isErr()) {
+            this.applyError();
+            return;
+        }
+        this.updateFromPayload(result.value);
+    }
+
+    async completeBreak(): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('complete_break');
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
-    async toggleBreak(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('toggle_break');
+    async setLabel(label: string | null, source: StopwatchLabelSource): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('set_stopwatch_label', { label, source });
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
@@ -140,48 +219,40 @@ export function splitTime(ms: number) {
     };
 }
 
-const TRANSITION_SOUNDS: Record<ClockPhase, Partial<Record<ClockPhase, string>>> = {
-    work: { break: 'work_to_break.wav' },
-    break: { work: 'break_to_work.wav' },
-};
-
-const soundCache = new Map<string, HTMLAudioElement>();
-
-function isMainWindow(): boolean {
-    return getCurrentWindow().label === 'main';
-}
-
-function playSound(file: string): void {
-    if (!isMainWindow()) return;
-    let audio = soundCache.get(file);
-    if (audio === undefined) {
-        audio = new Audio(`/sounds/${file}`);
-        soundCache.set(file, audio);
-    }
-    audio.currentTime = 0;
-    void audio.play().catch(() => { /* autoplay or decode failures are non-fatal */ });
-}
-
-async function triggerScreenEffect(): Promise<void> {
-    if (!isMainWindow()) return;
-    const result = await safeInvoke('show_screen_effect');
-    if (result.isErr()) return;
-    const { emit } = await import('@tauri-apps/api/event');
-    void emit(SCREEN_EFFECT);
-}
-
-let lastPhase: ClockPhase | undefined;
+let lastInBreak: boolean | undefined;
+let completingBreak = false;
 
 if (typeof window !== 'undefined') {
     $effect.root(() => {
         $effect(() => {
-            const currentPhase = stopwatchState.activePhase;
-            if (lastPhase !== undefined && lastPhase !== currentPhase) {
-                const file = TRANSITION_SOUNDS[lastPhase][currentPhase];
-                if (file !== undefined) playSound(file);
-                void triggerScreenEffect();
+            const inBreak = stopwatchState.phase === 'breaking';
+            if (lastInBreak !== undefined && lastInBreak !== inBreak) {
+                const from: ClockPhase = lastInBreak ? 'break' : 'work';
+                const to: ClockPhase = inBreak ? 'break' : 'work';
+                const sound = TRANSITION_SOUNDS[from][to];
+                if (!inBreak && stopwatchState.phase === 'stopped') {
+                    playSound(BREAK_OVER_SOUND);
+                } else if (sound !== undefined) {
+                    playSound(sound);
+                }
+                if (!stopwatchState.isStopped) void triggerScreenEffect();
             }
-            lastPhase = currentPhase;
+            lastInBreak = inBreak;
+        });
+    });
+
+    $effect.root(() => {
+        $effect(() => {
+            void now.ms;
+            if (completingBreak) return;
+            if (stopwatchState.phase !== 'breaking') return;
+            if (store.settings?.clock_style !== 'flowtime') return;
+            if (stopwatchState.breakRemainingMs > 0) return;
+
+            completingBreak = true;
+            void stopwatchState.completeBreak().finally(() => {
+                completingBreak = false;
+            });
         });
     });
 }
