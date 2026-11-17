@@ -5,11 +5,11 @@ import type { Tag } from "./Tag.generated";
 import type { TaskAlarmTrigger } from "./TaskAlarmTrigger.generated";
 import type { TaskPriority } from "./TaskPriority.generated";
 
-export type AppTask = { id: TaskId, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, parentTask?: TaskId, dependencies?: Array<TaskId>, est?: number, added?: string, canvasX?: number, canvasY?: number, onCanvas?: boolean, remoteId?: RemoteId, 
+export type AppTask = { id: TaskId, title: string, status?: AppTaskStatus, priority?: TaskPriority, tags?: Array<Tag>, parentTask?: TaskId, dependencies?: Array<TaskId>, est?: number, added?: string, remoteId?: RemoteId, 
 /**
  * Collection href this task lives in, matching `AppEvent`.
  */
-remoteCollectionId?: CollectionId, notes?: string, tabs?: string, 
+remoteCollectionId?: CollectionId, notes?: string, 
 /**
  * `DTSTART`: the task's start, which tasks.org also uses as "hide until".
  * Canonical form matches [`Self::due`].

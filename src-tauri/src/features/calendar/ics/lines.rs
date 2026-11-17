@@ -325,6 +325,8 @@ pub(super) enum OwnedKind {
     Name(&'static str),
     /// `RELATED-TO` lines whose `RELTYPE` is (or defaults to) `PARENT`.
     ParentRelation,
+    /// `RELATED-TO` lines whose `RELTYPE` is `DEPENDS-ON`.
+    DependencyRelation,
 }
 
 impl OwnedKind {
@@ -332,6 +334,7 @@ impl OwnedKind {
         match self {
             Self::Name(name) => property_name(line) == name,
             Self::ParentRelation => is_parent_relation(line),
+            Self::DependencyRelation => is_dependency_relation(line),
         }
     }
 }
@@ -411,6 +414,14 @@ fn flatten_calendar(roots: Vec<ComponentSpan>) -> Vec<ComponentSpan> {
 }
 
 fn is_parent_relation(line: &str) -> bool {
+    relates_with(line, "PARENT", true)
+}
+
+fn is_dependency_relation(line: &str) -> bool {
+    relates_with(line, "DEPENDS-ON", false)
+}
+
+fn relates_with(line: &str, reltype: &str, missing_is_match: bool) -> bool {
     if property_name(line) != "RELATED-TO" {
         return false;
     }
@@ -418,13 +429,15 @@ fn is_parent_relation(line: &str) -> bool {
         .split_once(';')
         .and_then(|(_, rest)| rest.split_once(':').map(|(params, _)| params));
     let Some(params) = params else {
-        return true;
+        return missing_is_match;
     };
-    let reltype = params.split(';').find_map(|param| {
+    let actual = params.split(';').find_map(|param| {
         let (key, value) = param.split_once('=')?;
         key.eq_ignore_ascii_case("RELTYPE").then_some(value)
     });
-    reltype.is_none_or(|value| value.eq_ignore_ascii_case("PARENT"))
+    actual.map_or(missing_is_match, |value| {
+        value.eq_ignore_ascii_case(reltype)
+    })
 }
 
 fn push_lines(out: &mut String, lines: &[RawLine], eol: &str) {
@@ -525,11 +538,16 @@ mod tests {
     }
 
     #[test]
-    fn only_parent_relations_are_owned() {
+    fn only_the_matching_relation_types_are_owned() {
         assert!(is_parent_relation("RELATED-TO;RELTYPE=PARENT:abc"));
         assert!(is_parent_relation("RELATED-TO:abc"));
         assert!(!is_parent_relation("RELATED-TO;RELTYPE=DEPENDS-ON:abc"));
         assert!(!is_parent_relation("X-RELATED-TO:abc"));
+
+        assert!(is_dependency_relation("RELATED-TO;RELTYPE=DEPENDS-ON:abc"));
+        assert!(!is_dependency_relation("RELATED-TO;RELTYPE=PARENT:abc"));
+        assert!(!is_dependency_relation("RELATED-TO:abc"));
+        assert!(!is_dependency_relation("X-RELATED-TO:abc"));
     }
 
     #[test]

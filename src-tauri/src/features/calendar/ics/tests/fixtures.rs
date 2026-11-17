@@ -39,6 +39,8 @@ pub(super) const TASK_PROPERTIES: &[&str] = &[
     "CATEGORIES",
     "GEO",
     "RELATED-TO",
+    "ESTIMATED-DURATION",
+    "X-NEXT-UP",
     "X-TASKROOT-STATUS",
     "X-TASKROOT-DEPENDENCIES",
     "X-TASKROOT-EST",

@@ -126,12 +126,6 @@ pub struct AppTask {
     #[query(sortable, filter_type = "text", label = "Created")]
     pub added: Option<String>,
     #[ts(optional)]
-    pub canvas_x: Option<f64>,
-    #[ts(optional)]
-    pub canvas_y: Option<f64>,
-    #[ts(optional)]
-    pub on_canvas: Option<bool>,
-    #[ts(optional)]
     pub remote_id: Option<RemoteId>,
     /// Collection href this task lives in, matching `AppEvent`.
     #[ts(optional)]
@@ -139,8 +133,6 @@ pub struct AppTask {
     pub remote_collection_id: Option<CollectionId>,
     #[ts(optional)]
     pub notes: Option<String>,
-    #[ts(optional)]
-    pub tabs: Option<String>,
     /// `DTSTART`: the task's start, which tasks.org also uses as "hide until".
     /// Canonical form matches [`Self::due`].
     #[ts(optional)]
@@ -190,13 +182,9 @@ mod tests {
             dependencies: None,
             est: None,
             added: None,
-            canvas_x: None,
-            canvas_y: None,
-            on_canvas: None,
             remote_id: None,
             remote_collection_id: None,
             notes: None,
-            tabs: None,
             start: None,
             due: None,
             completed_at: None,

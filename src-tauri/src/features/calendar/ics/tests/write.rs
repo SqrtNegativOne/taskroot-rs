@@ -286,7 +286,8 @@ fn reopening_a_task_clears_the_completion_properties() {
     let reopened = write_task_resource(&completed, &task).unwrap();
 
     assert!(reopened.contains("STATUS:NEEDS-ACTION"));
-    assert!(reopened.contains("X-TASKROOT-STATUS:next-up"));
+    assert!(reopened.contains("X-NEXT-UP:TRUE"));
+    assert!(!reopened.contains("X-TASKROOT-STATUS"));
     assert!(!reopened.contains("COMPLETED"));
     assert!(!reopened.contains("PERCENT-COMPLETE"));
 }
@@ -310,6 +311,26 @@ fn in_process_and_cancelled_write_standard_status() {
         read_task(&cancelled).status,
         Some(AppTaskStatus::Cancelled)
     );
+}
+
+#[test]
+fn next_up_uses_standard_status_plus_its_one_custom_marker() {
+    let raw = fixture(TASK);
+    let mut task = read_task(&raw);
+
+    task.status = Some(AppTaskStatus::NextUp);
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(written.contains("STATUS:NEEDS-ACTION"));
+    assert!(written.contains("X-NEXT-UP:TRUE"));
+    assert!(!written.contains("X-TASKROOT-STATUS"));
+    assert_eq!(read_task(&written).status, Some(AppTaskStatus::NextUp));
+
+    task.status = Some(AppTaskStatus::Todo);
+    let cleared = write_task_resource(&written, &task).unwrap();
+
+    assert!(!cleared.contains("X-NEXT-UP"));
+    assert_eq!(read_task(&cleared).status, Some(AppTaskStatus::Todo));
 }
 
 #[test]
@@ -376,7 +397,7 @@ fn a_depends_on_relation_is_not_treated_as_the_parent() {
 }
 
 #[test]
-fn tags_dependencies_and_canvas_fields_round_trip() {
+fn tags_dependencies_and_estimate_round_trip() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
     task.tags = Some(vec![Tag {
@@ -386,14 +407,15 @@ fn tags_dependencies_and_canvas_fields_round_trip() {
     }]);
     task.dependencies = Some(vec![TaskId::from("a"), TaskId::from("b")]);
     task.est = Some(25);
-    task.canvas_x = Some(12.5);
-    task.canvas_y = Some(-3.0);
-    task.on_canvas = Some(true);
-    task.tabs = Some("work".to_string());
 
     let written = write_task_resource(&raw, &task).unwrap();
 
     assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
+    assert!(written.contains("RELATED-TO;RELTYPE=DEPENDS-ON:a"));
+    assert!(written.contains("RELATED-TO;RELTYPE=DEPENDS-ON:b"));
+    assert!(written.contains("ESTIMATED-DURATION:PT25M"));
+    assert!(!written.contains("X-TASKROOT-DEPENDENCIES"));
+    assert!(!written.contains("X-TASKROOT-EST"));
     let reread = read_task(&written);
     assert_eq!(
         reread
@@ -406,10 +428,27 @@ fn tags_dependencies_and_canvas_fields_round_trip() {
         Some(vec![TaskId::from("a"), TaskId::from("b")])
     );
     assert_eq!(reread.est, Some(25));
-    assert_eq!(reread.canvas_x, Some(12.5));
-    assert_eq!(reread.canvas_y, Some(-3.0));
-    assert_eq!(reread.on_canvas, Some(true));
-    assert_eq!(reread.tabs.as_deref(), Some("work"));
+}
+
+#[test]
+fn legacy_taskroot_properties_are_removed_on_the_next_write() {
+    let raw = fixture(TASK).replace(
+        "BEGIN:VTODO\r\n",
+        "BEGIN:VTODO\r\nX-TASKROOT-STATUS:done\r\nX-TASKROOT-DEPENDENCIES:[\"a\"]\r\nX-TASKROOT-EST:25\r\nX-TASKROOT-CANVAS-X:12.5\r\nX-TASKROOT-CANVAS-Y:-3\r\nX-TASKROOT-ON-CANVAS:true\r\nX-TASKROOT-TABS:work\r\n",
+    );
+    let task = read_task(&raw);
+
+    assert_eq!(
+        task.status,
+        Some(AppTaskStatus::Todo),
+        "legacy X-TASKROOT-STATUS is no longer read"
+    );
+    assert_eq!(task.dependencies, None);
+    assert_eq!(task.est, None);
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(!written.contains("X-TASKROOT-"), "{written}");
 }
 
 // ---------------------------------------------------- tasks.org VTODO -------

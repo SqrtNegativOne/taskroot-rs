@@ -418,39 +418,26 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
             related_lines(task.parent_task.as_ref()),
         ),
         PropertySpec::new(
-            OwnedKind::Name("X-TASKROOT-STATUS"),
-            vec![format!(
-                "X-TASKROOT-STATUS:{}",
-                workflow_value(task.status.as_ref())
-            )],
+            OwnedKind::DependencyRelation,
+            dependency_lines(task.dependencies.as_deref()),
         ),
         PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-DEPENDENCIES"),
-            dependency_line(task.dependencies.as_deref()),
+            OwnedKind::Name("ESTIMATED-DURATION"),
+            estimate_line(task.est),
         ),
         PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-EST"),
-            task.est.map(|est| format!("X-TASKROOT-EST:{est}")),
+            OwnedKind::Name("X-NEXT-UP"),
+            (task.status == Some(AppTaskStatus::NextUp)).then(|| "X-NEXT-UP:TRUE".to_string()),
         ),
-        PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-CANVAS-X"),
-            task.canvas_x.map(|x| format!("X-TASKROOT-CANVAS-X:{x}")),
-        ),
-        PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-CANVAS-Y"),
-            task.canvas_y.map(|y| format!("X-TASKROOT-CANVAS-Y:{y}")),
-        ),
-        PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-ON-CANVAS"),
-            task.on_canvas
-                .map(|on| format!("X-TASKROOT-ON-CANVAS:{on}")),
-        ),
-        PropertySpec::optional(
-            OwnedKind::Name("X-TASKROOT-TABS"),
-            task.tabs
-                .as_deref()
-                .map(|tabs| format!("X-TASKROOT-TABS:{}", escape_text(tabs))),
-        ),
+        // Properties Taskroot used to write. The reader no longer reads them, so a
+        // write removes them instead of leaving a stale second representation.
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-STATUS"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-DEPENDENCIES"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-EST"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-CANVAS-X"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-CANVAS-Y"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-ON-CANVAS"), Vec::new()),
+        PropertySpec::new(OwnedKind::Name("X-TASKROOT-TABS"), Vec::new()),
         PropertySpec::optional(
             OwnedKind::Name("CREATED"),
             task.added
@@ -700,17 +687,19 @@ fn related_lines(parent: Option<&TaskId>) -> Vec<String> {
         .collect()
 }
 
-fn dependency_line(dependencies: Option<&[TaskId]>) -> Option<String> {
-    let ids = dependencies
+fn dependency_lines(dependencies: Option<&[TaskId]>) -> Vec<String> {
+    dependencies
         .unwrap_or_default()
         .iter()
-        .map(|id| id.0.as_str())
-        .collect::<Vec<_>>();
-    if ids.is_empty() {
-        return None;
-    }
-    let json = serde_json::to_string(&ids).ok()?;
-    Some(format!("X-TASKROOT-DEPENDENCIES:{}", escape_text(&json)))
+        .map(|id| format!("RELATED-TO;RELTYPE=DEPENDS-ON:{}", escape_text(&id.0)))
+        .collect()
+}
+
+/// `ESTIMATED-DURATION` carries an RFC 5545 duration, so whole minutes become
+/// `PT{minutes}M`. A zero or negative estimate is not an estimate.
+fn estimate_line(est: Option<i32>) -> Option<String> {
+    let minutes = est.filter(|minutes| *minutes > 0)?;
+    Some(format!("ESTIMATED-DURATION:PT{minutes}M"))
 }
 
 const fn priority_value(priority: Option<&TaskPriority>) -> u32 {
@@ -726,23 +715,13 @@ const fn priority_value(priority: Option<&TaskPriority>) -> u32 {
 /// The standard `VTODO` `STATUS` value for the task's workflow state.
 ///
 /// `NextUp` has no standard equivalent, so it maps to `NEEDS-ACTION` and keeps
-/// its marker in `X-TASKROOT-STATUS`.
+/// its marker in `X-NEXT-UP:TRUE`.
 const fn task_status_value(status: Option<&AppTaskStatus>) -> &'static str {
     match status {
         Some(AppTaskStatus::Doing) => "IN-PROCESS",
         Some(AppTaskStatus::Done) => "COMPLETED",
         Some(AppTaskStatus::Cancelled) => "CANCELLED",
         Some(AppTaskStatus::Todo | AppTaskStatus::NextUp) | None => "NEEDS-ACTION",
-    }
-}
-
-const fn workflow_value(status: Option<&AppTaskStatus>) -> &'static str {
-    match status {
-        Some(AppTaskStatus::NextUp) => "next-up",
-        Some(AppTaskStatus::Doing) => "doing",
-        Some(AppTaskStatus::Done) => "done",
-        Some(AppTaskStatus::Cancelled) => "cancelled",
-        Some(AppTaskStatus::Todo) | None => "todo",
     }
 }
 

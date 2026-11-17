@@ -4,31 +4,11 @@ Backlog for the inspector, iCalendar and stopwatch work. The inspector currently
 exposes only a subset of RFC 5545; this file lists the gap. It is a backlog, not
 a commitment to every field.
 
-## Priority: replace non-standard `X-TASKROOT-*` properties
-
-Rely on a standard iCalendar property wherever one exists. Remove the custom
-fallbacks instead of maintaining two representations.
-
-- [ ] `X-TASKROOT-STATUS` -> standard `STATUS`
-  - `todo` -> `NEEDS-ACTION`, `doing` -> `IN-PROCESS`, `done` -> `COMPLETED`,
-    `cancelled` -> `CANCELLED` are now read and written.
-  - `next-up` has no standard equivalent and is the only custom value still
-    written. Create new prop such as X-NEXT-UP:TRUE for example
-- [ ] `X-TASKROOT-DEPENDENCIES` -> one `RELATED-TO;RELTYPE=DEPENDS-ON` line per
-      dependency.
-- [ ] `X-TASKROOT-EST` -> `ESTIMATED-DURATION` (RFC 9074).
-- [ ] `X-TASKROOT-TASK-ID` (event -> task link) has no standard equivalent.
-      Document it as the one exception, or move the link into app UI state.
-- [ ] `X-TASKROOT-CANVAS-X`, `X-TASKROOT-CANVAS-Y`, `X-TASKROOT-ON-CANVAS` and
-      `X-TASKROOT-TABS` are app UI state, not calendar data. Move them to
-      `ui-state.json` so they are not written into `.ics`.
-- [ ] Confirm the writer removes the owned `X-*` lines cleanly. Taskroot has no
-      migration layer, so old values simply stop being read.
-
 ## VTODO (task inspector) - missing standard properties
 
 Currently: SUMMARY, DESCRIPTION, STATUS, PRIORITY, DTSTART, DUE, CATEGORIES,
-RELATED-TO;RELTYPE=PARENT, RRULE, VALARM, COMPLETED, CREATED, LAST-MODIFIED.
+RELATED-TO;RELTYPE=PARENT, RELATED-TO;RELTYPE=DEPENDS-ON, ESTIMATED-DURATION,
+RRULE, VALARM, COMPLETED, CREATED, LAST-MODIFIED.
 
 - [ ] LOCATION
 - [ ] GEO (already modelled and read/written; inspector row only)

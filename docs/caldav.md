@@ -136,7 +136,7 @@ tag names only. A missing priority or an empty tag list emits no line.
 | `start` | `DTSTART` | tasks.org's start ("hide until"); date-only stays `YYYY-MM-DD` |
 | `due` | `DUE` | preserve the raw value; date-only stays `YYYY-MM-DD` |
 | `timezone` | `TZID` of `DUE`, else of `DTSTART` | `DUE` wins when a resource mixes zones; a `…Z` value reads as `UTC` so its instant survives the write |
-| `status` | `STATUS` + `COMPLETED` + `PERCENT-COMPLETE` | `Todo`/`NextUp` -> `NEEDS-ACTION`, `Doing` -> `IN-PROCESS`, `Done` -> `COMPLETED`, `Cancelled` -> `CANCELLED`; the workflow value (including `next-up`) also travels in `X-TASKROOT-STATUS` |
+| `status` | `STATUS` + `COMPLETED` + `PERCENT-COMPLETE` | `Todo`/`NextUp` -> `NEEDS-ACTION`, `Doing` -> `IN-PROCESS`, `Done` -> `COMPLETED`, `Cancelled` -> `CANCELLED`; `next-up`, which has no standard equivalent, also writes `X-NEXT-UP:TRUE` |
 | `completed_at` | `COMPLETED` | kept across edits, so retitling a finished task does not move its completion time |
 | `priority` | `PRIORITY` | `None→` omitted, `Low→7`, `Medium→5`, `High→3`, `Urgent→1`; reverse `1–2→Urgent`, `3–4→High`, `5→Medium`, `6–9→Low`, `0→None` |
 | `tags` | `CATEGORIES` | names only; colours stay local keyed by name |
@@ -144,10 +144,14 @@ tag names only. A missing priority or an empty tag list emits no line.
 | `geo` | `GEO` | `latitude;longitude`, the point tasks.org geofences at |
 | `alarms` | `VALARM` `TRIGGER` | `relative` = `TRIGGER;RELATED=START` or `;RELATED=END` with `-PTnM` (minutes *before*, negative = after), `absolute` = `TRIGGER;VALUE=DATE-TIME:…Z`; `ACTION`/`DESCRIPTION` of an existing alarm are left alone, a new one gets tasks.org's `DISPLAY` + description |
 | `parent_task` | `RELATED-TO;RELTYPE=PARENT` | tasks.org's subtask relation |
-| `dependencies` | `X-TASKROOT-DEPENDENCIES` | JSON array of UIDs; **not** `RELATED-TO` because tasks.org rewrites reltypes |
+| `dependencies` | `RELATED-TO;RELTYPE=DEPENDS-ON` | one line per dependency UID |
 | `added` | `CREATED`, fallback `DTSTAMP` | tasks.org often omits `CREATED` |
 | `updated_at` | `LAST-MODIFIED` | |
-| `est`, `canvas_x/y`, `on_canvas`, `tabs` | `X-TASKROOT-*` | app-only, tolerated to be lost |
+| `est` | `ESTIMATED-DURATION` | RFC 9074 duration; whole minutes are written as `PT{n}M` |
+
+`canvas_x`, `canvas_y`, `on_canvas` and `tabs` are app UI state, not calendar data.
+They are no longer read from or written to `.ics`; per-task UI state belongs in
+`ui-state.json` through `get_ui_state`/`set_ui_state`.
 
 `VALARM` is only rewritten when `alarms` differs from what the resource already held, so an
 alarm whose trigger Taskroot cannot express (e.g. `-PT45S`) survives every unrelated edit.
@@ -159,7 +163,8 @@ the series forward, and a plain `STATUS:COMPLETED` on a recurring master would e
 for every client. The roll-forward is not implemented yet.
 
 An event's task attachment is stored on the `VEVENT` as
-`X-TASKROOT-TASK-ID: <task UID>` (app-only). The link lives on the event because one
+`X-TASKROOT-TASK-ID: <task UID>` (app-only), the one remaining `X-TASKROOT-*`
+property because it has no standard equivalent. The link lives on the event because one
 task can be scheduled as many blocks; `AppEvent.task_id` reads it back and the property
 is written only when the field is set or cleared. Nothing in tasks.org or CalDAV
 standardises this, so other clients simply ignore it rather than rewriting it. Dragging a

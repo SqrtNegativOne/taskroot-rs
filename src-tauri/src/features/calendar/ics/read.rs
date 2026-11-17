@@ -25,6 +25,11 @@
 //!   the writer can re-emit the same instant instead of floating it.
 //! - **`completed_at`**: ISO 8601 UTC, the `COMPLETED` timestamp.
 //! - **`rrule`** (VTODO): the wire form (`RRULE:FREQ=…`), one line per rule.
+//! - **`status`** (VTODO): standard `STATUS` (`NEEDS-ACTION`, `IN-PROCESS`,
+//!   `COMPLETED`, `CANCELLED`), with `X-NEXT-UP:TRUE` as the only custom marker
+//!   because `next-up` has no standard equivalent.
+//! - **`dependencies`**: one `RELATED-TO;RELTYPE=DEPENDS-ON` line per dependency.
+//! - **`est`**: the whole minutes in `ESTIMATED-DURATION` (RFC 9074).
 //! - **`geo`**: `GEO` as a latitude/longitude pair.
 //! - **`alarms`**: one entry per `VALARM`, in document order. `minutes_before` is
 //!   positive for "before the anchor", and an absolute trigger keeps its UTC instant.
@@ -327,16 +332,11 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
         tags: read_categories(component),
         parent_task: read_parent(component).map(TaskId::from),
         dependencies: read_dependencies(component),
-        est: property(component, "X-TASKROOT-EST")
-            .and_then(|property| property.val.as_str().parse().ok()),
+        est: property(component, "ESTIMATED-DURATION")
+            .and_then(|property| duration_minutes(property.val.as_str()))
+            .filter(|minutes| *minutes > 0),
         added: created.or(stamp),
-        canvas_x: number_property(component, "X-TASKROOT-CANVAS-X"),
-        canvas_y: number_property(component, "X-TASKROOT-CANVAS-Y"),
-        on_canvas: text_property(component, "X-TASKROOT-ON-CANVAS").map(|value| {
-            value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
-        }),
         notes: text_property(component, "DESCRIPTION"),
-        tabs: text_property(component, "X-TASKROOT-TABS"),
         start: start
             .as_ref()
             .and_then(|value| canonical(value, timezone.as_deref())),
@@ -354,21 +354,24 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
 }
 
 fn read_task_status(component: &Component<'_>) -> AppTaskStatus {
-    if let Some(status) = property(component, "STATUS").map(|property| property.val.as_str()) {
-        match status.to_ascii_uppercase().as_str() {
-            "COMPLETED" => return AppTaskStatus::Done,
-            "CANCELLED" => return AppTaskStatus::Cancelled,
-            "IN-PROCESS" => return AppTaskStatus::Doing,
-            _ => {}
-        }
-    }
-    match text_property(component, "X-TASKROOT-STATUS").as_deref() {
-        Some("next-up") => AppTaskStatus::NextUp,
-        Some("doing") => AppTaskStatus::Doing,
-        Some("done") => AppTaskStatus::Done,
-        Some("cancelled") => AppTaskStatus::Cancelled,
+    let next_up = text_property(component, "X-NEXT-UP").is_some_and(|value| is_true(&value));
+    match property(component, "STATUS")
+        .map(|property| property.val.as_str().to_ascii_uppercase())
+        .as_deref()
+    {
+        Some("COMPLETED") => AppTaskStatus::Done,
+        Some("CANCELLED") => AppTaskStatus::Cancelled,
+        Some("IN-PROCESS") => AppTaskStatus::Doing,
+        _ if next_up => AppTaskStatus::NextUp,
         _ => AppTaskStatus::Todo,
     }
+}
+
+fn is_true(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_uppercase().as_str(),
+        "TRUE" | "1" | "YES"
+    )
 }
 
 fn priority_value(property: &Property<'_>) -> Option<TaskPriority> {
@@ -413,13 +416,21 @@ fn relation_is_parent(property: &Property<'_>) -> bool {
     parameter(property, "RELTYPE").is_none_or(|kind| kind.eq_ignore_ascii_case("PARENT"))
 }
 
+fn relation_is_dependency(property: &Property<'_>) -> bool {
+    parameter(property, "RELTYPE").is_some_and(|kind| kind.eq_ignore_ascii_case("DEPENDS-ON"))
+}
+
 fn read_dependencies(component: &Component<'_>) -> Option<Vec<TaskId>> {
-    let raw = text_property(component, "X-TASKROOT-DEPENDENCIES")?;
-    let ids: Vec<String> = serde_json::from_str(&raw).ok()?;
+    let ids = properties(component, "RELATED-TO")
+        .filter(|property| relation_is_dependency(property))
+        .map(|property| property.val.as_str().trim())
+        .filter(|id| !id.is_empty())
+        .map(TaskId::from)
+        .collect::<Vec<_>>();
     if ids.is_empty() {
         return None;
     }
-    Some(ids.into_iter().map(TaskId::from).collect())
+    Some(ids)
 }
 
 /// The zone a `DTSTART`/`DUE` value is expressed in: its `TZID`, or `"UTC"` for a
@@ -554,10 +565,6 @@ fn iso_value(property: &Property<'_>) -> Option<String> {
             }
         }
     }
-}
-
-fn number_property(component: &Component<'_>, name: &str) -> Option<f64> {
-    text_property(component, name).and_then(|value| value.parse().ok())
 }
 
 fn property<'a>(component: &'a Component<'a>, name: &str) -> Option<&'a Property<'a>> {
