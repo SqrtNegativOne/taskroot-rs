@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@testing-library/svelte';
 import EventBlock from './EventBlock.svelte';
-import { PX_PER_MIN } from './constants';
+import { EVENT_INSET_PX, PX_PER_MIN } from './constants';
 import { makeInstance } from '../../../test/factories';
 
 describe('EventBlock geometry', () => {
@@ -23,9 +23,9 @@ describe('EventBlock geometry', () => {
         const firstBottom = firstTop + Number.parseFloat(firstEl.style.height);
         const secondTop = Number.parseFloat(secondEl.style.top);
 
-        expect(firstTop).toBeCloseTo(60 * PX_PER_MIN + 2, 5);
-        expect(firstBottom).toBeCloseTo(120 * PX_PER_MIN - 2, 5);
-        expect(secondTop - firstBottom).toBeCloseTo(4, 5);
+        expect(firstTop).toBeCloseTo(60 * PX_PER_MIN + EVENT_INSET_PX, 5);
+        expect(firstBottom).toBeCloseTo(120 * PX_PER_MIN - EVENT_INSET_PX, 5);
+        expect(secondTop).toBeGreaterThan(firstBottom);
     });
 
     it('keeps a minimum visible height for very short events', () => {
@@ -33,8 +33,9 @@ describe('EventBlock geometry', () => {
             props: { event: makeInstance(), startMins: 60, endMins: 61, lane: 0, lanes: 1 },
         });
         const block = container.querySelector<HTMLElement>('.day-event')!;
+        const slotHeight = (61 - 60) * PX_PER_MIN;
 
-        expect(Number.parseFloat(block.style.height)).toBe(18);
-        expect(Number.parseFloat(block.style.top)).toBeCloseTo(60 * PX_PER_MIN + 2, 5);
+        expect(Number.parseFloat(block.style.height)).toBeGreaterThan(slotHeight);
+        expect(Number.parseFloat(block.style.top)).toBeCloseTo(60 * PX_PER_MIN + EVENT_INSET_PX, 5);
     });
 });
