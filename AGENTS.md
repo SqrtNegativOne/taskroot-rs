@@ -16,7 +16,7 @@ Planning docs live at the repository root: [TODO.md](TODO.md) is the inspector/i
 - **Package Manager**: Bun (`bun`). Used for package management and running frontend scripts.
 - **Frontend Framework**: Svelte 5 with SvelteKit configured for SPA (Single Page Application) mode (`ssr = false` in `src/routes/+layout.ts`, `adapter-static` with an `index.html` fallback). Uses Svelte runes for reactivity.
 - **Build Tool**: Vite (via SvelteKit), fixed dev port 1420 (`vite.config.js`).
-- **Desktop Wrapper**: Tauri v2 (Rust backend, configured in `src-tauri/tauri.conf.json`).
+- **Desktop Wrapper**: Tauri v2 (Rust backend, configured in `src-tauri/tauri.conf.json`). Desktop-only: the crate is built as an `rlib` (no mobile `staticlib`/`cdylib`), and `[profile.dev]` keeps `line-tables-only` debug info with dependency debuginfo off to keep `target/` bounded.
 - **Language**: TypeScript (`.ts`, `.svelte`) on the frontend, Rust (`.rs`) on the backend.
 - **Date Math**: `date-fns` (narrow named imports) supplies week/day arithmetic in `src/lib/time.ts`; `ymd` stays hand-written so `format` and its locale data are not pulled in.
 - **Styling**: Vanilla CSS (`src/app.css`) with extensive use of CSS variables for theming.

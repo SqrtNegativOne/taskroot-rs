@@ -13,7 +13,7 @@ fallbacks instead of maintaining two representations.
   - `todo` -> `NEEDS-ACTION`, `doing` -> `IN-PROCESS`, `done` -> `COMPLETED`,
     `cancelled` -> `CANCELLED` are now read and written.
   - `next-up` has no standard equivalent and is the only custom value still
-    written. Decide whether to drop it or keep one documented custom value.
+    written. Create new prop such as X-NEXT-UP:TRUE for example
 - [ ] `X-TASKROOT-DEPENDENCIES` -> one `RELATED-TO;RELTYPE=DEPENDS-ON` line per
       dependency.
 - [ ] `X-TASKROOT-EST` -> `ESTIMATED-DURATION` (RFC 9074).
