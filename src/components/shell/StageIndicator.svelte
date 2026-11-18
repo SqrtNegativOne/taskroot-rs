@@ -8,7 +8,8 @@
 
     const defaultStages = [
         { key: 'plan', label: 'plan', href: Routes.HOME },
-        { key: 'do', label: 'do', href: Routes.DO }
+        { key: 'do', label: 'do', href: Routes.DO },
+        { key: 'tags', label: 'tags', href: Routes.TAGS }
     ] as const;
 
     const isDefault = $derived(defaultStages.some(s => s.key === current) || current === 'settings');

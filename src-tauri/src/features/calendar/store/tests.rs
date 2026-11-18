@@ -71,6 +71,22 @@ fn timed_starts(store: &Store, start: &str, end: &str) -> Vec<String> {
 
 const OCTOBER_RANGE: (&str, &str) = ("2026-10-19T00:00:00Z", "2026-11-02T23:59:59Z");
 
+const TASK_WITH_TAGS: &str = include_str!("../ics/fixtures/tasks-org-task-alarm.ics");
+
+#[test]
+fn tag_names_are_deduped_and_sorted_across_events_and_tasks() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::load(dir.path().to_path_buf());
+    store
+        .set_resource("/cal/event.ics", "/cal/", None, all_day())
+        .unwrap();
+    store
+        .set_resource("/cal/task.ics", "/cal/", None, TASK_WITH_TAGS)
+        .unwrap();
+
+    assert_eq!(store.tag_names(), vec!["Garden", "Holiday", "Home"]);
+}
+
 fn series_raw(store: &Store) -> &str {
     &store.resource_for_event("series").unwrap().raw
 }

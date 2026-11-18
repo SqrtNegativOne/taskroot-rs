@@ -77,6 +77,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::plan::query_events,
             ipc::plan::query_event_instances,
             ipc::plan::query_task_dates,
+            ipc::plan::list_tags,
             ipc::plan::get_event,
             ipc::schema::get_task_schema,
             ipc::schema::get_event_schema,

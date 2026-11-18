@@ -9,5 +9,6 @@ export const Routes = {
     RECAP: '/recap',
     SETTINGS: '/settings',
     STATS: '/stats',
+    TAGS: '/tags',
     WRAP: '/wrap',
 } as const;

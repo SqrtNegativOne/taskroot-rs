@@ -8,7 +8,7 @@ use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::features::calendar::domain::{AppEvent, AppTask};
 use crate::error::AppError;
 use crate::settings::AppSettings;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use super::persist;
@@ -178,6 +178,31 @@ impl Store {
             .flatten()
             .cloned()
             .collect()
+    }
+
+    /// Every distinct tag name in the store, sorted, for the filter pickers.
+    #[must_use]
+    pub fn tag_names(&self) -> Vec<String> {
+        let mut names = BTreeSet::new();
+        for resource in self.resources.values() {
+            match &resource.items {
+                ResourceItems::Events(events) => {
+                    for event in events {
+                        if let Some(tags) = &event.tags {
+                            names.extend(tags.iter().map(|tag| tag.name.clone()));
+                        }
+                    }
+                }
+                ResourceItems::Tasks(tasks) => {
+                    for task in tasks {
+                        if let Some(tags) = &task.tags {
+                            names.extend(tags.iter().map(|tag| tag.name.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        names.into_iter().collect()
     }
 
     #[must_use]

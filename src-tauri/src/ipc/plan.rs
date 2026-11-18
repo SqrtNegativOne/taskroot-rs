@@ -67,6 +67,19 @@ pub async fn query_event_instances(
     }
 }
 
+/// Return every distinct tag name for the filter pickers.
+///
+/// # Errors
+///
+/// Returns an error if the store is not initialized.
+#[tauri::command]
+pub async fn list_tags(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
+    let state = store_state(&app)?;
+    Ok(state
+        .read(crate::features::calendar::Store::tag_names)
+        .await)
+}
+
 /// Return task start/due markers inside a local date window.
 ///
 /// # Errors

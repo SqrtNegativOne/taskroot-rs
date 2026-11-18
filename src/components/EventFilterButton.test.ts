@@ -1,12 +1,25 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import EventFilterButton from './EventFilterButton.svelte';
+import { mockTauriInvoke } from '../test/tauriMock';
 import type { AppCalendar } from '../lib/domain';
+
+vi.mock('@tauri-apps/api/core', async () => {
+    const { mockTauriInvoke } = await import('../test/tauriMock');
+    return { invoke: mockTauriInvoke().invoke };
+});
+
+const tauri = mockTauriInvoke();
 
 const calendars: AppCalendar[] = [
     { id: 'events', summary: 'Event Calendar', writable: true, component: 'VEVENT' },
     { id: 'tasks', summary: 'Task List', writable: true, component: 'VTODO' },
 ];
+
+beforeEach(() => {
+    tauri.reset();
+    tauri.stubCommandValue('list_tags', ['home', 'work']);
+});
 
 afterEach(() => { cleanup(); });
 
@@ -19,6 +32,21 @@ describe('EventFilterButton', () => {
         await fireEvent.click(screen.getByRole('button', { name: /select\.\.\./i }));
         expect(screen.getByRole('checkbox', { name: 'Event Calendar' })).toBeTruthy();
         expect(screen.queryByRole('checkbox', { name: 'Task List' })).toBeNull();
+    });
+
+    it('offers existing tags as a multi-select that appends chips', async () => {
+        render(EventFilterButton, { props: { calendars } });
+        await fireEvent.click(screen.getByTitle('Filter'));
+        await fireEvent.click(screen.getByRole('button', { name: /add filter/i }));
+
+        const columnSelect = screen.getAllByRole('combobox')[0]!;
+        await fireEvent.change(columnSelect, { target: { value: 'tags' } });
+
+        await fireEvent.click(await screen.findByRole('button', { name: /select\.\.\./i }));
+        await fireEvent.click(await screen.findByRole('checkbox', { name: 'work' }));
+        await fireEvent.click(screen.getByRole('checkbox', { name: 'home' }));
+
+        expect(screen.getByRole('button', { name: /work.*home/i })).toBeTruthy();
     });
 
     it('keeps the Filter button accessible by name when its badge is active', () => {

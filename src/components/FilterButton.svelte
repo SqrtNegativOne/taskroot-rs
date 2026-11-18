@@ -3,6 +3,7 @@
     import FloatingMenu from './FloatingMenu.svelte';
     import FilterSortRow from './FilterSortRow.svelte';
     import MultiSelect from './inputs/MultiSelect.svelte';
+    import { useAutoQuery } from '../lib/safeInvoke.svelte';
 
     let {
         filters = $bindable([]),
@@ -19,6 +20,14 @@
         extraFilters?: Snippet;
         extraFilterCount?: number;
     } = $props();
+
+    const tagsQuery = useAutoQuery<string[]>('list_tags', () => ({}));
+    const tagOptions = $derived((tagsQuery.data ?? []).map((name) => ({ label: name, value: name })));
+
+    function availableValuesFor(column: string): { label: string; value: string }[] {
+        if (column === 'tags') return tagOptions;
+        return getValuesForColumn(column);
+    }
 
     function addFilter() {
         const id = columns[0]?.id ?? 'status';
@@ -54,7 +63,7 @@
 
     {#each filters as f, i (i)}
         {@const column = f.column ?? ''}
-        {@const availableValues = getValuesForColumn(column)}
+        {@const availableValues = availableValuesFor(column)}
         <FilterSortRow onremove={() => removeFilter(i)} removeTitle="Remove filter">
             <select
                 value={f.column}

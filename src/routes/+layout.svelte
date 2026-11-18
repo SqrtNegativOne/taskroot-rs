@@ -97,6 +97,7 @@
                 'home': Routes.HOME,
                 'plan': Routes.HOME,
                 'do': Routes.DO,
+                'tags': Routes.TAGS,
                 'settings': Routes.SETTINGS,
             };
             
