@@ -1,15 +1,17 @@
 [package]
-name = "tauri-app"
-version = "0.1.0"
-description = "A Tauri App"
+name = "taskroot"
+version = "0.2.0"
+description = "Local-first desktop task manager for planning, focus and rest"
 # `cargo run` has two binaries to choose from; the GUI is the default, the
-# headless CLI stays available through `cargo run --bin taskroot`.
-default-run = "tauri-app"
-authors = ["you"]
+# headless CLI stays available through `cargo run --bin taskroot-cli`.
+default-run = "taskroot"
+authors = ["arkma"]
+license = "MIT"
+repository = "https://github.com/SqrtNegativOne/taskroot-rs"
 edition = "2021"
 
 [lib]
-name = "tauri_app_lib"
+name = "taskroot_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

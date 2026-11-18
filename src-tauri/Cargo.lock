@@ -4408,6 +4408,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
+name = "taskroot"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "color-eyre",
+ "icalendar",
+ "keyring",
+ "proptest",
+ "reqwest",
+ "roxmltree",
+ "rrule",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "taskroot-macros",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "ts-rs",
+ "uuid",
+ "windows",
+ "wiremock",
+]
+
+[[package]]
 name = "taskroot-macros"
 version = "0.1.0"
 dependencies = [
@@ -4466,40 +4500,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "color-eyre",
- "icalendar",
- "keyring",
- "proptest",
- "reqwest",
- "roxmltree",
- "rrule",
- "serde",
- "serde_json",
- "serde_repr",
- "taskroot-macros",
- "tauri",
- "tauri-build",
- "tauri-plugin-deep-link",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "ts-rs",
- "uuid",
- "windows",
- "wiremock",
 ]
 
 [[package]]

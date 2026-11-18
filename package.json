@@ -1,7 +1,7 @@
 {
-  "name": "tauri-app",
-  "version": "0.1.0",
-  "description": "",
+  "name": "taskroot",
+  "version": "0.2.0",
+  "description": "Local-first desktop task manager for planning, focus and rest",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -15,7 +15,7 @@
     "coverage:frontend": "vitest run --coverage",
     "coverage:backend": "cd src-tauri && cargo llvm-cov nextest --lcov --output-path ../lcov.info",
     "check:deps": "cd src-tauri && cargo machete",
-    "cli": "cd src-tauri && cargo run --quiet --bin taskroot --",
+    "cli": "cd src-tauri && cargo run --quiet --bin taskroot-cli --",
     "tauri": "tauri"
   },
   "license": "MIT",

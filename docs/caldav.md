@@ -22,9 +22,10 @@ Windows/macOS) contains:
 | `ui-state.json` | Flat `{ "<key>": <value> }` map for per-component UI state. |
 | `account.json` | Server URL, username, home-set, principal and discovered collections. No password. |
 
-A debug build whose app-data directory is not writable (a sandboxed dev run) keeps this
-directory next to the executable in `dev-data/` instead, copying `account.json`,
-`settings.json` and `ui-state.json` over once. `TASKROOT_DATA_DIR` overrides both.
+Debug and release builds share this directory. Only a debug build whose app-data
+directory is not writable (a sandboxed dev run) keeps it next to the executable in
+`dev-data/` instead, copying `account.json`, `settings.json` and `ui-state.json` over
+once. `TASKROOT_DATA_DIR` overrides both.
 
 Discovery runs at account setup and on every load (startup, Refresh, and after a list is
 created) to pick up the server-assigned collection. There is no background sync.

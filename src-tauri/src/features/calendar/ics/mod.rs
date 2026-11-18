@@ -11,7 +11,7 @@
 //!    formats.
 //!
 //! ```
-//! use tauri_app_lib::features::calendar::{read_event_resource, write_event_resource};
+//! use taskroot_lib::features::calendar::{read_event_resource, write_event_resource};
 //!
 //! let raw = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:one\r\nDTSTART;VALUE=DATE:20261017\r\nDTEND;VALUE=DATE:20261018\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 //! let events = read_event_resource(raw, "/cal/one.ics", "/cal/").unwrap();

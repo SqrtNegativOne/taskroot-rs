@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
-  "version": "0.1.0",
-  "identifier": "com.arkma.tauri-app",
+  "productName": "taskroot",
+  "version": "0.2.0",
+  "identifier": "com.arkma.taskroot",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://127.0.0.1:1420",

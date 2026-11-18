@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::error::AppError;
 use crate::features::calendar::{Session, open as open_calendar};
 
-const APP_IDENTIFIER: &str = "com.arkma.tauri-app";
+const APP_IDENTIFIER: &str = "com.arkma.taskroot";
 
 /// Load the account, the keychain password and every collection.
 ///
