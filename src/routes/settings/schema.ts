@@ -1,6 +1,6 @@
 export type SettingValue = string | number | boolean;
 
-export type SettingType = 'select' | 'checkbox' | 'number' | 'time' | 'keybinding';
+export type SettingType = 'select' | 'checkbox' | 'number' | 'time' | 'keybinding' | 'calendar';
 
 export interface SettingOption {
     value: SettingValue;

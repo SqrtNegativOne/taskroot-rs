@@ -21,7 +21,8 @@
     });
 
     function countLabel(count: number, singular: string): string {
-        return `${count} ${count === 1 ? singular : `${singular}s`}`;
+        const noun = count === 1 ? singular : `${singular}s`;
+        return `${count} ${noun}`;
     }
 
     function eventWhen(event: AppEvent): string {

@@ -61,7 +61,9 @@ fn timed_starts(store: &Store, start: &str, end: &str) -> Vec<String> {
     let mut starts: Vec<String> = expand_event_instances(&store.events(), start, end)
         .into_iter()
         .filter_map(|instance| match instance.timing {
-            crate::features::calendar::domain::EventTiming::Timed { start, .. } => Some(start.to_rfc3339()),
+            crate::features::calendar::domain::EventTiming::Timed { start, .. } => {
+                Some(start.to_rfc3339())
+            }
             crate::features::calendar::domain::EventTiming::AllDay { .. } => None,
         })
         .collect();
@@ -198,11 +200,9 @@ async fn full_load_replaces_the_store_with_the_server_contents() {
     ops::full_load(&mut store, &client).await.unwrap();
 
     assert_eq!(store.resources.len(), 1, "stale resources are dropped");
-    assert!(
-        store
-            .event("dsh-20261017-first-day-of-durga@dsh-import")
-            .is_none()
-    );
+    assert!(store
+        .event("dsh-20261017-first-day-of-durga@dsh-import")
+        .is_none());
     assert_eq!(
         store.event("fresh").map(|event| event.title.as_str()),
         Some("First Day of Durga")
@@ -231,7 +231,10 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
         raw.contains("EXDATE;TZID=Asia/Kolkata:20261026T110000"),
         "the occurrence must be excluded in the event's zone: {raw}"
     );
-    assert!(raw.contains("RRULE:FREQ=WEEKLY"), "the rule is untouched: {raw}");
+    assert!(
+        raw.contains("RRULE:FREQ=WEEKLY"),
+        "the rule is untouched: {raw}"
+    );
     assert_eq!(
         occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
         vec!["2026-10-19T11:00:00", "2026-11-02T11:00:00"],
@@ -357,7 +360,10 @@ async fn rescheduling_the_series_moves_the_master() {
     .unwrap();
 
     let raw = series_raw(&store);
-    assert!(raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T150000"), "{raw}");
+    assert!(
+        raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T150000"),
+        "{raw}"
+    );
     assert!(raw.contains("RRULE:FREQ=WEEKLY"), "{raw}");
     assert_eq!(
         occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
@@ -444,7 +450,8 @@ fn task(id: &str, title: &str, priority: TaskPriority) -> AppTask {
 }
 
 #[test]
-fn priority_filter_compares_the_numeric_bucket() {    let tasks = vec![
+fn priority_filter_compares_the_numeric_bucket() {
+    let tasks = vec![
         task("a", "Urgent", TaskPriority::Urgent),
         task("b", "Low", TaskPriority::Low),
     ];
@@ -478,4 +485,119 @@ fn empty_filter_values_do_not_match_anything() {
     );
 
     assert_eq!(filtered.len(), 1, "an empty exclusion set filters nothing");
+}
+
+fn calendar(
+    href: &str,
+    summary: &str,
+    component: CalendarComponent,
+    writable: bool,
+) -> CalendarInfo {
+    CalendarInfo {
+        href: href.to_string(),
+        display_name: summary.to_string(),
+        component,
+        writable,
+        ..CalendarInfo::default()
+    }
+}
+
+fn store_with_calendars() -> Store {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::load(dir.path().to_path_buf());
+    store.calendars = vec![
+        calendar("/cal/tasks/", "Tasks", CalendarComponent::VTodo, true),
+        calendar("/cal/tasks2/", "Tasks 2", CalendarComponent::VTodo, true),
+        calendar(
+            "/cal/readonly/",
+            "Read-only",
+            CalendarComponent::VTodo,
+            false,
+        ),
+        calendar("/cal/events/", "Events", CalendarComponent::VEvent, true),
+        calendar("/cal/events2/", "Events 2", CalendarComponent::VEvent, true),
+        calendar(
+            "/cal/mismatch/",
+            "Wrong component",
+            CalendarComponent::VEvent,
+            true,
+        ),
+    ];
+    store
+}
+
+fn default_href(store: &Store, component: CalendarComponent) -> Option<&str> {
+    store
+        .default_calendar(component, None)
+        .map(|calendar| calendar.href.as_str())
+}
+
+#[test]
+fn default_calendar_uses_each_configured_list() {
+    let mut store = store_with_calendars();
+    store.settings.default_task_list = "/cal/tasks2/".to_string();
+    store.settings.default_event_list = "/cal/events2/".to_string();
+
+    assert_eq!(
+        default_href(&store, CalendarComponent::VTodo),
+        Some("/cal/tasks2/")
+    );
+    assert_eq!(
+        default_href(&store, CalendarComponent::VEvent),
+        Some("/cal/events2/")
+    );
+}
+
+#[test]
+fn default_calendar_falls_back_to_the_first_writable_list() {
+    let store = store_with_calendars();
+
+    assert_eq!(
+        default_href(&store, CalendarComponent::VTodo),
+        Some("/cal/tasks/")
+    );
+    assert_eq!(
+        default_href(&store, CalendarComponent::VEvent),
+        Some("/cal/events/")
+    );
+}
+
+#[test]
+fn default_calendar_ignores_a_deleted_wrong_component_or_read_only_default() {
+    for configured in ["/cal/missing/", "/cal/mismatch/", "/cal/readonly/"] {
+        let mut store = store_with_calendars();
+        store.settings.default_task_list = configured.to_string();
+
+        assert_eq!(
+            default_href(&store, CalendarComponent::VTodo),
+            Some("/cal/tasks/"),
+            "{configured} must not be selected for a task"
+        );
+    }
+}
+
+#[test]
+fn an_explicit_calendar_request_wins_over_the_configured_default() {
+    let mut store = store_with_calendars();
+    store.settings.default_task_list = "/cal/tasks/".to_string();
+
+    let selected = store.default_calendar(CalendarComponent::VTodo, Some("/cal/tasks2/"));
+
+    assert_eq!(
+        selected.map(|calendar| calendar.href.as_str()),
+        Some("/cal/tasks2/")
+    );
+}
+
+#[test]
+fn an_invalid_explicit_calendar_request_falls_through_to_the_configured_default() {
+    let mut store = store_with_calendars();
+    store.settings.default_task_list = "/cal/tasks2/".to_string();
+
+    let selected = store.default_calendar(CalendarComponent::VTodo, Some("/cal/readonly/"));
+
+    assert_eq!(
+        selected.map(|calendar| calendar.href.as_str()),
+        Some("/cal/tasks2/")
+    );
 }

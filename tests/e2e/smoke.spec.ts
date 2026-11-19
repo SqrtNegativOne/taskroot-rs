@@ -3,6 +3,8 @@ import type { AppSettings } from '../../src/lib/bindings/AppSettings.generated';
 
 const settings: AppSettings = {
   default_calendar_view: 'month',
+  default_task_list: '',
+  default_event_list: '',
   day_timeline_start_view: 1,
   default_task_duration: 30,
   clock_style: 'flowtime',

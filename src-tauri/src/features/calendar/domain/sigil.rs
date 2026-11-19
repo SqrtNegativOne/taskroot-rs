@@ -24,6 +24,8 @@ pub struct SigilProperties {
     pub duration: Option<i32>,
     #[ts(optional)]
     pub day: Option<String>,
+    #[ts(optional)]
+    pub list: Option<String>,
 }
 
 #[must_use]
@@ -66,6 +68,10 @@ pub fn parse_sigils(input: impl AsRef<str>) -> ParsedSigils {
                 }
             }
         }
+        if let Some(priority) = parse_priority_alias(word) {
+            properties.priority = Some(priority);
+            continue;
+        }
         if let Some(est) = word.strip_prefix('^') {
             if let Some(m) = parse_duration(est) {
                 properties.duration = Some(m);
@@ -78,12 +84,28 @@ pub fn parse_sigils(input: impl AsRef<str>) -> ParsedSigils {
                 continue;
             }
         }
+        if let Some(list) = word.strip_prefix('+') {
+            if !list.is_empty() {
+                properties.list = Some(list.to_string());
+                continue;
+            }
+        }
         title_words.push(word);
     }
 
     ParsedSigils {
         clean_title: title_words.join(" "),
         properties,
+    }
+}
+
+fn parse_priority_alias(word: &str) -> Option<TaskPriority> {
+    match word {
+        "p1" => Some(TaskPriority::Urgent),
+        "p2" => Some(TaskPriority::High),
+        "p3" => Some(TaskPriority::Medium),
+        "p4" => Some(TaskPriority::Low),
+        _ => None,
     }
 }
 
@@ -132,6 +154,37 @@ mod tests {
         let parsed4 = parse_sigils(input4);
         assert_eq!(parsed4.clean_title, "Too high !5");
         assert_eq!(parsed4.properties.priority, None);
+    }
+
+    #[test]
+    fn parses_a_list_sigil() {
+        let parsed = parse_sigils("Buy milk +groceries");
+        assert_eq!(parsed.clean_title, "Buy milk");
+        assert_eq!(parsed.properties.list, Some("groceries".to_string()));
+
+        let empty = parse_sigils("Buy milk +");
+        assert_eq!(empty.clean_title, "Buy milk +");
+        assert_eq!(empty.properties.list, None);
+    }
+
+    #[test]
+    fn parses_priority_aliases() {
+        for (token, expected) in [
+            ("p1", TaskPriority::Urgent),
+            ("p2", TaskPriority::High),
+            ("p3", TaskPriority::Medium),
+            ("p4", TaskPriority::Low),
+        ] {
+            let parsed = parse_sigils(format!("Buy milk {token}"));
+            assert_eq!(parsed.clean_title, "Buy milk");
+            assert_eq!(parsed.properties.priority, Some(expected));
+        }
+
+        for token in ["p0", "p5", "p10", "P1"] {
+            let parsed = parse_sigils(format!("Buy milk {token}"));
+            assert_eq!(parsed.clean_title, format!("Buy milk {token}"));
+            assert_eq!(parsed.properties.priority, None);
+        }
     }
 
     use proptest::prelude::*;

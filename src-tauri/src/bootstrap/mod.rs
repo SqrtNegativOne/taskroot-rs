@@ -63,6 +63,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
         .on_window_event(platform::handle_window_event)
         .invoke_handler(tauri::generate_handler![
             ipc::tasks::parse_sigils,
+            ipc::quick_capture::parse_quick_capture,
             ipc::tasks::create_task,
             ipc::tasks::update_task,
             ipc::tasks::delete_task,

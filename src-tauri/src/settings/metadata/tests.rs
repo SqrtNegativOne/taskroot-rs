@@ -10,6 +10,7 @@ const KNOWN_SETTING_KINDS: &[&str] = &[
     "number",
     "time",
     "keybinding",
+    "calendar",
     "custom",
     "action",
 ];
@@ -168,7 +169,7 @@ fn setting_kind_matches_the_default_value_type() {
                 meta.id
             ),
             Value::String(_) => assert!(
-                kind == "keybinding" || is_select_of(&meta, Value::is_string),
+                matches!(kind, "keybinding" | "calendar") || is_select_of(&meta, Value::is_string),
                 "{}: string setting declared as `{kind}`",
                 meta.id
             ),
@@ -176,4 +177,3 @@ fn setting_kind_matches_the_default_value_type() {
         }
     }
 }
-

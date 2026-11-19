@@ -8,11 +8,13 @@
     import SettingRow from './SettingRow.svelte';
     import AccountPanel from './AccountPanel.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
+    import type { AppCalendar } from '$lib/domain';
 
     const ACCOUNT_TAB_ID = 'account';
 
     let schema = $state<SettingsSchema | null>(null);
     let settings = $state<AppSettings | null>(null);
+    let calendars = $state<AppCalendar[]>([]);
     let activeTabId = $state(ACCOUNT_TAB_ID);
     let saveError = $state<string | null>(null);
 
@@ -21,7 +23,17 @@
     });
 
     async function initialize(): Promise<void> {
-        await Promise.all([loadSchema(), loadSettings()]);
+        await Promise.all([loadSchema(), loadSettings(), loadCalendars()]);
+    }
+
+    async function loadCalendars(): Promise<void> {
+        const result = await safeInvoke<AppCalendar[]>('get_active_calendars', {});
+        result.match(
+            (loaded) => {
+                calendars = loaded;
+            },
+            (error) => console.error('Failed to load calendars:', error)
+        );
     }
 
     async function loadSchema(): Promise<void> {
@@ -105,6 +117,7 @@
                                         {#each section.settings as item (item.id)}
                                             <SettingRow
                                                 {item}
+                                                {calendars}
                                                 value={settings?.[item.id]}
                                                 onchange={(value: SettingValue) => handleSettingChange(item.id, value)}
                                             />

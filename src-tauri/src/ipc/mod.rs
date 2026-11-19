@@ -7,6 +7,7 @@
 pub mod calendars;
 pub mod events;
 pub mod plan;
+pub mod quick_capture;
 pub mod refresh;
 pub mod schema;
 pub mod session;

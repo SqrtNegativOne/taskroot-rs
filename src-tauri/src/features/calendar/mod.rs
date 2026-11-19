@@ -14,6 +14,8 @@ pub(crate) mod load;
 #[allow(unreachable_pub)]
 pub(crate) mod occurrences;
 #[allow(unreachable_pub)]
+pub(crate) mod quick_capture;
+#[allow(unreachable_pub)]
 pub(crate) mod session;
 #[allow(unreachable_pub)]
 pub(crate) mod store;
@@ -33,7 +35,8 @@ pub use ics::{
 };
 pub use load::{apply, fetch_into, load_into, Fetched};
 pub use occurrences::{expand_event_instances, single_instance};
-pub use session::{Session, app_calendar, open};
+pub use quick_capture::{parse as parse_quick_capture, QuickCaptureDraft};
+pub use session::{app_calendar, open, Session};
 pub use store::persist;
-pub use store::{Resource, ResourceItems, Store, StoreState, ops, query};
+pub use store::{ops, query, Resource, ResourceItems, Store, StoreState};
 pub use task_dates::expand_task_dates;

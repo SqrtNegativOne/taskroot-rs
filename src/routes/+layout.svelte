@@ -9,11 +9,13 @@
     import { store, describeError } from '$lib/store.svelte';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
+    import { LAUNCHER_NAVIGATE } from '$lib/ipcEvents';
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
+    import LauncherPalette from '$lib/launcher/LauncherPalette.svelte';
     import { Toaster } from 'svelte-sonner';
 
-    import { listen, emit } from '@tauri-apps/api/event';
+    import { listen } from '@tauri-apps/api/event';
     import type { RouteId } from '$app/types';
     import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
 
@@ -27,7 +29,6 @@
     let isSidebar = $state(false);
     let isEffect = $state(false);
     let isBooting = $state(true);
-    let launcherValue = $state('');
 
     onMount(() => {
         const appWindow = getCurrentWindow();
@@ -69,7 +70,7 @@
             isBooting = false;
 
             if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
-                unlistenNav = await listen('launcher-navigate', (event) => {
+                unlistenNav = await listen(LAUNCHER_NAVIGATE, (event) => {
                     const route = event.payload as string;
                     if (isRouteId(route)) {
                         void (async () => {
@@ -87,44 +88,10 @@
             unlistenNav();
         };
     });
-
-    async function handleLauncherKeydown(e: KeyboardEvent) {
-        if (e.key === 'Escape') {
-            await safeInvoke('hide_launcher');
-        } else if (e.key === 'Enter') {
-            const cmd = launcherValue.trim().toLowerCase();
-            const routeMap: Record<string, string> = {
-                'home': Routes.HOME,
-                'plan': Routes.HOME,
-                'do': Routes.DO,
-                'tags': Routes.TAGS,
-                'settings': Routes.SETTINGS,
-            };
-            
-            if (routeMap[cmd]) {
-                await emit('launcher-navigate', routeMap[cmd]);
-                await safeInvoke('hide_launcher');
-                launcherValue = '';
-            } else {
-                console.log('Unknown command:', cmd);
-            }
-        }
-    }
 </script>
 
 {#if isLauncher}
-    <div class="launcher-shell">
-        <div class="launcher-panel">
-            <span class="launcher-prefix">Cmd</span>
-            <input 
-                type="text" 
-                class="launcher-input" 
-                placeholder="Type a command..." 
-                bind:value={launcherValue}
-                onkeydown={handleLauncherKeydown}
-            />
-        </div>
-    </div>
+    <LauncherPalette />
 {:else if isSidebar}
     <div class="sidebar-shell">
         {@render children()}
@@ -164,41 +131,6 @@
         width: 100vw;
         background: transparent;
         overflow: hidden;
-    }
-
-    .launcher-shell {
-        height: 100vh;
-        width: 100vw;
-        padding: 8px;
-        background: transparent;
-    }
-
-    .launcher-panel {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        height: 100%;
-        padding: 16px;
-        color: var(--fg);
-        background: var(--bg-surface);
-        border: 1px solid var(--border-strong);
-        border-radius: 8px;
-        box-shadow: var(--shadow-btn-hover);
-    }
-
-    .launcher-prefix {
-        margin-right: 12px;
-        color: var(--fg-muted);
-    }
-
-    .launcher-input {
-        flex: 1;
-        font: inherit;
-        font-size: 1.15em;
-        color: inherit;
-        background: transparent;
-        border: none;
-        outline: none;
     }
 
     .boot-screen {

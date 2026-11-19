@@ -4,9 +4,9 @@
 //! edits mutate before the resource is `PUT` back. Nothing is cached on disk: a
 //! startup or Refresh load fills the map from the server.
 
+use crate::error::AppError;
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::features::calendar::domain::{AppEvent, AppTask};
-use crate::error::AppError;
 use crate::settings::AppSettings;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -211,8 +211,9 @@ impl Store {
     }
 
     /// The collection a new resource of `component` should target: the requested
-    /// href when it is writable and of the right component, otherwise the first
-    /// writable collection of that component.
+    /// href when it is writable and of the right component, otherwise the
+    /// configured default list, otherwise the first writable collection of that
+    /// component.
     #[must_use]
     pub fn default_calendar(
         &self,
@@ -230,6 +231,18 @@ impl Store {
                 }
             }
         }
+        let configured = match component {
+            CalendarComponent::VEvent => &self.settings.default_event_list,
+            CalendarComponent::VTodo => &self.settings.default_task_list,
+        };
+        if !configured.is_empty() {
+            let configured_calendar = self.calendars.iter().find(|calendar| {
+                calendar.href == *configured && calendar.writable && calendar.component == component
+            });
+            if let Some(calendar) = configured_calendar {
+                return Some(calendar);
+            }
+        }
         self.calendars
             .iter()
             .find(|calendar| calendar.writable && calendar.component == component)
@@ -238,11 +251,11 @@ impl Store {
 
 fn parse_items(raw: &str, href: &str, collection: &str) -> Result<ResourceItems, AppError> {
     if raw.contains("BEGIN:VTODO") && !raw.contains("BEGIN:VEVENT") {
-        return Ok(ResourceItems::Tasks(crate::features::calendar::ics::read_task_resource(
-            raw, href, collection,
-        )?));
+        return Ok(ResourceItems::Tasks(
+            crate::features::calendar::ics::read_task_resource(raw, href, collection)?,
+        ));
     }
-    Ok(ResourceItems::Events(crate::features::calendar::ics::read_event_resource(
-        raw, href, collection,
-    )?))
+    Ok(ResourceItems::Events(
+        crate::features::calendar::ics::read_event_resource(raw, href, collection)?,
+    ))
 }

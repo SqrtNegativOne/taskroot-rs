@@ -20,6 +20,7 @@ export type { FilterOperator } from './bindings/FilterOperator.generated';
 export type { FilterType } from './bindings/FilterType.generated';
 export type { LaidEvent } from './bindings/LaidEvent.generated';
 export type { PlanDayLayout } from './bindings/PlanDayLayout.generated';
+export type { QuickCapturePreview } from './bindings/QuickCapturePreview.generated';
 export type { SortDirection } from './bindings/SortDirection.generated';
 export type { StopwatchHistoryEntry } from './bindings/StopwatchHistoryEntry.generated';
 export type { StopwatchHistoryKind } from './bindings/StopwatchHistoryKind.generated';

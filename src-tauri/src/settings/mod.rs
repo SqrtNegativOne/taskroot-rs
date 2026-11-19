@@ -44,6 +44,22 @@ pub struct AppSettings {
     )]
     pub default_calendar_view: String,
     #[setting(
+        label = "Default Tasks List",
+        description = "List new tasks are added to when no list is chosen. Leave empty to use the first writable tasks list.",
+        keywords = ["task", "list", "calendar", "default", "capture"],
+        kind = "calendar",
+        section = "plan_calendar"
+    )]
+    pub default_task_list: String,
+    #[setting(
+        label = "Default Events List",
+        description = "List new events are added to when no list is chosen. Leave empty to use the first writable events list.",
+        keywords = ["event", "list", "calendar", "default"],
+        kind = "calendar",
+        section = "plan_calendar"
+    )]
+    pub default_event_list: String,
+    #[setting(
         label = "Timeline View Start Time",
         keywords = ["timeline", "day", "start", "time", "scroll", "view"],
         kind = "time",
@@ -146,6 +162,8 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             default_calendar_view: "month".to_string(),
+            default_task_list: String::new(),
+            default_event_list: String::new(),
             day_timeline_start_view: 300,
             default_task_duration: 0,
             clock_style: "flowtime".to_string(),

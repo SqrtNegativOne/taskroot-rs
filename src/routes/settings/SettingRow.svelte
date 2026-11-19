@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { SettingsSchemaItem, SettingValue } from './schema';
+    import type { AppCalendar } from '../../lib/domain';
     import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
     import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
 
@@ -7,13 +8,37 @@
         item: SettingsSchemaItem;
         value: SettingValue | undefined;
         onchange: (value: SettingValue) => void;
+        calendars?: AppCalendar[];
     }
 
-    let { item, value, onchange }: Props = $props();
+    let { item, value, onchange, calendars = [] }: Props = $props();
 
     function selectValue(): SettingValue | undefined {
         return value ?? item.defaultValue;
     }
+
+    function calendarComponent(id: string): AppCalendar['component'] | undefined {
+        if (id === 'default_task_list') return 'VTODO';
+        if (id === 'default_event_list') return 'VEVENT';
+        return undefined;
+    }
+
+    let calendarOptions = $derived.by(() => {
+        if (item.type !== 'calendar') return [];
+        const component = calendarComponent(item.id);
+        return calendars.filter(
+            (calendar) =>
+                calendar.writable &&
+                (component === undefined || calendar.component === component),
+        );
+    });
+
+    let calendarValue = $derived(
+        typeof selectValue() === 'string' ? selectValue() : '',
+    );
+    let missingCalendar = $derived(
+        calendarValue !== '' && !calendarOptions.some((calendar) => calendar.id === calendarValue),
+    );
 
     // A <select> value is always a string; map it back to the option's typed
     // value so numeric settings (e.g. default_task_duration) are not stored as
@@ -40,6 +65,20 @@
             >
                 {#each item.options as option (option.value)}
                     <option value={option.value}>{option.label}</option>
+                {/each}
+            </select>
+        {:else if item.type === 'calendar'}
+            <select
+                id={item.id}
+                value={calendarValue}
+                onchange={(e) => onchange(e.currentTarget.value)}
+            >
+                <option value="">First writable list</option>
+                {#if missingCalendar}
+                    <option value={calendarValue}>(missing list) {calendarValue}</option>
+                {/if}
+                {#each calendarOptions as calendar (calendar.id)}
+                    <option value={calendar.id}>{calendar.summary}</option>
                 {/each}
             </select>
         {:else if item.type === 'checkbox'}
