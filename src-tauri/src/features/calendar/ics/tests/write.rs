@@ -285,22 +285,22 @@ fn reopening_a_task_clears_the_completion_properties() {
     task.status = Some(AppTaskStatus::NextUp);
     let reopened = write_task_resource(&completed, &task).unwrap();
 
-    assert!(reopened.contains("STATUS:NEEDS-ACTION"));
-    assert!(reopened.contains("X-NEXT-UP:TRUE"));
+    assert!(reopened.contains("STATUS:IN-PROCESS"));
+    assert!(!reopened.contains("X-NEXT-UP"));
     assert!(!reopened.contains("X-TASKROOT-STATUS"));
     assert!(!reopened.contains("COMPLETED"));
     assert!(!reopened.contains("PERCENT-COMPLETE"));
 }
 
 #[test]
-fn in_process_and_cancelled_write_standard_status() {
+fn next_up_and_cancelled_write_standard_status() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
 
-    task.status = Some(AppTaskStatus::Doing);
+    task.status = Some(AppTaskStatus::NextUp);
     let in_process = write_task_resource(&raw, &task).unwrap();
     assert!(in_process.contains("STATUS:IN-PROCESS"));
-    assert_eq!(read_task(&in_process).status, Some(AppTaskStatus::Doing));
+    assert_eq!(read_task(&in_process).status, Some(AppTaskStatus::NextUp));
 
     task.status = Some(AppTaskStatus::Cancelled);
     let cancelled = write_task_resource(&in_process, &task).unwrap();
@@ -314,23 +314,40 @@ fn in_process_and_cancelled_write_standard_status() {
 }
 
 #[test]
-fn next_up_uses_standard_status_plus_its_one_custom_marker() {
+fn next_up_writes_in_process_without_a_custom_marker() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
 
     task.status = Some(AppTaskStatus::NextUp);
     let written = write_task_resource(&raw, &task).unwrap();
 
-    assert!(written.contains("STATUS:NEEDS-ACTION"));
-    assert!(written.contains("X-NEXT-UP:TRUE"));
+    assert!(written.contains("STATUS:IN-PROCESS"));
+    assert!(!written.contains("X-NEXT-UP"));
     assert!(!written.contains("X-TASKROOT-STATUS"));
     assert_eq!(read_task(&written).status, Some(AppTaskStatus::NextUp));
 
     task.status = Some(AppTaskStatus::Todo);
     let cleared = write_task_resource(&written, &task).unwrap();
 
-    assert!(!cleared.contains("X-NEXT-UP"));
+    assert!(cleared.contains("STATUS:NEEDS-ACTION"));
+    assert!(!cleared.contains("STATUS:IN-PROCESS"));
     assert_eq!(read_task(&cleared).status, Some(AppTaskStatus::Todo));
+}
+
+#[test]
+fn writing_a_task_drops_the_retired_next_up_marker() {
+    let raw = fixture(TASK).replace("STATUS:NEEDS-ACTION", "STATUS:NEEDS-ACTION\r\nX-NEXT-UP:TRUE");
+    let task = read_task(&raw);
+    assert_eq!(
+        task.status,
+        Some(AppTaskStatus::Todo),
+        "the reader ignores the retired marker"
+    );
+
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert!(!written.contains("X-NEXT-UP"));
+    assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
 }
 
 #[test]

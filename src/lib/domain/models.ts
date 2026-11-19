@@ -1,7 +1,7 @@
 import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
 import type { TaskPriority } from '../bindings/TaskPriority.generated';
 
-const TASK_STATUSES: readonly string[] = ['todo', 'next-up', 'doing', 'done', 'cancelled'];
+const TASK_STATUSES: readonly string[] = ['todo', 'next-up', 'done', 'cancelled'];
 
 export const DEFAULT_TASK_PRIORITY: TaskPriority = 2;
 

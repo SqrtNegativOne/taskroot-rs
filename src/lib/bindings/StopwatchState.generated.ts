@@ -24,6 +24,11 @@ breakStartedAt: number | null,
  */
 pausedUntil: number | null, 
 /**
+ * Local focus pointer: the task the user is tracking, if any. The task's
+ * own status is independent and never stored in iCalendar.
+ */
+taskId: string | null, 
+/**
  * Free-text label shown in the mini tracker and recorded in history.
  */
 label: string | null, labelSource: StopwatchLabelSource, };

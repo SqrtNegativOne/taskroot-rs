@@ -82,6 +82,7 @@ pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<Stopwat
 }
 
 /// Set or clear the mini tracker label recorded with work and break history.
+/// Setting a label clears the local focus task.
 ///
 /// # Errors
 ///
@@ -93,6 +94,23 @@ pub fn set_stopwatch_label(
     source: StopwatchLabelSource,
 ) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, |manager| manager.set_label(label, source))?;
+    emit(&app, &updated);
+    Ok(updated)
+}
+
+/// Point the stopwatch at a task, or clear the local focus pointer. This never
+/// writes the task's `CalDAV` status.
+///
+/// # Errors
+///
+/// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
+#[tauri::command]
+pub fn set_stopwatch_task(
+    app: tauri::AppHandle,
+    task_id: Option<String>,
+    label: Option<String>,
+) -> Result<StopwatchState, AppError> {
+    let updated = with_manager(&app, |manager| manager.set_task(task_id, label))?;
     emit(&app, &updated);
     Ok(updated)
 }

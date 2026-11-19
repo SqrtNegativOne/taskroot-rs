@@ -65,7 +65,7 @@
         (task.dependencies ?? []).map((id) => tasks.find((candidate) => candidate.id === id)?.title ?? id),
     );
 
-    const STATUSES = ['todo', 'doing', 'next-up', 'done', 'cancelled'] as const;
+    const STATUSES = ['todo', 'next-up', 'done', 'cancelled'] as const;
 
     function isAppTaskStatus(value: string): value is AppTaskStatus {
         return STATUSES.some((status) => status === value);
@@ -133,7 +133,6 @@
         onchange={handleStatusChange}
         options={[
             { label: 'Todo', value: 'todo' },
-            { label: 'Doing', value: 'doing' },
             { label: 'Next Up', value: 'next-up' },
             { label: 'Done', value: 'done' },
             { label: 'Cancelled', value: 'cancelled' },

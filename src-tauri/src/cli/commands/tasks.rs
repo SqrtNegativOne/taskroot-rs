@@ -182,11 +182,10 @@ fn parse_task_status(value: &str) -> Result<AppTaskStatus, AppError> {
     match value {
         "todo" => Ok(AppTaskStatus::Todo),
         "next-up" | "nextup" | "next" => Ok(AppTaskStatus::NextUp),
-        "doing" | "in-progress" => Ok(AppTaskStatus::Doing),
         "done" | "completed" => Ok(AppTaskStatus::Done),
         "cancelled" | "canceled" => Ok(AppTaskStatus::Cancelled),
         other => Err(AppError::InvalidInput(format!(
-            "unknown status `{other}` (todo, next-up, doing, done, cancelled)"
+            "unknown status `{other}` (todo, next-up, done, cancelled)"
         ))),
     }
 }
@@ -228,7 +227,7 @@ mod tests {
             "--priority",
             "urgent",
             "--status",
-            "doing",
+            "next-up",
             "--tz",
             "Asia/Calcutta",
         ]);
@@ -240,7 +239,7 @@ mod tests {
         assert_eq!(task.due.as_deref(), Some("2026-10-28"));
         assert_eq!(task.start.as_deref(), Some("2026-10-27"));
         assert_eq!(task.priority, Some(TaskPriority::Urgent));
-        assert_eq!(task.status, Some(AppTaskStatus::Doing));
+        assert_eq!(task.status, Some(AppTaskStatus::NextUp));
         assert_eq!(task.timezone.as_deref(), Some("Asia/Calcutta"));
     }
 

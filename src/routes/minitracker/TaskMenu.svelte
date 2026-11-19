@@ -98,7 +98,7 @@
                         >
                             <span class="task-title">{task.title}</span>
                             {#if task.id === activeTask?.id}
-                                <span class="task-badge">doing</span>
+                                <span class="task-badge">current</span>
                             {/if}
                         </button>
                         <button

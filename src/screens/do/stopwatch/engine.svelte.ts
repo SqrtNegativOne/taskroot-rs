@@ -57,6 +57,7 @@ export class StopwatchState {
     breakDuration = $state(0);
     breakStartedAt = $state<number | undefined>(undefined);
     pausedUntil = $state<number | undefined>(undefined);
+    taskId = $state<string | undefined>(undefined);
     label = $state<string | undefined>(undefined);
     labelSource = $state<StopwatchLabelSource>('unset');
 
@@ -68,8 +69,8 @@ export class StopwatchState {
     }
 
     async init(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('get_stopwatch_state');
-        if (result.isOk()) this.updateFromPayload(result.value);
+        const result = await safeInvoke<StopwatchSnapshot | undefined>('get_stopwatch_state');
+        if (result.isOk() && result.value !== undefined) this.updateFromPayload(result.value);
 
         await this.connect();
     }
@@ -96,6 +97,7 @@ export class StopwatchState {
         this.breakDuration = payload.breakDuration;
         this.breakStartedAt = payload.breakStartedAt ?? undefined;
         this.pausedUntil = payload.pausedUntil ?? undefined;
+        this.taskId = payload.taskId ?? undefined;
         this.label = payload.label ?? undefined;
         this.labelSource = payload.labelSource;
     }
@@ -189,6 +191,22 @@ export class StopwatchState {
     async setLabel(label: string | null, source: StopwatchLabelSource): Promise<void> {
         const result = await safeInvoke<StopwatchSnapshot>('set_stopwatch_label', { label, source });
         if (result.isOk()) this.updateFromPayload(result.value);
+    }
+
+    async setTask(taskId: string | null, label: string | null): Promise<void> {
+        const result = await safeInvoke<StopwatchSnapshot>('set_stopwatch_task', { taskId, label });
+        if (result.isOk()) this.updateFromPayload(result.value);
+    }
+
+    async startTask(task: { id: string; title: string }): Promise<void> {
+        await this.setTask(task.id, task.title);
+        if (this.phase === 'paused' || this.phase === 'stopped') {
+            await this.toggle();
+        }
+    }
+
+    async clearTask(): Promise<void> {
+        await this.setTask(null, null);
     }
 
     async togglePause(minutes: number): Promise<void> {

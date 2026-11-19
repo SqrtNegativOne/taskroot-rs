@@ -13,11 +13,12 @@ describe('isAppTaskStatus', () => {
     it('accepts valid task statuses', () => {
         expect(isAppTaskStatus('todo')).toBe(true);
         expect(isAppTaskStatus('next-up')).toBe(true);
-        expect(isAppTaskStatus('doing')).toBe(true);
         expect(isAppTaskStatus('done')).toBe(true);
+        expect(isAppTaskStatus('cancelled')).toBe(true);
     });
 
     it('rejects invalid or non-string values', () => {
+        expect(isAppTaskStatus('doing')).toBe(false);
         expect(isAppTaskStatus('in-progress')).toBe(false);
         expect(isAppTaskStatus('completed')).toBe(false);
         expect(isAppTaskStatus('TODO')).toBe(false);
@@ -47,9 +48,9 @@ describe('computeFilterDefaults', () => {
 
     it('picks fallback after multiple excluded statuses', () => {
         const filters = [
-            { column: 'status', operator: 'is not', value: ['todo', 'next-up', 'doing'] },
+            { column: 'status', operator: 'is not', value: ['todo', 'next-up', 'done'] },
         ];
-        expect(computeFilterDefaults(filters)).toEqual({ status: 'done' });
+        expect(computeFilterDefaults(filters)).toEqual({ status: 'cancelled' });
     });
 
     it('does not set field if required value is also excluded', () => {

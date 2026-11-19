@@ -26,8 +26,8 @@
 //! - **`completed_at`**: ISO 8601 UTC, the `COMPLETED` timestamp.
 //! - **`rrule`** (VTODO): the wire form (`RRULE:FREQ=…`), one line per rule.
 //! - **`status`** (VTODO): standard `STATUS` (`NEEDS-ACTION`, `IN-PROCESS`,
-//!   `COMPLETED`, `CANCELLED`), with `X-NEXT-UP:TRUE` as the only custom marker
-//!   because `next-up` has no standard equivalent.
+//!   `COMPLETED`, `CANCELLED`); `IN-PROCESS` reads as `next-up`. There is no
+//!   custom status marker.
 //! - **`dependencies`**: one `RELATED-TO;RELTYPE=DEPENDS-ON` line per dependency.
 //! - **`est`**: the whole minutes in `ESTIMATED-DURATION` (RFC 9074).
 //! - **`geo`**: `GEO` as a latitude/longitude pair.
@@ -354,24 +354,15 @@ fn task_from_component(component: &Component<'_>) -> Result<AppTask, AppError> {
 }
 
 fn read_task_status(component: &Component<'_>) -> AppTaskStatus {
-    let next_up = text_property(component, "X-NEXT-UP").is_some_and(|value| is_true(&value));
     match property(component, "STATUS")
         .map(|property| property.val.as_str().to_ascii_uppercase())
         .as_deref()
     {
         Some("COMPLETED") => AppTaskStatus::Done,
         Some("CANCELLED") => AppTaskStatus::Cancelled,
-        Some("IN-PROCESS") => AppTaskStatus::Doing,
-        _ if next_up => AppTaskStatus::NextUp,
+        Some("IN-PROCESS") => AppTaskStatus::NextUp,
         _ => AppTaskStatus::Todo,
     }
-}
-
-fn is_true(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_uppercase().as_str(),
-        "TRUE" | "1" | "YES"
-    )
 }
 
 fn priority_value(property: &Property<'_>) -> Option<TaskPriority> {

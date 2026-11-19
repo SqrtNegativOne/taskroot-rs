@@ -425,12 +425,9 @@ fn task_specs(task: &AppTask) -> Vec<PropertySpec> {
             OwnedKind::Name("ESTIMATED-DURATION"),
             estimate_line(task.est),
         ),
-        PropertySpec::optional(
-            OwnedKind::Name("X-NEXT-UP"),
-            (task.status == Some(AppTaskStatus::NextUp)).then(|| "X-NEXT-UP:TRUE".to_string()),
-        ),
         // Properties Taskroot used to write. The reader no longer reads them, so a
         // write removes them instead of leaving a stale second representation.
+        PropertySpec::new(OwnedKind::Name("X-NEXT-UP"), Vec::new()),
         PropertySpec::new(OwnedKind::Name("X-TASKROOT-STATUS"), Vec::new()),
         PropertySpec::new(OwnedKind::Name("X-TASKROOT-DEPENDENCIES"), Vec::new()),
         PropertySpec::new(OwnedKind::Name("X-TASKROOT-EST"), Vec::new()),
@@ -714,14 +711,14 @@ const fn priority_value(priority: Option<&TaskPriority>) -> u32 {
 
 /// The standard `VTODO` `STATUS` value for the task's workflow state.
 ///
-/// `NextUp` has no standard equivalent, so it maps to `NEEDS-ACTION` and keeps
-/// its marker in `X-NEXT-UP:TRUE`.
+/// `NextUp` owns the standard `IN-PROCESS` value; the live "currently doing"
+/// task is app-local and never written to iCalendar.
 const fn task_status_value(status: Option<&AppTaskStatus>) -> &'static str {
     match status {
-        Some(AppTaskStatus::Doing) => "IN-PROCESS",
+        Some(AppTaskStatus::NextUp) => "IN-PROCESS",
         Some(AppTaskStatus::Done) => "COMPLETED",
         Some(AppTaskStatus::Cancelled) => "CANCELLED",
-        Some(AppTaskStatus::Todo | AppTaskStatus::NextUp) | None => "NEEDS-ACTION",
+        Some(AppTaskStatus::Todo) | None => "NEEDS-ACTION",
     }
 }
 

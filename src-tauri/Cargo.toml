@@ -76,6 +76,8 @@ panic = "deny"
 exit = "deny"
 as_conversions = "deny"
 
+doc_markdown = "allow"
+
 [lints.cargo]
 unused_dependencies = "warn"
 

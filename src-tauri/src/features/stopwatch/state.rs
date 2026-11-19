@@ -72,6 +72,9 @@ pub struct StopwatchState {
     /// Timed pause (`P`); work stops ticking until this instant.
     #[ts(type = "number | null")]
     pub paused_until: Option<u64>,
+    /// Local focus pointer: the task the user is tracking, if any. The task's
+    /// own status is independent and never stored in iCalendar.
+    pub task_id: Option<String>,
     /// Free-text label shown in the mini tracker and recorded in history.
     pub label: Option<String>,
     pub label_source: StopwatchLabelSource,
@@ -323,30 +326,63 @@ impl StopwatchState {
     }
 
     pub fn set_label(&mut self, label: Option<String>, source: StopwatchLabelSource) {
-        let trimmed = label.and_then(|text| {
-            let trimmed = text.trim();
-            (!trimmed.is_empty()).then(|| trimmed.to_string())
-        });
-        self.label_source = if trimmed.is_some() {
-            source
-        } else {
-            StopwatchLabelSource::Unset
-        };
-        self.label = trimmed;
+        self.task_id = None;
+        self.label = label;
+        self.label_source = source;
+        self.normalize_focus();
     }
+
+    /// Point the stopwatch at a task, or clear the local focus pointer.
+    pub fn set_task(&mut self, task_id: Option<String>, label: Option<String>) {
+        self.task_id = task_id;
+        self.label = label;
+        self.label_source = StopwatchLabelSource::Task;
+        self.normalize_focus();
+    }
+
+    fn normalize_focus(&mut self) {
+        self.task_id = trim_to_some(self.task_id.take());
+        self.label = trim_to_some(self.label.take());
+        if self.task_id.is_some() {
+            self.label_source = StopwatchLabelSource::Task;
+        } else if self.label.is_some() {
+            if self.label_source != StopwatchLabelSource::Custom {
+                self.label_source = StopwatchLabelSource::Custom;
+            }
+        } else {
+            self.label_source = StopwatchLabelSource::Unset;
+        }
+    }
+}
+
+fn trim_to_some(value: Option<String>) -> Option<String> {
+    value.and_then(|text| {
+        let trimmed = text.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    })
 }
 
 pub struct StopwatchManager {
     state: Mutex<StopwatchState>,
     history_path: PathBuf,
+    focus_path: PathBuf,
 }
 
 impl StopwatchManager {
     #[must_use]
     pub fn load(data_dir: &Path) -> Self {
+        let focus_path = super::focus::focus_path(data_dir);
+        let mut state = StopwatchState::default();
+        if let Some(stored) = super::focus::load(&focus_path) {
+            state.task_id = stored.task_id;
+            state.label = stored.label;
+            state.label_source = stored.label_source;
+        }
+        state.normalize_focus();
         Self {
-            state: Mutex::new(StopwatchState::default()),
+            state: Mutex::new(state),
             history_path: history::history_path(data_dir),
+            focus_path,
         }
     }
 
@@ -358,9 +394,17 @@ impl StopwatchManager {
             .state
             .lock()
             .map_err(|_| AppError::Internal("Stopwatch state is unavailable".to_string()))?;
+        let focus_before = focus_key(&state);
         let entries = change(&mut state)?;
+        state.normalize_focus();
+        let focus_changed = focus_before != focus_key(&state);
         let snapshot = state.clone();
         drop(state);
+        if focus_changed {
+            if let Err(error) = super::focus::save(&self.focus_path, &snapshot) {
+                eprintln!("Failed to persist stopwatch focus: {error}");
+            }
+        }
         if let Err(error) = history::append(&self.history_path, &entries) {
             eprintln!("Failed to record stopwatch history: {error}");
         }
@@ -460,6 +504,32 @@ impl StopwatchManager {
             Ok(Vec::new())
         })
     }
+
+    /// Point the stopwatch at a task, or clear the focus pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::Internal`] when the state lock fails.
+    pub fn set_task(
+        &self,
+        task_id: Option<String>,
+        label: Option<String>,
+    ) -> Result<StopwatchState, AppError> {
+        self.alter(|state| {
+            state.set_task(task_id, label);
+            Ok(Vec::new())
+        })
+    }
+}
+
+type FocusKey = (Option<String>, Option<String>, StopwatchLabelSource);
+
+fn focus_key(state: &StopwatchState) -> FocusKey {
+    (
+        state.task_id.clone(),
+        state.label.clone(),
+        state.label_source,
+    )
 }
 
 pub fn current_epoch_millis() -> Result<u64, AppError> {
@@ -646,5 +716,60 @@ mod tests {
 
         assert_eq!(state.label, None);
         assert_eq!(state.label_source, StopwatchLabelSource::Unset);
+    }
+
+    #[test]
+    fn setting_a_task_sets_the_focus_and_its_title() {
+        let mut state = StopwatchState::default();
+
+        state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+
+        assert_eq!(state.task_id.as_deref(), Some("task-1"));
+        assert_eq!(state.label.as_deref(), Some("Learn Python"));
+        assert_eq!(state.label_source, StopwatchLabelSource::Task);
+    }
+
+    #[test]
+    fn setting_a_label_clears_the_focus_task() {
+        let mut state = StopwatchState::default();
+        state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+
+        state.set_label(Some("writing".to_string()), StopwatchLabelSource::Custom);
+
+        assert_eq!(state.task_id, None);
+        assert_eq!(state.label.as_deref(), Some("writing"));
+        assert_eq!(state.label_source, StopwatchLabelSource::Custom);
+    }
+
+    #[test]
+    fn clearing_a_task_clears_the_label() {
+        let mut state = StopwatchState::default();
+        state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+
+        state.set_task(None, None);
+
+        assert_eq!(state.task_id, None);
+        assert_eq!(state.label, None);
+        assert_eq!(state.label_source, StopwatchLabelSource::Unset);
+    }
+
+    #[test]
+    fn the_focus_survives_a_manager_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = StopwatchManager::load(dir.path());
+        manager
+            .set_task(
+                Some("task-1".to_string()),
+                Some("Learn Python".to_string()),
+            )
+            .unwrap();
+        drop(manager);
+
+        let reloaded = StopwatchManager::load(dir.path()).snapshot().unwrap();
+
+        assert_eq!(reloaded.task_id.as_deref(), Some("task-1"));
+        assert_eq!(reloaded.label.as_deref(), Some("Learn Python"));
+        assert_eq!(reloaded.label_source, StopwatchLabelSource::Task);
+        assert_eq!(reloaded.phase, StopwatchPhase::Paused);
     }
 }

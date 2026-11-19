@@ -123,7 +123,7 @@
     let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(listQuery.data ?? []);
 
-    let activeTask = $derived(allTasks.find((task) => task.status === 'doing'));
+    let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
 
     const now = useNow();
 
@@ -139,14 +139,16 @@
         stopwatchState.labelSource === 'custom' ? stopwatchState.label : undefined,
     );
     let hasCustomLabel = $derived(customLabel !== undefined && customLabel !== '');
-    let hasTaskLabel = $derived(activeTask !== undefined && !hasCustomLabel);
+    let hasTaskLabel = $derived(stopwatchState.labelSource === 'task' && !hasCustomLabel);
     let barLabel = $derived(
-        hasCustomLabel ? (customLabel ?? '') : (activeTask?.title ?? 'select task'),
+        hasCustomLabel
+            ? (customLabel ?? '')
+            : (activeTask?.title ?? stopwatchState.label ?? 'select task'),
     );
 
     const barTitle = $derived(
         hasTaskLabel
-            ? `Tracking ${activeTask?.title ?? ''}. Drag the clock to move, click the label to switch. Double-click to quit.`
+            ? `Tracking ${barLabel}. Drag the clock to move, click the label to switch. Double-click to quit.`
             : hasCustomLabel
                 ? `Tracking ${customLabel ?? ''}. Drag the clock to move, click the label to change it. Double-click to quit.`
                 : 'No active label. Drag the clock to move, click the label to choose a task or type your own. Double-click to quit.',
@@ -185,27 +187,12 @@
         if (selected === undefined) return;
 
         await controller.closeMenu();
-        for (const task of allTasks) {
-            if (task.id === taskId) {
-                await setTaskStatus(task, 'doing');
-            } else if (task.status === 'doing') {
-                await setTaskStatus(task, 'todo');
-            }
-        }
-
-        await stopwatchState.setLabel(selected.title, 'task');
-        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
-            await stopwatchState.toggle();
-        }
+        await stopwatchState.startTask(selected);
     }
 
     async function setCustomLabel(text: string): Promise<void> {
         const trimmed = text.trim();
         await controller.closeMenu();
-
-        for (const task of allTasks) {
-            if (task.status === 'doing') await setTaskStatus(task, 'todo');
-        }
 
         if (trimmed === '') {
             await stopwatchState.setLabel(null, 'unset');
@@ -219,28 +206,21 @@
     }
 
     async function stopWorking(): Promise<void> {
-        const task = activeTask;
-        if (task === undefined) return;
+        if (activeTask === undefined) return;
 
         await controller.closeMenu();
-        await setTaskStatus(task, 'todo');
         await stopClock();
-        await stopwatchState.setLabel(null, 'unset');
+        await stopwatchState.clearTask();
     }
 
     async function toggleDone(task: AppTask): Promise<void> {
         const next: AppTaskStatus = task.status === 'done' ? 'todo' : 'done';
         await setTaskStatus(task, next);
-        if (next === 'done' && task.status === 'doing') {
+        if (next === 'done' && stopwatchState.taskId === task.id) {
             await stopClock();
-            await stopwatchState.setLabel(null, 'unset');
+            await stopwatchState.clearTask();
         }
     }
-
-    $effect(() => {
-        if (activeTask === undefined || stopwatchState.labelSource !== 'unset') return;
-        void stopwatchState.setLabel(activeTask.title, 'task');
-    });
 
     async function runShortcut(action: ShortcutAction) {
         if (action === 'toggleDimmed') {

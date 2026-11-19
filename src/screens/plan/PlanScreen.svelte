@@ -14,6 +14,7 @@
     import RecurringActionModal from '../../components/RecurringActionModal.svelte';
     import DateGrid from './date-grid/DateGrid.svelte';
     import DayTimeline from './day-timeline/DayTimeline.svelte';
+    import { stopwatchState } from '../do/stopwatch/engine.svelte';
     import { createEventDragController } from './hooks/eventDrag.svelte';
     import { createTaskDragController } from './hooks/taskDrag.svelte';
     import { createReschedulePrompt } from './hooks/reschedule.svelte';
@@ -127,6 +128,10 @@
                         {onAddTask}
                         {onDeleteTask}
                         selectedTaskId={inspectorState?.type === 'task' ? inspectorState.id : undefined}
+                        activeTaskId={stopwatchState.taskId}
+                        onStartTask={(task: AppTask) => {
+                            void stopwatchState.startTask(task);
+                        }}
                         onUpdateTask={(task: AppTask) => {
                             void store.mutate('Failed to update task', () => store.updateTask(task));
                         }}

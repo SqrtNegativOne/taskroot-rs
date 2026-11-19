@@ -7,6 +7,8 @@
 #[allow(unreachable_pub)]
 pub mod history;
 #[allow(unreachable_pub)]
+mod focus;
+#[allow(unreachable_pub)]
 mod state;
 #[allow(unreachable_pub)]
 mod tauri;

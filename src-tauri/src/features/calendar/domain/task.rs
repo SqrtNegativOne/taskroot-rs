@@ -14,7 +14,6 @@ use super::{CollectionId, RemoteId, TaskId};
 pub enum AppTaskStatus {
     Todo,
     NextUp,
-    Doing,
     Done,
     Cancelled,
 }
@@ -25,7 +24,6 @@ impl AppTaskStatus {
         vec![
             "todo".into(),
             "next-up".into(),
-            "doing".into(),
             "done".into(),
             "cancelled".into(),
         ]

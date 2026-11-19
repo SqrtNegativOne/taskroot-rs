@@ -12,6 +12,8 @@
         isPastDue,
         selected,
         onTaskClick,
+        isActive,
+        onStartTask,
     }: {
         task: AppTask;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
@@ -21,6 +23,8 @@
         isPastDue?: boolean;
         selected?: boolean;
         onTaskClick?: (task: AppTask) => void;
+        isActive?: boolean;
+        onStartTask?: (task: AppTask) => void;
     } = $props();
 
     let isChecking = $state(false);
@@ -53,11 +57,7 @@
     function handleCircleContextMenu(e: MouseEvent) {
         e.preventDefault();
         e.stopPropagation();
-        if (task.status !== "doing") {
-            updateTask(task.id, t => ({ ...t, status: 'doing' }));
-        } else {
-            updateTask(task.id, t => ({ ...t, status: 'todo' }));
-        }
+        onStartTask?.(task);
     }
     
     let dueStr = $derived(task.due ? `due ${task.due}` : "");
@@ -92,7 +92,7 @@
     <TaskCircle
         priority={task.priority ?? undefined}
         isDoneOrChecking={task.status === "done" || isChecking}
-        isActive={task.status === "doing"}
+        isActive={isActive}
         onclick={handleCircleClick}
         oncontextmenu={handleCircleContextMenu}
     />

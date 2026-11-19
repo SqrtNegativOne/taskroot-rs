@@ -98,6 +98,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::stopwatch::toggle_pause,
             ipc::stopwatch::adjust_pause,
             ipc::stopwatch::set_stopwatch_label,
+            ipc::stopwatch::set_stopwatch_task,
             ipc::stopwatch::reset_stopwatch,
             ipc::settings::get_settings_schema,
             ipc::settings::get_settings,

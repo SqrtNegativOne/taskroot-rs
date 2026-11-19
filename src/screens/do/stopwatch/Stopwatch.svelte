@@ -5,7 +5,6 @@
     import ActiveTaskDisplay from './ActiveTaskDisplay.svelte';
     import TaskSelector from '../TaskSelector.svelte';
     import { store } from '../../../lib/store.svelte';
-    import type { AppTaskStatus } from '../../../lib/domain';
     import './stopwatch.css';
 
     import { useAutoQuery, useTauriQuery } from '../../../lib/safeInvoke.svelte';
@@ -30,7 +29,7 @@
     let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
     let selectableTasks = $derived(listQuery.data ?? []);
 
-    let activeTask = $derived(allTasks.find((task) => task.status === 'doing'));
+    let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
 
     // If no active task and we require one, open the selector
     $effect(() => {
@@ -44,28 +43,12 @@
         onBreakStatusChange?.(stopwatchState.isBreak);
     });
 
-    async function updateTaskStatus(taskId: string, status: AppTaskStatus): Promise<void> {
-        const task = allTasks.find(t => t.id === taskId);
-        if (!task) return;
-        await store.mutate('Failed to update task status', () => store.updateTask({ ...task, status }));
-    }
-
     async function setActiveTask(taskId: string): Promise<void> {
         const selected = allTasks.find((task) => task.id === taskId);
-        for (const task of allTasks) {
-            if (task.id === taskId) {
-                await updateTaskStatus(task.id, 'doing');
-            } else if (task.status === 'doing') {
-                await updateTaskStatus(task.id, 'todo');
-            }
-        }
         selectorOpen = false;
 
         if (selected !== undefined) {
-            await stopwatchState.setLabel(selected.title, 'task');
-        }
-        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
-            await stopwatchState.toggle();
+            await stopwatchState.startTask(selected);
         }
     }
 

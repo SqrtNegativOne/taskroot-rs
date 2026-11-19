@@ -332,10 +332,9 @@ const fn status_rank(status: Option<&crate::features::calendar::domain::AppTaskS
     match status {
         Some(crate::features::calendar::domain::AppTaskStatus::Todo) => 0,
         Some(crate::features::calendar::domain::AppTaskStatus::NextUp) => 1,
-        Some(crate::features::calendar::domain::AppTaskStatus::Doing) => 2,
-        Some(crate::features::calendar::domain::AppTaskStatus::Done) => 3,
-        Some(crate::features::calendar::domain::AppTaskStatus::Cancelled) => 4,
-        None => 5,
+        Some(crate::features::calendar::domain::AppTaskStatus::Done) => 2,
+        Some(crate::features::calendar::domain::AppTaskStatus::Cancelled) => 3,
+        None => 4,
     }
 }
 
@@ -362,7 +361,6 @@ const fn status_name(status: &crate::features::calendar::domain::AppTaskStatus) 
     match status {
         crate::features::calendar::domain::AppTaskStatus::Todo => "todo",
         crate::features::calendar::domain::AppTaskStatus::NextUp => "next-up",
-        crate::features::calendar::domain::AppTaskStatus::Doing => "doing",
         crate::features::calendar::domain::AppTaskStatus::Done => "done",
         crate::features::calendar::domain::AppTaskStatus::Cancelled => "cancelled",
     }
