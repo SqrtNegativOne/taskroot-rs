@@ -7,6 +7,10 @@
 - `history.rs` - append-only persistence of completed work/break segments to
   `stopwatch-history.json` in the data directory. A malformed history file is
   moved aside to `.bad` and recording starts fresh.
+- `feed.rs` - the opt-in localhost focus feed. `GET /focus` returns a JSON
+  snapshot of the tracked task (title, tags, list, phase and an `active` flag)
+  and `GET /focus/events` streams snapshots over server-sent events. It polls the
+  manager and store every 500 ms; see `docs/focus-feed.md`.
 - `tauri.rs` - the adapter that resolves the managed `StopwatchManager` from an
   `AppHandle`.
 

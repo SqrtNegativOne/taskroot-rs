@@ -34,6 +34,7 @@ pub use metadata::{SettingMeta, SettingOption};
 #[derive(Debug, Clone, Serialize, Deserialize, TS, SettingsMeta)]
 #[ts(export, export_to = "../../src/lib/bindings/AppSettings.generated.ts")]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AppSettings {
     #[setting(
         label = "Default View",
@@ -156,6 +157,24 @@ pub struct AppSettings {
         max = 100
     )]
     pub tracker_opacity: i32,
+    #[setting(
+        label = "Enable Focus Feed",
+        description = "Serve the current focus task on a local HTTP endpoint for other apps. Restart Taskroot to apply.",
+        keywords = ["focus", "feed", "http", "integration", "api", "current task", "blocker"],
+        kind = "checkbox",
+        section = "focus_feed"
+    )]
+    pub focus_feed_enabled: bool,
+    #[setting(
+        label = "Focus Feed Port",
+        description = "Loopback port for the focus feed (127.0.0.1). Restart Taskroot to apply.",
+        keywords = ["focus", "feed", "port", "http", "integration"],
+        kind = "number",
+        section = "focus_feed",
+        min = 1024,
+        max = 65535
+    )]
+    pub focus_feed_port: i32,
 }
 
 impl Default for AppSettings {
@@ -176,6 +195,8 @@ impl Default for AppSettings {
             keybinding_restore_app: "Ctrl+Alt+R".to_string(),
             tracker_show_border: true,
             tracker_opacity: 80,
+            focus_feed_enabled: false,
+            focus_feed_port: 8765,
         }
     }
 }

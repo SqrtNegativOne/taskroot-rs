@@ -5,14 +5,17 @@
 //! resolves the managed state from an `AppHandle`.
 
 #[allow(unreachable_pub)]
-pub mod history;
+mod feed;
 #[allow(unreachable_pub)]
 mod focus;
+#[allow(unreachable_pub)]
+pub mod history;
 #[allow(unreachable_pub)]
 mod state;
 #[allow(unreachable_pub)]
 mod tauri;
 
+pub use feed::start as start_focus_feed;
 pub use state::{
     StopwatchLabelSource, StopwatchManager, StopwatchPhase, StopwatchState,
     LONG_BREAK_THRESHOLD_MS, MIN_WORK_FOR_BREAK_MS,

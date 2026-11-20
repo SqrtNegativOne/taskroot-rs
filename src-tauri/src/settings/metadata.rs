@@ -76,6 +76,12 @@ const SETTING_SECTIONS: &[SectionDef] = &[
         tab_label: "Tracker window",
         name: "Appearance",
     },
+    SectionDef {
+        key: "focus_feed",
+        tab: "integrations",
+        tab_label: "Integrations",
+        name: "Focus feed",
+    },
 ];
 
 #[derive(Serialize)]

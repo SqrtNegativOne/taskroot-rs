@@ -128,10 +128,15 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = platform::app_data_dir(&handle)?;
     app.manage(stopwatch::StopwatchManager::load(&data_dir));
     let store = calendar::Store::load(data_dir);
+    let focus_feed_enabled = store.settings.focus_feed_enabled;
+    let focus_feed_port = store.settings.focus_feed_port;
     platform::set_minitracker_visible(&handle, store.settings.mini_tracker_enabled);
     platform::start_minitracker_topmost_guard(&handle);
     handle.manage(calendar::StoreState::new(store));
     ipc::session::start_load(handle.clone());
+    if focus_feed_enabled {
+        stopwatch::start_focus_feed(handle.clone(), focus_feed_port);
+    }
     reminders::start_reminder_engine(handle);
 
     Ok(())

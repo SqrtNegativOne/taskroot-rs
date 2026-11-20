@@ -17,6 +17,8 @@ const settings: AppSettings = {
   keybinding_restore_app: '',
   tracker_show_border: false,
   tracker_opacity: 1,
+  focus_feed_enabled: false,
+  focus_feed_port: 8765,
 };
 
 test('spa mounts the main window and routes an unconfigured account to connect', async ({ page }) => {
