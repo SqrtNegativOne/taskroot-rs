@@ -121,7 +121,7 @@ pub struct AppTask {
     #[ts(optional)]
     pub est: Option<i32>,
     #[ts(optional)]
-    #[query(sortable, filter_type = "text", label = "Created")]
+    #[query(sortable, filter_type = "date", label = "Created")]
     pub added: Option<String>,
     #[ts(optional)]
     pub remote_id: Option<RemoteId>,
@@ -134,10 +134,10 @@ pub struct AppTask {
     /// `DTSTART`: the task's start, which tasks.org also uses as "hide until".
     /// Canonical form matches [`Self::due`].
     #[ts(optional)]
-    #[query(filter_type = "text")]
+    #[query(filter_type = "date")]
     pub start: Option<String>,
     #[ts(optional)]
-    #[query(sortable, filter_type = "text")]
+    #[query(sortable, filter_type = "date")]
     pub due: Option<String>,
     /// The `COMPLETED` timestamp, ISO 8601 UTC.
     #[ts(optional)]

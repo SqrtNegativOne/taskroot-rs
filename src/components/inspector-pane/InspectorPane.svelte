@@ -12,12 +12,24 @@
     let {
         inspectorState,
         onClose,
+        onConverted,
     }: {
         inspectorState?: InspectorTarget;
         onClose: () => void;
+        onConverted?: (target: InspectorTarget) => void;
     } = $props();
 
-    const inspector = createInspectorState(() => inspectorState, () => onClose());
+    const inspector = createInspectorState(
+        () => inspectorState,
+        () => onClose(),
+        (task) => {
+            if (onConverted) {
+                onConverted({ type: 'task', id: task.id, draft: task });
+                return;
+            }
+            onClose();
+        },
+    );
 
     const currentTask = $derived(inspector.currentTask);
     const currentEvent = $derived(inspector.currentEvent);
@@ -89,6 +101,7 @@
                     updateEvent={inspector.updateEvent}
                     readOnly={isReadOnly}
                     onDelete={inspector.handleDelete}
+                    onConvert={inspector.handleConvertToTask}
                 />
             {/if}
 
@@ -103,7 +116,7 @@
 
 <RecurringActionModal
     isOpen={inspector.recurringModalOpen}
-    actionType="delete"
+    actionType={inspector.recurringAction}
     onConfirm={inspector.handleRecurringConfirm}
     onCancel={inspector.handleRecurringCancel}
 />

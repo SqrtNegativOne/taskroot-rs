@@ -4,7 +4,7 @@
 
     interface Props {
         isOpen: boolean;
-        actionType: "edit" | "delete" | "move";
+        actionType: "edit" | "delete" | "move" | "convert";
         /** Which choices to offer; a move cannot re-anchor a series from one occurrence. */
         modes?: EventScope[];
         onConfirm: (mode: EventScope) => void;
@@ -28,7 +28,12 @@
         }
     });
 
-    let actionText = $derived(actionType === "delete" ? "Delete" : actionType === "move" ? "Move" : "Edit");
+    let actionText = $derived(
+        actionType === "delete" ? "Delete"
+        : actionType === "move" ? "Move"
+        : actionType === "convert" ? "Convert"
+        : "Edit",
+    );
 
     function handleConfirm() {
         onConfirm(selectedMode);

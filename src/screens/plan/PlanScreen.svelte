@@ -47,6 +47,10 @@
     const startTaskDrag = createTaskDragController({
         setDragState: (ds) => { dragState = ds; },
         defaultDuration: () => store.settings?.default_task_duration || 30,
+        onSetStart: (task, date) => {
+            void store.mutate('Failed to set task start', () =>
+                store.updateTask({ ...task, start: date }));
+        },
         onSchedule: (task, slot) => {
             const event = buildNewEvent(parseLocalYmd(slot.date), {
                 startMinutes: slot.minute,
@@ -179,6 +183,7 @@
         <InspectorPane
             {inspectorState}
             onClose={() => { inspectorState = undefined; }}
+            onConverted={(target) => { inspectorState = target; }}
         />
 
         <RecurringActionModal

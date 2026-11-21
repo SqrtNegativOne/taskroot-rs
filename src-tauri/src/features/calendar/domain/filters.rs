@@ -7,6 +7,7 @@ use ts_rs::TS;
 pub enum FilterType {
     Text,
     Number,
+    Date,
     Enum(Vec<String>),
     Relation(String),
 }
@@ -37,4 +38,12 @@ pub enum FilterOperator {
     Contains,
     #[serde(rename = "does not contain")]
     DoesNotContain,
+    #[serde(rename = "before")]
+    Before,
+    #[serde(rename = "after")]
+    After,
+    #[serde(rename = "on or before")]
+    OnOrBefore,
+    #[serde(rename = "on or after")]
+    OnOrAfter,
 }

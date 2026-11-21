@@ -21,6 +21,12 @@
 
     let editing = $state(false);
     let localValue = $state('');
+    let copied = $state(false);
+    let copyReset: ReturnType<typeof setTimeout> | undefined;
+
+    $effect(() => () => clearTimeout(copyReset));
+
+    const hasContent = $derived(!!value && value.trim() !== '');
 
     function startEditing() {
         if (disabled) return;
@@ -45,34 +51,105 @@
         if (localValue !== (value ?? '')) onchange(localValue);
     }
 
+    async function handleCopy() {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            copied = true;
+            clearTimeout(copyReset);
+            copyReset = setTimeout(() => {
+                copied = false;
+            }, 1500);
+        } catch (error) {
+            console.error('Failed to copy description:', error);
+        }
+    }
+
     function focusAction(node: HTMLTextAreaElement) {
         node.focus();
     }
 </script>
 
-{#if !editing}
-    <button
-        type="button"
-        {disabled}
-        onkeydown={handleKeyDown}
-        onclick={startEditing}
-        class={className}
-        aria-label={ariaLabel}
-        style={`min-height: 24px; cursor: ${disabled ? 'not-allowed' : 'text'}; padding: 0; color: ${value ? 'var(--fg)' : 'var(--fg-dim)'}; border-radius: 4px; background: none; border: none; font: inherit; text-align: left; width: 100%; white-space: pre-wrap; ${style}`}
-    >
-        {value || placeholder}
-    </button>
-{:else}
-    <textarea
-        use:focusAction
-        value={localValue}
-        oninput={handleTextareaChange}
-        onblur={handleBlur}
-        rows="5"
-        class={className}
-        aria-label={ariaLabel}
-        style={`width: 100%; resize: vertical; padding: 6px 8px; font-family: inherit; font-size: inherit; border: 1px solid var(--border); background: var(--bg-surface); color: var(--fg); border-radius: 6px; ${style}`}
-        placeholder={placeholder}
-        spellcheck="false"
-    ></textarea>
-{/if}
+<div class="description-input">
+    {#if !editing}
+        <button
+            type="button"
+            {disabled}
+            onkeydown={handleKeyDown}
+            onclick={startEditing}
+            class={`inspector-description-display ${className}`.trim()}
+            class:is-empty={!hasContent}
+            aria-label={ariaLabel}
+            style={style}
+        >
+            {value || placeholder}
+        </button>
+    {:else}
+        <textarea
+            use:focusAction
+            value={localValue}
+            oninput={handleTextareaChange}
+            onblur={handleBlur}
+            rows="5"
+            class={`inspector-description-editor ${className}`.trim()}
+            style={style}
+            aria-label={ariaLabel}
+            placeholder={placeholder}
+            spellcheck="false"
+        ></textarea>
+    {/if}
+    {#if hasContent && !editing}
+        <button
+            type="button"
+            class="description-copy"
+            class:is-copied={copied}
+            aria-label={copied ? 'Copied' : 'Copy description'}
+            title={copied ? 'Copied' : 'Copy description'}
+            onclick={handleCopy}
+        >
+            <span class="material-symbols-outlined" aria-hidden="true">{copied ? 'check' : 'content_copy'}</span>
+        </button>
+    {/if}
+</div>
+
+<style>
+    .description-input {
+        position: relative;
+        width: 100%;
+    }
+
+    .description-copy {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        border: none;
+        border-radius: 4px;
+        background: none;
+        color: var(--fg-dim);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s ease, color 0.12s ease;
+    }
+
+    .description-input:hover .description-copy,
+    .description-copy:focus-visible,
+    .description-copy.is-copied {
+        opacity: 1;
+    }
+
+    .description-copy:hover:not(:disabled) {
+        color: var(--fg);
+    }
+
+    .description-copy.is-copied {
+        color: var(--p0);
+    }
+
+    .description-copy .material-symbols-outlined {
+        font-size: 16px;
+    }
+</style>

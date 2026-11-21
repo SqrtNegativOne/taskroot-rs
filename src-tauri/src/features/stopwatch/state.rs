@@ -362,6 +362,16 @@ fn trim_to_some(value: Option<String>) -> Option<String> {
     })
 }
 
+fn stop_running_work(state: &mut StopwatchState, now: u64) -> Vec<StopwatchHistoryEntry> {
+    if state.phase != StopwatchPhase::Running {
+        return Vec::new();
+    }
+    if state.paused_until.is_some_and(|until| until > now) {
+        state.paused_until = None;
+    }
+    state.toggle_work(now).unwrap_or_default()
+}
+
 pub struct StopwatchManager {
     state: Mutex<StopwatchState>,
     history_path: PathBuf,
@@ -519,6 +529,28 @@ impl StopwatchManager {
             state.set_task(task_id, label);
             Ok(Vec::new())
         })
+    }
+
+    /// Clear the focus when it points at `task_id`, stopping a running clock.
+    ///
+    /// Returns the updated snapshot when the focus matched, `None` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::Internal`] when the state lock or system clock fails.
+    pub fn clear_task_if(&self, task_id: &str) -> Result<Option<StopwatchState>, AppError> {
+        let now = current_epoch_millis()?;
+        let mut cleared = false;
+        let snapshot = self.alter(|state| {
+            if state.task_id.as_deref() != Some(task_id) {
+                return Ok(Vec::new());
+            }
+            let entries = stop_running_work(state, now);
+            state.set_task(None, None);
+            cleared = true;
+            Ok(entries)
+        })?;
+        Ok(cleared.then_some(snapshot))
     }
 }
 
@@ -754,14 +786,50 @@ mod tests {
     }
 
     #[test]
+    fn clearing_the_focused_task_stops_work_and_records_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = StopwatchManager::load(dir.path());
+        manager
+            .set_task(Some("task-1".to_string()), Some("Learn Python".to_string()))
+            .unwrap();
+        manager.toggle_work().unwrap();
+
+        let cleared = manager.clear_task_if("task-1").unwrap().unwrap();
+
+        assert_eq!(cleared.task_id, None);
+        assert_eq!(cleared.label, None);
+        assert_eq!(cleared.label_source, StopwatchLabelSource::Unset);
+        assert_eq!(cleared.phase, StopwatchPhase::Paused);
+    }
+
+    #[test]
+    fn clearing_another_task_leaves_the_focus_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = StopwatchManager::load(dir.path());
+        manager
+            .set_task(Some("task-1".to_string()), Some("Learn Python".to_string()))
+            .unwrap();
+
+        assert!(manager.clear_task_if("task-2").unwrap().is_none());
+
+        let snapshot = manager.snapshot().unwrap();
+        assert_eq!(snapshot.task_id.as_deref(), Some("task-1"));
+    }
+
+    #[test]
+    fn clearing_without_a_focused_task_is_a_no_op() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = StopwatchManager::load(dir.path());
+
+        assert!(manager.clear_task_if("task-1").unwrap().is_none());
+    }
+
+    #[test]
     fn the_focus_survives_a_manager_reload() {
         let dir = tempfile::tempdir().unwrap();
         let manager = StopwatchManager::load(dir.path());
         manager
-            .set_task(
-                Some("task-1".to_string()),
-                Some("Learn Python".to_string()),
-            )
+            .set_task(Some("task-1".to_string()), Some("Learn Python".to_string()))
             .unwrap();
         drop(manager);
 

@@ -169,7 +169,7 @@
     
     {#if isDragOver}
         <div class="day-cell-drop-hint">
-            <span class="bracket">▸</span> drop to plan
+            <span class="bracket">▸</span> {dragState?.task ? 'drop to set start' : 'drop to plan'}
         </div>
     {/if}
 </div>

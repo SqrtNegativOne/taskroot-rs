@@ -184,7 +184,7 @@
 
     async function selectTask(taskId: string): Promise<void> {
         const selected = tasks.find((task) => task.id === taskId);
-        if (selected === undefined) return;
+        if (selected === undefined || selected.status === 'done') return;
 
         await controller.closeMenu();
         await stopwatchState.startTask(selected);

@@ -5,8 +5,10 @@
 
 use crate::features::calendar::domain::{
     AppEvent, AppEventFilter, AppEventFilterColumn, AppEventSort, AppTask, AppTaskFilter,
-    AppTaskFilterColumn, AppTaskSort, EventStatus, FilterOperator, SortDirection, Tag, TaskPriority,
+    AppTaskFilterColumn, AppTaskSort, EventStatus, FilterOperator, SortDirection, Tag,
+    TaskPriority,
 };
+use chrono::{Local, NaiveDate};
 use std::cmp::Ordering;
 
 #[must_use]
@@ -17,9 +19,10 @@ pub fn query_tasks(
     search: &str,
 ) -> Vec<AppTask> {
     let needle = search.trim().to_lowercase();
+    let today = Local::now().date_naive();
     let mut result: Vec<AppTask> = tasks
         .iter()
-        .filter(|task| task_matches_filters(task, filters))
+        .filter(|task| task_matches_filters(task, filters, today))
         .filter(|task| task_matches_search(task, &needle))
         .cloned()
         .collect();
@@ -45,7 +48,7 @@ pub fn query_events(
     result
 }
 
-fn task_matches_filters(task: &AppTask, filters: &[AppTaskFilter]) -> bool {
+fn task_matches_filters(task: &AppTask, filters: &[AppTaskFilter], today: NaiveDate) -> bool {
     filters.iter().all(|filter| {
         let (Some(column), Some(value)) = (&filter.column, &filter.value) else {
             return true;
@@ -57,7 +60,7 @@ fn task_matches_filters(task: &AppTask, filters: &[AppTaskFilter]) -> bool {
         }
         let matched = candidates
             .iter()
-            .any(|candidate| task_column_matches(task, column, candidate, &operator));
+            .any(|candidate| task_column_matches(task, column, candidate, &operator, today));
         if is_exclusion(&operator) {
             !matched
         } else {
@@ -106,6 +109,7 @@ fn task_column_matches(
     column: &AppTaskFilterColumn,
     value: &serde_json::Value,
     operator: &FilterOperator,
+    today: NaiveDate,
 ) -> bool {
     match column {
         AppTaskFilterColumn::Id => text_matches(task.id.as_str(), value, operator),
@@ -125,9 +129,13 @@ fn task_column_matches(
             tags.iter()
                 .any(|tag| tag.name.to_lowercase().contains(&needle))
         }),
-        AppTaskFilterColumn::Start => date_text_matches(task.start.as_deref(), value, operator),
-        AppTaskFilterColumn::Due => date_text_matches(task.due.as_deref(), value, operator),
-        AppTaskFilterColumn::Added => date_text_matches(task.added.as_deref(), value, operator),
+        AppTaskFilterColumn::Start => {
+            date_text_matches(task.start.as_deref(), value, operator, today)
+        }
+        AppTaskFilterColumn::Due => date_text_matches(task.due.as_deref(), value, operator, today),
+        AppTaskFilterColumn::Added => {
+            date_text_matches(task.added.as_deref(), value, operator, today)
+        }
         AppTaskFilterColumn::Remotecollectionid => task
             .remote_collection_id
             .as_ref()
@@ -139,16 +147,45 @@ fn date_text_matches(
     date: Option<&str>,
     value: &serde_json::Value,
     operator: &FilterOperator,
+    today: NaiveDate,
 ) -> bool {
     let Some(date) = date else {
         return false;
     };
     let needle = value_as_string(value);
+    if matches!(
+        operator,
+        FilterOperator::Contains | FilterOperator::DoesNotContain
+    ) {
+        return date.to_lowercase().contains(&needle.to_lowercase());
+    }
+    let (Some(day), Some(needle_day)) = (date_prefix(date), resolve_filter_date(&needle, today))
+    else {
+        return false;
+    };
     match operator {
-        FilterOperator::Contains | FilterOperator::DoesNotContain => {
-            date.to_lowercase().contains(&needle.to_lowercase())
-        }
-        FilterOperator::Is | FilterOperator::IsNot => date == needle,
+        FilterOperator::Is | FilterOperator::IsNot => day == needle_day,
+        FilterOperator::Before => day < needle_day,
+        FilterOperator::After => day > needle_day,
+        FilterOperator::OnOrBefore => day <= needle_day,
+        FilterOperator::OnOrAfter => day >= needle_day,
+        FilterOperator::Contains | FilterOperator::DoesNotContain => false,
+    }
+}
+
+/// The calendar day of a canonical date or date-time string.
+fn date_prefix(raw: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(raw.get(..10)?, "%Y-%m-%d").ok()
+}
+
+/// Resolve an absolute `YYYY-MM-DD` value or a relative day keyword.
+fn resolve_filter_date(raw: &str, today: NaiveDate) -> Option<NaiveDate> {
+    let trimmed = raw.trim();
+    match trimmed.to_lowercase().as_str() {
+        "today" => Some(today),
+        "tomorrow" => today.succ_opt(),
+        "yesterday" => today.pred_opt(),
+        _ => date_prefix(trimmed),
     }
 }
 
@@ -188,7 +225,12 @@ fn text_matches(haystack: &str, value: &serde_json::Value, operator: &FilterOper
         FilterOperator::Contains | FilterOperator::DoesNotContain => {
             haystack.to_lowercase().contains(&needle.to_lowercase())
         }
-        FilterOperator::Is | FilterOperator::IsNot => haystack == needle,
+        FilterOperator::Before
+        | FilterOperator::After
+        | FilterOperator::OnOrBefore
+        | FilterOperator::OnOrAfter
+        | FilterOperator::Is
+        | FilterOperator::IsNot => haystack == needle,
     }
 }
 
@@ -301,7 +343,9 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
             .as_deref()
             .unwrap_or("9999")
             .cmp(b.added.as_deref().unwrap_or("9999")),
-        AppTaskFilterColumn::Tags => tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref())),
+        AppTaskFilterColumn::Tags => {
+            tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref()))
+        }
         AppTaskFilterColumn::Remotecollectionid => collection_id(a).cmp(collection_id(b)),
     }
 }
@@ -576,6 +620,73 @@ mod tests {
         );
         assert_eq!(tags.len(), 1);
         assert_eq!(tags[0].id.as_str(), "a");
+    }
+
+    #[test]
+    fn start_date_filters_compare_calendar_days() {
+        let mut early = task("a", "Early");
+        early.start = Some("2026-09-07".into());
+        let mut late = task("b", "Late");
+        late.start = Some("2026-09-10T09:00:00".into());
+        let tasks = vec![early, late, task("c", "No start")];
+
+        let before = query_tasks(
+            &tasks,
+            &[filter(
+                AppTaskFilterColumn::Start,
+                FilterOperator::OnOrBefore,
+                json!("2026-09-08"),
+            )],
+            &[],
+            "",
+        );
+        let ids: Vec<&str> = before.iter().map(|task| task.id.as_str()).collect();
+        assert_eq!(ids, vec!["a"]);
+
+        let after = query_tasks(
+            &tasks,
+            &[filter(
+                AppTaskFilterColumn::Start,
+                FilterOperator::After,
+                json!("2026-09-08"),
+            )],
+            &[],
+            "",
+        );
+        let ids: Vec<&str> = after.iter().map(|task| task.id.as_str()).collect();
+        assert_eq!(ids, vec!["b"]);
+
+        let on_day = query_tasks(
+            &tasks,
+            &[filter(
+                AppTaskFilterColumn::Start,
+                FilterOperator::Is,
+                json!("2026-09-10"),
+            )],
+            &[],
+            "",
+        );
+        let ids: Vec<&str> = on_day.iter().map(|task| task.id.as_str()).collect();
+        assert_eq!(ids, vec!["b"]);
+    }
+
+    #[test]
+    fn date_filter_tokens_resolve_relative_to_today() {
+        let today = NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
+
+        assert_eq!(resolve_filter_date("today", today), Some(today));
+        assert_eq!(
+            resolve_filter_date("tomorrow", today),
+            NaiveDate::from_ymd_opt(2026, 11, 21)
+        );
+        assert_eq!(
+            resolve_filter_date("yesterday", today),
+            NaiveDate::from_ymd_opt(2026, 11, 19)
+        );
+        assert_eq!(
+            resolve_filter_date("2026-11-20T09:00:00", today),
+            Some(today)
+        );
     }
 
     #[test]

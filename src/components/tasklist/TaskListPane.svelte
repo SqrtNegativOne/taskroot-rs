@@ -62,7 +62,7 @@
     
     let schema = $derived(schemaQuery.data ?? []);
     
-    let filterColumns = $derived(schema.map(c => ({ id: c.id, label: c.label })));
+    let filterColumns = $derived(schema.map(c => ({ id: c.id, label: c.label, filterType: c.filter_type })));
     let sortColumns = $derived(schema.filter(c => c.sortable).map(c => ({ id: c.id, label: c.label })));
 
     function getFilterValues(colId: string): {label: string, value: string}[] {

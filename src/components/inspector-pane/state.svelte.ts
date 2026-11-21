@@ -1,16 +1,37 @@
 import type { AppCalendar, AppEvent, AppTask, EventScope } from '../../lib/domain';
-import { isCalendarReadOnly, isEventReadOnly, isRecurring } from '../../lib/domain';
+import {
+    calendarsForComponent,
+    isCalendarReadOnly,
+    isEventReadOnly,
+    isRecurring,
+} from '../../lib/domain';
 import { activeCalendars, allEvents } from '../../lib/queries';
 import { useAutoQuery } from '../../lib/safeInvoke.svelte';
 import { store } from '../../lib/store.svelte';
+import { notifyError } from '../../lib/toast';
+import { eventStartDate } from './eventDates';
 
 export type InspectorTarget =
     | { type: 'task'; id: string; draft?: AppTask }
     | { type: 'event'; id: string; occurrenceStart?: string; draft?: AppEvent };
 
+function writableTaskListId(
+    calendars: readonly AppCalendar[],
+    preferred?: string,
+): string | undefined {
+    const writable = calendarsForComponent(calendars, 'VTODO').filter(
+        (calendar) => !isCalendarReadOnly(calendar),
+    );
+    if (preferred !== undefined && writable.some((calendar) => calendar.id === preferred)) {
+        return preferred;
+    }
+    return writable[0]?.id;
+}
+
 /** Reactive inspector state: queries, the selected item, mutations and the recurring-delete scope prompt. */
 export class InspectorPaneState {
     recurringModalOpen = $state(false);
+    recurringAction = $state<'delete' | 'convert'>('delete');
     private eventPendingAction = $state<AppEvent | undefined>(undefined);
     private eventPendingStart = $state<string | undefined>(undefined);
 
@@ -21,6 +42,7 @@ export class InspectorPaneState {
     constructor(
         private readonly getTarget: () => InspectorTarget | undefined,
         private readonly onClose: () => void,
+        private readonly onConverted: (task: AppTask) => void = onClose,
     ) {}
 
     get tasks(): AppTask[] {
@@ -124,6 +146,7 @@ export class InspectorPaneState {
             this.eventPendingAction = event;
             const target = this.getTarget();
             this.eventPendingStart = target?.type === 'event' ? target.occurrenceStart : undefined;
+            this.recurringAction = 'delete';
             this.recurringModalOpen = true;
             return;
         }
@@ -131,9 +154,71 @@ export class InspectorPaneState {
         this.onClose();
     };
 
+    handleConvertToTask = (): void => {
+        if (this.isReadOnly) return;
+        const event = this.currentEvent;
+        if (!event) return;
+        const target = this.getTarget();
+        const occurrenceStart = target?.type === 'event' ? target.occurrenceStart : undefined;
+
+        if (isRecurring(event)) {
+            this.eventPendingAction = event;
+            this.eventPendingStart = occurrenceStart;
+            this.recurringAction = 'convert';
+            this.recurringModalOpen = true;
+            return;
+        }
+
+        void this.convertEvent(event, 'all', undefined);
+    };
+
+    private async convertEvent(
+        event: AppEvent,
+        scope: EventScope,
+        occurrenceStart: string | undefined,
+    ): Promise<void> {
+        const taskList = writableTaskListId(
+            this.calendarsQuery.data ?? [],
+            store.settings?.default_task_list,
+        );
+        if (taskList === undefined) {
+            notifyError('Convert to task: no writable task list is available.');
+            return;
+        }
+
+        const start = scope === 'all'
+            ? eventStartDate(event)
+            : occurrenceStart?.slice(0, 10) ?? eventStartDate(event);
+        if (start === undefined) {
+            notifyError('Convert to task: the event has no start date.');
+            return;
+        }
+
+        const task: AppTask = {
+            id: crypto.randomUUID(),
+            title: event.title,
+            status: 'todo',
+            priority: event.priority,
+            tags: event.tags?.map((tag) => ({ id: crypto.randomUUID(), name: tag.name })),
+            notes: event.description,
+            start,
+            remoteCollectionId: taskList,
+        };
+
+        const created = await store.mutate('Failed to convert event to task', () => store.addTask(task));
+        if (created.isErr()) return;
+
+        const deleteStart = isRecurring(event) ? occurrenceStart : undefined;
+        await store.mutate('Failed to remove converted event', () =>
+            store.deleteEvent(event.id, scope, deleteStart),
+        );
+        this.onConverted(task);
+    }
+
     handleRecurringConfirm = (scope: EventScope): void => {
         this.recurringModalOpen = false;
         const pending = this.eventPendingAction;
+        const action = this.recurringAction;
         if (!pending) {
             this.onClose();
             return;
@@ -142,6 +227,12 @@ export class InspectorPaneState {
         const occurrenceStart = this.eventPendingStart;
         this.eventPendingAction = undefined;
         this.eventPendingStart = undefined;
+        this.recurringAction = 'delete';
+
+        if (action === 'convert') {
+            void this.convertEvent(pending, scope, occurrenceStart);
+            return;
+        }
 
         void store.mutate('Failed to delete event', () =>
             store.deleteEvent(pending.id, scope, occurrenceStart),
@@ -151,6 +242,7 @@ export class InspectorPaneState {
 
     handleRecurringCancel = (): void => {
         this.recurringModalOpen = false;
+        this.recurringAction = 'delete';
         this.eventPendingAction = undefined;
         this.eventPendingStart = undefined;
     };
@@ -159,6 +251,7 @@ export class InspectorPaneState {
 export function createInspectorState(
     getTarget: () => InspectorTarget | undefined,
     onClose: () => void,
+    onConverted?: (task: AppTask) => void,
 ): InspectorPaneState {
-    return new InspectorPaneState(getTarget, onClose);
+    return new InspectorPaneState(getTarget, onClose, onConverted);
 }

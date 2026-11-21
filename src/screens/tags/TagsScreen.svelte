@@ -103,6 +103,7 @@
     <InspectorPane
         {inspectorState}
         onClose={() => { inspectorState = undefined; }}
+        onConverted={(target) => { inspectorState = target; }}
     />
 </main>
 

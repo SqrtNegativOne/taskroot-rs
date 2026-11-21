@@ -1,7 +1,18 @@
-use crate::ipc::session::{client_for, store_state};
-use crate::features::calendar as domain;
+use tauri::Emitter;
+
 use crate::error::AppError;
+use crate::features::calendar as domain;
 use crate::features::calendar::ops;
+use crate::ipc::session::{client_for, store_state};
+
+fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
+    let Ok(Some(updated)) =
+        crate::features::stopwatch::with_manager(app, |manager| manager.clear_task_if(task_id))
+    else {
+        return;
+    };
+    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, updated);
+}
 
 #[tauri::command]
 #[must_use]
@@ -27,10 +38,16 @@ pub async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result
 /// Returns an error when the task is missing or the `CalDAV` write fails.
 #[tauri::command]
 pub async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), AppError> {
+    let task_id = task.id.0.clone();
+    let completed = task.status == Some(domain::AppTaskStatus::Done);
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
     let mut store = state.lock().await;
     ops::update_task(&mut store, &client, task).await?;
+    drop(store);
+    if completed {
+        clear_focus(&app, &task_id);
+    }
     Ok(())
 }
 
@@ -43,6 +60,8 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
     let state = store_state(&app)?;
     let mut store = state.lock().await;
     ops::delete_task(&mut store, &client, &id).await?;
+    drop(store);
+    clear_focus(&app, &id);
     Ok(())
 }
 

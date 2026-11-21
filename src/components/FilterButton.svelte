@@ -4,6 +4,12 @@
     import FilterSortRow from './FilterSortRow.svelte';
     import MultiSelect from './inputs/MultiSelect.svelte';
     import { useAutoQuery } from '../lib/safeInvoke.svelte';
+    import type { FilterType } from '../lib/bindings/FilterType.generated';
+
+    type FilterColumn = { id: string; label: string; filterType?: FilterType };
+
+    const TEXT_OPERATORS = ['is', 'is not'] as const;
+    const DATE_OPERATORS = ['is', 'is not', 'before', 'after', 'on or before', 'on or after'] as const;
 
     let {
         filters = $bindable([]),
@@ -14,12 +20,20 @@
         extraFilterCount = 0,
     }: {
         filters?: F[];
-        columns?: {id: string, label: string}[];
+        columns?: FilterColumn[];
         getValuesForColumn?: (col: string) => {label: string, value: string}[];
         align?: "left" | "right";
         extraFilters?: Snippet;
         extraFilterCount?: number;
     } = $props();
+
+    function isDateColumn(column: string): boolean {
+        return columns.find((candidate) => candidate.id === column)?.filterType === 'Date';
+    }
+
+    function operatorsFor(column: string): readonly string[] {
+        return isDateColumn(column) ? DATE_OPERATORS : TEXT_OPERATORS;
+    }
 
     const tagsQuery = useAutoQuery<string[]>('list_tags', () => ({}));
     const tagOptions = $derived((tagsQuery.data ?? []).map((name) => ({ label: name, value: name })));
@@ -32,7 +46,12 @@
     function addFilter() {
         const id = columns[0]?.id ?? 'status';
         const blankFilter = {} as F;
-        filters = [...filters, { ...blankFilter, column: id, operator: 'is', value: [] }];
+        filters = [...filters, {
+            ...blankFilter,
+            column: id,
+            operator: operatorsFor(id)[0] ?? 'is',
+            value: [],
+        }];
     }
 
     function removeFilter(index: number) {
@@ -67,7 +86,14 @@
         <FilterSortRow onremove={() => removeFilter(i)} removeTitle="Remove filter">
             <select
                 value={f.column}
-                onchange={(e) => updateFilter(i, { column: e.currentTarget.value, value: [] })}
+                onchange={(e) => {
+                    const column = e.currentTarget.value;
+                    updateFilter(i, {
+                        column,
+                        operator: operatorsFor(column)[0] ?? 'is',
+                        value: [],
+                    });
+                }}
                 style="flex: 0 0 auto; width: 110px;"
                 class="form-select"
             >
@@ -78,11 +104,12 @@
             <select
                 value={f.operator}
                 onchange={(e) => updateFilter(i, { operator: e.currentTarget.value })}
-                style="width: 75px;"
+                style="width: 110px;"
                 class="form-select"
             >
-                <option value="is">is</option>
-                <option value="is not">is not</option>
+                {#each operatorsFor(column) as operator (operator)}
+                    <option value={operator}>{operator}</option>
+                {/each}
             </select>
 
             <div style="flex: 1; min-width: 0; display: flex;">
@@ -96,7 +123,7 @@
                 {:else}
                     <input
                         type="text"
-                        placeholder="Value..."
+                        placeholder={isDateColumn(column) ? 'YYYY-MM-DD or today' : 'Value...'}
                         value={Array.isArray(f.value) ? f.value.join(', ') : (f.value ?? '')}
                         oninput={(e) => updateFilter(i, { value: [e.currentTarget.value] })}
                         style="flex: 1; width: 100%;"

@@ -26,7 +26,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
     for field in fields_named.named {
         let field_name = field.ident.unwrap();
         let field_name_str = field_name.to_string();
-        
+
         let mut chars = field_name_str.chars();
         let pascal_name = match chars.next() {
             None => String::new(),
@@ -46,7 +46,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         for attr in field.attrs {
             if attr.path().is_ident("query") {
                 is_filterable = true;
-                
+
                 let _ = attr.parse_nested_meta(|meta| {
                     if meta.path.is_ident("sortable") {
                         is_sortable = true;
@@ -60,6 +60,8 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
                         let ft = s.value();
                         if ft == "number" {
                             filter_type = quote! { crate::features::calendar::domain::FilterType::Number };
+                        } else if ft == "date" {
+                            filter_type = quote! { crate::features::calendar::domain::FilterType::Date };
                         } else if ft.starts_with("enum:") {
                             let enum_name = syn::Ident::new(&ft[5..], proc_macro2::Span::call_site());
                             filter_type = quote! { crate::features::calendar::domain::FilterType::Enum(#enum_name::all_values()) };
@@ -93,7 +95,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
     let col_def_file = format!("../../src/lib/bindings/{}.generated.ts", col_def_name);
     let filter_file = format!("../../src/lib/bindings/{}.generated.ts", filter_name);
     let sort_file = format!("../../src/lib/bindings/{}.generated.ts", sort_name);
-    
+
     let gen = quote! {
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, ts_rs::TS)]
         #[ts(export, export_to = #file_name)]
@@ -135,7 +137,7 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
     gen.into()
 }
 
@@ -176,7 +178,9 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
     let mut errors = Vec::new();
 
     for field in fields_named.named {
-        let Some(field_name) = field.ident else { continue };
+        let Some(field_name) = field.ident else {
+            continue;
+        };
         let mut label: Option<String> = None;
         let mut kind: Option<String> = None;
         let mut section: Option<String> = None;
@@ -195,9 +199,19 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
 
             let parsed = attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("label") {
-                    set_once(&mut label, meta.value()?.parse::<LitStr>()?.value(), &meta, "label")?;
+                    set_once(
+                        &mut label,
+                        meta.value()?.parse::<LitStr>()?.value(),
+                        &meta,
+                        "label",
+                    )?;
                 } else if meta.path.is_ident("kind") {
-                    set_once(&mut kind, meta.value()?.parse::<LitStr>()?.value(), &meta, "kind")?;
+                    set_once(
+                        &mut kind,
+                        meta.value()?.parse::<LitStr>()?.value(),
+                        &meta,
+                        "kind",
+                    )?;
                 } else if meta.path.is_ident("section") {
                     set_once(
                         &mut section,
@@ -224,7 +238,11 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                     let value = meta.value()?;
                     let array: syn::ExprArray = value.parse()?;
                     for element in array.elems {
-                        let syn::Expr::Lit(syn::ExprLit { lit: Lit::Str(text), .. }) = element else {
+                        let syn::Expr::Lit(syn::ExprLit {
+                            lit: Lit::Str(text),
+                            ..
+                        }) = element
+                        else {
                             return Err(meta.error("keywords entries must be string literals"));
                         };
                         keywords.push(text.value());
@@ -363,7 +381,10 @@ fn parse_setting_option(
     }
 
     let label = match label_expr {
-        syn::Expr::Lit(syn::ExprLit { lit: Lit::Str(text), .. }) => text.value(),
+        syn::Expr::Lit(syn::ExprLit {
+            lit: Lit::Str(text),
+            ..
+        }) => text.value(),
         other => {
             return Err(syn::Error::new_spanned(
                 other,
@@ -373,10 +394,16 @@ fn parse_setting_option(
     };
 
     let value = match value_expr {
-        syn::Expr::Lit(syn::ExprLit { lit: Lit::Str(text), .. }) => {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: Lit::Str(text),
+            ..
+        }) => {
             quote! { serde_json::json!(#text) }
         }
-        syn::Expr::Lit(syn::ExprLit { lit: Lit::Int(number), .. }) => {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: Lit::Int(number),
+            ..
+        }) => {
             quote! { serde_json::json!(#number) }
         }
         other => {

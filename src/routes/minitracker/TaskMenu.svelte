@@ -75,10 +75,27 @@
     </form>
 
     {#if activeTask}
-        <button type="button" role="menuitem" class="selected-row" onclick={onStop} title="Stop working on this task">
-            <span class="selected-title">{activeTask.title}</span>
-            <span class="selected-clear">×</span>
-        </button>
+        <div class="selected-row">
+            <span class="selected-title" title={activeTask.title}>{activeTask.title}</span>
+            <button
+                type="button"
+                class="task-check"
+                aria-label={`Mark ${activeTask.title} done`}
+                title="Mark done"
+                onclick={() => onToggleDone(activeTask)}
+            >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5" />
+                </svg>
+            </button>
+            <button
+                type="button"
+                class="selected-clear"
+                aria-label="Stop working"
+                title="Stop working"
+                onclick={onStop}
+            >×</button>
+        </div>
     {/if}
 
     <div class="menu-list">
@@ -238,37 +255,46 @@
     .selected-row {
         display: flex;
         flex: none;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
+        align-items: stretch;
         height: 34px;
-        padding: 0 12px;
-        border: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         background: rgba(255, 255, 255, 0.04);
-        color: #f87171;
-        font-size: 12px;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .selected-row:hover,
-    .selected-row:focus-visible {
-        background: rgba(248, 113, 113, 0.12);
-        outline: none;
     }
 
     .selected-title {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        min-width: 0;
+        padding: 0 12px;
         overflow: hidden;
+        color: #fff;
+        font-size: 13px;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .selected-clear {
+        display: flex;
         flex: none;
-        margin-left: auto;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        padding: 0;
+        border: none;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        background: transparent;
+        color: #f87171;
         font-size: 16px;
         line-height: 1;
+        cursor: pointer;
+    }
+
+    .selected-clear:hover,
+    .selected-clear:focus-visible {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fff;
+        outline: none;
     }
 
     .task-item {
