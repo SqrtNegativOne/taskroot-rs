@@ -6,7 +6,7 @@ mod data_dir;
 mod tray;
 mod windows;
 
-pub use data_dir::{app_data_dir, configure_dev_webview_storage};
+pub use data_dir::{app_data_dir, configure_dev_webview_storage, configure_webview_flags};
 pub use tray::build_tray;
 pub use windows::{
     WindowLabel, handle_window_event, hide_launcher, hide_screen_effect, quit_app, resize_launcher,

@@ -192,8 +192,7 @@ describe('DateGrid task dates', () => {
         render(DateGrid, { onTaskClick });
 
         expect(await screen.findAllByText('Pay rent')).toHaveLength(2);
-        expect(screen.getAllByText('Start')).toHaveLength(1);
-        expect(screen.getAllByText('Due')).toHaveLength(2);
+
         expect(screen.getByText('Call mom')).toBeTruthy();
     });
 

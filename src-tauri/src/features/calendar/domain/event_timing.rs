@@ -1,4 +1,4 @@
-use super::{AppEvent, CollectionId, Color, EventId, EventStatus, TaskId};
+use super::{AppEvent, AppTaskStatus, CollectionId, Color, EventId, EventStatus, TaskId};
 use chrono::{DateTime, Days, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz as ChronoTz;
 use serde::{Deserialize, Serialize};
@@ -157,6 +157,8 @@ pub struct EventInstance {
     pub status: EventStatus,
     #[ts(optional)]
     pub task_id: Option<TaskId>,
+    #[ts(optional)]
+    pub task_status: Option<AppTaskStatus>,
 }
 
 #[cfg(test)]

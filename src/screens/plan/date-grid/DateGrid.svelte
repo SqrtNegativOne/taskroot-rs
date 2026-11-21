@@ -16,6 +16,7 @@
     import { activeCalendars, eventInstances, taskDates } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
+    import { store } from '../../../lib/store.svelte';
 
     let {
         dragState,
@@ -24,6 +25,7 @@
         onAddEvent,
         onEventClick,
         onTaskClick,
+        onToggleTask,
     }: {
         dragState?: import('../day-timeline/types').DragState;
         selectedEventId?: string;
@@ -31,6 +33,7 @@
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
         onTaskClick?: (marker: TaskDateInstance) => void;
+        onToggleTask?: (taskId: string) => void;
     } = $props();
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
@@ -119,6 +122,14 @@
     function shift(n: number) {
         anchor = shiftDateGridAnchor(anchor, view, n);
     }
+
+    function handleToggleTask(taskId: string) {
+        if (onToggleTask) {
+            onToggleTask(taskId);
+        } else {
+            void store.mutate('Failed to update task', () => store.toggleTask(taskId));
+        }
+    }
 </script>
 
 <section class="date-grid-pane">
@@ -159,6 +170,7 @@
                             {onAddEvent}
                             {onEventClick}
                             {onTaskClick}
+                            onToggleTask={handleToggleTask}
                             calendars={calendars}
                             {taskCalendars}
                         />

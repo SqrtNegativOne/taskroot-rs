@@ -204,6 +204,7 @@ fn build_instance(
         color: event.color.clone(),
         status: event.status.clone().unwrap_or(EventStatus::Confirmed),
         task_id: event.task_id.clone(),
+        task_status: None,
     }
 }
 

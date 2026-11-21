@@ -119,6 +119,28 @@ pub fn configure_dev_webview_storage(context: &tauri::Context) {
     );
 }
 
+/// Configure Chromium / `WebView2` arguments to prevent background throttling
+/// and renderer suspension when windows are inactive or when the display sleeps.
+pub fn configure_webview_flags() {
+    #[cfg(target_os = "windows")]
+    {
+        const FLAGS: &str = "--disable-background-timer-throttling --disable-renderer-backgrounding";
+        match std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            Ok(existing) => {
+                if !existing.contains("--disable-background-timer-throttling") {
+                    std::env::set_var(
+                        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                        format!("{existing} {FLAGS}"),
+                    );
+                }
+            }
+            Err(_) => {
+                std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", FLAGS);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

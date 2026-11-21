@@ -33,6 +33,7 @@ fn app_context() -> tauri::Context {
 fn try_run() -> tauri::Result<()> {
     let context = app_context();
     platform::configure_dev_webview_storage(&context);
+    platform::configure_webview_flags();
     build_app().run(context)
 }
 
@@ -66,6 +67,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::quick_capture::parse_quick_capture,
             ipc::tasks::create_task,
             ipc::tasks::update_task,
+            ipc::tasks::toggle_task,
             ipc::tasks::delete_task,
             ipc::tasks::get_past_due_task_ids,
             ipc::events::create_event,

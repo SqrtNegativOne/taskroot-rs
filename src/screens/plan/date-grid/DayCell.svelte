@@ -3,6 +3,7 @@
     import { isEventReadOnly } from '../../../lib/domain';
     import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
     import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
+    import TaskCircle from '../../../components/TaskCircle.svelte';
 
     const OPACITY_FADED = 0.4;
     const OPACITY_READ_ONLY = 0.6;
@@ -20,6 +21,7 @@
         onAddEvent,
         onEventClick,
         onTaskClick,
+        onToggleTask,
         calendars = [],
         taskCalendars = [],
     }: {
@@ -35,6 +37,7 @@
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
         onTaskClick?: (marker: TaskDateInstance) => void;
+        onToggleTask?: (taskId: string) => void;
         calendars?: AppCalendar[];
         taskCalendars?: AppCalendar[];
     } = $props();
@@ -42,10 +45,6 @@
     function formatStartTime(ev: EventInstance) {
         if (ev.timing.kind !== 'timed') return 'All Day';
         return formatHhMm(minutesSinceMidnight(new Date(ev.timing.start)));
-    }
-
-    function taskKindLabel(marker: TaskDateInstance) {
-        return marker.kind === 'due' ? 'Due' : 'Start';
     }
 
     function formatTaskTime(marker: TaskDateInstance) {
@@ -116,6 +115,8 @@
                 
                 <div
                     class="day-cell-event"
+                    class:ev-plan={!!ev.taskId}
+                    class:is-done={ev.taskStatus === 'done'}
                     class:is-readonly={readOnly}
                     class:is-selected={ev.id === selectedEventId}
                     style="
@@ -123,12 +124,25 @@
                         opacity: {readOnly ? OPACITY_READ_ONLY : (dragState?.event?.id === ev.id ? OPACITY_FADED : 1)};
                         {eventColorVars(resolveEventColor(ev, calendars))}
                     "
-                    onpointerdown={readOnly ? undefined : (e) => onEventDragStart?.(e, ev)}
+                    onpointerdown={readOnly ? undefined : (e) => {
+                        if (e.target instanceof Element && e.target.closest('.task-circle')) return;
+                        onEventDragStart?.(e, ev);
+                    }}
                     onclick={(e) => {
                         e.stopPropagation();
                         if (onEventClick) onEventClick(ev);
                     }}
                 >
+                    {#if ev.taskId}
+                        <TaskCircle
+                            size="sm"
+                            isDoneOrChecking={ev.taskStatus === 'done'}
+                            onclick={(e) => {
+                                e.stopPropagation();
+                                onToggleTask?.(ev.taskId!);
+                            }}
+                        />
+                    {/if}
                     {#if !isAllDay}
                         <span class="day-cell-event-time">
                             {formatStartTime(ev)}
@@ -152,12 +166,20 @@
                     class:is-done={isDone}
                     class:is-due={marker.kind === 'due'}
                     style={eventColorVars(taskColor(marker))}
+                    title="{marker.kind === 'due' ? 'Due: ' : 'Start: '}{marker.title}"
                     onclick={(e) => {
                         e.stopPropagation();
                         onTaskClick?.(marker);
                     }}
                 >
-                    <span class="day-cell-task-kind">{taskKindLabel(marker)}</span>
+                    <TaskCircle
+                        size="sm"
+                        isDoneOrChecking={isDone}
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            onToggleTask?.(marker.taskId);
+                        }}
+                    />
                     {#if taskTime}
                         <span class="day-cell-task-time">{taskTime}</span>
                     {/if}

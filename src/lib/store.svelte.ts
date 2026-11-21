@@ -79,6 +79,10 @@ export class AppStore {
         return this.commit(safeInvoke('update_task', { task }));
     }
 
+    toggleTask(id: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke('toggle_task', { id }));
+    }
+
     deleteTask(id: string): Promise<Result<void, AppError>> {
         return this.commit(safeInvoke('delete_task', { id }));
     }

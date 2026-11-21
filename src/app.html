@@ -10,19 +10,56 @@
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
     <script>
-      window.addEventListener('error', (event) => {
-        const msg = "GLOBAL RUNTIME ERROR:\n" + event.message + "\n\n" + event.filename + ":" + event.lineno + ":" + event.colno + "\n\n" + (event.error && event.error.stack ? event.error.stack : '');
-        const errorDiv = document.createElement('div');
-        errorDiv.style = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: red; color: white; z-index: 999999; padding: 20px; font-family: monospace; white-space: pre-wrap; overflow: auto;";
-        errorDiv.innerText = msg;
-        document.body.appendChild(errorDiv);
+      // Keep WebView2 active and mitigate timer throttling when windows are inactive.
+      if ('locks' in navigator) {
+        navigator.locks.request('taskroot-keep-awake', { mode: 'shared' }, () => new Promise(() => {}));
+      }
+
+      function isChunkError(error) {
+        const msg = String(error?.message || error || '');
+        return (
+          msg.includes('Failed to fetch dynamically imported module') ||
+          msg.includes('error loading dynamically imported module') ||
+          msg.includes('Importing a module script failed')
+        );
+      }
+
+      function attemptChunkRecovery() {
+        const key = 'taskroot_chunk_reload_ts';
+        const last = parseInt(sessionStorage.getItem(key) || '0', 10);
+        const now = Date.now();
+        // Prevent infinite reload loops if a module is genuinely missing or broken.
+        if (now - last > 5000) {
+          sessionStorage.setItem(key, String(now));
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+          return true;
+        }
+        return false;
+      }
+
+      window.addEventListener('vite:preloadError', (event) => {
+        event.preventDefault();
+        attemptChunkRecovery();
       });
+
       window.addEventListener('unhandledrejection', (event) => {
-        const msg = "UNHANDLED PROMISE REJECTION:\n" + (event.reason && event.reason.stack ? event.reason.stack : String(event.reason));
-        const errorDiv = document.createElement('div');
-        errorDiv.style = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: darkred; color: white; z-index: 999999; padding: 20px; font-family: monospace; white-space: pre-wrap; overflow: auto;";
-        errorDiv.innerText = msg;
-        document.body.appendChild(errorDiv);
+        if (isChunkError(event.reason)) {
+          event.preventDefault();
+          attemptChunkRecovery();
+          return;
+        }
+        console.error('Unhandled promise rejection:', event.reason);
+      });
+
+      window.addEventListener('error', (event) => {
+        if (isChunkError(event.error || event.message)) {
+          event.preventDefault();
+          attemptChunkRecovery();
+          return;
+        }
+        console.error('Global runtime error:', event.error || event.message);
       });
     </script>
   </body>

@@ -11,6 +11,7 @@
     import { formatHhMm } from '../../../lib/time';
     import { MINUTES_PER_DAY, snapPixels } from '../snapping';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
+    import TaskCircle from '../../../components/TaskCircle.svelte';
 
     const MIN_EVENT_HEIGHT_PX = 18;
     const SHORT_EVENT_DURATION_MINS = 30;
@@ -25,6 +26,7 @@
         onResize,
         onMove,
         onEventClick,
+        onToggleTask,
         readOnly = false,
         calendars = [],
     }: {
@@ -37,6 +39,7 @@
         onResize?: (event: EventInstance, start: number, end: number) => void;
         onMove?: (event: EventInstance, start: number, end: number) => void;
         onEventClick?: (e: EventInstance) => void;
+        onToggleTask?: (taskId: string) => void;
         readOnly?: boolean;
         calendars?: AppCalendar[];
     } = $props();
@@ -77,7 +80,7 @@
 
     function onBodyDown(e: PointerEvent) {
         if (!(e.target instanceof Element)) return;
-        if (e.target.closest('.day-event-handle')) return;
+        if (e.target.closest('.day-event-handle, .task-circle')) return;
         if (e.button !== 0) return;
 
         if (readOnly) {
@@ -137,6 +140,7 @@
     <div
         class="day-event"
         class:ev-plan={!!event.taskId}
+        class:is-done={event.taskStatus === 'done'}
         class:is-compact={compact}
         class:is-short={isShort && !compact}
         class:is-ghost={isGhost}
@@ -161,6 +165,16 @@
         
         <div class="day-event-inner">
             <div class="day-event-title" style="display: flex; align-items: center; gap: 4px;">
+                {#if event.taskId}
+                    <TaskCircle
+                        size="sm"
+                        isDoneOrChecking={event.taskStatus === 'done'}
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            onToggleTask?.(event.taskId!);
+                        }}
+                    />
+                {/if}
                 {#if isRecurring}
                     <span style="flex-shrink: 0; font-size: 14px;">↻</span>
                 {/if}

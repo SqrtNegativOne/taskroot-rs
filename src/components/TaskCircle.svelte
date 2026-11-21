@@ -7,6 +7,7 @@
         oncontextmenu,
         title = "Toggle Done",
         ariaLabel,
+        size = "md",
     }: {
         priority?: number | string;
         isDoneOrChecking: boolean;
@@ -15,6 +16,7 @@
         oncontextmenu?: (e: MouseEvent) => void;
         title?: string;
         ariaLabel?: string;
+        size?: "sm" | "md";
     } = $props();
 
     let priorityLevel = $derived(priority === undefined ? undefined : Number(priority));
@@ -23,6 +25,7 @@
 <button
     type="button"
     class="task-circle"
+    class:is-sm={size === "sm"}
     class:pri-bg-0={priorityLevel === 0}
     class:pri-bg-1={priorityLevel === 1}
     class:pri-bg-2={priorityLevel === 2}
@@ -31,6 +34,7 @@
     style="padding: 0; font: inherit; color: inherit; cursor: pointer;"
     {title}
     aria-label={ariaLabel ?? (priority !== undefined ? `Priority ${priority.toString()}` : 'Toggle Done')}
+    onpointerdown={(e) => { e.stopPropagation(); }}
     {onclick}
     {oncontextmenu}
 >
@@ -57,3 +61,62 @@
         </svg>
     {/if}
 </button>
+
+<style>
+    .task-circle {
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        min-height: 18px;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        border: 2px solid var(--circle-border, var(--border));
+        background-color: var(--circle-fill, transparent);
+        margin-right: 8px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .task-circle:hover {
+        border-color: var(--circle-border, var(--accent));
+    }
+
+    .task-circle.is-sm {
+        width: 13px;
+        height: 13px;
+        min-width: 13px;
+        min-height: 13px;
+        border-width: 1.5px;
+        margin-right: 0;
+        margin-top: 0;
+    }
+
+    .task-circle-check {
+        width: 12px;
+        height: 12px;
+        color: #fff;
+        stroke-dasharray: 24;
+        stroke-dashoffset: 24;
+        animation: dash 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    .task-circle.is-sm .task-circle-check {
+        width: 8px;
+        height: 8px;
+    }
+
+    @keyframes dash {
+        to { stroke-dashoffset: 0; }
+    }
+
+    .pri-bg-0 { --circle-fill: #3e4a5b; --circle-border: #6a7c92; }
+    .pri-bg-1 { --circle-fill: #435b49; --circle-border: #719379; }
+    .pri-bg-2 { --circle-fill: #735e38; --circle-border: #b59864; }
+    .pri-bg-3 { --circle-fill: #784838; --circle-border: #c47e68; }
+    .pri-bg-4 { --circle-fill: #783a48; --circle-border: #c96b7f; }
+</style>

@@ -35,8 +35,11 @@ export default defineConfig({
           protocol: "ws",
           host,
           port: 1421,
+          timeout: 60000,
         }
-      : undefined,
+      : {
+          timeout: 60000,
+        },
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],

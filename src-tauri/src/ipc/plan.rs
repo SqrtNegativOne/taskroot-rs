@@ -57,14 +57,25 @@ pub async fn query_event_instances(
     end_date: Option<String>,
 ) -> Result<Vec<crate::features::calendar::EventInstance>, AppError> {
     let state = store_state(&app)?;
-    let events = state
-        .read(|store| query::query_events(&store.events(), &filters, &sort, &query))
+    let instances = state
+        .read(|store| {
+            let events = query::query_events(&store.events(), &filters, &sort, &query);
+            let mut insts = match (start_date, end_date) {
+                (Some(start), Some(end)) => expand_event_instances(&events, &start, &end),
+                _ => events.iter().filter_map(single_instance).collect(),
+            };
+            for inst in &mut insts {
+                if let Some(ref tid) = inst.task_id {
+                    if let Some(task) = store.task(tid.as_str()) {
+                        inst.task_status = task.status.clone();
+                    }
+                }
+            }
+            insts
+        })
         .await;
 
-    match (start_date, end_date) {
-        (Some(start), Some(end)) => Ok(expand_event_instances(&events, &start, &end)),
-        _ => Ok(events.iter().filter_map(single_instance).collect()),
-    }
+    Ok(instances)
 }
 
 /// Return every distinct tag name for the filter pickers.
