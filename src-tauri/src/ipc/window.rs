@@ -8,11 +8,6 @@ pub fn window_restore_main(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-pub fn show_minitracker(app: tauri::AppHandle) {
-    platform::show_minitracker(&app);
-}
-
-#[tauri::command]
 pub fn set_minitracker_visible(app: tauri::AppHandle, visible: bool) {
     platform::set_minitracker_visible(&app, visible);
 }

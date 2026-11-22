@@ -9,6 +9,7 @@
     import { store, describeError } from '$lib/store.svelte';
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
+    import { claimFirstOpenOfDay } from '$lib/dailyStartup';
     import { LAUNCHER_NAVIGATE } from '$lib/ipcEvents';
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
@@ -40,20 +41,28 @@
 
         let unlistenNav = () => { /* noop */ };
 
-        const redirectForAccount = async () => {
+        const redirectForAccount = async (): Promise<boolean> => {
             const configured = await safeInvoke<boolean>('is_account_configured');
             if (configured.isErr()) {
                 store.error = `Could not check the CalDAV account: ${describeError(configured.error)}`;
-                return;
+                return false;
             }
 
             const onConnect = page.url.pathname === Routes.CONNECT;
             if (!configured.value && !onConnect) {
                 await goto(resolve(Routes.CONNECT));
-                return;
+                return false;
             }
             if (configured.value && onConnect) {
                 await goto(resolve(Routes.HOME));
+            }
+            return configured.value;
+        };
+
+        const redirectToStartup = async () => {
+            if (page.url.pathname !== Routes.HOME) return;
+            if (await claimFirstOpenOfDay()) {
+                await goto(resolve(Routes.STARTUP));
             }
         };
 
@@ -64,7 +73,8 @@
             }
 
             if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
-                await redirectForAccount();
+                const configured = await redirectForAccount();
+                if (configured) await redirectToStartup();
             }
 
             isBooting = false;

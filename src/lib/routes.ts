@@ -8,6 +8,7 @@ export const Routes = {
     MINITRACKER: '/minitracker',
     RECAP: '/recap',
     SETTINGS: '/settings',
+    STARTUP: '/startup',
     STATS: '/stats',
     TAGS: '/tags',
     WRAP: '/wrap',

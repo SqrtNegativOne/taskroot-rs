@@ -85,7 +85,6 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::schema::get_task_schema,
             ipc::schema::get_event_schema,
             ipc::window::window_restore_main,
-            ipc::window::show_minitracker,
             ipc::window::set_minitracker_visible,
             ipc::window::hide_launcher,
             ipc::window::show_screen_effect,

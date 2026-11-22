@@ -3,20 +3,15 @@
     import { stopwatchState } from './engine.svelte';
     import StopwatchDisplay from './StopwatchDisplay.svelte';
     import ActiveTaskDisplay from './ActiveTaskDisplay.svelte';
-    import TaskSelector from '../TaskSelector.svelte';
     import { store } from '../../../lib/store.svelte';
     import './stopwatch.css';
 
-    import { useAutoQuery, useTauriQuery } from '../../../lib/safeInvoke.svelte';
-    import { taskListQueryArgs } from '../../../lib/taskList.svelte';
+    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
     import type { AppTask } from '../../../lib/domain';
 
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
 
-    let selectorOpen = $state(false);
-    let allowNoTask = $derived(store.settings?.allow_stopwatch_without_task ?? false);
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
-    const breakDivisor = $derived(store.settings?.flowtime_break_divisor ?? 5);
 
     let allTasksQuery = useTauriQuery<AppTask[]>('query_tasks');
     let allTasks = $derived(allTasksQuery.data ?? []);
@@ -26,43 +21,19 @@
         void allTasksQuery.execute({ filters: [], sort: [], query: "" });
     });
 
-    let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
-    let selectableTasks = $derived(listQuery.data ?? []);
-
-    let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
-
-    // If no active task and we require one, open the selector
-    $effect(() => {
-        if (!activeTask && !allowNoTask) {
-            selectorOpen = true;
-        }
-    });
+    let activeTask = $derived(
+        stopwatchState.labelSource === 'task'
+            ? allTasks.find((task) => task.id === stopwatchState.taskId)
+            : undefined,
+    );
 
     // Notify break status changes
     $effect(() => {
         onBreakStatusChange?.(stopwatchState.isBreak);
     });
 
-    async function setActiveTask(taskId: string): Promise<void> {
-        const selected = allTasks.find((task) => task.id === taskId);
-        selectorOpen = false;
-
-        if (selected !== undefined) {
-            await stopwatchState.startTask(selected);
-        }
-    }
-
     async function toggleStopwatch(): Promise<void> {
-        if (stopwatchState.isPristine && !activeTask && !allowNoTask) {
-            selectorOpen = true;
-            return;
-        }
         await stopwatchState.toggle();
-    }
-
-    async function openMinitracker(): Promise<void> {
-        const { safeInvoke } = await import('../../../lib/safeInvoke.svelte');
-        await store.mutate('Failed to open mini tracker', async () => safeInvoke('show_minitracker'));
     }
 
     // P toggles the timed pause; arrow keys resize an active pause by a minute.
@@ -88,39 +59,21 @@
 
     // Keyboard shortcuts
     function handleKeydown(e: KeyboardEvent) {
-        if (e.target instanceof HTMLElement && e.target.matches('input:not(.task-search-input), textarea, [contenteditable]')) {
+        if (e.target instanceof HTMLElement && e.target.matches('input, textarea, [contenteditable]')) {
             return;
         }
 
         if (handlePauseKey(e)) return;
 
-        const isModifier = e.metaKey || e.ctrlKey;
+        if (e.code === "Space") {
+            e.preventDefault();
+            void toggleStopwatch();
+            return;
+        }
 
-        switch (e.code) {
-            case "Space":
-                if (!selectorOpen) {
-                    e.preventDefault();
-                    void toggleStopwatch();
-                }
-                break;
-            case "KeyR":
-                if (isModifier) {
-                    e.preventDefault();
-                    void stopwatchState.reset();
-                }
-                break;
-            case "Enter":
-                if (isModifier) {
-                    e.preventDefault();
-                    selectorOpen = !selectorOpen;
-                }
-                break;
-            case "Escape":
-                if (selectorOpen && (activeTask || allowNoTask)) {
-                    e.preventDefault();
-                    selectorOpen = false;
-                }
-                break;
+        if (e.code === "KeyR" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void stopwatchState.reset();
         }
     }
 
@@ -139,32 +92,7 @@
             engine={stopwatchState}
             onToggle={() => { void toggleStopwatch(); }}
         />
-        <div style="position: absolute; right: 0; top: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-            {#if store.settings?.mini_tracker_enabled}
-                <button onclick={() => { void openMinitracker(); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-top: 8px; margin-right: 8px;" title="Open Mini Tracker">
-                    Mini Tracker
-                </button>
-            {/if}
-            {#if store.settings?.clock_style === 'flowtime'}
-                <button onclick={() => { void stopwatchState.toggleBreak(breakDivisor); }} class="sw-btn" style="padding: 4px 8px; font-size: 12px; margin-right: 8px;" title="Toggle Break">
-                    {stopwatchState.isBreak ? 'End Break' : 'Take Break'}
-                </button>
-            {/if}
-        </div>
 
-        {#if (stopwatchState.running || stopwatchState.isBreak) && (activeTask ?? allowNoTask)}
-            <ActiveTaskDisplay
-                activeTask={activeTask}
-                onOpenSelector={() => selectorOpen = true}
-            />
-        {/if}
-
-        <TaskSelector
-            selectorOpen={selectorOpen}
-            onCloseSelector={() => selectorOpen = false}
-            tasks={selectableTasks}
-            activeTask={activeTask}
-            onStartWithTask={(taskId: string) => { void setActiveTask(taskId); }}
-        />
+        <ActiveTaskDisplay activeTask={activeTask} label={stopwatchState.label} />
     </div>
 </section>

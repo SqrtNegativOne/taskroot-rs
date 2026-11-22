@@ -8,6 +8,7 @@ import { createDebouncedWriter, hydrateOnce } from './asyncState.svelte';
  * namespace; renaming a key orphans its stored value.
  */
 export const persistedKeys = {
+    appLastOpened: 'ui.app.last_opened',
     taskListFilters: 'ui.task_list.filters',
     taskListSort: 'ui.task_list.sort',
     dateGridFilters: 'ui.date_grid.filters',

@@ -87,13 +87,6 @@ pub struct AppSettings {
     )]
     pub clock_style: String,
     #[setting(
-        label = "Allow stopwatch use without selecting task",
-        keywords = ["stopwatch", "task", "requirement", "allow"],
-        kind = "checkbox",
-        section = "do_stopwatch"
-    )]
-    pub allow_stopwatch_without_task: bool,
-    #[setting(
         label = "Flowtime Break Divisor",
         description = "How much break time you earn (e.g. 5 means 1 min break for every 5 mins of work).",
         keywords = ["flowtime", "break", "divisor", "rest"],
@@ -113,7 +106,7 @@ pub struct AppSettings {
     pub pause_minutes: i32,
     #[setting(
         label = "Enable Mini Tracker",
-        description = "Show the floating stopwatch window on launch and allow opening it from the Do screen.",
+        description = "Show the floating stopwatch window on launch.",
         keywords = ["stopwatch", "mini tracker", "minitracker", "window", "enable", "launch"],
         kind = "checkbox",
         section = "do_stopwatch"
@@ -186,7 +179,6 @@ impl Default for AppSettings {
             day_timeline_start_view: 300,
             default_task_duration: 0,
             clock_style: "flowtime".to_string(),
-            allow_stopwatch_without_task: false,
             flowtime_break_divisor: 5,
             pause_minutes: 10,
             mini_tracker_enabled: false,

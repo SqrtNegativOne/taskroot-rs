@@ -8,7 +8,6 @@ const settings: AppSettings = {
   day_timeline_start_view: 1,
   default_task_duration: 30,
   clock_style: 'flowtime',
-  allow_stopwatch_without_task: true,
   flowtime_break_divisor: 5,
   pause_minutes: 5,
   mini_tracker_enabled: false,

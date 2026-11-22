@@ -176,23 +176,15 @@
 
 /* ── Active Task Display ────────────────────────────────────────────────── */
 
-.active-task-btn {
+.active-task-label {
   margin-top: 16px;
   font-size: 18px;
   color: var(--fg, #fff);
   text-align: center;
-  cursor: pointer;
-  transition: color 0.15s;
   padding: 4px 12px;
-  border-radius: 4px;
-  background: none;
-  border: none;
   font: inherit;
 }
-.active-task-btn:hover {
-  color: var(--accent, #66b2ff);
-}
-.active-task-label {
+.active-task-verb {
   color: var(--fg-dim, #888);
   margin-right: 8px;
 }

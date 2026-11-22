@@ -366,7 +366,7 @@
             onpointermove={controller.pointerMove}
             onpointerup={controller.pointerUp}
             onpointercancel={controller.pointerUp}
-        >{timeParts.m}:{timeParts.s}</span>
+        >{timeParts.m}</span>
 
         <button
             type="button"

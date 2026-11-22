@@ -57,10 +57,6 @@ pub fn restore_main(app: &AppHandle) {
     let _ = main_win.set_focus();
 }
 
-pub fn show_minitracker(app: &AppHandle) {
-    set_minitracker_visible(app, true);
-}
-
 pub fn set_minitracker_visible(app: &AppHandle, visible: bool) {
     if !visible {
         if let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) {
