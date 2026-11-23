@@ -178,7 +178,7 @@
                 {#if isRecurring}
                     <span style="flex-shrink: 0; font-size: 14px;">↻</span>
                 {/if}
-                {title}
+                <span class="day-event-title-text">{title}</span>
             </div>
             <div class="day-event-time">
                 {formatHhMm(start)} – {formatHhMm(end)}

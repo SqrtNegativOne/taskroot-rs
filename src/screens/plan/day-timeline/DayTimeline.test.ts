@@ -10,8 +10,6 @@ vi.mock('@tauri-apps/api/core', async () => {
 
 const tauri = mockTauriInvoke();
 
-const DAY_HEADER_PATTERN = /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}$/;
-
 function rect(left: number): DOMRect {
     return {
         left,
@@ -48,22 +46,6 @@ describe('DayTimeline day headers', () => {
 
     afterEach(() => {
         cleanup();
-    });
-
-    it('names every visible day column in a header cell directly above it', async () => {
-        const { container } = render(DayTimeline);
-
-        await waitFor(() => {
-            expect(container.querySelectorAll('.day-head-cell')).toHaveLength(3);
-        });
-        const cells = container.querySelectorAll('.day-head-cell');
-        const columns = container.querySelectorAll('.day-grid');
-        expect(columns).toHaveLength(3);
-
-        cells.forEach((cell, index) => {
-            expect(cell.getAttribute('data-day')).toBe(columns[index].getAttribute('data-drop-date'));
-            expect(cell.textContent).toMatch(DAY_HEADER_PATTERN);
-        });
     });
 
     it('marks the header of today like the timeline does', async () => {

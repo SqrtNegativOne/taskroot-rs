@@ -12,6 +12,7 @@
         onadd,
         trigger,
         children,
+        onOpenChange,
     }: {
         align?: 'left' | 'right';
         minWidth?: string;
@@ -22,13 +23,20 @@
         onadd?: () => void;
         trigger: Snippet;
         children?: Snippet;
+        onOpenChange?: (open: boolean) => void;
     } = $props();
 
     let open = $state(false);
 </script>
 
 <div class="filter-sort-container">
-    <Popover.Root bind:open>
+    <Popover.Root
+        {open}
+        onOpenChange={(next) => {
+            open = next;
+            onOpenChange?.(next);
+        }}
+    >
         <Popover.Trigger>
             {#snippet child({ props })}
                 <button

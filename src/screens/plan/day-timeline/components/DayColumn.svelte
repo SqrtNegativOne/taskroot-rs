@@ -23,6 +23,7 @@
         onMoveEvent,
         onEventClick,
         onAddEvent,
+        onToggleTask,
         calendars = [],
         showTimeLabels = true,
     }: {
@@ -35,6 +36,7 @@
         onMoveEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
         onEventClick?: (ev: EventInstance) => void;
         onAddEvent?: (d: Date, start: number, end: number) => Promise<string | undefined>;
+        onToggleTask?: (taskId: string) => void;
         calendars?: AppCalendar[];
         showTimeLabels?: boolean;
     } = $props();
@@ -174,6 +176,7 @@
             onResize={handleResize}
             onMove={handleMove}
             {onEventClick}
+            {onToggleTask}
         />
     {/each}
 

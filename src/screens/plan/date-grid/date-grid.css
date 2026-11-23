@@ -173,9 +173,14 @@
   .day-cell-event.pri-bar-3 { border-left-color: #c47e68; }
   .day-cell-event.pri-bar-4 { border-left-color: #c96b7f; }
   .day-cell-event.is-done { opacity: 0.45; text-decoration: line-through; }
+  .day-cell-event.is-done .day-cell-event-title-text { text-decoration: line-through; }
   .day-cell-event-time { color: white; flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
+  .day-cell-event-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .day-cell .day-cell-events .task-circle { border-color: currentColor; opacity: 0.6; }
+  .day-cell .day-cell-events .task-circle:hover { opacity: 1; }
   .day-cell-task {
+    font-family: var(--sans);
     font-size: 0.74em;
     line-height: 1.25;
     padding: 1px 4px 1px 5px;
@@ -193,6 +198,7 @@
   }
   .day-cell-task:hover { filter: brightness(1.3); }
   .day-cell-task.is-done { opacity: 0.45; text-decoration: line-through; }
+  .day-cell-task.is-done .day-cell-task-title { text-decoration: line-through; }
   .day-cell-task.is-due { border-left-color: var(--p0); }
   .day-cell-task-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--fg-dim); }
   .day-cell-task-title { overflow: hidden; text-overflow: ellipsis; }

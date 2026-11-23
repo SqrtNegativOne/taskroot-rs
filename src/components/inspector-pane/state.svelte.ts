@@ -1,5 +1,6 @@
 import type { AppCalendar, AppEvent, AppTask, EventScope } from '../../lib/domain';
 import {
+    DEFAULT_TASK_PRIORITY,
     calendarsForComponent,
     isCalendarReadOnly,
     isEventReadOnly,
@@ -198,7 +199,7 @@ export class InspectorPaneState {
             id: crypto.randomUUID(),
             title: event.title,
             status: 'todo',
-            priority: event.priority,
+            priority: event.priority ?? DEFAULT_TASK_PRIORITY,
             tags: event.tags?.map((tag) => ({ id: crypto.randomUUID(), name: tag.name })),
             notes: event.description,
             start,

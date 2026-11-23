@@ -2,12 +2,12 @@
     import './day-timeline.css';
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
-    import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
+    import { PIXELS_PER_HOUR, PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
     import type { EventInstance, AppCalendar, AppEventFilter } from '../../../lib/domain';
     import { calendarsForComponent, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
-    import TimelineHeader from './components/TimelineHeader.svelte';
+    import TimelineControls from './components/TimelineControls.svelte';
     import DayColumn from './components/DayColumn.svelte';
     import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
@@ -16,6 +16,7 @@
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
     import { createReschedulePrompt } from '../hooks/reschedule.svelte';
     import { attachDaySnap } from './scrollSnap';
+    import { store } from '../../../lib/store.svelte';
 
     let {
         dragState,
@@ -67,11 +68,16 @@
         );
     }
 
+    function handleToggleTask(taskId: string) {
+        void store.mutate('Failed to update task', () => store.toggleTask(taskId));
+    }
+
     let eventFilters = $state<AppEventFilter[]>([]);
     let eventQuery = $state('');
     let timelineDate = $state(new Date());
     let today = $state(new Date());
     let numDays = $state(1);
+    let filterOpen = $state(false);
 
     const timelineKeys = untrack(() =>
         variant === 'sidebar'
@@ -93,7 +99,6 @@
     );
 
     let viewDate = $derived(timelineDate);
-    let isToday = $derived(sameDay(viewDate, today));
     
     let dates = $derived(Array.from({ length: numDays }, (_, i) => addDays(viewDate, i)));
     
@@ -136,34 +141,44 @@
         return attachDaySnap(scrollRef);
     });
 
-    const dayHeaderFormat = new Intl.DateTimeFormat('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-    });
+    const weekdayFormat = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+    const dayOfMonthFormat = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
+
+    function formatDayHeader(d: Date): string {
+        return `${weekdayFormat.format(d).toLowerCase()}, ${dayOfMonthFormat.format(d)}`;
+    }
 </script>
 
 <section class="day-pane">
     {#snippet filterMenu()}
-        <EventFilterButton bind:filters={eventFilters} {calendars} />
+        <EventFilterButton
+            bind:filters={eventFilters}
+            {calendars}
+            align="left"
+            onOpenChange={(isOpen) => { filterOpen = isOpen; }}
+        />
     {/snippet}
-
-    <TimelineHeader
-        {viewDate}
-        {isToday}
-        {today}
-        setTimelineDate={(d: Date) => { timelineDate = d; }}
-        {filterMenu}
-        {numDays}
-        setNumDays={(n: number) => { numDays = n; }}
-    />
 
     <div class="day-scroll" bind:this={scrollRef}>
         <div class="day-cols">
-            <div class="day-head">
-                {#each dates as d (ymd(d))}
-                    <div class="day-head-cell" class:is-today={sameDay(d, today)} data-day={ymd(d)}>
-                        {dayHeaderFormat.format(d)}
+            <div class="day-head" style="--day-gutter: {PIXELS_PER_HOUR}px;">
+                <TimelineControls
+                    {viewDate}
+                    {today}
+                    setTimelineDate={(d: Date) => { timelineDate = d; }}
+                    {filterMenu}
+                    {numDays}
+                    setNumDays={(n: number) => { numDays = n; }}
+                    keepOpen={filterOpen}
+                />
+                {#each dates as d, i (ymd(d))}
+                    <div
+                        class="day-head-cell"
+                        class:is-first={i === 0}
+                        class:is-today={sameDay(d, today)}
+                        data-day={ymd(d)}
+                    >
+                        {formatDayHeader(d)}
                     </div>
                 {/each}
             </div>
@@ -179,6 +194,7 @@
                         {onMoveEvent}
                         {onEventClick}
                         {onAddEvent}
+                        onToggleTask={handleToggleTask}
                         calendars={calendars}
                         showTimeLabels={i === 0}
                     />

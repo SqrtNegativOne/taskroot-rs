@@ -267,7 +267,7 @@
     />
 </InspectorField>
 
-<InspectorField icon="link" label="Attached task" disabled={readOnly}>
+<InspectorField icon="task" label="Attached task" disabled={readOnly}>
     <SelectInput
         value={event.taskId ?? ''}
         onchange={handleAttachmentChange}

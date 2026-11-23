@@ -9,11 +9,13 @@
         calendars,
         visibility = $bindable(),
         align = 'right',
+        onOpenChange,
     }: {
         filters?: AppEventFilter[];
         calendars: AppCalendar[];
         visibility?: EventVisibility;
         align?: 'left' | 'right';
+        onOpenChange?: (open: boolean) => void;
     } = $props();
 
     const calendarOptions = $derived(calendarsForComponent(calendars, 'VEVENT')
@@ -43,6 +45,7 @@
     getValuesForColumn={valuesForColumn}
     {align}
     extraFilterCount={visibilityCount}
+    {onOpenChange}
 >
     {#snippet extraFilters()}
         {#if visibility}

@@ -26,7 +26,7 @@ Planning docs live at the repository root: [TODO.md](TODO.md) is the inspector/i
   - **Frontend E2E**: Playwright (`playwright.config.ts`, specs in `tests/e2e/`, run via `bun run test`; the config boots `bun run dev` on port 1420 with chromium). Timeline CSS geometry tests use DOM-only fixtures and bounding-box/hit-test assertions, not screenshots.
   - **Frontend Unit**: Vitest with jsdom (`bun run test:unit`). Coverage is collected via `@vitest/coverage-v8` (`bun run coverage:frontend`).
   - **Backend**: Rust unit tests (`cargo nextest run` in `src-tauri`, including CalDAV XML-parser fixtures, ICS round-trip invariants and `AppError` shape checks). `src-tauri/examples/e2e_caldav.rs` is the live Radicale check. Coverage is collected via `cargo-llvm-cov` (`bun run coverage:backend`, requires `cargo install cargo-llvm-cov`).
-- **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). Source and config files are linted; only generated/vendor directories are ignored. Svelte's three pointer-UI a11y warnings (`a11y_autofocus`, `a11y_click_events_have_key_events`, `a11y_no_static_element_interactions`) are filtered once in `svelte.config.js`; do not add per-node `svelte-ignore` comments. CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo nextest run`. **CRITICAL: You must run `bun run check` (for frontend) and `cargo clippy` (for backend) after EVERY change to ensure code quality and avoid regressions.**
+- **Linters**: ESLint (strictTypeChecked; `**/*.generated.ts` is exempt from `array-type` and `consistent-type-definitions` in `eslint.config.js`) and Rust `clippy` (`lib.rs` warns on pedantic/nursery and denies `unwrap`/`expect`). Source and config files are linted; only generated/vendor directories are ignored. Svelte's three pointer-UI a11y warnings (`a11y_autofocus`, `a11y_click_events_have_key_events`, `a11y_no_static_element_interactions`) are filtered once in `svelte.config.js`; do not add per-node `svelte-ignore` comments. CI (`.github/workflows/ci.yml`) runs `bun run check` + `bun run lint` and `cargo clippy --all-targets -- -D warnings` + `cargo nextest run`. You must run `bun run check` after frontend changes, and `cargo clippy` after backend changes.
 
 ## Project Structure
 - `src/`: SvelteKit frontend codebase.
@@ -102,10 +102,10 @@ Planning docs live at the repository root: [TODO.md](TODO.md) is the inspector/i
 
 ## Style (Important)
 - **Generated Code**: Never hand-edit anything in `src/lib/bindings/` — regenerate via `cargo nextest run`.
-- **Test-Driven Development**: Write tests first as a contract. Do not modify them unless there is something truly wrong.
+- **Test-Driven Development**: In backend, write tests first as a contract. Do not modify them unless there is something truly wrong.
 - **Self-Documenting Code**: Avoid redundant comments. Extract complex logic into well-named functions or constants.
 - **Small, Modular Code**: Refactor files if they exceed 250 LOC. Refactor functions with more than 4 levels of indentation.
-- **Store Assets Offline**: Store assets offline.
+- Store assets offline.
 - **Calendar Write Semantics**: Every edit is a read-modify-write on the fetched `.ics` body: merge the DTO into the stored raw resource (`features::calendar::ics::write_*_resource`), then `PUT` with `If-Match` (create: `If-None-Match: *`). Never serialize a DTO into a resource. A `412` re-fetches, re-merges and retries once; a second failure is reported to the UI. Deletes are `DELETE`; a repeating-event edit takes an `EventScope` and is resolved in `features::calendar::store::ops` — `this` writes an `EXDATE` or a `RECURRENCE-ID` exception, `following` truncates the rule before the occurrence, `all` touches the whole resource. See `docs/caldav.md`.
 - Tautological tests are considered harmful.
 - Please use early returns. This will make code nicer for you too.
