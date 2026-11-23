@@ -96,6 +96,28 @@ describe('persistState', () => {
         expect(writes).toHaveLength(1);
     });
 
+    it('keeps a local edit made while hydration is in flight', async () => {
+        const deferred = Promise.withResolvers<unknown>();
+        tauri.stubCommand('get_ui_state', () => deferred.promise);
+
+        render(Harness, { props: { storageKey: KEY, fallback: ['fallback'], debounceMs: 5 } });
+        await waitFor(() => {
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
+        });
+        await fireEvent.click(screen.getByText('add'));
+        expect(screen.getByTestId('value').textContent).toBe('fallback,added');
+
+        deferred.resolve(['stored']);
+
+        await waitFor(() => {
+            expect(invoke).toHaveBeenCalledWith('set_ui_state', {
+                key: KEY,
+                value: ['fallback', 'added'],
+            });
+        });
+        expect(screen.getByTestId('value').textContent).toBe('fallback,added');
+    });
+
     it('flushes a pending write when the component is destroyed', async () => {
         mockStoredSetting(null);
 

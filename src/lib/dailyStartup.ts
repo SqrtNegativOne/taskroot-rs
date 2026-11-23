@@ -20,6 +20,9 @@ export async function claimFirstOpenOfDay(now: Date = new Date()): Promise<boole
     if (stored.isErr()) return false;
     if (!isFirstOpenToday(stored.value, today)) return false;
 
-    await safeInvoke('set_ui_state', { key: persistedKeys.appLastOpened, value: today });
-    return true;
+    const saved = await safeInvoke('set_ui_state', {
+        key: persistedKeys.appLastOpened,
+        value: today,
+    });
+    return saved.isOk();
 }

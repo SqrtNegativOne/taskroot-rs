@@ -157,3 +157,57 @@ describe('Do screen shared focus', () => {
         expect(screen.queryByRole('dialog')).toBeNull();
     });
 });
+
+describe('Do screen clock shortcuts', () => {
+    it.each(['input', 'textarea', 'div'])('does not intercept keys while editing a %s', async (tag) => {
+        tauri.stubCommandValue('toggle_stopwatch', snapshot({ phase: 'running' }));
+        render(Stopwatch);
+        const editor = document.createElement(tag);
+        if (tag === 'div') editor.setAttribute('contenteditable', 'true');
+        document.body.append(editor);
+
+        const allowedDefault = await fireEvent.keyDown(editor, { code: 'Space' });
+        editor.remove();
+
+        expect(allowedDefault).toBe(true);
+        expect(stopwatchState.running).toBe(false);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined);
+    });
+
+    it('toggles a timed pause and adjusts its duration with arrow keys', async () => {
+        const paused = snapshot({ phase: 'running', pausedUntil: Date.now() + 60_000 });
+        tauri.stubCommandValue('toggle_pause', paused);
+        tauri.stubCommandValue('adjust_pause', paused);
+        render(Stopwatch);
+
+        expect(await fireEvent.keyDown(window, { code: 'KeyP' })).toBe(false);
+        await waitFor(() => { expect(stopwatchState.isPaused).toBe(true); });
+        expect(tauri.invoke).toHaveBeenCalledWith('toggle_pause', { pauseMinutes: 10 });
+
+        expect(await fireEvent.keyDown(window, { code: 'ArrowRight' })).toBe(false);
+        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: 1 });
+        expect(await fireEvent.keyDown(window, { code: 'ArrowDown' })).toBe(false);
+        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: -1 });
+    });
+
+    it('leaves arrow keys alone outside a timed pause', async () => {
+        render(Stopwatch);
+
+        expect(await fireEvent.keyDown(window, { code: 'ArrowUp' })).toBe(true);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('adjust_pause', expect.anything());
+    });
+
+    it('resets through Ctrl+R and stops handling shortcuts after unmount', async () => {
+        await loadFocus({ workElapsed: 60_000 });
+        tauri.stubCommandValue('reset_stopwatch', snapshot());
+        tauri.stubCommandValue('toggle_stopwatch', snapshot({ phase: 'running' }));
+        const { unmount } = render(Stopwatch);
+
+        expect(await fireEvent.keyDown(window, { code: 'KeyR', ctrlKey: true })).toBe(false);
+        await waitFor(() => { expect(stopwatchState.workMs).toBe(0); });
+        unmount();
+        expect(await fireEvent.keyDown(window, { code: 'Space' })).toBe(true);
+        expect(stopwatchState.running).toBe(false);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined);
+    });
+});

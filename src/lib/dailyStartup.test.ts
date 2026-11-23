@@ -67,4 +67,13 @@ describe('claimFirstOpenOfDay', () => {
         expect(claimed).toBe(false);
         expect(tauri.invoke).not.toHaveBeenCalledWith('set_ui_state', expect.anything());
     });
+
+    it('does not claim the day when recording it fails', async () => {
+        tauri.stubCommandValue('get_ui_state', null);
+        tauri.stubCommand('set_ui_state', () => Promise.reject(new Error('offline')));
+
+        const claimed = await claimFirstOpenOfDay(new Date(2026, 10, 22, 9, 0));
+
+        expect(claimed).toBe(false);
+    });
 });

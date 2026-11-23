@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
     import { stopwatchState } from './engine.svelte';
     import StopwatchDisplay from './StopwatchDisplay.svelte';
     import ActiveTaskDisplay from './ActiveTaskDisplay.svelte';
@@ -32,10 +31,6 @@
         onBreakStatusChange?.(stopwatchState.isBreak);
     });
 
-    async function toggleStopwatch(): Promise<void> {
-        await stopwatchState.toggle();
-    }
-
     // P toggles the timed pause; arrow keys resize an active pause by a minute.
     function handlePauseKey(e: KeyboardEvent): boolean {
         if (e.code === "KeyP") {
@@ -67,7 +62,7 @@
 
         if (e.code === "Space") {
             e.preventDefault();
-            void toggleStopwatch();
+            void stopwatchState.toggle();
             return;
         }
 
@@ -77,20 +72,15 @@
         }
     }
 
-    onMount(() => {
-        window.addEventListener('keydown', handleKeydown);
-    });
-
-    onDestroy(() => {
-        window.removeEventListener('keydown', handleKeydown);
-    });
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <section class="stopwatch-hero">
     <div class="stopwatch-stage" style="position: relative;">
         <StopwatchDisplay
             engine={stopwatchState}
-            onToggle={() => { void toggleStopwatch(); }}
+            onToggle={() => { void stopwatchState.toggle(); }}
         />
 
         <ActiveTaskDisplay activeTask={activeTask} label={stopwatchState.label} />

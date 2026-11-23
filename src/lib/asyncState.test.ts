@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/svelte';
-import { createDebouncedWriter, createDebouncer, createStaleGuard } from './asyncState.svelte';
+import { createDebouncer, createStaleGuard } from './asyncState.svelte';
 import HydrateHarness from './hydrateOnceHarness.svelte';
 
 describe('hydrateOnce', () => {
@@ -69,17 +69,11 @@ describe('createDebouncer', () => {
         vi.advanceTimersByTime(10);
         expect(run).not.toHaveBeenCalled();
     });
-});
-
-describe('createDebouncedWriter', () => {
-    afterEach(() => {
-        vi.useRealTimers();
-    });
 
     it('coalesces rapid schedules into a single write of the latest value', () => {
         vi.useFakeTimers();
         const write = vi.fn();
-        const writer = createDebouncedWriter(write, 10);
+        const writer = createDebouncer(write, 10);
 
         writer.schedule(1);
         writer.schedule(2);
@@ -94,7 +88,7 @@ describe('createDebouncedWriter', () => {
     it('flushes a pending write immediately without a second write later', () => {
         vi.useFakeTimers();
         const write = vi.fn();
-        const writer = createDebouncedWriter(write, 10);
+        const writer = createDebouncer(write, 10);
 
         writer.schedule(7);
         writer.flush();
@@ -106,7 +100,7 @@ describe('createDebouncedWriter', () => {
 
     it('does nothing when flushed with no pending write', () => {
         const write = vi.fn();
-        const writer = createDebouncedWriter(write, 10);
+        const writer = createDebouncer(write, 10);
 
         writer.flush();
 

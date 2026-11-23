@@ -1,6 +1,6 @@
 import { onDestroy, untrack } from 'svelte';
 import { safeInvoke } from './safeInvoke.svelte';
-import { createDebouncedWriter, hydrateOnce } from './asyncState.svelte';
+import { createDebouncer, hydrateOnce } from './asyncState.svelte';
 
 /**
  * Keys for per-component UI state persisted in the backend `ui-state.json` via
@@ -47,10 +47,11 @@ interface PersistStateOptions {
  * Keeps a reactive value in sync with the backend `ui_state` store.
  *
  * The stored value is read once on mount and written back (debounced) whenever
- * `read()` changes. While hydration is in flight writes are suppressed so a
- * slow read cannot clobber a faster user edit. Unchanged values — including the
- * component fallback — are never written, so untouched defaults stay current
- * with the code and no redundant saves occur.
+ * `read()` changes. Writes are suppressed while hydration is in flight; if the
+ * user edits in that window the local value wins and is saved instead of being
+ * overwritten by the stored value. Unchanged values — including the component
+ * fallback — are never written, so untouched defaults stay current with the
+ * code and no redundant saves occur.
  *
  * @param key Backend `ui_state` key
  * @param read Reads the current reactive value
@@ -66,7 +67,7 @@ export function persistState<T>(
     const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     let hydrated = $state(false);
     let saved = '';
-    const writer = createDebouncedWriter<T>((value) => {
+    const writer = createDebouncer<T>((value) => {
         saved = serialize(value);
         saveSetting(key, value);
     }, debounceMs);
@@ -79,7 +80,10 @@ export function persistState<T>(
         },
         (stored) => {
             const present = stored !== null && stored !== undefined;
-            if (present && (options.isValid?.(stored) ?? true)) {
+            const editedLocally = serialize($state.snapshot(read()) as T) !== fallback;
+            if (editedLocally) {
+                saved = fallback;
+            } else if (present && (options.isValid?.(stored) ?? true)) {
                 write(stored as T);
                 saved = serialize(stored);
             } else {

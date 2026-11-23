@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, untrack } from 'svelte';
-    import { createDebouncedWriter } from '../../lib/asyncState.svelte';
+    import { createDebouncer } from '../../lib/asyncState.svelte';
 
     interface Props {
         value: string;
@@ -13,7 +13,7 @@
     let localValue = $state(untrack(() => value));
     let focused = $state(false);
 
-    const writer = createDebouncedWriter<string>((next) => onchange(next), 400);
+    const writer = createDebouncer<string>((next) => onchange(next), 400);
 
     $effect(() => {
         if (!focused && value !== localValue) localValue = value;

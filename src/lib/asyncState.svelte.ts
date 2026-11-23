@@ -86,26 +86,6 @@ export function createDebouncer<T>(
     return { schedule, flush, cancel };
 }
 
-export interface DebouncedWriter<T> {
-    /** Replaces the pending value and restarts the debounce timer. */
-    schedule: (value: T) => void;
-    /** Writes the pending value immediately, or does nothing when none is pending. */
-    flush: () => void;
-}
-
-/**
- * Coalesces rapid writes into a single debounced write.
- *
- * Register `flush` with `onDestroy` so a pending write is not lost on teardown.
- */
-export function createDebouncedWriter<T>(
-    write: (value: T) => void,
-    debounceMs: number,
-): DebouncedWriter<T> {
-    const debouncer = createDebouncer(write, debounceMs);
-    return { schedule: debouncer.schedule, flush: debouncer.flush };
-}
-
 /**
  * Hydrates once from an async loader on mount.
  *
