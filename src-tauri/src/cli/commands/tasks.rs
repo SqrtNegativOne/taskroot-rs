@@ -2,12 +2,12 @@
 
 use chrono::{SecondsFormat, Utc};
 
-use crate::features::calendar::CalendarComponent;
-use crate::features::calendar::{
-    AppTask, AppTaskStatus, CollectionId, TaskId, TaskPriority,
-};
 use crate::error::AppError;
+use crate::features::calendar::CalendarComponent;
 use crate::features::calendar::{ops, query};
+use crate::features::calendar::{
+    AppTask, AppTaskStatus, CollectionId, FilterGroup, TaskId, TaskPriority,
+};
 
 use super::super::args::Cli;
 use super::super::output::print_json;
@@ -20,7 +20,8 @@ use super::{find_task, require_component, resolve_list};
 pub async fn list_tasks(cli: &Cli) -> Result<(), AppError> {
     let session = open().await?;
     let search = cli.option("search").unwrap_or_default();
-    let mut tasks = query::query_tasks(&session.store.tasks(), &[], &[], search);
+    let mut tasks =
+        query::query_tasks(&session.store.tasks(), &FilterGroup::default(), &[], search);
 
     if let Some(status) = cli.option("status") {
         let wanted = parse_task_status(status)?;

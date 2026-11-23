@@ -2,6 +2,62 @@ use serde::{Deserialize, Serialize};
 
 use ts_rs::TS;
 
+#[cfg(test)]
+mod tests;
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/LogicalOperator.generated.ts"
+)]
+pub enum LogicalOperator {
+    #[default]
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/bindings/FilterGroup.generated.ts")]
+pub struct FilterGroup<F> {
+    pub operator: LogicalOperator,
+    pub children: Vec<FilterNode<F>>,
+}
+
+impl<F> Default for FilterGroup<F> {
+    fn default() -> Self {
+        Self {
+            operator: LogicalOperator::And,
+            children: Vec::new(),
+        }
+    }
+}
+
+impl<F> From<Vec<F>> for FilterGroup<F> {
+    fn from(filters: Vec<F>) -> Self {
+        Self {
+            operator: LogicalOperator::And,
+            children: filters
+                .into_iter()
+                .map(|filter| FilterNode::Condition { filter })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+#[ts(export, export_to = "../../src/lib/bindings/FilterNode.generated.ts")]
+pub enum FilterNode<F> {
+    Condition {
+        filter: F,
+    },
+    Group {
+        operator: LogicalOperator,
+        children: Vec<Self>,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/FilterType.generated.ts")]
 pub enum FilterType {

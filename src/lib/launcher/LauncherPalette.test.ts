@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
+import { emptyFilterGroup, filterGroup } from '../domain';
 import { ymd } from '../time';
 import LauncherPalette from './LauncherPalette.svelte';
 
@@ -69,12 +70,12 @@ describe('LauncherPalette', () => {
         await waitFor(() => {
             expect(tauri.invoke).toHaveBeenCalledWith(
                 'query_event_instances',
-                expect.objectContaining({ startDate: today, endDate: today }),
+                expect.objectContaining({ startDate: today, endDate: today, filters: emptyFilterGroup() }),
             );
         });
         expect(tauri.invoke).toHaveBeenCalledWith(
             'query_tasks',
-            expect.objectContaining({ query: '' }),
+            { filters: filterGroup([{ column: 'status', operator: 'is not', value: ['done'] }]), sort: [], query: '' },
         );
     });
 

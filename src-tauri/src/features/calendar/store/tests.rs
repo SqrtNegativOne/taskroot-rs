@@ -3,6 +3,7 @@
 use super::model::Store;
 use super::persist;
 use super::query;
+use crate::features::calendar::domain::FilterGroup;
 use crate::features::calendar::domain::{
     AppTask, AppTaskFilter, AppTaskFilterColumn, EventScope, FilterOperator, TaskId, TaskPriority,
 };
@@ -457,11 +458,11 @@ fn priority_filter_compares_the_numeric_bucket() {
     ];
     let filtered = query::query_tasks(
         &tasks,
-        &[AppTaskFilter {
+        &FilterGroup::from(vec![AppTaskFilter {
             column: Some(AppTaskFilterColumn::Priority),
             operator: Some(FilterOperator::Is),
             value: Some(json!([4])),
-        }],
+        }]),
         &[],
         "",
     );
@@ -475,11 +476,11 @@ fn empty_filter_values_do_not_match_anything() {
     let tasks = vec![task("a", "Alpha", TaskPriority::Medium)];
     let filtered = query::query_tasks(
         &tasks,
-        &[AppTaskFilter {
+        &FilterGroup::from(vec![AppTaskFilter {
             column: Some(AppTaskFilterColumn::Status),
             operator: Some(FilterOperator::IsNot),
             value: Some(json!([])),
-        }],
+        }]),
         &[],
         "",
     );

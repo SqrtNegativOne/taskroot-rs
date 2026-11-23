@@ -52,7 +52,14 @@ async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() 
 async fn ui_state_round_trips_and_is_absent_until_written() {
     let dir = tempfile::tempdir().unwrap();
     let state = StoreState::new(Store::load(dir.path().to_path_buf()));
-    let stored = json!([{ "column": "status", "value": ["done"] }]);
+    let stored = json!({
+        "operator": "and", "children": [{
+            "kind": "group", "operator": "or", "children": [
+                { "kind": "condition", "filter": { "column": "status", "operator": "is", "value": ["todo"] } },
+                { "kind": "condition", "filter": { "column": "status", "operator": "is", "value": ["next-up"] } }
+            ]
+        }]
+    });
 
     assert_eq!(
         storage::read_ui_state(&state, "ui.task_list.filters")

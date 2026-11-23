@@ -3,8 +3,8 @@
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
     import { PIXELS_PER_HOUR, PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
-    import type { EventInstance, AppCalendar, AppEventFilter } from '../../../lib/domain';
-    import { calendarsForComponent, isEventReadOnly } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup } from '../../../lib/domain';
+    import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineControls from './components/TimelineControls.svelte';
@@ -72,7 +72,7 @@
         void store.mutate('Failed to update task', () => store.toggleTask(taskId));
     }
 
-    let eventFilters = $state<AppEventFilter[]>([]);
+    let eventFilters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
     let eventQuery = $state('');
     let timelineDate = $state(new Date());
     let today = $state(new Date());
@@ -89,7 +89,7 @@
         timelineKeys.filters,
         () => eventFilters,
         (stored) => { eventFilters = stored; },
-        { isValid: Array.isArray },
+        { isValid: isEventFilterGroup },
     );
     persistState(
         timelineKeys.numDays,

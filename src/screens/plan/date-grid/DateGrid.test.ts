@@ -4,6 +4,7 @@ import { mockTauriInvoke } from '../../../test/tauriMock';
 import { makeInstance, makeTaskDateInstance } from '../../../test/factories';
 import { addDays, startOfWeek, ymd } from '../../../lib/time';
 import { persistedKeys } from '../../../lib/persisted.svelte';
+import { filterGroup } from '../../../lib/domain';
 import type { AppCalendar } from '../../../lib/domain';
 import DateGrid from './DateGrid.svelte';
 
@@ -99,7 +100,7 @@ describe('DateGrid visibility filters', () => {
 
     it('persists choices and restores them on remount without overwriting calendar filters', async () => {
         const stored = new Map<string, unknown>([
-            [persistedKeys.dateGridFilters, [{ column: 'remotecollectionid', operator: 'is', value: ['events'] }]],
+            [persistedKeys.dateGridFilters, filterGroup([{ column: 'remotecollectionid', operator: 'is', value: ['events'] }])],
         ]);
         tauri.stubCommand('get_ui_state', args => stored.get(String(args?.key)));
         tauri.stubCommand('set_ui_state', args => { stored.set(String(args?.key), args?.value); });

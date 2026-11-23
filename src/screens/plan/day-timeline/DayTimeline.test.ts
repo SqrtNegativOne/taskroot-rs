@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { filterGroup } from '../../../lib/domain';
+import type { AppEventFilter, FilterGroup } from '../../../lib/domain';
+import { persistedKeys } from '../../../lib/persisted.svelte';
 import { mockTauriInvoke } from '../../../test/tauriMock';
 import DayTimeline from './DayTimeline.svelte';
 
@@ -72,5 +75,35 @@ describe('DayTimeline day headers', () => {
         scroller.dispatchEvent(new Event('scrollend'));
 
         expect(scroller.scrollLeft).toBe(200);
+    });
+});
+
+const nestedFilters: FilterGroup<AppEventFilter> = { operator: 'and', children: [
+    { kind: 'condition', filter: { column: 'remotecollectionid', operator: 'is', value: ['events'] } },
+    { kind: 'group', ...filterGroup<AppEventFilter>([
+        { column: 'status', operator: 'is', value: ['confirmed'] },
+        { column: 'status', operator: 'is', value: ['tentative'] },
+    ], 'or') },
+] };
+
+describe('DayTimeline nested filters', () => {
+    beforeEach(() => {
+        tauri.reset();
+        tauri.stubCommandValue('query_event_instances', []);
+        tauri.stubCommandValue('get_active_calendars', []);
+        tauri.stubCommandValue('list_tags', []);
+    });
+    afterEach(() => { cleanup(); });
+
+    it.each(['plan', 'sidebar'] as const)('restores, queries and saves a tree in the %s timeline', async variant => {
+        const key = variant === 'plan' ? persistedKeys.dayTimelineFilters : persistedKeys.sidebarTimelineFilters;
+        tauri.stubCommand('get_ui_state', args => args?.key === key ? nestedFilters : undefined);
+        const mounted = render(DayTimeline, { props: { variant } });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_event_instances', expect.objectContaining({ filters: nestedFilters })); });
+        await fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+        expect(screen.getAllByRole('combobox', { name: 'Group operator' })).toHaveLength(2);
+        await fireEvent.change(screen.getAllByRole('combobox', { name: 'Group operator' })[0]!, { target: { value: 'or' } });
+        mounted.unmount();
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('set_ui_state', { key, value: { ...nestedFilters, operator: 'or' } }); });
     });
 });

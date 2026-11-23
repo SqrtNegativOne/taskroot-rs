@@ -1,9 +1,11 @@
 //! Event verbs: list, add, remove.
 
-use crate::features::calendar::CalendarComponent;
-use crate::features::calendar::{AppEvent, CollectionId, EventId, EventScope, EventStatus};
 use crate::error::AppError;
-use crate::features::calendar::{ops, query};
+use crate::features::calendar::CalendarComponent;
+use crate::features::calendar::{ops, query_event_instances};
+use crate::features::calendar::{
+    AppEvent, CollectionId, EventId, EventScope, EventStatus, FilterGroup,
+};
 
 use super::super::args::Cli;
 use super::super::output::{plus_days, print_json, today};
@@ -16,13 +18,17 @@ use super::{require_component, resolve_list};
 pub async fn list_events(cli: &Cli) -> Result<(), AppError> {
     let session = open().await?;
     let search = cli.option("search").unwrap_or_default();
-    let events = query::query_events(&session.store.events(), &[], &[], search);
+    let events = session.store.events();
     let start = cli.option("start").map_or_else(today, ToString::to_string);
     let end = cli
         .option("end")
         .map_or_else(|| plus_days(14), ToString::to_string);
-    print_json(&crate::features::calendar::expand_event_instances(
-        &events, &start, &end,
+    print_json(&query_event_instances(
+        &events,
+        &FilterGroup::default(),
+        &[],
+        search,
+        Some((&start, &end)),
     ))
 }
 

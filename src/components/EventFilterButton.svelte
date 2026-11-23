@@ -1,17 +1,17 @@
 <script lang="ts">
-    import type { AppCalendar, AppEventFilter } from '../lib/domain';
-    import { calendarsForComponent } from '../lib/domain';
+    import type { AppCalendar, AppEventFilter, AppEventFilterColumn, FilterColumn, FilterGroup } from '../lib/domain';
+    import { calendarsForComponent, emptyFilterGroup } from '../lib/domain';
     import type { EventVisibility } from '../lib/eventVisibility';
     import FilterButton from './FilterButton.svelte';
 
     let {
-        filters = $bindable([]),
+        filters = $bindable(emptyFilterGroup<AppEventFilter>()),
         calendars,
         visibility = $bindable(),
         align = 'right',
         onOpenChange,
     }: {
-        filters?: AppEventFilter[];
+        filters?: FilterGroup<AppEventFilter>;
         calendars: AppCalendar[];
         visibility?: EventVisibility;
         align?: 'left' | 'right';
@@ -22,7 +22,7 @@
         .map(calendar => ({ label: calendar.summary || calendar.id, value: calendar.id })));
     const visibilityCount = $derived(Number(visibility?.hideFrequentRecurring ?? false) + Number(visibility?.hideTimed ?? false));
 
-    const filterColumns = [
+    const filterColumns: FilterColumn<AppEventFilterColumn>[] = [
         { id: 'remotecollectionid', label: 'Calendar' },
         { id: 'title', label: 'Title' },
         { id: 'status', label: 'Status' },

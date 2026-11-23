@@ -9,7 +9,8 @@
     import { eventInstances } from '$lib/queries';
     import { createDebouncer, createStaleGuard } from '$lib/asyncState.svelte';
     import { addDays, formatHhMm, minutesSinceMidnight, parseLocalYmd, sameDay, ymd } from '$lib/time';
-    import type { AppTask, AppTaskFilter, EventInstance, QuickCapturePreview } from '$lib/domain';
+    import type { AppTask, AppTaskFilter, EventInstance, FilterGroup, QuickCapturePreview } from '$lib/domain';
+    import { emptyFilterGroup, filterGroup } from '$lib/domain';
 
     const PARSE_DEBOUNCE_MS = 160;
 
@@ -17,9 +18,9 @@
     const todayIso = ymd(today);
     const todayRange = { startDate: todayIso, endDate: todayIso };
 
-    const OPEN_TASK_FILTERS: AppTaskFilter[] = [
+    const OPEN_TASK_FILTERS: FilterGroup<AppTaskFilter> = filterGroup([
         { column: 'status', operator: 'is not', value: ['done'] },
-    ];
+    ]);
 
     const ROUTE_COMMANDS: Record<string, string> = {
         home: Routes.HOME,
@@ -38,7 +39,7 @@
     const guard = createStaleGuard();
 
     const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
-        eventInstances(todayRange, [], ''),
+        eventInstances(todayRange, emptyFilterGroup(), ''),
     );
     const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({
         filters: OPEN_TASK_FILTERS,

@@ -5,6 +5,7 @@
     import { safeInvoke, useAutoQuery, useTauriQuery } from '../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import { useNow } from '../../lib/useNow.svelte';
+    import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
     import type { AppTask, AppTaskStatus } from '../../lib/domain';
@@ -117,7 +118,7 @@
     let allTasks = $derived(allTasksQuery.data ?? []);
 
     $effect(() => {
-        void allTasksQuery.execute({ filters: [], sort: [], query: '' });
+        void allTasksQuery.execute(allTasksQueryArgs());
     });
 
     let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });

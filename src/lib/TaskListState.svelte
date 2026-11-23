@@ -1,15 +1,16 @@
 <script lang="ts">
-    import type { AppTaskFilter, AppTaskSort } from './domain';
+    import type { AppTaskFilter, AppTaskSort, FilterGroup } from './domain';
+    import { isTaskFilterGroup } from './domain';
     import { persistState, persistedKeys } from './persisted.svelte';
     import { taskListState } from './taskList.svelte';
 
-    persistState<AppTaskFilter[]>(
+    persistState<FilterGroup<AppTaskFilter>>(
         persistedKeys.taskListFilters,
         () => taskListState.filters,
         (stored) => {
             taskListState.filters = stored;
         },
-        { isValid: Array.isArray },
+        { isValid: isTaskFilterGroup },
     );
 
     persistState<AppTaskSort[]>(

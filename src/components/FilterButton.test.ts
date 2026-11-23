@@ -29,7 +29,7 @@ async function openWithFilter() {
 }
 
 function operatorValues(): string[] {
-    const select = screen.getAllByRole('combobox')[1];
+    const select = screen.getByRole('combobox', { name: 'Filter operator' });
     if (!(select instanceof HTMLSelectElement)) throw new Error('operator select missing');
     return Array.from(select.options).map((option) => option.value);
 }
@@ -51,7 +51,7 @@ describe('FilterButton date columns', () => {
     it('falls back to equality operators for a text column', async () => {
         await openWithFilter();
 
-        const columnSelect = screen.getAllByRole('combobox')[0];
+        const columnSelect = screen.getByRole('combobox', { name: 'Filter property' });
         if (!(columnSelect instanceof HTMLSelectElement)) throw new Error('column select missing');
         await fireEvent.change(columnSelect, { target: { value: 'title' } });
 

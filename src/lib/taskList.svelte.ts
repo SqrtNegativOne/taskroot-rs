@@ -1,9 +1,10 @@
-import type { AppTaskFilter, AppTaskSort } from './domain';
+import type { AppTaskFilter, AppTaskSort, FilterGroup } from './domain';
+import { filterGroup, isTaskFilterGroup } from './domain';
 import { persistedKeys } from './persisted.svelte';
 import { safeInvoke } from './safeInvoke.svelte';
 
-export function defaultTaskListFilters(): AppTaskFilter[] {
-    return [{ column: 'status', operator: 'is not', value: ['done'] }];
+export function defaultTaskListFilters(): FilterGroup<AppTaskFilter> {
+    return filterGroup([{ column: 'status', operator: 'is not', value: ['done'] }]);
 }
 
 /**
@@ -21,7 +22,7 @@ export function taskListQueryArgs() {
 }
 
 function applyStoredFilters(value: unknown): void {
-    if (Array.isArray(value)) taskListState.filters = value as AppTaskFilter[];
+    taskListState.filters = isTaskFilterGroup(value) ? value : defaultTaskListFilters();
 }
 
 function applyStoredSort(value: unknown): void {

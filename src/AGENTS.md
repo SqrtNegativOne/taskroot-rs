@@ -1,53 +1,64 @@
-# Frontend Architecture & Rules
+# Frontend instructions
 
-This file contains rules specific to the Svelte 5 frontend of Taskroot. It supplements the root `AGENTS.md`.
+These rules supplement [the root guide](../AGENTS.md) for `src/`.
+Read [the frontend reference](../docs/frontend.md) for the affected feature and
+[testing setup](../docs/testing.md) when adding/reviewing tests.
 
-## Key Concepts
-- **Hydration Primitive**: `src/lib/asyncState.svelte.ts` holds the shared pieces for reading backend state into runes: `createStaleGuard` (only the latest of overlapping requests may apply its response), `createDebouncer` (coalesce delayed callbacks and writes with `flush`/`cancel`), and `hydrateOnce` (read once on mount, skipping a response that is no longer current). `persistState` is composed from these and `useTauriQuery` uses the stale guard and debouncer; when adding backend-backed reactive state, compose these rather than hand-rolling another flag/timer/request-id state machine.
-- **State Management**: Frontend state is managed using Svelte 5 Runes (`$state`, `$derived`, `$effect`, `$props`). The primary store is located in `src/lib/store.svelte.ts`, which syncs with the Rust backend via Tauri IPC (`invoke` wrapped in `safeInvoke`). User-triggered mutations run through `store.mutate(operation, action)`, which raises an error notification on failure; `store.error` is reserved for fatal load/bootstrap failures.
-- **Notifications**: `svelte-sonner` is the transient-toast channel. `src/lib/toast.ts` exports `notifyError(message)`, which calls `toast.custom` with the click-to-copy `CopyableToast` and `duration: Infinity`; `<Toaster richColors position="bottom-right" />` is mounted in `src/routes/+layout.svelte` in every window except `effect`. Report recoverable operation failures there, never through `store.error`.
-- **Persisted UI State**: Per-component UI state (filters, sorts, date-grid view, timeline day count, split-pane sizes, Do-screen section collapse) is persisted with the `persistState` rune (`src/lib/persisted.svelte.ts`) in `ui-state.json` via `set_ui_state`. It hydrates once from `get_ui_state` and debounce-saves via `set_ui_state`; while hydration is in flight, writes are suppressed, and only values that differ from the stored/fallback value are written. It is built on the shared primitives in `src/lib/asyncState.svelte.ts` (see Hydration Primitive above).
-- **Persistence Channels**: The Rust backend owns persistence so state survives a webview data reset and is shared across windows. Typed app settings are `AppSettings` fields written with `update_setting` (`settings.json`); arbitrary per-component UI state goes through `get_ui_state`/`set_ui_state` (`ui-state.json`). Calendar data is never cached in the frontend: it comes from the backend store, whose source of truth is the CalDAV server. `localStorage` is not used for user-facing state.
-- **Sidebar State**: The sidebar is a separate `sidebar` webview, so its state goes through the shared backend. `src/screens/sidebar/state.svelte.ts` (`createSidebarState`) persists the tab position, notes and notes-pane visibility under `ui.sidebar.*` in `ui-state.json`. Notes/visibility write back through `persistState`; `saveTabTop` persists a finished drag.
-- **Backend Source of Truth**: The frontend relies strictly on the Rust store as the source of truth. It avoids complex optimistic patching arrays locally. Mutations return `neverthrow` `Result`s, `await` the backend command (which `PUT`s to CalDAV), then emit `store-updated` so live queries re-fetch. If the server write fails the command fails and the frontend keeps the previous state; wrap the call in `store.mutate` so the failure becomes a toast.
-- **Local-Date Rule**: All day bucketing/comparison must go through `src/lib/time.ts` (`ymd`, `parseLocalYmd`, `formatHhMm`, `startOfWeek`, `startOfMonth`, `getWeekNumber`, `isoWeeksInYear`, `isoWeekYear`, `addDays`, `dayDiff`, `sameDay`, `MS_PER_MINUTE`), which operate on local date parts. `Date.toISOString()` is UTC-shifted and must not be used to derive a calendar day.
-- **Event Instance Projection**: Render surfaces (`DateGrid`, `DayCell`, `DayTimeline`, `bucketing.ts`, `EventBlock`) consume `EventInstance` (from `query_event_instances`), never raw `AppEvent` wire strings. All-day vs timed is discriminated via `event.timing.kind`; day membership goes through `src/lib/domain/timing.ts` (`instanceOccursOnDay`). All-day events compare floating `YYYY-MM-DD` strings; timed events compare UTC instants against system-local wall-clock `d`..`d+1` boundaries, so 23/25-hour DST days stay exact. `occurrenceKey` is the per-occurrence identity used for list keys; `occurrenceStart` is what a mutation sends back so the backend can target that one occurrence. Recurrence scopes (`this`/`following`/`all`) are resolved in Rust — never compose `EXDATE`/`RRULE` text in a component.
-- **Task Date Markers**: The date grid also shows task `start`/`due` markers from `query_task_dates` (`TaskDateInstance`, one per date, so a task with both dates appears twice). Day membership goes through `taskDateOccursOnDay`; a date-only marker is a floating date and a timed marker compares its UTC instant to the local day, matching events. Markers are read-only in the grid: clicking one opens the task inspector, and they never take part in event drag/reschedule. `DateGrid` colours them by the task's `VTODO` collection.
-- **Launcher Quick Capture**: The `launcher` window renders `src/lib/launcher/LauncherPalette.svelte` (not a route page). It queries today's agenda with `query_event_instances`/`query_tasks`, debounces `parse_quick_capture` for the preview, then builds an `AppTask` from the preview and creates it through `store.mutate(... store.addTask)` (the existing `create_task` command). Enter on a `home`/`plan`/`do`/`tags`/`settings` word emits `LAUNCHER_NAVIGATE`, which the main window's `+layout.svelte` consumes. Sigil and date parsing stay in Rust; never re-implement it in the component.
-- **Timeline Geometry**: `screens/plan/day-timeline/day-timeline.css` owns horizontal positioning for event blocks and creation previews. `DayColumn` supplies the inherited `--day-label-offset` (time-label gutter in the first column, zero otherwise); `EventBlock` supplies `--event-lane`/`--event-lanes`. Each lane reserves a 24px right-side strip for pointer creation. Grid lines and drop previews consume the same gutter variable. Event borders are left accents only, including ghost/floating/read-only states.
-- **Recurrence Detection**: `lib/domain/events.ts` owns `isRecurring` for raw `AppEvent` rows. Rust serializes absent recurrence fields as `null`, so the predicate accepts both `null` and `undefined`; only a present rule or series id opens the inspector's recurring-delete scope prompt.
-- **Date-Grid Visibility**: `lib/eventVisibility.ts` owns typed `hideFrequentRecurring`/`hideTimed` choices and their validation. `DateGrid` persists them under `ui.date_grid.visibility`, separately from backend calendar filters, and filters projected `EventInstance`s before inline bucketing and span layout. "Frequently recurring" means the series repeats at least weekly (`FREQ` of `SECONDLY`/`MINUTELY`/`HOURLY`/`DAILY`/`WEEKLY`, regardless of `INTERVAL`), read from `instance.rrule`; monthly and yearly series stay visible. Moved exceptions inherit the master rule from the backend. Timed status uses `instance.timing.kind`. Do not pre-filter raw series rows, which can break exception suppression. Both choices default off, remain grid-only, and do not hide task date markers.
-- **Date-Grid Dates**: `screens/plan/date-grid/dates.ts` builds the displayed cells and inclusive backend query range from one set of dates for every view. Navigation uses `lib/time.ts`'s `addMonths` for month views so an end-of-month anchor cannot skip a short month.
-- **Spanning All-Day Events**: `src/screens/plan/date-grid/spanLayout.ts` decides which instances span (`isMultiDayAllDay`) and packs their week-clipped segments into lanes (`layoutWeekSpans`). `DateGrid` renders one bar per week above the cells and sets `--span-lanes` so each `DayCell`'s event list reserves the band; single-day all-day and timed events stay inline.
-- **Filter/Sort Menus**: `FilterButton.svelte` and `SortButton.svelte` share the shell through `components/FloatingMenu.svelte` (bits-ui `Popover`: trigger with a stable accessible name, badge, positioning, Escape/outside-close, add-row action) and `components/FilterSortRow.svelte` (row layout, drag handle, remove button). `EventFilterButton.svelte` shares the grid/timeline calendar-column configuration and offers optional visibility checkboxes through `FilterButton`'s `extraFilters` snippet and `extraFilterCount`; task-list columns remain supplied by the task pane. The tags column always uses the shared multi-select fed by the backend `list_tags` command (every distinct tag in the store), rather than free-form text. Columns carrying `filter_type = "date"` (`start`, `due`, `added`) expose `before`/`after`/`on or before`/`on or after` in addition to `is`/`is not`, and their value accepts `YYYY-MM-DD` or the relative keywords `today`/`tomorrow`/`yesterday`. Sort rows reorder with native HTML5 drag events (`dragstart`/`dragover`/`drop` on the row, started from its handle), which relies on `dragDropEnabled: false` in `tauri.conf.json` (see the root `AGENTS.md` -> Multi-Window Architecture).
-- **Grid Drag & Drop**: `src/screens/plan/hooks/eventDrag.svelte.ts` owns the pointer gesture for dragging date-grid instances; it hit-tests `[data-drop-kind]` elements (`grid-day` cells and `day-time` columns) and stores the target in the shared `dragState` so `DayCell`/`DropPreview` can highlight it. `src/screens/plan/date-grid/dropPayload.ts` is the pure payload seam: a `grid-day` drop shifts the date (all-day stays all-day, timed keeps local time-of-day and duration), a `day-time` drop places the instance at a snapped minute (timed keeps duration, all-day defaults to 1 hour). Drops persist through `store.mutate(...)` wrapping `store.rescheduleEvent(id, startTime, endTime, isAllDay, scope, occurrenceStart)` → `reschedule_event`. A recurring instance first opens `RecurringActionModal` (`this`/`all`; the backend refuses a `following` move), so a drag never silently shifts the whole series. `src/screens/plan/hooks/taskDrag.svelte.ts` shares the same pointer pipeline: dropping a task row on a `grid-day` cell sets the task's `start` to that date (date-only), while dropping it on a `day-time` column still creates a linked event at the snapped minute.
+## Svelte and TypeScript
 
-## Testing
-Unit tests run under Vitest in a `jsdom` environment (`bun run test:unit`); component tests use `@testing-library/svelte`. Tests live next to the code as `*.test.ts` (`src/**/*.{test,spec}.{js,ts}`) and shared test utilities live in `src/test/`.
+- Use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`), not legacy `$:`
+  or `export let` reactivity.
+- Wrap intentional one-time prop reads that seed state in `untrack`, e.g.
+  `$state(untrack(() => defaultSize))`. Do not suppress
+  `state_referenced_locally` to hide the issue.
+- Preserve end-to-end types; do not use `any`, casts through `unknown` or loose
+  records as lint/compiler escapes. Refactor generic components properly when
+  needed rather than patching away type safety.
+- Use `Routes` from `src/lib/routes.ts` for route paths.
+- The three pointer-UI a11y warning filters belong in `svelte.config.js`
+  (`a11y_autofocus`, `a11y_click_events_have_key_events`,
+  `a11y_no_static_element_interactions`), not per-node `svelte-ignore` comments.
 
-- **Domain fixtures**: Build `AppEvent` and `EventInstance` fixtures with `makeEvent`/`makeInstance` from `src/test/factories.ts` instead of hand-written literals; pass partial overrides, including a partial nested `timing` object.
-- **Browser Svelte build**: `vite.config.js` sets `resolve.conditions: ['browser']` when `process.env.VITEST` is set. Without it, Vitest resolves Svelte's server build under the default node condition and mounting a component fails. Do not remove that conditional.
-- **Tauri runtime globals**: `src/test/setup.ts` (registered via `test.setupFiles` in `vite.config.js`) calls `installTauriGlobals()` before each test file loads, installing `window.__TAURI_INTERNALS__` and `window.__TAURI_EVENT_PLUGIN_INTERNALS__`. `@tauri-apps/api/event` is externalized under Vitest and bypasses the mocked `invoke`, so do not re-add per-test globals for it.
-- **Mocking Tauri IPC**: `src/test/tauriMock.ts` exports `mockTauriInvoke()`, the process-wide `invoke` mock shared by the test and the module factory. Keep the `vi.mock('@tauri-apps/api/core', ...)` call at the top level of the test file so Vitest can hoist it, and hand off through the factory:
-  ```ts
-  vi.mock('@tauri-apps/api/core', async () => {
-      const { mockTauriInvoke } = await import('../test/tauriMock');
-      return { invoke: mockTauriInvoke().invoke };
-  });
+## State, queries and errors
 
-  const tauri = mockTauriInvoke();
-  ```
+- Use `safeInvoke`/`useTauriQuery`/`useAutoQuery` from `lib/safeInvoke.svelte.ts` and
+  `neverthrow` for expected IPC failures, not ordinary `try/catch`.
+- Wrap user-triggered calendar mutations in `store.mutate(operation, action)`.
+  Recoverable failures go through `notifyError`/copyable toasts; `store.error`
+  is for fatal load/bootstrap failures only.
+- Await backend writes, then let `STORE_UPDATED` trigger re-querying. Do not
+  optimistically patch local calendar arrays or cache them in localStorage.
+- App settings use `update_setting`/`settings.json`; component state uses
+  `persistState`/`ui-state.json`. Reuse the stale guard, debouncer and hydration
+  primitives in `lib/asyncState.svelte.ts` instead of duplicating timer/request
+  state machines. Use `lib/useNow.svelte.ts` instead of ad-hoc clock loops.
+- Reuse `lib/queries.ts` argument builders. They centralize argument shapes,
+  **not command names**, and are not fully followed by the IPC source scan.
+- Shared task-list filters/sorts live in `lib/taskList.svelte.ts`; do not create
+  separate definitions for the plan pane, Do screen or mini tracker.
 
-  Register behaviour with `tauri.stubCommand(cmd, (args) => ...)` or `tauri.stubCommandValue(cmd, value)`; unregistered commands resolve to `undefined`. Clear state with `tauri.reset()` in `beforeEach`. Assert directly on `tauri.invoke` (e.g. `toHaveBeenCalledWith`).
-- **Cleanup**: Vitest is not configured with `globals: true`, so `@testing-library/svelte`'s automatic `afterEach(cleanup)` never registers. Every component test must import `afterEach` from `vitest` and call `cleanup()` explicitly.
-- **Component harnesses**: Prefer mocking the backend over mounting a full screen. A tiny harness `.svelte` component (see `src/lib/persistedHarness.svelte`) is warranted when the behaviour under test is driven by a rune or lifecycle hook rather than markup, since a rune cannot be exercised from a plain `.ts` test.
-- **Browser Geometry**: `tests/e2e/day-timeline.spec.ts` uses DOM-only stylesheet fixtures and Chromium bounding boxes/hit-testing to verify event gutters and accent-only borders; it does not capture screenshots or launch the desktop app.
-- Do not add coverage thresholds.
+## Calendar and interaction invariants
 
-## Style & Idioms
-- **Svelte 5 Idioms**: Strictly use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`) instead of legacy Svelte 4 reactivity (`let foo = ...`, `$:`, `export let`).
-- **One-Time Prop Reads**: When a prop is read once to seed local `$state` (e.g. `defaultSize`, `persistKey`, `defaultOpen`), wrap it in `untrack`: `let size = $state(untrack(() => defaultSize))`. This documents the intent and silences Svelte's `state_referenced_locally` warning. Do not use `// svelte-ignore state_referenced_locally` for this.
-- **A11y Warning Policy**: This is a single-user, pointer-driven desktop app. The `a11y_autofocus`, `a11y_click_events_have_key_events` and `a11y_no_static_element_interactions` compiler warnings are disabled once in `svelte.config.js` (`compilerOptions.warningFilter`). Do not add per-node `svelte-ignore` comments for them.
-- **Typescript Idioms**: Strongly type your code. Never use `any`, `unknown` casts, or loose interfaces (like `Record<string, unknown>`) as quick hacks to bypass ESLint, Oxlint, or TypeScript compiler errors. If fixing a type warning requires a larger architectural change—such as utilizing Svelte 5 component `generics="T"` to preserve end-to-end type safety for generic UI components—you must do the thorough refactor rather than applying a bandage solution.
-- **Frontend Error Handling (`neverthrow`)**: Use the `neverthrow` library to handle errors functionally on the frontend, mirroring the Rust backend's `Result` type. Do not use standard `try/catch` for expected errors. When calling Tauri's `invoke`, use the `safeInvoke` wrapper (or `useTauriQuery` rune) located in `src/lib/safeInvoke.svelte.ts` to ensure type-safe `ResultAsync` returns.
-- **Routing**: Never use magic strings for route paths (e.g., `goto('/login')`). Always import and use the centralized constants from `src/lib/routes.ts` (e.g., `goto(Routes.LOGIN)`).
+- Day bucketing/arithmetic uses `lib/time.ts`. Never derive a calendar day with
+  `Date.toISOString()` (it shifts to UTC); use month-safe `addMonths` navigation.
+- Render events/tasks through `EventInstance`/`TaskDateInstance` and
+  `lib/domain/timing.ts`'s day-membership helpers. All-day dates float; timed
+  instances use local day boundaries. Raw `AppEvent` rows are for editing.
+- Key events by `occurrenceKey`; send `occurrenceStart` with scoped mutations.
+  Use `lib/domain/events.ts`'s `isRecurring` and `buildNewEvent`. Never construct
+  `EXDATE`/`RRULE`/ICS text in components.
+- Grid visibility filters operate on projected instances before bucketing **and**
+  span layout, never on raw recurrence context. Task date markers are
+  non-draggable but allow completion toggles; task-list-row dragging is separate.
+- Reuse the shared event colors, timeline CSS geometry, snapping/duration helpers
+  and pointer gesture registry; retain cancellation/teardown safety.
+- Keep `dragDropEnabled: false` in Tauri config for in-page HTML5 sort-row drags
+  on Windows. It is separate from planning's pointer-based drag pipeline.
+- Recursive filter construction/validation belongs in `lib/domain/filterTree.ts`;
+  new-task default inference belongs in `lib/domain/filters.ts`. Invalid persisted
+  filter trees fall back to defaults without migration.
+- Launcher sigil/date parsing and recurring mutation scope stay in Rust.
+
+Run the frontend checks in the [root guide](../AGENTS.md#required-checks).
+For component tests, retain the shared Tauri mock/globals, Vitest browser
+resolution and explicit cleanup described in [testing](../docs/testing.md).

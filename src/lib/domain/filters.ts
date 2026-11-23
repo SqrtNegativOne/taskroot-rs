@@ -1,5 +1,8 @@
 import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
 import type { TaskPriority } from '../bindings/TaskPriority.generated';
+import type { FilterGroup } from '../bindings/FilterGroup.generated';
+import { emptyFilterGroup } from './filterTree';
+import { isAppTaskStatus } from './models';
 
 export interface FilterLike {
     readonly column?: string | null;
@@ -11,101 +14,73 @@ export interface FilterDefaults {
     status?: AppTaskStatus;
     priority?: TaskPriority;
     tags?: string[];
-    [key: string]: unknown;
 }
 
-const FALLBACKS: Record<string, readonly (string | number)[]> = {
-    status: ['todo', 'next-up', 'done', 'cancelled'],
-    priority: [1, 2, 3, 4, 0],
-};
+type FilterValue = string | number;
 
-function normalizeFilterValues(raw: unknown): readonly (string | number)[] {
-    if (raw === undefined || raw === null || raw === '') {
-        return [];
-    }
-    const arr = Array.isArray(raw) ? raw : [raw];
-    const result: (string | number)[] = [];
-    for (const item of arr) {
-        if (typeof item === 'string' || typeof item === 'number') {
-            result.push(item);
-        } else if (typeof item === 'object' && item !== null && 'name' in item) {
-            result.push(String((item as { readonly name: unknown }).name));
-        }
-    }
-    return result;
+function normalizeFilterValues(raw: unknown): FilterValue[] {
+    const values: unknown[] = Array.isArray(raw) ? raw : [raw];
+    return values.filter((value): value is FilterValue => (typeof value === 'string' && value !== '') || typeof value === 'number');
 }
 
-function processFilterItem(
-    f: FilterLike,
-    req: Record<string, Set<string | number>>,
-    excl: Record<string, Set<string | number>>,
-) {
-    if (!f.column) return;
-    const values = normalizeFilterValues(f.value);
-    if (values.length === 0) return;
-
-    const col = f.column === 'tag' ? 'tags' : f.column;
-    const isExclusion = f.operator === 'is not' || f.operator === 'does not contain';
-    const targetMap = isExclusion ? excl : req;
-
-    const set = targetMap[col] ?? new Set<string | number>();
-    targetMap[col] = set;
-    for (const val of values) {
-        set.add(val);
-    }
+function filterKey(filter: FilterLike): string {
+    return JSON.stringify([filter.column, filter.operator ?? 'is', normalizeFilterValues(filter.value).map(String).sort()]);
 }
 
-function processSingleValueCol(
-    col: string,
-    reqCol: Set<string | number> | undefined,
-    exclCol: Set<string | number> | undefined,
-    defaults: FilterDefaults,
-) {
-    if (reqCol?.size === 1) {
-        const val = Array.from(reqCol)[0];
-        if (val !== undefined && (!exclCol || !exclCol.has(val))) {
-            defaults[col] = val as never;
-        }
-        return;
-    }
-
-    const fallbacks = FALLBACKS[col];
-    if (!exclCol || !fallbacks) {
-        return;
-    }
-
-    for (const fallback of fallbacks) {
-        if (!exclCol.has(fallback)) {
-            defaults[col] = fallback as never;
-            return;
-        }
-    }
+function requiredConditions(group: FilterGroup<FilterLike>): FilterLike[] | undefined {
+    const branches = group.children.map(child => {
+        if (child.kind === 'group') return requiredConditions(child);
+        return child.filter.column && normalizeFilterValues(child.filter.value).length > 0 ? [child.filter] : undefined;
+    }).filter((branch): branch is FilterLike[] => branch !== undefined);
+    const first = branches[0];
+    if (!first) return undefined;
+    if (group.operator === 'and') return branches.flat();
+    return first.filter(filter => branches.every(branch => branch.some(candidate => filterKey(candidate) === filterKey(filter))));
 }
 
-export function computeFilterDefaults(filters: readonly FilterLike[] = []): FilterDefaults {
-    const req: Record<string, Set<string | number>> = {};
-    const excl: Record<string, Set<string | number>> = {};
+function parsePriority(value: FilterValue | undefined): TaskPriority | undefined {
+    if (typeof value === 'string' && !/^[0-4]$/.test(value)) return undefined;
+    const priority = typeof value === 'string' ? Number(value) : value;
+    if (priority === 0 || priority === 1 || priority === 2 || priority === 3 || priority === 4) return priority;
+    return undefined;
+}
 
-    for (const f of filters) {
-        processFilterItem(f, req, excl);
+function singleValue(
+    required: Set<FilterValue> | undefined,
+    excluded: Set<FilterValue> | undefined,
+    fallbacks: readonly FilterValue[],
+): FilterValue | undefined {
+    if (required) {
+        const value = required.size === 1 ? [...required][0] : undefined;
+        return value !== undefined && !excluded?.has(value) ? value : undefined;
     }
+    return excluded ? fallbacks.find(value => !excluded.has(value)) : undefined;
+}
 
+function collectConstraints(group: FilterGroup<FilterLike>) {
+    const required = new Map<string, Set<FilterValue>>();
+    const excluded = new Map<string, Set<FilterValue>>();
+    for (const filter of requiredConditions(group) ?? []) {
+        if (!filter.column) continue;
+        const values = normalizeFilterValues(filter.value);
+        const target = filter.operator === 'is not' || filter.operator === 'does not contain' ? excluded : required;
+        const normalized = filter.column === 'priority'
+            ? values.map(parsePriority).filter((value): value is TaskPriority => value !== undefined)
+            : values;
+        target.set(filter.column, new Set([...(target.get(filter.column) ?? []), ...normalized]));
+    }
+    return { required, excluded };
+}
+
+/** Only infer constraints required by every OR branch, never flatten alternatives. */
+export function computeFilterDefaults(group: FilterGroup<FilterLike> = emptyFilterGroup()): FilterDefaults {
+    const { required, excluded } = collectConstraints(group);
     const defaults: FilterDefaults = {};
-    const singleValueCols = ['status', 'priority'];
-    for (const col of singleValueCols) {
-        processSingleValueCol(col, req[col], excl[col], defaults);
-    }
-
-    const reqTags = req['tags'];
-    if (reqTags) {
-        const exclTags = excl['tags'];
-        const validTags = Array.from(reqTags)
-            .filter((t) => !exclTags || !exclTags.has(t))
-            .map(String);
-        if (validTags.length > 0) {
-            defaults.tags = validTags;
-        }
-    }
-
+    const status = singleValue(required.get('status'), excluded.get('status'), ['todo', 'next-up', 'done', 'cancelled']);
+    if (isAppTaskStatus(status)) defaults.status = status;
+    const priority = parsePriority(singleValue(required.get('priority'), excluded.get('priority'), [1, 2, 3, 4, 0]));
+    if (priority !== undefined) defaults.priority = priority;
+    const tags = [...required.get('tags') ?? []].filter(tag => !excluded.get('tags')?.has(tag)).map(String);
+    if (tags.length > 0) defaults.tags = tags;
     return defaults;
 }

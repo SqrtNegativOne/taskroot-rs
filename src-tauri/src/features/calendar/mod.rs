@@ -7,6 +7,7 @@
 pub(crate) mod caldav;
 #[allow(unreachable_pub)]
 pub(crate) mod domain;
+mod event_query;
 #[allow(unreachable_pub)]
 pub(crate) mod ics;
 #[allow(unreachable_pub)]
@@ -29,6 +30,7 @@ pub use caldav::model::{CalendarComponent, CalendarInfo};
 pub use caldav::transport::HttpClient;
 pub use caldav::{account, calendars, connect, discovery};
 pub use domain::*;
+pub use event_query::query_event_instances;
 pub use ics::{
     create_event_resource, create_task_resource, delete_event_component, delete_task_component,
     read_event_resource, read_task_resource, write_event_resource, write_task_resource,

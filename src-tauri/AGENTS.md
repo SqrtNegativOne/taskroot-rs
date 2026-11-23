@@ -1,87 +1,81 @@
-# Backend Architecture & Rules
+# Backend instructions
 
-This file contains rules specific to the Tauri v2 Rust backend of Taskroot. It supplements the root `AGENTS.md`.
+These rules supplement [the root guide](../AGENTS.md) for `src-tauri/`.
+Read the affected [feature README](../docs/architecture.md#backend-entry-points),
+[CalDAV reference](../docs/caldav.md) or [testing reference](../docs/testing.md)
+before changing that seam. Paths below are relative to `src-tauri/src/`.
 
-## Layering
+## Dependency direction
 
-The backend is layered `bootstrap -> ipc -> features`, with `platform` below
-`ipc`. Dependencies point downward; `src-tauri/src/architecture_tests.rs`
-enforces the rules:
+- `bootstrap` composes IPC, platform and features; nothing should import it.
+- `ipc` adapts Tauri to platform/features. Features never import IPC/bootstrap.
+- `platform` owns the desktop shell and imports none of those layers.
+- `features::calendar` keeps its behavior Tauri-free at the source level (the
+  containing Cargo crate still depends on Tauri). Its session adapter belongs in
+  `ipc/session.rs`; stopwatch/reminders separate pure state/policy from adapters.
+- Prefer each feature's `mod.rs` façade/re-exports. Some internal modules are
+  crate-visible today; that does not authorize new upward dependencies.
+- The CLI uses the calendar feature/settings, not IPC or desktop-shell services.
+  `architecture_tests.rs` guards selected dependency edges; it is a source scan,
+  not a complete dependency proof.
 
-- `bootstrap` may import `ipc`, `platform` and `features`; nothing imports it.
-- `ipc` may import `platform` and `features`; no feature imports `ipc`.
-- `platform` imports none of them.
-- `features::calendar` has no Tauri dependency; Tauri adapters live in
-  `ipc/session.rs`. `features::stopwatch` and `features::reminders` split their
-  pure `state`/`policy` from their Tauri adapters.
+## Rust and command seams
 
-Each feature exposes one façade in its `mod.rs`; internal submodules are private
-to the feature.
+- Return typed `AppError`s from commands. Use idiomatic `Result`/`Option` handling;
+  production `unwrap`/`expect` are denied. Tests use the existing `clippy.toml`
+  allowances. Do not scatter equivalent allows around modules.
+- Use tagged enums, not `#[serde(untagged)]` (overlapping shapes can silently
+  deserialize into the wrong variant).
+- Keep command handlers thin: marshal arguments, resolve state/client and
+  delegate. Protocol, merge, query and state-machine behavior belongs below IPC.
+  Small Tauri-specific orchestration belongs in IPC/session helpers, not calendar.
+- Register commands in `bootstrap/mod.rs` and update the relevant seam tests.
+  `ipc/tests.rs` checks literal names and recognized supplied keys; it does not
+  resolve argument builders/spreads or check omitted required keys. Do not claim
+  full runtime coverage from it. See [IPC testing limits](../docs/testing.md#ipc-source-contract-what-it-does-and-does-not-prove).
 
+## Calendar boundaries
 
-## Key Concepts
-- **Storage Channels**: `settings.json` holds one `AppSettings` object (`get_settings`/`update_setting`); `ui-state.json` is a flat map for per-component UI state (`get_ui_state`/`set_ui_state`); `account.json` holds the server URL, principal/home-set and discovered collections but no password. Calendar data is not cached on disk. A stored setting is merged only if it round-trips through its field's serde type, so a wrongly-typed value keeps the default instead of corrupting the struct; `update_setting` rejects a *known* key whose value fails that probe with `invalid-input` (unknown keys stay generic). `features/calendar/store/persist.rs` owns the JSON read/write and merge rule. `app_data_dir` (`platform/data_dir.rs`) falls back to `<exe dir>/dev-data` for debug builds whose app-data directory is unwritable (sandboxed dev runs), seeding the three files above; `TASKROOT_DATA_DIR` always wins. See the root `AGENTS.md` → Development Environment Notes.
-- **Setting Metadata**: `get_settings_schema` is generated from `#[setting(..)]` attributes on `AppSettings`. `#[derive(SettingsMeta)]` (`src-tauri/taskroot-macros`) emits `AppSettings::setting_metadata()`, and each `defaultValue` is read from `AppSettings::default()`. Add metadata next to the field; never re-add a hand-written `json!` schema.
-- **In-Memory Store**: `features::calendar::store::Store` maps every fetched resource href to `Resource { href, collection, etag, raw, items }`. `items` is `Vec<AppEvent>` or `Vec<AppTask>` according to the collection's `CalendarComponent`. Ids come from ICS content (`UID`, `UID@RECURRENCE-ID` for an exception), so a load needs no id lookup; `remote_id` is the href and `remote_collection_id` is the collection href. A new resource is created at `<collection>/<uid>.ics`. `StoreState` wraps the store in a `tokio::sync::Mutex`; commands lock it, merge and `PUT`.
-- **Startup & Refresh**: `ipc::session::load_all` reads `account.json`, re-reads the collection list with one `PROPFIND` of the stored calendar home (`features::calendar::caldav::discovery::refresh_collections`: 3 s timeout, cached list on failure, persisted with `account::write_account` when it changed), then calls `features::calendar::load::fetch_into`, which fetches every collection with one `calendar-query` each. The fetch runs without the store lock; the fetched snapshot is applied under the lock only if `Store::revision` did not change meanwhile, so an edit that landed during the load is not overwritten. It runs once at startup, after `connect_account`, and from the manual `refresh_data` command; a failed refresh leaves the previous resources in place. The startup load retries `AppError::Remote` failures every 2 s for 20 attempts, because the app is often launched before the local Radicale process is listening. There is no poller, no sync tokens and no offline fallback.
-- **Stopwatch State & History**: `features::stopwatch::state` is a pure phase machine (`paused`/`running`/`breaking`/`stopped`) behind a mutex; `features::stopwatch::history` appends each finished work/break segment to `stopwatch-history.json` in the data directory (malformed files move to `.bad`). The focus pointer (`taskId` + label + label source) persists separately in `stopwatch-focus.json` via `features::stopwatch::focus`, so the tracked task survives a restart while the clock starts paused; the task's VTODO status stays independent and is never written from the stopwatch. The manager is loaded in `bootstrap` from that directory, so history and focus survive restarts. Labels come from the mini tracker as `unset`, a task title, or a custom string.
-- **Focus Feed**: `features::stopwatch::feed` is an opt-in localhost HTTP server started by `bootstrap` when `focus_feed_enabled` is set. `GET /focus` returns a JSON snapshot and `GET /focus/events` an SSE stream; both are rebuilt every 500 ms from the stopwatch manager plus `StoreState` (live task title/tags/list, persisted label as fallback). `active` is true only while work is ticking. The server binds `127.0.0.1` only, has no auth and sends no CORS headers; the port change applies on restart. See `docs/focus-feed.md`.
-- **Event Normalization Boundary**: `features::calendar::domain::event_timing` owns the only conversion from stored `AppEvent` wall-clock/all-day strings to `EventTiming` (tagged `AllDay`/`Timed`) and `EventInstance`. Naive timed strings are resolved in `AppEvent.timezone` (fallback UTC) via `wall_clock_to_utc`, so timing stays DST-correct. `features::calendar::occurrences::expand_event_instances` consumes those plus the requested range to produce instances, honoring `occurrenceKey`-based exception suppression, all-day floating-date recurrence, and cancellation tombstones; it passes `AppEvent.exdates` to the rule engine, which is the single home of exclusion dates (`rrule` holds `RRULE` lines only). Timed recurrence is expanded in the event's zone (`DTSTART;TZID=…`), then each occurrence is converted to UTC for `EventInstance`. Never parse `start_time`/`end_time` in ipc handlers or consumers.
-- **Task Date Normalization Boundary**: `features::calendar::domain::task_timing` is the only place a task's `start`/`due` strings are interpreted. `TaskDateTiming::from_canonical` keeps a date-only value floating and resolves a timed wall clock in `AppTask.timezone` (fallback UTC) through the same `wall_clock_to_utc` as events. `features::calendar::task_dates::expand_task_dates` projects each non-empty date into a `TaskDateInstance` inside the shared `features::calendar::window::RenderWindow`; both projections use that window for local-date boundaries.
-- **Quick Capture**: `features::calendar::quick_capture::parse(input, today)` is pure and Tauri-free: it delegates sigils to `domain::sigil` and recognizes exactly one date/time phrase, returning a `QuickCaptureDraft` with canonical values. `ipc::quick_capture::parse_quick_capture` resolves the `+list` sigil (exact summary, then unique href prefix) against writable `VTODO` collections, falling back to `default_task_list` and then the first writable list; it returns `QuickCapturePreview` to the launcher window. There is no separate create command — the frontend builds the `AppTask` and calls `create_task`.
-- **ICS Read/Write Path**: `src-tauri/src/features/calendar/ics/` is the only CalDAV resource ↔ DTO boundary. `read_event_resource`/`read_task_resource` map a whole resource body with `icalendar`; `write_event_resource`/`write_task_resource` start from the fetched bytes and replace only the owned property lines (`SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`, `CATEGORIES`, `RRULE`, `EXDATE`, `STATUS`, `COLOR`, `X-TASKROOT-TASK-ID` for VEVENT; `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DUE`, `RRULE`, `STATUS`, `COMPLETED`, `PERCENT-COMPLETE`, `PRIORITY`, `CATEGORIES`, `GEO`, `RELATED-TO;RELTYPE=PARENT`, `RELATED-TO;RELTYPE=DEPENDS-ON`, `ESTIMATED-DURATION`, the retired `X-NEXT-UP`/`X-TASKROOT-STATUS`/`X-TASKROOT-DEPENDENCIES`/`X-TASKROOT-EST`/`X-TASKROOT-CANVAS-*`/`X-TASKROOT-ON-CANVAS`/`X-TASKROOT-TABS` lines (removed on the next write), `CREATED`, `LAST-MODIFIED`, `DTSTAMP` and each `VALARM`'s `TRIGGER` for VTODO), so `VTIMEZONE`, `ATTENDEE`, `X-MOZ-GENERATION`, `X-APPLE-SORT-ORDER`, `SEQUENCE`, `LOCATION` and unknown `X-*` survive verbatim. `lines.rs` tracks `BEGIN`/`END` depth, so a nested component's property lines belong to it and never to its parent (a `VALARM`'s `DESCRIPTION` is not the task's `DESCRIPTION`); nested components are matched by position and only rewritten when the DTO's list changed, which keeps alarms Taskroot cannot model byte-identical. `delete_*_component` returns `None` when no component remains, which means DELETE the resource. Nothing may serialize a DTO into a resource. Canonical value formats are documented on `ics::read`; event ids are `<UID>` for a master and `<UID>@<RECURRENCE-ID>` for an exception. `write_event_resource` inserts a missing VEVENT (used to append exceptions), but refuses to mix UIDs in one resource. `features::calendar::store::ops::update_task` refuses to complete a task whose `RRULE` is set: tasks.org completes one by rolling the series forward, so a plain `STATUS:COMPLETED` would end it.
-- **Calendar Write Path**: Every command edit is a read-modify-write of the stored raw resource. `ops::create_*` builds a new resource with `icalendar` and `PUT`s it with `If-None-Match: *`; `ops::update_*` merges into `resource.raw`, `PUT`s with `If-Match`, and on `412` re-fetches/re-merges/retries once (a second failure is returned, never swallowed). When the target collection changed, the new resource is `PUT` first and the old one deleted. Deletes use `DELETE`; `404` counts as success. A recurring event's edits take an `EventScope`: `ops::delete_event` and `ops::reschedule_event` resolve `this` (append `EXDATE` / write a `RECURRENCE-ID` exception), `following` (truncate `RRULE` before the occurrence via `features::calendar::domain::timing::truncate_before`, dropping later exceptions) and `all` (whole resource); the frontend passes the clicked `EventInstance::occurrence_start` and never builds rule text. `AppCalendar.writable` gates every write with `invalid-input`, and the frontend greys out read-only calendars. See `docs/caldav.md`.
-- **Read-Only Semantics**: A discovered collection carries `writable` from `current-user-privilege-set`; no local-only storage mode exists. `Store::default_calendar` picks the requested writable collection of the right component; without a request it uses the configured `default_task_list`/`default_event_list` when that href is a writable collection of the right component, otherwise the first writable one. The account gate (`is_account_configured`) is repurposed as "connect your CalDAV server".
+- Preserve the [I1–I3 ICS invariants](../docs/caldav.md#the-three-invariants).
+  `features/calendar/ics/` is the resource/DTO boundary. Merge edits into fetched
+  raw bytes; never rebuild an existing resource from a DTO. Preserve unknown
+  properties, nested components/alarms and sibling exceptions.
+- `store/ops` owns conditional writes and scoped mutations. Same-collection updates
+  retry conflicts once; moves/deletes currently do not. A move writes the
+  destination before deleting the source. Collection writability must gate writes,
+  but current source/delete checks have gaps; see [follow-ups](../docs/known-limitations.md).
+- Deletes may use `this`/`following`/`all`; recurring rescheduling supports
+  `this`/`all`. Do not silently treat a `following` move as a whole-series
+  move; the current `all` path also needs an exception-ID fix (see follow-ups).
+- Completing a recurring task is refused until roll-forward semantics are
+  implemented; do not end the shared master with plain `STATUS:COMPLETED`.
+- Event/task **render normalization** belongs in `domain/event_timing.rs` and
+  `domain/task_timing.rs`. Consumers use projected timing, not their own parsing
+  of raw start/end/due strings. ICS and scoped-write code still handle canonical
+  strings at their respective boundaries.
+- `event_query.rs` selects/sorts rows while preserving **all** masters/exceptions
+  as expansion context. Filters/search must not discard cancellation suppression
+  or inherited rules. `task_dates.rs` uses the same `RenderWindow` for task markers.
+- Empty/unfinished filter nodes are ignored, including inside OR. A tree with no
+  effective conditions is unfiltered; search is ANDed with it. Leaf multi-values
+  retain ANY inclusion / NONE exclusion semantics.
+- Loading fetches without the store lock, then applies under a revision guard.
+  Keep failed/stale snapshots from overwriting successful edits. Collection
+  mutations currently have revision-guard gaps (see follow-ups). There is no
+  background calendar sync or offline write fallback.
 
-## Command Testing
+## Settings and generated types
 
-Every `#[tauri::command]` handler is a **thin wrapper**, and the command layer is
-tested at the seam underneath it:
+- Settings metadata belongs beside `AppSettings` fields in `#[setting(..)]`,
+  not a hand-written JSON schema. Defaults come from `AppSettings::default()`.
+  See [adding a setting](../docs/architecture.md#adding-a-setting).
+- Keep typed settings separate from arbitrary UI-state keys. The current loader
+  defaults the whole object on invalid settings; known invalid updates are errors
+  and unknown update keys are ignored. Do not invent migration/merge behavior.
+- For shared Rust types, regenerate bindings with `cargo nextest run`; never edit
+  generated TS. Keep timestamp bindings as JS `number` with
+  `#[ts(type = "number")]`, not `bigint`.
 
-- A handler marshals its arguments, resolves `store_state(&app)` and/or `client_for(&app)` and delegates. Behaviour lives below the command layer: `features::calendar::store::ops` (load/create/update/delete), `features::calendar::store::query` (filter/sort/search), `features::calendar::store::persist` (JSON), `settings::storage`, `features::calendar::load`, or an `AppHandle`-based helper in `ipc::session`. Either way: no protocol or merge logic in a handler, and a new branch is a hint that the body wants a store-level function.
-- The store tests (`features/calendar/store/tests.rs`, `features/calendar/store/query.rs`) cover full-load replacement, JSON merge/reject rules and the in-memory query path; `settings/tests.rs` drives the store-backed settings/UI-state bodies. Test code relies on `clippy.toml`'s `allow-unwrap-in-tests`/`allow-expect-in-tests` instead of per-module allows.
-- `test_support::caldav::start_server()`/`start_http_server()` and `test_support::ics::{series, all_day, with_exception}` are the shared wiremock server and ICS fixture setup for the CalDAV and store tests; reuse them instead of starting servers or inlining `.ics` resources.
-- `src-tauri/examples/e2e_caldav.rs` is the live Radicale check (event/task create → edit/move → delete, reload + body comparison, `X-APPLE-SORT-ORDER` preservation). Run it with `TASKROOT_DATA_DIR=target/e2e-data cargo run --example e2e_caldav -- --user … --password …`; it needs a running server and is not part of CI.
-
-**Why there is no mock-runtime test.** A handler can only be invoked end-to-end through
-`tauri::test::get_ipc_response`, which needs a `Webview<MockRuntime>`. The commands
-that take `app` use the concrete `tauri::AppHandle` (`AppHandle<Wry>`), and `MockRuntime`
-cannot satisfy that parameter — `AppHandle<Wry>: CommandArg<'_, MockRuntime>` does not
-hold, so the production `generate_handler!` table cannot even be installed into a mock
-app. Making the 33 commands that take `app` generic over `R: Runtime` would rewrite
-every public command signature, which the thin-wrapper rule does not cover. On Windows
-there is a second blocker: `tauri-build` attaches the Common Controls v6 manifest to binary targets only
-(`rustc-link-arg-bins`), so a test binary that builds an `App` aborts at load with
-`STATUS_ENTRYPOINT_NOT_FOUND` no matter what the handler does.
-
-Instead the JS ↔ Rust contract is pinned by source scans (`test_support::source_scan`
-for the Rust side, `test_support::frontend_scan` for the call sites), asserted in
-`ipc/tests.rs`:
-
-- every command in `generate_handler!` is listed once and is snake_case;
-- the registered names and the `#[tauri::command]` functions under `src` are the same set;
-- every literal command name at a `safeInvoke`/`useAutoQuery`/`useTauriQuery`/`invoke`
-  call site under `../src` is registered, and every argument key it passes matches a
-  camelCased Rust parameter of that command (the exact key `#[tauri::command]` looks up).
-  A `useTauriQuery(..)` result bound to a local is followed to its later
-  `query.execute({..})` calls, so those keys are checked too.
-
-Limits to keep in mind: the scan sees literal command names only (a call site that
-computes the name is not checked) and it skips test sources (`src/test/**`, `*.test.ts`,
-`*tests.rs`). The source heuristics are deliberately shallow and can mis-read
-non-literal code:
-
-- `between(.., ']')` stops at the *first* `]`, so a `]` inside the `generate_handler!`
-  list would truncate the registered-command scan;
-- `#[tauri::command]` parameters are split on every comma, so a parameter type that
-  contains a comma (e.g. a generic) would be mis-split;
-- only that the *supplied* keys are declared is checked — a call site that omits a
-  required argument is not flagged (the handler would reject it at runtime).
-
-A green suite is a contract check, not end-to-end coverage of a handler — the handler's
-own `store_state(&app)`/`client_for(&app)` lines are only compile-checked.
-
-## Style & Idioms
-- **Rust Idioms**: Write clean, idiomatic Rust. Handle all `Result` and `Option` types safely (do not use `unwrap()` or `expect()` in production code unless absolutely necessary). Use `clippy` for linting.
-- **Testing**: Backend tests should cover CalDAV XML parsers, the I1–I3 ICS invariants, store behaviour and `AppError` shape checks. Coverage is collected via `cargo-llvm-cov`. Run `cargo clippy --all-targets -- -D warnings` and `cargo nextest run` after changes. Command-layer changes follow the Command Testing convention above.
-- **Serde Serialization**: Never use `#[serde(untagged)]` on enums, especially those with struct variants containing `Option<T>` fields. Untagged enums rely on structural "duck typing" which can cause silent parsing failures where an object parses as the wrong variant simply because it shares a few required fields (e.g. `id` and `title`). Use internally tagged enums (`#[serde(tag = "...")]`) or externally tagged enums instead.
+Write backend tests first and reuse the shared wiremock/ICS fixtures. Run
+`cargo clippy --all-targets -- -D warnings` and `cargo nextest run` from
+`src-tauri/` after backend source changes; see [testing](../docs/testing.md).

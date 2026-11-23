@@ -1,12 +1,15 @@
 //! Plan-screen queries: tasks, raw events and render-ready event instances.
 
-use crate::ipc::session::store_state;
-use crate::features::calendar::{expand_event_instances, expand_task_dates, single_instance};
-use crate::features::calendar::{
-    AppEvent, AppEventFilter, AppEventSort, AppTask, AppTaskFilter, AppTaskSort, TaskDateInstance,
-};
 use crate::error::AppError;
 use crate::features::calendar::query;
+use crate::features::calendar::{
+    expand_task_dates, query_event_instances as project_event_instances,
+};
+use crate::features::calendar::{
+    AppEvent, AppEventFilter, AppEventSort, AppTask, AppTaskFilter, AppTaskSort, FilterGroup,
+    TaskDateInstance,
+};
+use crate::ipc::session::store_state;
 
 /// # Errors
 ///
@@ -14,7 +17,7 @@ use crate::features::calendar::query;
 #[tauri::command]
 pub async fn query_tasks(
     app: tauri::AppHandle,
-    filters: Vec<AppTaskFilter>,
+    filters: FilterGroup<AppTaskFilter>,
     sort: Vec<AppTaskSort>,
     query: String,
 ) -> Result<Vec<AppTask>, AppError> {
@@ -32,7 +35,7 @@ pub async fn query_tasks(
 #[tauri::command]
 pub async fn query_events(
     app: tauri::AppHandle,
-    filters: Vec<AppEventFilter>,
+    filters: FilterGroup<AppEventFilter>,
     sort: Vec<AppEventSort>,
     query: String,
 ) -> Result<Vec<AppEvent>, AppError> {
@@ -50,7 +53,7 @@ pub async fn query_events(
 #[tauri::command]
 pub async fn query_event_instances(
     app: tauri::AppHandle,
-    filters: Vec<AppEventFilter>,
+    filters: FilterGroup<AppEventFilter>,
     sort: Vec<AppEventSort>,
     query: String,
     start_date: Option<String>,
@@ -59,11 +62,9 @@ pub async fn query_event_instances(
     let state = store_state(&app)?;
     let instances = state
         .read(|store| {
-            let events = query::query_events(&store.events(), &filters, &sort, &query);
-            let mut insts = match (start_date, end_date) {
-                (Some(start), Some(end)) => expand_event_instances(&events, &start, &end),
-                _ => events.iter().filter_map(single_instance).collect(),
-            };
+            let range = start_date.as_deref().zip(end_date.as_deref());
+            let mut insts =
+                project_event_instances(&store.events(), &filters, &sort, &query, range);
             for inst in &mut insts {
                 if let Some(ref tid) = inst.task_id {
                     if let Some(task) = store.task(tid.as_str()) {

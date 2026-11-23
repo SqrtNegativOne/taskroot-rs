@@ -3,8 +3,8 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { EventInstance, AppCalendar, AppEventFilter, TaskDateInstance } from '../../../lib/domain';
-    import { calendarsForComponent, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
+    import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
+    import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
     import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
     import { isMultiDayAllDay, layoutWeekSpans } from './spanLayout';
     import { getWeekNumber, isoWeeksInYear, isoWeekYear, ymd } from '../../../lib/time';
@@ -38,7 +38,7 @@
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let anchor = $state(new Date());
-    let filters = $state<AppEventFilter[]>([]);
+    let filters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
     let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false });
     let query = $state('');
     const now = useNow(60_000);
@@ -55,7 +55,7 @@
         persistedKeys.dateGridFilters,
         () => filters,
         (stored) => { filters = stored; },
-        { isValid: Array.isArray },
+        { isValid: isEventFilterGroup },
     );
     persistState(
         persistedKeys.dateGridView,

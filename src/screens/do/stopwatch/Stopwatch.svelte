@@ -6,6 +6,7 @@
     import './stopwatch.css';
 
     import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import { allTasks as allTasksQueryArgs } from '../../../lib/queries';
     import type { AppTask } from '../../../lib/domain';
 
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
@@ -17,7 +18,7 @@
 
     $effect(() => {
         if (!store.loaded) return;
-        void allTasksQuery.execute({ filters: [], sort: [], query: "" });
+        void allTasksQuery.execute(allTasksQueryArgs());
     });
 
     let activeTask = $derived(

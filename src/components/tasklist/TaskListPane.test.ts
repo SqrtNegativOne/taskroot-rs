@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
-import type { AppCalendar, AppTaskColumnDef } from '../../lib/domain';
+import type { AppCalendar, AppTaskColumnDef, AppTaskFilter, FilterGroup } from '../../lib/domain';
+import { filterGroup } from '../../lib/domain';
+import { defaultTaskListFilters, taskListState } from '../../lib/taskList.svelte';
 import TaskListPane from './TaskListPane.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
@@ -23,6 +25,8 @@ const schema: AppTaskColumnDef[] = [
 describe('TaskListPane calendar filter', () => {
     beforeEach(() => {
         tauri.reset();
+        taskListState.filters = defaultTaskListFilters();
+        taskListState.sort = [];
         tauri.stubCommandValue('get_active_calendars', calendars);
         tauri.stubCommandValue('get_task_schema', schema);
         tauri.stubCommandValue('query_tasks', []);
@@ -43,5 +47,22 @@ describe('TaskListPane calendar filter', () => {
 
         expect(screen.getByRole('checkbox', { name: 'Task List' })).toBeTruthy();
         expect(screen.queryByRole('checkbox', { name: 'Event Calendar' })).toBeNull();
+    });
+
+    it('queries a nested definition and creates tasks with only unconditional typed defaults', async () => {
+        const filters: FilterGroup<AppTaskFilter> = { operator: 'and', children: [
+            { kind: 'condition', filter: { column: 'priority', operator: 'is', value: ['3'] } },
+            { kind: 'condition', filter: { column: 'tags', operator: 'is', value: ['work'] } },
+            { kind: 'group', ...filterGroup<AppTaskFilter>([
+                { column: 'status', operator: 'is', value: ['todo'] },
+                { column: 'status', operator: 'is', value: ['next-up'] },
+            ], 'or') },
+        ] };
+        taskListState.filters = filters;
+        const onAddTask = vi.fn();
+        render(TaskListPane, { props: { onAddTask } });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_tasks', { filters, sort: [], query: '' }); });
+        await fireEvent.click(screen.getByTitle('Add Task'));
+        expect(onAddTask).toHaveBeenCalledWith({ status: undefined, priority: 3, tags: [expect.objectContaining({ name: 'work' })] });
     });
 });

@@ -39,7 +39,7 @@ describe('EventFilterButton', () => {
         await fireEvent.click(screen.getByTitle('Filter'));
         await fireEvent.click(screen.getByRole('button', { name: /add filter/i }));
 
-        const columnSelect = screen.getAllByRole('combobox')[0]!;
+        const columnSelect = screen.getByRole('combobox', { name: 'Filter property' });
         await fireEvent.change(columnSelect, { target: { value: 'tags' } });
 
         await fireEvent.click(await screen.findByRole('button', { name: /select\.\.\./i }));

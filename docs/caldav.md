@@ -42,24 +42,29 @@ Read-only collections refuse these edits with `invalid-input` before any request
 ## Data flow
 
 1. On start (and on Refresh) Taskroot re-reads the collection list with one `PROPFIND` of
-   the stored calendar home (~40–70 ms against a local Radicale, capped at 3 s),
+   the stored calendar home (capped at 3 s),
    rewrites `account.json` when it changed, and falls back to the cached list when the
    server cannot be asked. `account.json` is therefore a cache, not the truth: a list
    created or deleted elsewhere is picked up at the next load.
 2. It then sends one `calendar-query` REPORT per collection asking for every resource's
-   `ETag` and body, and parses the raw ICS into memory. A failed load leaves the
-   previously loaded resources untouched.
+   `ETag` and body. REPORT/XML fetch failures leave previously loaded resources
+   untouched. During application, however, malformed ICS or missing calendar-data
+   resources are logged/skipped; their previous copies are not retained.
 3. Edits merge into the in-memory raw resource and `PUT` immediately. There is no offline
    edit queue: if Radicale is down the command fails and the UI reports it.
 4. There is no poller and no change hook. Changes made by another client become visible
    when the user presses Refresh (or restarts the app).
-5. `PUT` updates use `If-Match: <etag>`; creates use `If-None-Match: *`. A `412` re-fetches,
-   re-merges and retries once; a second failure is reported, never silently kept.
-6. Deletes are `DELETE`; `404` counts as success. Deleting a master deletes its whole
-   resource (exceptions live in the same file). Deleting an exception removes just that
-   component.
+5. `PUT` updates use `If-Match: <etag>`; creates use `If-None-Match: *`. Ordinary
+   same-collection updates re-fetch, re-merge and retry a `412` once. Moves and
+   scoped deletes currently propagate conflicts without that retry.
+6. Whole-resource deletion uses `DELETE`; `404` and `410` count as success. Scoped
+   recurring deletion often edits the resource with `PUT`: `this` removes any
+   selected exception and adds EXDATE; `all` resolves/deletes the master series.
 
-HTTP status mapping: `401 → auth`, `412 → conflict`, `410 → gone`, other non-2xx → `remote`.
+Most operations map `401 → auth`, `412 → conflict`, `410 → gone`, other non-2xx
+→ `remote`; DELETE's already-missing resource statuses are the exception.
+See [audited follow-ups](known-limitations.md) for writability, conflict, move and
+revision-guard gaps; these are current limitations, not desired guarantees.
 
 ## The three invariants
 
@@ -76,14 +81,18 @@ file that drops the other components.
 
 **I3 — unknown components are not round-tripped through `icalendar`.** The typed model has
 no `VTIMEZONE` variant, so parse→serialise would silently drop timezone blocks. Taskroot
-reads with `icalendar` (typed `DTSTART`/`RRULE`/`RECURRENCE-ID` extraction) and writes with
-a line-preserving editor: unfold, locate the target component by UID + `RECURRENCE-ID`,
-replace/insert/remove only owned property lines, refold at 75 octets, restore CRLF.
-Nested components are matched by position inside their parent, so a `VALARM`'s lines can
-never be mistaken for the `VTODO`'s — `BEGIN`/`END` depth is tracked exactly.
-New resources are built with `icalendar`'s builder because there is nothing to preserve.
+reads with `icalendar` (typed `DTSTART`/`RRULE`/`RECURRENCE-ID` extraction) and writes
+with a line-preserving editor. It locates components by UID + `RECURRENCE-ID` and
+replaces/inserts/removes owned lines, preserving original folds and LF/CRLF;
+newly generated lines are folded at 75 octets. Nested ownership follows
+`BEGIN`/`END` depth, so alarm properties cannot be mistaken for task properties.
+Changed alarm lists are currently matched by position and have a mixed-supported/
+unsupported identity limitation (see follow-ups). New resources use `icalendar`'s
+builder because there is nothing to preserve.
 
-`DTSTAMP` is generated on every write and never persisted.
+`DTSTAMP` is present in server ICS: new events/inserted exceptions and task writes
+generate it; ordinary edits of existing events preserve it. The reader may use it
+as the `added` fallback.
 
 ## Timezones
 
@@ -114,8 +123,9 @@ the clicked `occurrenceStart`:
   before the occurrence and drops exceptions at or after it. `UNTIL` is written in UTC for a
   `TZID` series, as a bare date for all-day, and floating for a zone-less series. A move is
   rejected: re-anchoring a series from one occurrence is not supported yet.
-- `all` — delete drops every component sharing the UID (the resource goes too when nothing
-  remains); a move shifts the master's `DTSTART`/`DTEND`.
+- `all` — delete drops every VEVENT sharing the UID. A move using the master id
+  shifts its `DTSTART`/`DTEND`; the current move path does not resolve an exception
+  id to its master, so “all” from an exception is a known bug.
 
 The canonical `occurrenceStart` shapes are the same ones `exdates` uses, so the values a
 projection returns can be written straight back.
@@ -168,9 +178,12 @@ An event's task attachment is stored on the `VEVENT` as
 property because it has no standard equivalent. The link lives on the event because one
 task can be scheduled as many blocks; `AppEvent.task_id` reads it back and the property
 is written only when the field is set or cleared. Nothing in tasks.org or CalDAV
-standardises this, so other clients simply ignore it rather than rewriting it. Dragging a
-task onto the grid creates a `VEVENT` with the task's title and this property set; the
-block length comes from the task's estimate, then the "Default Duration" setting.
+standardises this, so other clients simply ignore it rather than rewriting it.
+Dragging a task-list row onto the timeline creates a `VEVENT` with the task's title
+and this property set; the block length comes from the estimate, then the
+"Default Duration" setting. Dropping a task row on a date-grid day instead sets
+its date-only start; the task date markers themselves are non-draggable, with
+completion toggles still available.
 
 Checklist items are not mapped and have been removed from the UI. Real subtasks are the
 task tree (`parent_task` ↔ `RELATED-TO;RELTYPE=PARENT`).

@@ -1,4 +1,5 @@
-import type { AppEventFilter, AppEventSort } from './domain';
+import type { AppEventFilter, AppEventSort, AppTaskFilter, AppTaskSort, FilterGroup } from './domain';
+import { emptyFilterGroup } from './domain';
 
 /** Local date window (both `YYYY-MM-DD`) accepted by the render projections. */
 export interface DateWindow {
@@ -9,7 +10,7 @@ export interface DateWindow {
 /** Args for `query_event_instances`: render-ready instances in a local date window. */
 export function eventInstances(
     range: DateWindow,
-    filters: AppEventFilter[],
+    filters: FilterGroup<AppEventFilter>,
     query: string,
     sort: AppEventSort[] = [],
 ) {
@@ -23,7 +24,12 @@ export function taskDates(range: DateWindow) {
 
 /** Args for `query_events`: all raw events, unfiltered (inspector). */
 export function allEvents() {
-    return { filters: [] as AppEventFilter[], sort: [] as AppEventSort[], query: '' };
+    return { filters: emptyFilterGroup<AppEventFilter>(), sort: [] as AppEventSort[], query: '' };
+}
+
+/** Args for `query_tasks`: all tasks, independent of the shared list filters. */
+export function allTasks() {
+    return { filters: emptyFilterGroup<AppTaskFilter>(), sort: [] as AppTaskSort[], query: '' };
 }
 
 /** Args for `get_active_calendars`. */

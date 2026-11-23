@@ -3,6 +3,7 @@ import type { AppCalendar } from './domain';
 import {
     buildNewEvent,
     calendarsForComponent,
+    filterGroup,
     computeFilterDefaults,
     isAppTaskStatus,
     isCalendarReadOnly,
@@ -30,7 +31,7 @@ describe('isAppTaskStatus', () => {
 
 describe('computeFilterDefaults', () => {
     it('returns empty object when no filters are present', () => {
-        expect(computeFilterDefaults([])).toEqual({});
+        expect(computeFilterDefaults()).toEqual({});
     });
 
     it('infers status and priority from "is" filters', () => {
@@ -38,19 +39,19 @@ describe('computeFilterDefaults', () => {
             { column: 'status', operator: 'is', value: 'done' },
             { column: 'priority', operator: 'is', value: 3 },
         ];
-        expect(computeFilterDefaults(filters)).toEqual({ status: 'done', priority: 3 });
+        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'done', priority: 3 });
     });
 
     it('picks next fallback status when status is excluded', () => {
         const filters = [{ column: 'status', operator: 'is not', value: 'todo' }];
-        expect(computeFilterDefaults(filters)).toEqual({ status: 'next-up' });
+        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'next-up' });
     });
 
     it('picks fallback after multiple excluded statuses', () => {
         const filters = [
             { column: 'status', operator: 'is not', value: ['todo', 'next-up', 'done'] },
         ];
-        expect(computeFilterDefaults(filters)).toEqual({ status: 'cancelled' });
+        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'cancelled' });
     });
 
     it('does not set field if required value is also excluded', () => {
@@ -58,15 +59,15 @@ describe('computeFilterDefaults', () => {
             { column: 'status', operator: 'is', value: 'done' },
             { column: 'status', operator: 'is not', value: 'done' },
         ];
-        expect(computeFilterDefaults(filters)).toEqual({});
+        expect(computeFilterDefaults(filterGroup(filters))).toEqual({});
     });
 
     it('includes valid tags and strips excluded tags', () => {
         const filters = [
-            { column: 'tag', operator: 'is', value: ['feature', 'bug'] },
+            { column: 'tags', operator: 'is', value: ['feature', 'bug'] },
             { column: 'tags', operator: 'is not', value: 'bug' },
         ];
-        expect(computeFilterDefaults(filters)).toEqual({ tags: ['feature'] });
+        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ tags: ['feature'] });
     });
 });
 

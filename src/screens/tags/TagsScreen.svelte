@@ -1,6 +1,6 @@
 <script lang="ts">
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { allEvents } from '../../lib/queries';
+    import { allEvents, allTasks } from '../../lib/queries';
     import type { AppEvent, AppTask } from '../../lib/domain';
     import SearchBar from '../../components/SearchBar.svelte';
     import InspectorPane from '../../components/inspector-pane/InspectorPane.svelte';
@@ -10,7 +10,7 @@
     let search = $state('');
     let inspectorState = $state<InspectorTarget | undefined>(undefined);
 
-    const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ filters: [], sort: [], query: '' }));
+    const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', allTasks);
     const eventsQuery = useAutoQuery<AppEvent[]>('query_events', allEvents);
 
     const groups = $derived(groupByTag(tasksQuery.data ?? [], eventsQuery.data ?? []));

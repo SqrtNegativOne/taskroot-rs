@@ -83,7 +83,7 @@ fn assert_keys_match_rust_signatures(calls: &[frontend_scan::FrontendCall]) {
 fn dot_execute_argument_keys_are_attributed_to_the_command() {
     let source = "\
 let tasksQuery = useTauriQuery<AppTask[]>('query_tasks');
-tasksQuery.execute({ filters: [], sort: [], query: \"\" });";
+tasksQuery.execute({ filters: { operator: 'and', children: [] }, sort: [], query: \"\" });";
 
     let calls = frontend_scan::calls_in(source);
 
