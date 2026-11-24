@@ -1,7 +1,7 @@
 import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
 import type { TaskPriority } from '../bindings/TaskPriority.generated';
 import type { FilterGroup } from '../bindings/FilterGroup.generated';
-import { emptyFilterGroup } from './filterTree';
+import { emptyFilterGroup, isValueFreeOperator } from './filterTree';
 import { isAppTaskStatus } from './models';
 
 export interface FilterLike {
@@ -30,7 +30,9 @@ function filterKey(filter: FilterLike): string {
 function requiredConditions(group: FilterGroup<FilterLike>): FilterLike[] | undefined {
     const branches = group.children.map(child => {
         if (child.kind === 'group') return requiredConditions(child);
-        return child.filter.column && normalizeFilterValues(child.filter.value).length > 0 ? [child.filter] : undefined;
+        const effective = child.filter.column
+            && (isValueFreeOperator(child.filter.operator) || normalizeFilterValues(child.filter.value).length > 0);
+        return effective ? [child.filter] : undefined;
     }).filter((branch): branch is FilterLike[] => branch !== undefined);
     const first = branches[0];
     if (!first) return undefined;
@@ -61,7 +63,7 @@ function collectConstraints(group: FilterGroup<FilterLike>) {
     const required = new Map<string, Set<FilterValue>>();
     const excluded = new Map<string, Set<FilterValue>>();
     for (const filter of requiredConditions(group) ?? []) {
-        if (!filter.column) continue;
+        if (!filter.column || isValueFreeOperator(filter.operator)) continue;
         const values = normalizeFilterValues(filter.value);
         const target = filter.operator === 'is not' || filter.operator === 'does not contain' ? excluded : required;
         const normalized = filter.column === 'priority'

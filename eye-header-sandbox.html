@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Day header / eye sandbox</title>
+<style>
+  :root { --stage-w: 1200px; }
+  * { box-sizing: border-box; }
+  body { background: #17181c; color: #e8eaf0; font-family: system-ui, sans-serif; margin: 24px; }
+  h1 { font-size: 16px; margin: 0 0 12px; }
+  .toolbar { display: flex; gap: 16px; margin-bottom: 24px; color: #9aa0ab; font-size: 13px; }
+  .sample { margin-bottom: 32px; }
+  .sample-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .readout { font-size: 12px; color: #9aa0ab; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .readout .bad { color: #e06c75; font-weight: 600; }
+  .stage { width: var(--stage-w); border: 1px solid #2a2d35; }
+
+  .head { display: flex; height: 28px; background: #17181c; border-bottom: 1px solid #2a2d35; }
+  .head-cell {
+    flex: 1; min-width: 200px; border-right: 1px solid #232630;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #9aa0ab;
+  }
+  .row { display: flex; height: 172px; }
+  .col { flex: 1; min-width: 200px; border-right: 1px solid #232630; position: relative; }
+  .hour {
+    position: absolute; left: 0; width: 44px; text-align: right; padding-right: 6px;
+    transform: translateY(-50%); font-size: 10px; color: #9aa0ab;
+    border-top: 1px solid #232630; background: #17181c;
+  }
+  .event {
+    position: absolute; left: 8px; right: 24px; top: 40px; height: 44px;
+    background: #1e2026; border-left: 3px solid #7aa2f7; border-radius: 6px;
+    font-size: 12px; padding: 4px 8px;
+  }
+  .eye {
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: 0; padding: 0; color: #9aa0ab; cursor: pointer;
+  }
+  .eye svg { transform: scaleY(0.62); opacity: 0.75; }
+  body.show-hit .eye { outline: 1px dashed #7aa2f7; outline-offset: -1px; }
+
+  /* G — 44px gutter track (hour-label width), eye fills it, divider on its right */
+  .vt-g .head, .vt-g .row { display: grid; grid-template-columns: 44px repeat(var(--days), 1fr); }
+  .vt-g .eye, .vt-g .gutter { border-right: 1px solid #232630; }
+  .vt-g .gutter { position: relative; }
+  .vt-g .gutter .hour { left: 0; }
+
+  /* H — 44px gutter track, borderless eye */
+  .vt-h .head, .vt-h .row { display: grid; grid-template-columns: 44px repeat(var(--days), 1fr); }
+  .vt-h .gutter { border-right: 1px solid #232630; position: relative; }
+
+  /* I — 56px gutter track, eye fills it */
+  .vt-i .head, .vt-i .row { display: grid; grid-template-columns: 56px repeat(var(--days), 1fr); }
+  .vt-i .eye, .vt-i .gutter { border-right: 1px solid #232630; }
+  .vt-i .gutter { position: relative; }
+  .vt-i .gutter .hour { left: 0; }
+
+  /* J — old overlay style: 44px eye floating over day 1 (for comparison) */
+  .vt-j .head { position: relative; }
+  .vt-j .eye { position: absolute; top: 0; left: 0; width: 44px; height: 100%; border-right: 1px solid #232630; }
+  .vt-j .hour { z-index: 1; }
+</style>
+</head>
+<body>
+<h1>Day header / eye sandbox</h1>
+<div class="toolbar">
+  <label>Width <input id="w" type="range" min="720" max="1600" value="1200"> <span id="wv"></span></label>
+  <label>Days <select id="days"><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+  <label><input id="hit" type="checkbox"> show hit areas</label>
+</div>
+<div id="samples"></div>
+
+<script>
+  const VARIANTS = [
+    ['G', 'gutter track 44px, eye fills it, divider on right', 'vt-g'],
+    ['H', 'gutter track 44px, borderless eye', 'vt-h'],
+    ['I', 'gutter track 56px, eye fills it', 'vt-i'],
+    ['J', 'overlay 44px eye floating over day 1 (old style)', 'vt-j'],
+  ];
+
+  const EYE_SVG = `<svg viewBox="0 0 28 16" width="28" height="16" fill="none" stroke="currentColor"
+    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1 8c3.6-4.6 8.6-7 13-7s9.4 2.4 13 7c-3.6 4.6-8.6 7-13 7S4.6 12.6 1 8Z"/>
+    <circle cx="14" cy="8" r="3.2"/></svg>`;
+
+  const DOW = ['mon', 'tue', 'wed', 'thu', 'fri'];
+  const day = (i) => `${DOW[i % DOW.length]}, ${24 + i}`;
+  const headCells = (n) => Array.from({ length: n }, (_, i) => `<div class="head-cell" data-hcell>${day(i)}</div>`).join('');
+  const hours = () => [0, 1, 2, 3].map(h => `<div class="hour" style="top:${h * 43 + 20}px">${String(h).padStart(2, '0')}:00</div>`).join('');
+  const cols = (n, firstHasHours) => Array.from({ length: n }, (_, i) =>
+    `<div class="col" data-hcell>${firstHasHours && i === 0 ? hours() : ''}${i === 1 ? '<div class="event">standup</div>' : ''}</div>`).join('');
+
+  function build(cls, n) {
+    if (cls === 'vt-j') {
+      return `<div class="stage ${cls}" style="--days:${n}">
+        <div class="head"><div class="eye">${EYE_SVG}</div>${headCells(n)}</div>
+        <div class="row">${cols(n, true)}</div></div>`;
+    }
+    return `<div class="stage ${cls}" style="--days:${n}">
+      <div class="head"><div class="eye">${EYE_SVG}</div>${headCells(n)}</div>
+      <div class="row"><div class="gutter">${hours()}</div>${cols(n, false)}</div></div>`;
+  }
+
+  const samples = document.getElementById('samples');
+  function render() {
+    const n = parseInt(document.getElementById('days').value, 10);
+    samples.innerHTML = VARIANTS.map(([l, d, c]) =>
+      `<div class="sample" data-letter="${l}"><div class="sample-title">${l} — ${d}</div>${build(c, n)}<div class="readout"></div></div>`).join('');
+    measure();
+  }
+
+  function measure() {
+    for (const sample of samples.querySelectorAll('.sample')) {
+      const stageBox = sample.querySelector('.stage').getBoundingClientRect();
+      const cells = [...sample.querySelectorAll('.head [data-hcell]')].map((c) => {
+        const b = c.getBoundingClientRect();
+        return { left: Math.round(b.left - stageBox.left), width: Math.round(b.width) };
+      });
+      const eye = sample.querySelector('.eye').getBoundingClientRect();
+      const dividerX = Math.round(eye.right - stageBox.left);
+      const firstRight = cells.length > 1 ? cells[1].left : Math.round(stageBox.width);
+      const visible = firstRight - dividerX;
+      const equal = cells.every((c) => c.width === cells[0].width);
+      const visEqual = Math.abs(visible - cells[0].width) < 2;
+      sample.querySelector('.readout').innerHTML =
+        `col boxes <b class="${equal ? '' : 'bad'}">${cells.map((c) => c.width).join(' / ')}</b>` +
+        ` · day-1 visible <b class="${visEqual ? '' : 'bad'}">${visible}px</b> vs ${cells[0].width}px` +
+        ` · divider x ${dividerX}px`;
+    }
+  }
+
+  const w = document.getElementById('w');
+  w.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--stage-w', w.value + 'px');
+    document.getElementById('wv').textContent = w.value + 'px';
+    requestAnimationFrame(measure);
+  });
+  document.getElementById('wv').textContent = w.value + 'px';
+  document.getElementById('days').addEventListener('change', render);
+  document.getElementById('hit').addEventListener('change', (e) => {
+    document.body.classList.toggle('show-hit', e.target.checked);
+    measure();
+  });
+  render();
+</script>
+</body>
+</html>

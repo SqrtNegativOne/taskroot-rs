@@ -8,23 +8,21 @@
         onDragStart,
         dragging,
         updateTask,
-        deleteTask,
         isPastDue,
         selected,
         onTaskClick,
+        onContextMenu,
         isActive,
-        onStartTask,
     }: {
         task: AppTask;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
         dragging?: boolean;
         updateTask: (id: string, transform: (task: AppTask) => AppTask) => void;
-        deleteTask: (id: string) => void;
         isPastDue?: boolean;
         selected?: boolean;
         onTaskClick?: (task: AppTask) => void;
+        onContextMenu?: (e: MouseEvent, task: AppTask) => void;
         isActive?: boolean;
-        onStartTask?: (task: AppTask) => void;
     } = $props();
 
     let isChecking = $state(false);
@@ -33,10 +31,14 @@
         if (e.button !== 0) return;
         if (e.target instanceof Element && (
             e.target.closest('.task-row-subtask-toggle') ||
-            e.target.closest('.task-row-actions') ||
             e.target.closest('.task-circle')
         )) return;
         if (onDragStart) onDragStart(e, task);
+    }
+
+    function handleContextMenu(e: MouseEvent) {
+        e.preventDefault();
+        onContextMenu?.(e, task);
     }
     
     function handleCircleClick(e: MouseEvent) {
@@ -52,12 +54,6 @@
         if (newStatus === "todo") {
             isChecking = false;
         }
-    }
-    
-    function handleCircleContextMenu(e: MouseEvent) {
-        e.preventDefault();
-        e.stopPropagation();
-        onStartTask?.(task);
     }
     
     let dueStr = $derived(task.due ? `due ${task.due}` : "");
@@ -80,10 +76,10 @@
     class:is-done={task.status === "done"}
     class:is-selected={selected}
     onpointerdown={handlePointerDown}
+    oncontextmenu={handleContextMenu}
     onclick={(e) => {
         if (e.target instanceof Element && (
             e.target.closest('.task-row-subtask-toggle') ||
-            e.target.closest('.task-row-actions') ||
             e.target.closest('.task-circle')
         )) return;
         if (onTaskClick) onTaskClick(task);
@@ -94,7 +90,6 @@
         isDoneOrChecking={task.status === "done" || isChecking}
         isActive={isActive}
         onclick={handleCircleClick}
-        oncontextmenu={handleCircleContextMenu}
     />
     <div class="task-row-content">
         <div class="task-row-line1">
@@ -110,19 +105,6 @@
             {#if task.status === "next-up"}
                 <span class="status-pill status-nextup">next up</span>
             {/if}
-            <div class="task-row-actions">
-                <button
-                    onclick={(e) => {
-                        e.stopPropagation();
-                        if (e.shiftKey || confirm("Delete task?")) {
-                            deleteTask(task.id);
-                        }
-                    }}
-                    title="Delete"
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
-            </div>
         </div>
         {#if hasEst || hasTags || dueStr}
             <div class="task-row-line2">

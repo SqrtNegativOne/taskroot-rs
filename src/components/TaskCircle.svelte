@@ -73,7 +73,7 @@
         border: 2px solid var(--circle-border, var(--border));
         background-color: var(--circle-fill, transparent);
         margin-right: 8px;
-        margin-top: 2px;
+        margin-top: 1px;
         flex-shrink: 0;
         cursor: pointer;
         display: flex;

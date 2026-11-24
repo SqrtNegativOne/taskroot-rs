@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { MINUTES_IN_HOUR, PIXELS_PER_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
+    import { MINUTES_IN_HOUR, PX_PER_MIN, SNAP_MIN } from '../constants';
     import type { CreationRange, DragState, LaidEvent } from '../types';
     import type { EventInstance, AppCalendar } from '../../../../lib/domain';
     import { isEventReadOnly } from '../../../../lib/domain';
@@ -25,7 +25,6 @@
         onAddEvent,
         onToggleTask,
         calendars = [],
-        showTimeLabels = true,
     }: {
         date: Date;
         today: Date;
@@ -38,7 +37,6 @@
         onAddEvent?: (d: Date, start: number, end: number) => Promise<string | undefined>;
         onToggleTask?: (taskId: string) => void;
         calendars?: AppCalendar[];
-        showTimeLabels?: boolean;
     } = $props();
 
     let isToday = $derived(sameDay(date, today));
@@ -146,10 +144,7 @@
     class="day-grid"
     bind:this={containerRef}
     style="
-        --day-label-offset: {showTimeLabels ? PIXELS_PER_HOUR : 0}px;
         position: relative;
-        flex: 1;
-        min-width: 200px;
         height: {MINUTES_PER_DAY * PX_PER_MIN}px;
         border-right: 1px solid var(--border-soft);
     "
@@ -157,10 +152,10 @@
     data-drop-date={cellDateStr}
     onpointerdown={onGridPointerDown}
 >
-    <TimeGridBackground {isToday} showLabels={showTimeLabels} />
+    <TimeGridBackground />
     
     {#if isToday}
-        <CurrentTimeLine showLabels={showTimeLabels} />
+        <CurrentTimeLine />
     {/if}
 
     {#each laid as { event, startMins, endMins, lane, lanes } (event.occurrenceKey)}

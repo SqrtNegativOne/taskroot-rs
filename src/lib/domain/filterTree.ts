@@ -34,9 +34,14 @@ export function countFilters<F>(group: FilterGroup<F>): number {
     return group.children.reduce((count, child) => count + (child.kind === 'condition' ? 1 : countFilters(child)), 0);
 }
 
-const EQUALITY_OPERATORS = ['is', 'is not'] as const;
-const DATE_OPERATORS = ['is', 'is not', 'before', 'after', 'on or before', 'on or after'] as const;
+const VALUE_FREE_OPERATORS = ['is empty', 'is not empty'] as const;
+const EQUALITY_OPERATORS = ['is', 'is not', ...VALUE_FREE_OPERATORS] as const;
+const DATE_OPERATORS = ['is', 'is not', 'before', 'after', 'on or before', 'on or after', ...VALUE_FREE_OPERATORS] as const;
 const ALL_OPERATORS = [...DATE_OPERATORS, 'contains', 'does not contain'] as const;
+
+export function isValueFreeOperator(operator: string | null | undefined): boolean {
+    return VALUE_FREE_OPERATORS.some(candidate => candidate === operator);
+}
 
 export function operatorsForColumn(column?: FilterColumn): readonly FilterOperator[] {
     return column?.filterType === 'Date' ? DATE_OPERATORS : EQUALITY_OPERATORS;

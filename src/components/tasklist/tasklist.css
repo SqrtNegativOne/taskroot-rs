@@ -95,44 +95,7 @@
   .task-row-line1 {
     display: flex; align-items: center; gap: 6px;
   }
-  .task-circle {
-    width: 18px;
-    height: 18px;
-    min-width: 18px;
-    min-height: 18px;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: 2px solid var(--circle-border, var(--border));
-    background-color: var(--circle-fill, transparent);
-    margin-right: 8px;
-    margin-top: 2px;
-    flex-shrink: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-  }
 
-  .task-circle-check {
-    width: 12px;
-    height: 12px;
-    color: #fff;
-    stroke-dasharray: 24;
-    stroke-dashoffset: 24;
-    animation: dash 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-  }
-  @keyframes dash {
-    to { stroke-dashoffset: 0; }
-  }
-
-  /* Pastel colors for priorities 0-4 */
-  .pri-bg-0 { --circle-fill: #3e4a5b; --circle-border: #6a7c92; } /* Lowest */
-  .pri-bg-1 { --circle-fill: #435b49; --circle-border: #719379; }
-  .pri-bg-2 { --circle-fill: #735e38; --circle-border: #b59864; }
-  .pri-bg-3 { --circle-fill: #784838; --circle-border: #c47e68; }
-  .pri-bg-4 { --circle-fill: #783a48; --circle-border: #c96b7f; } /* Highest */
-  
   .pri { font-size: 0.85em; flex-shrink: 0; line-height: 1; }
   .pri-0 { color: #6a7c92; }
   .pri-1 { color: #719379; }

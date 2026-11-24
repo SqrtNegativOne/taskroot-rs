@@ -35,26 +35,22 @@
 </script>
 
 <div class="filter-group" class:nested={onremove !== undefined} role="group" aria-label={onremove ? 'Filter group' : 'Filters'}>
-    <div class="group-header">
-        <span>Match</span>
-        <select
-            aria-label="Group operator"
-            value={group.operator}
-            onchange={event => onchange({ ...group, operator: event.currentTarget.value === 'or' ? 'or' : 'and' })}
-        >
-            <option value="and">All (AND)</option>
-            <option value="or">Any (OR)</option>
-        </select>
-        <span>of the following</span>
-        {#if onremove}
-            <button class="remove-group" title="Remove filter group" aria-label="Remove filter group" onclick={onremove}>×</button>
-        {:else if group.children.length > 0}
-            <button class="clear" onclick={() => onchange({ ...group, children: [] })}>Clear filters</button>
-        {/if}
-    </div>
     {#each group.children as child, i (i)}
         <div class="filter-entry">
-            <span class="connector">{i === 0 ? 'Where' : group.operator.toUpperCase()}</span>
+            <span class="connector">
+                {#if i === 1}
+                    <select
+                        aria-label="Group operator"
+                        value={group.operator}
+                        onchange={event => onchange({ ...group, operator: event.currentTarget.value === 'or' ? 'or' : 'and' })}
+                    >
+                        <option value="and">AND</option>
+                        <option value="or">OR</option>
+                    </select>
+                {:else}
+                    {i === 0 ? 'Where' : group.operator.toUpperCase()}
+                {/if}
+            </span>
             <div class="entry-content">
                 {#if child.kind === 'condition'}
                     <FilterConditionRow
@@ -82,23 +78,26 @@
     <div class="group-actions">
         <button onclick={addCondition} disabled={columns.length === 0}>+ Add filter</button>
         <button onclick={addGroup} disabled={columns.length === 0}>+ Add group</button>
+        {#if onremove}
+            <button class="clear" onclick={onremove}>Remove filter group</button>
+        {:else if group.children.length > 0}
+            <button class="clear" onclick={() => onchange({ ...group, children: [] })}>Clear filters</button>
+        {/if}
     </div>
 </div>
 
 <style>
     .filter-group { display: flex; flex-direction: column; gap: 8px; min-width: 440px; }
     .nested { border: 1px solid var(--border); border-radius: 4px; padding: 10px; background: var(--bg); }
-    .group-header { display: flex; align-items: center; gap: 6px; color: var(--fg); font-size: 0.9em; }
-    select { background: var(--bg); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; padding: 4px; }
+    select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; padding: 4px; font: inherit; }
     select:focus { outline-color: var(--accent); }
     .filter-entry { display: flex; align-items: flex-start; gap: 6px; }
-    .connector { flex: 0 0 40px; padding-top: 6px; opacity: 0.6; font-size: 0.85em; }
+    .connector { flex: 0 0 58px; min-height: 28px; display: flex; align-items: center; font-size: 0.85em; color: var(--fg-muted); }
     .entry-content { flex: 1; min-width: 0; }
-    .group-actions { display: flex; gap: 12px; padding-left: 46px; }
+    .group-actions { display: flex; gap: 12px; padding-left: 64px; }
     button { background: transparent; border: none; color: var(--fg); cursor: pointer; padding: 4px; font-size: 0.9em; opacity: 0.7; }
     button:hover { opacity: 1; }
     button:disabled { cursor: default; opacity: 0.4; }
-    .remove-group, .clear { margin-left: auto; }
-    .remove-group { font-size: 20px; padding: 0 4px; line-height: 1; }
-    .empty-hint { font-size: 0.85em; opacity: 0.6; padding-left: 46px; }
+    .clear { margin-left: auto; }
+    .empty-hint { font-size: 0.85em; opacity: 0.6; padding-left: 64px; }
 </style>

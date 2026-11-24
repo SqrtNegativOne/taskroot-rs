@@ -38,23 +38,24 @@ describe('FilterButton date columns', () => {
     it('offers comparison operators for a date column', async () => {
         await openWithFilter();
 
-        expect(operatorValues()).toEqual([
-            'is',
-            'is not',
-            'before',
-            'after',
-            'on or before',
-            'on or after',
-        ]);
+        expect(operatorValues()).toContain('before');
+        expect(operatorValues()).toContain('on or after');
+        expect(operatorValues()).toContain('is empty');
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter operator' }), { target: { value: 'before' } });
+        expect(screen.getByPlaceholderText('YYYY-MM-DD or today')).toBeTruthy();
     });
 
-    it('falls back to equality operators for a text column', async () => {
+    it('does not offer date comparisons for a text column', async () => {
         await openWithFilter();
 
         const columnSelect = screen.getByRole('combobox', { name: 'Filter property' });
         if (!(columnSelect instanceof HTMLSelectElement)) throw new Error('column select missing');
         await fireEvent.change(columnSelect, { target: { value: 'title' } });
 
-        expect(operatorValues()).toEqual(['is', 'is not']);
+        expect(operatorValues()).toContain('is');
+        expect(operatorValues()).toContain('is not');
+        expect(operatorValues()).not.toContain('before');
+        expect(operatorValues()).not.toContain('after');
+        expect(screen.getByPlaceholderText('Value...')).toBeTruthy();
     });
 });

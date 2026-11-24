@@ -81,16 +81,23 @@ in-page drag/drop on Windows. This is not a requirement to enable native file dr
 
 `FilterButton`/`SortButton` share `FloatingMenu`; filter conditions and sortable
 rows share `FilterSortRow`. `FilterGroupEditor` recursively edits independent
-AND/OR groups; badges count conditions, not groups. `EventFilterButton` provides
-the common calendar configuration with optional grid-only visibility controls.
-Tags use the backend `list_tags` multi-select; date conditions support comparison
-operators and `today`/`tomorrow`/`yesterday` as well as date literals.
+AND/OR groups: the first child is labelled “Where”, the second child's connector
+selects AND/OR for the whole group, and later connectors display that operator.
+New groups default to AND; groups with fewer than two children have no operator
+control. Clear/remove-group actions sit alongside the add actions at the bottom.
+Badges count conditions, not groups. `EventFilterButton` provides the common
+calendar configuration with optional grid-only visibility controls. Tags use the
+backend `list_tags` multi-select; date conditions support comparison operators and
+`today`/`tomorrow`/`yesterday` as well as date literals. Every column also offers
+`is empty`/`is not empty`, which hide the value control and clear stale values.
 
 `domain/filterTree.ts` owns construction/counting and task/event persistence
 validation. The four filter-state keys reject malformed trees/old arrays without
 migration. `domain/filters.ts` derives new-task defaults only from required
-conditions, intersecting shared constraints across OR branches. Backend semantics
-are documented in the [calendar feature](../src-tauri/src/features/calendar/README.md).
+conditions, intersecting shared constraints across OR branches. Value-free
+conditions are effective branches but do not supply literal defaults, so an
+“empty tags OR tags is work” filter does not assign `work` to new tasks. Backend
+semantics are documented in the [calendar feature](../src-tauri/src/features/calendar/README.md).
 
 The inspector's `state.svelte.ts` owns selection, queries, mutations and recurring
 scope prompts. `eventDates.ts` handles inclusive all-day ends and timed/all-day

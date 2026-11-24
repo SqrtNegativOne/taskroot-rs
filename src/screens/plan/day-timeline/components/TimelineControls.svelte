@@ -21,7 +21,7 @@
         keepOpen?: boolean;
     } = $props();
 
-    const CLOSE_DELAY_MS = 600;
+    const CLOSE_DELAY_MS = 120;
 
     let open = $state(false);
     let hovering = $state(false);

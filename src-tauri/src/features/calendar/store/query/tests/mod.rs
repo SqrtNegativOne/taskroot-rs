@@ -5,6 +5,7 @@ use crate::features::calendar::domain::{
 };
 use serde_json::json;
 
+mod empty_fields;
 mod events;
 mod recursive;
 mod tasks;

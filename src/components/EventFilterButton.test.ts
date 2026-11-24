@@ -49,6 +49,20 @@ describe('EventFilterButton', () => {
         expect(screen.getByRole('button', { name: /work.*home/i })).toBeTruthy();
     });
 
+    it('filters an optional enum by presence instead of a selected value', async () => {
+        render(EventFilterButton, { props: { calendars } });
+        await fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+        await fireEvent.click(screen.getByRole('button', { name: /add filter/i }));
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter property' }), { target: { value: 'status' } });
+        await fireEvent.click(screen.getByRole('button', { name: /select\.\.\./i }));
+        await fireEvent.click(screen.getByRole('checkbox', { name: 'confirmed' }));
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter operator' }), { target: { value: 'is empty' } });
+        expect(screen.queryByRole('button', { name: /confirmed/i })).toBeNull();
+        expect(screen.queryByRole('checkbox', { name: 'confirmed' })).toBeNull();
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter operator' }), { target: { value: 'is' } });
+        expect(screen.getByRole('button', { name: /select\.\.\./i })).toBeTruthy();
+    });
+
     it('keeps the Filter button accessible by name when its badge is active', () => {
         render(EventFilterButton, { props: { calendars, visibility: { hideFrequentRecurring: true, hideTimed: true } } });
         expect(screen.getByRole('button', { name: 'Filter' })).toBeTruthy();

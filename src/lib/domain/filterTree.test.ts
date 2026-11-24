@@ -20,6 +20,16 @@ describe('recursive filter state', () => {
         expect(countFilters(nested)).toBe(3);
     });
 
+    it('restores value-free empty-field conditions', () => {
+        expect(isTaskFilterGroup(filterGroup([
+            { column: 'start', operator: 'is empty', value: [] },
+            { column: 'tags', operator: 'is not empty', value: [] },
+        ]))).toBe(true);
+        expect(isEventFilterGroup(filterGroup([
+            { column: 'tags', operator: 'is empty', value: [] },
+        ]))).toBe(true);
+    });
+
     it('accepts draft conditions and empty groups', () => {
         expect(isTaskFilterGroup({ operator: 'or', children: [
             condition({ column: null, operator: null, value: null }),
@@ -68,6 +78,25 @@ describe('new-task defaults from nested filters', () => {
     it('ignores unfinished OR branches when inferring defaults', () => {
         const group: FilterGroup<AppTaskFilter> = { operator: 'or', children: [status('next-up'), { kind: 'group', ...emptyFilterGroup<AppTaskFilter>() }, condition({ column: 'status', operator: 'is', value: [''] })] };
         expect(computeFilterDefaults(group)).toEqual({ status: 'next-up' });
+    });
+
+    it('does not infer a value from an OR alternative to a value-free condition', () => {
+        expect(computeFilterDefaults(filterGroup([
+            { column: 'tags', operator: 'is empty', value: [] },
+            { column: 'tags', operator: 'is', value: ['work'] },
+        ], 'or'))).toEqual({});
+        expect(computeFilterDefaults(filterGroup([
+            { column: 'start', operator: 'is not empty', value: [] },
+            { column: 'priority', operator: 'is', value: ['3'] },
+        ], 'or'))).toEqual({});
+    });
+
+    it('ignores stale unary values while retaining surrounding required defaults', () => {
+        expect(computeFilterDefaults(filterGroup([
+            { column: 'tags', operator: 'is empty', value: ['stale'] },
+            { column: 'priority', operator: 'is not empty', value: ['4'] },
+            { column: 'status', operator: 'is', value: ['todo'] },
+        ]))).toEqual({ status: 'todo' });
     });
 
     it('normalizes numeric string priorities to the typed task value', () => {

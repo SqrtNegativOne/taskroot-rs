@@ -12,20 +12,32 @@
     scrollbar-width: thin;
   }
 
-  .day-cols { display: flex; flex-direction: column; min-width: min-content; }
+  .day-cols {
+    display: flex;
+    flex-direction: column;
+    min-width: min-content;
+  }
+  /* Day headers and day columns share one grid definition so the gutter track
+     and every day column line up vertically across the two rows. */
+  .day-head,
+  .day-row {
+    display: grid;
+    grid-template-columns: var(--day-gutter-w, 44px) repeat(var(--day-count, 1), minmax(200px, 1fr));
+  }
   .day-head {
     position: sticky;
     /* Chrome pins sticky boxes to the scrollport's content edge, so back off the
        scroller's 4px top padding to sit flush with the viewport (flow keeps it). */
     top: -4px;
     z-index: 7;
-    display: flex;
     background: var(--bg);
     border-bottom: 1px solid var(--border-soft);
   }
+  .day-gutter {
+    position: relative;
+    border-right: 1px solid var(--border-soft);
+  }
   .day-head-cell {
-    flex: 1;
-    min-width: 200px;
     border-right: 1px solid var(--border-soft);
     padding: 5px 8px;
     text-align: center;
@@ -39,10 +51,12 @@
     text-overflow: ellipsis;
   }
   .day-head-cell.is-today { color: var(--accent); }
-  /* The first header label is centred over the event area: the left gutter is
-     reserved for the timeline controls, matching the hour labels below. */
-  .day-head-cell.is-first { padding-left: calc(var(--day-gutter, 56px) + 8px); }
-  .day-row { display: flex; flex-direction: row; width: 100%; }
+  .day-head-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* ── Timeline controls (eye in the hour gutter) ─────────────────────── */
 
@@ -50,13 +64,12 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: var(--day-gutter, 56px);
+    width: 100%;
     height: 100%;
     display: flex;
     justify-content: center;
     z-index: 3;
-  }
-  .timeline-eye {
+  }  .timeline-eye {
     appearance: none;
     background: transparent;
     border: 0;
@@ -91,7 +104,7 @@
     position: absolute;
     top: 100%;
     left: 0;
-    width: var(--day-gutter, 56px);
+    width: 44px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -204,47 +217,51 @@
     border-top: 1px solid var(--border-soft);
   }
   .day-hour:first-child { border-top-color: var(--border); }
-  .day-hour-label {
+  .day-hour-line { display: none; }
+  .day-hour-half {
+    position: absolute; left: 0; right: 0;
+    top: 50%;
+    border-top: 1px dashed var(--border-soft);
+    opacity: 0.6;
+  }
+  .day-now {
+    position: absolute; left: 0; right: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .day-now-line {
+    position: absolute; left: 0; right: 0; top: 0;
+    border-top: 1px solid var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  /* ── Hour gutter: eye sits above this strip; labels live here ───────── */
+
+  .day-gutter-hours .day-hour-label {
     position: absolute; left: 0; top: 0;
     transform: translateY(-50%);
     font-size: 0.7em;
     color: var(--fg-dim);
     background: var(--bg);
     letter-spacing: 0.02em;
-    width: 44px;
+    width: 100%;
     text-align: right;
     padding: 0 6px 0 0;
     font-variant-numeric: tabular-nums;
+    z-index: 1;
   }
-  .day-hour-line { display: none; }
-  .day-hour-half {
-    position: absolute; left: var(--day-label-offset, 56px); right: 0;
-    top: 50%;
-    border-top: 1px dashed var(--border-soft);
-    opacity: 0.6;
-  }
-
-  .day-now {
-    position: absolute; left: 0; right: 0;
-    pointer-events: none;
-    z-index: 5;
-  }
-  .day-now-label {
+  .day-gutter-hours .day-now-label {
     position: absolute; left: 0; top: 0;
     transform: translateY(-50%);
     font-size: 0.7em;
     color: var(--accent);
     background: var(--bg);
     letter-spacing: 0.02em;
-    width: 44px;
+    width: 100%;
     text-align: right;
     padding: 0 6px 0 0;
     font-variant-numeric: tabular-nums;
-  }
-  .day-now-line {
-    position: absolute; left: var(--day-label-offset, 56px); right: 0; top: 0;
-    border-top: 1px solid var(--accent);
-    box-shadow: 0 0 8px var(--accent-glow);
+    z-index: 2;
   }
 
   .day-event {
@@ -252,8 +269,8 @@
     --event-lanes: 1;
     font-family: var(--sans);
     position: absolute;
-    left: calc(var(--day-label-offset, 56px) + ((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) * var(--event-lane));
-    width: calc(((100% - var(--day-label-offset, 56px)) / var(--event-lanes)) - 24px);
+    left: calc((100% / var(--event-lanes)) * var(--event-lane));
+    width: calc((100% / var(--event-lanes)) - 24px);
     background: var(--ev-bg, var(--bg-surface));
     border: 0;
     border-left: 3px solid var(--ev-color, var(--fg-dimmer));
@@ -339,7 +356,7 @@
 
   .day-drop-preview {
     position: absolute;
-    left: var(--day-label-offset, 56px);
+    left: 0;
     right: 0;
     border: 1px dashed var(--accent);
     background: var(--accent-soft);
@@ -390,30 +407,4 @@
     color: var(--fg-dim);
     margin-top: 3px;
   }
-
-  .task-row-actions {
-    display: flex;
-    opacity: 0;
-    pointer-events: none;
-    margin-left: auto;
-    gap: 4px;
-  }
-  .task-row:hover .task-row-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .task-row-actions button {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--fg-dim);
-    cursor: pointer;
-    padding: 2px 6px;
-    font-size: 0.85em;
-  }
-  .task-row-actions button:hover {
-    background: var(--bg-surface-hover);
-    color: var(--fg);
-    border-color: var(--accent);
-  }
-
 

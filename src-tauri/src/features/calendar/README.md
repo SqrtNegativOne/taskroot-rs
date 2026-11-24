@@ -39,7 +39,12 @@ Filters are `FilterGroup<F> { operator, children }` trees with tagged condition
 and group nodes. Each group chooses AND/OR independently. `query/matcher.rs`
 ignores unfinished leaves and groups without effective children, including inside
 OR; an ineffective root matches all. Search is ANDed with the tree. Leaf
-multi-values retain ANY inclusion / NONE exclusion semantics.
+multi-values retain ANY inclusion / NONE exclusion semantics. `is empty` and
+`is not empty` are effective conditions without a value; any stored value is
+ignored. Absence, blank text and empty tag lists count as empty. An absent priority
+and explicit `TaskPriority::None` both count as empty. Presence matching lives
+beside value comparisons in `query/columns.rs`; `matcher.rs` owns tree traversal,
+unfinished-condition handling and multi-value inclusion/exclusion.
 
 ## Loading and writes
 

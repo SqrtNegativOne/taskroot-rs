@@ -4,6 +4,38 @@ use crate::features::calendar::domain::{
 };
 use chrono::NaiveDate;
 
+pub(super) fn task_column_is_empty(task: &AppTask, column: &AppTaskFilterColumn) -> bool {
+    match column {
+        AppTaskFilterColumn::Id => task.id.as_str().is_empty(),
+        AppTaskFilterColumn::Title => task.title.is_empty(),
+        AppTaskFilterColumn::Status => task.status.is_none(),
+        AppTaskFilterColumn::Priority => priority_number(task.priority.as_ref()) == 0,
+        AppTaskFilterColumn::Tags => task.tags.as_ref().is_none_or(Vec::is_empty),
+        AppTaskFilterColumn::Start => text_is_empty(task.start.as_deref()),
+        AppTaskFilterColumn::Due => text_is_empty(task.due.as_deref()),
+        AppTaskFilterColumn::Added => text_is_empty(task.added.as_deref()),
+        AppTaskFilterColumn::Remotecollectionid => {
+            text_is_empty(task.remote_collection_id.as_ref().map(|id| id.as_str()))
+        }
+    }
+}
+
+pub(super) fn event_column_is_empty(event: &AppEvent, column: &AppEventFilterColumn) -> bool {
+    match column {
+        AppEventFilterColumn::Title => event.title.is_empty(),
+        AppEventFilterColumn::Status => event.status.is_none(),
+        AppEventFilterColumn::Priority => priority_number(event.priority.as_ref()) == 0,
+        AppEventFilterColumn::Tags => event.tags.as_ref().is_none_or(Vec::is_empty),
+        AppEventFilterColumn::Remotecollectionid => {
+            text_is_empty(event.remote_collection_id.as_ref().map(|id| id.as_str()))
+        }
+    }
+}
+
+fn text_is_empty(value: Option<&str>) -> bool {
+    value.is_none_or(str::is_empty)
+}
+
 pub(super) fn task_column_matches(
     task: &AppTask,
     column: &AppTaskFilterColumn,
@@ -69,7 +101,10 @@ fn date_text_matches(
         FilterOperator::After => day > needle_day,
         FilterOperator::OnOrBefore => day <= needle_day,
         FilterOperator::OnOrAfter => day >= needle_day,
-        FilterOperator::Contains | FilterOperator::DoesNotContain => false,
+        FilterOperator::Contains
+        | FilterOperator::DoesNotContain
+        | FilterOperator::IsEmpty
+        | FilterOperator::IsNotEmpty => false,
     }
 }
 
@@ -131,6 +166,7 @@ fn text_matches(haystack: &str, value: &serde_json::Value, operator: &FilterOper
         | FilterOperator::OnOrAfter
         | FilterOperator::Is
         | FilterOperator::IsNot => haystack == needle,
+        FilterOperator::IsEmpty | FilterOperator::IsNotEmpty => false,
     }
 }
 

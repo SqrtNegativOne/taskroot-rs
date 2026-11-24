@@ -51,6 +51,7 @@ offline queue or background calendar sync.
 | Change | Run |
 |---|---|
 | Frontend source | `bun run check`, `bun run lint`, relevant `bun run test:unit` tests |
+| Frontend styles only (CSS) | Visual/manual verification; check, lint and unit tests do not cover it |
 | Backend source | From `src-tauri/`: `cargo clippy --all-targets -- -D warnings`, `cargo nextest run` |
 | Shared Rust types / IPC | Backend checks and regenerated bindings, then frontend checks |
 | Documentation only | Verify paths/links and factual claims; no app launch required |

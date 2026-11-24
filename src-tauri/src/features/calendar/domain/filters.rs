@@ -90,6 +90,10 @@ pub enum FilterOperator {
     Is,
     #[serde(rename = "is not")]
     IsNot,
+    #[serde(rename = "is empty")]
+    IsEmpty,
+    #[serde(rename = "is not empty")]
+    IsNotEmpty,
     #[serde(rename = "contains")]
     Contains,
     #[serde(rename = "does not contain")]

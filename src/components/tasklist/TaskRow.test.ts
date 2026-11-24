@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type { AppTask } from '../../lib/domain';
 import TaskRow from './TaskRow.svelte';
 
@@ -9,7 +9,7 @@ function makeTask(overrides: Partial<AppTask> = {}): AppTask {
 
 function renderRow(task: AppTask) {
     return render(TaskRow, {
-        props: { task, updateTask: vi.fn(), deleteTask: vi.fn() },
+        props: { task, updateTask: vi.fn() },
     });
 }
 
@@ -36,5 +36,17 @@ describe('TaskRow', () => {
         expect(
             screen.getByRole('button', { name: 'Priority 2' }).classList.contains('pri-bg-2'),
         ).toBe(true);
+    });
+
+    it('offers the task context menu on right click', async () => {
+        const task = makeTask();
+        const onContextMenu = vi.fn();
+        const { container } = render(TaskRow, {
+            props: { task, updateTask: vi.fn(), onContextMenu },
+        });
+
+        await fireEvent.contextMenu(container.querySelector('.task-row')!);
+
+        expect(onContextMenu).toHaveBeenCalledWith(expect.anything(), task);
     });
 });

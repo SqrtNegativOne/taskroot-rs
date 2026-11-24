@@ -5,7 +5,9 @@ use crate::features::calendar::domain::{
 use chrono::NaiveDate;
 use serde_json::Value;
 
-use super::columns::{event_column_matches, task_column_matches};
+use super::columns::{
+    event_column_is_empty, event_column_matches, task_column_is_empty, task_column_matches,
+};
 
 pub(super) fn task_matches_filters(
     task: &AppTask,
@@ -17,6 +19,7 @@ pub(super) fn task_matches_filters(
             filter.column.as_ref(),
             filter.value.as_ref(),
             filter.operator.as_ref(),
+            |column| task_column_is_empty(task, column),
             |column, value, operator| task_column_matches(task, column, value, operator, today),
         )
     })
@@ -32,6 +35,7 @@ pub(super) fn event_matches_filters(
             filter.column.as_ref(),
             filter.value.as_ref(),
             filter.operator.as_ref(),
+            |column| event_column_is_empty(event, column),
             |column, value, operator| event_column_matches(event, column, value, operator),
         )
     })
@@ -59,11 +63,17 @@ fn match_condition<C>(
     column: Option<&C>,
     value: Option<&Value>,
     operator: Option<&FilterOperator>,
+    is_empty: impl Fn(&C) -> bool,
     match_value: impl Fn(&C, &Value, &FilterOperator) -> bool,
 ) -> Option<bool> {
     let column = column?;
-    let value = value?;
     let operator = operator.unwrap_or(&FilterOperator::Is);
+    match operator {
+        FilterOperator::IsEmpty => return Some(is_empty(column)),
+        FilterOperator::IsNotEmpty => return Some(!is_empty(column)),
+        _ => {}
+    }
+    let value = value?;
     let values: &[Value] = match value {
         Value::Array(values) => values,
         value => std::slice::from_ref(value),

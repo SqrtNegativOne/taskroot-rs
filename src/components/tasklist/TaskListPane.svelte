@@ -1,5 +1,6 @@
 <script lang="ts">
     import TaskRow from './TaskRow.svelte';
+    import TaskContextMenu from './TaskContextMenu.svelte';
     import ListManagerModal from './ListManagerModal.svelte';
     import FilterButton from '../FilterButton.svelte';
     import SortButton from '../SortButton.svelte';
@@ -43,8 +44,10 @@
         if (task) onUpdateTask?.(transform(task));
     }
 
-    function deleteTask(id: string) {
-        if (onDeleteTask) onDeleteTask(id);
+    let contextMenu = $state<{ task: AppTask; x: number; y: number } | null>(null);
+
+    function openContextMenu(e: MouseEvent, task: AppTask) {
+        contextMenu = { task, x: e.clientX, y: e.clientY };
     }
     
     let pastDueQuery = useAutoQuery<string[]>('get_past_due_task_ids', () => ({}));
@@ -182,11 +185,10 @@
                         {onDragStart}
                         dragging={activeDragId === item.task.id}
                         {updateTask}
-                        {deleteTask}
                         isPastDue={pastDueTaskIds.has(item.task.id)}
                         selected={item.task.id === selectedTaskId}
                         isActive={item.task.id === activeTaskId}
-                        {onStartTask}
+                        onContextMenu={openContextMenu}
                         {onTaskClick}
                     />
                 </div>
@@ -198,6 +200,17 @@
         {@render footer()}
     {/if}
 </aside>
+
+{#if contextMenu}
+    <TaskContextMenu
+        task={contextMenu.task}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => { contextMenu = null; }}
+        onDelete={(id) => { onDeleteTask?.(id); }}
+        onDo={(task) => { onStartTask?.(task); }}
+    />
+{/if}
 
 <ListManagerModal
     isOpen={listModalOpen}

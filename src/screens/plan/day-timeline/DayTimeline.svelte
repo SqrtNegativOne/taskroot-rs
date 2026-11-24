@@ -2,13 +2,14 @@
     import './day-timeline.css';
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
-    import { PIXELS_PER_HOUR, PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
+    import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
     import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup } from '../../../lib/domain';
     import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
     import TimelineControls from './components/TimelineControls.svelte';
     import DayColumn from './components/DayColumn.svelte';
+    import HourGutter from './components/HourGutter.svelte';
     import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
     import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
     import { activeCalendars, eventInstances } from '../../../lib/queries';
@@ -160,30 +161,32 @@
     {/snippet}
 
     <div class="day-scroll" bind:this={scrollRef}>
-        <div class="day-cols">
-            <div class="day-head" style="--day-gutter: {PIXELS_PER_HOUR}px;">
-                <TimelineControls
-                    {viewDate}
-                    {today}
-                    setTimelineDate={(d: Date) => { timelineDate = d; }}
-                    {filterMenu}
-                    {numDays}
-                    setNumDays={(n: number) => { numDays = n; }}
-                    keepOpen={filterOpen}
-                />
-                {#each dates as d, i (ymd(d))}
+        <div class="day-cols" style="--day-count: {dates.length};">
+            <div class="day-head">
+                <div class="day-gutter">
+                    <TimelineControls
+                        {viewDate}
+                        {today}
+                        setTimelineDate={(d: Date) => { timelineDate = d; }}
+                        {filterMenu}
+                        {numDays}
+                        setNumDays={(n: number) => { numDays = n; }}
+                        keepOpen={filterOpen}
+                    />
+                </div>
+                {#each dates as d (ymd(d))}
                     <div
                         class="day-head-cell"
-                        class:is-first={i === 0}
                         class:is-today={sameDay(d, today)}
                         data-day={ymd(d)}
                     >
-                        {formatDayHeader(d)}
+                        <span class="day-head-label">{formatDayHeader(d)}</span>
                     </div>
                 {/each}
             </div>
             <div class="day-row">
-                {#each dates as d, i (ymd(d))}
+                <div class="day-gutter day-gutter-hours"><HourGutter /></div>
+                {#each dates as d (ymd(d))}
                     <DayColumn
                         date={d}
                         {today}
@@ -196,7 +199,6 @@
                         {onAddEvent}
                         onToggleTask={handleToggleTask}
                         calendars={calendars}
-                        showTimeLabels={i === 0}
                     />
                 {/each}
             </div>

@@ -56,9 +56,11 @@ before changing that seam. Paths below are relative to `src-tauri/src/`.
 - `event_query.rs` selects/sorts rows while preserving **all** masters/exceptions
   as expansion context. Filters/search must not discard cancellation suppression
   or inherited rules. `task_dates.rs` uses the same `RenderWindow` for task markers.
-- Empty/unfinished filter nodes are ignored, including inside OR. A tree with no
+- Unfinished filter nodes are ignored, including inside OR. A tree with no
   effective conditions is unfiltered; search is ANDed with it. Leaf multi-values
-  retain ANY inclusion / NONE exclusion semantics.
+  retain ANY inclusion / NONE exclusion semantics. Explicit `is empty` and
+  `is not empty` conditions are effective without a value, unlike unfinished
+  comparisons.
 - Loading fetches without the store lock, then applies under a revision guard.
   Keep failed/stale snapshots from overwriting successful edits. Collection
   mutations currently have revision-guard gaps (see follow-ups). There is no
