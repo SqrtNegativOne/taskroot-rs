@@ -13,6 +13,7 @@
         trigger,
         children,
         onOpenChange,
+        triggerHeight,
     }: {
         align?: 'left' | 'right';
         minWidth?: string;
@@ -24,6 +25,7 @@
         trigger: Snippet;
         children?: Snippet;
         onOpenChange?: (open: boolean) => void;
+        triggerHeight?: string;
     } = $props();
 
     let open = $state(false);
@@ -45,6 +47,7 @@
                     class:is-active={active || open}
                     {title}
                     aria-label={title}
+                    style={triggerHeight ? `height: ${triggerHeight};` : ''}
                 >
                     {@render trigger()}
                     {#if badge > 0}

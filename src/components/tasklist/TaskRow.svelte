@@ -1,5 +1,6 @@
 <script lang="ts">
     import TaskCircle from '../TaskCircle.svelte';
+    import Icon from '../Icon.svelte';
     import { isRecurring, type AppTask } from '../../lib/domain';
     import { ymd } from '../../lib/time';
 
@@ -63,6 +64,21 @@
         && task.status !== "done",
     );
 
+    let startState = $derived.by(() => {
+        if (!task.start) return null;
+        const today = ymd(new Date());
+        const day = task.start.slice(0, 10);
+        if (day < today) return "past";
+        if (day === today) return "today";
+        return "future";
+    });
+
+    let startTitle = $derived(
+        startState === "past" ? "Start date passed"
+        : startState === "today" ? "Starts today"
+        : "Scheduled start",
+    );
+
     let hasNotes = $derived(!!task.notes && task.notes.trim() !== "");
     let hasTags = $derived(!!task.tags && task.tags.length > 0);
     let isTaskRecurring = $derived(isRecurring({ rrule: task.rrule }));
@@ -101,7 +117,12 @@
             {#if isTaskRecurring}
                 <span class="task-row-recurring-icon" title="Recurring task">↻</span>
             {/if}
-            <span class="task-row-title">{task.title}{#if hasNotes}<span class="task-row-notes-icon" title="Has a description"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h9"/></svg></span>{/if}</span>
+            <span class="task-row-title">{task.title}{#if hasNotes}<span class="task-row-notes-icon" title="Has a description"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h9"/></svg></span>{/if}{#if startState}<span
+                    class="task-row-start-icon"
+                    class:is-past={startState === "past"}
+                    class:is-today={startState === "today"}
+                    title={startTitle}
+                ><Icon name="pending_actions" size={13} /></span>{/if}</span>
             {#if task.status === "next-up"}
                 <span class="status-pill status-nextup">next up</span>
             {/if}

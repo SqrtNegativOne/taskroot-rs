@@ -12,57 +12,17 @@
   .task-pane-hd {
     padding: 12px 16px 10px;
     border-bottom: 1px dashed var(--border);
-    display: flex; flex-direction: column; gap: 10px;
   }
-  .task-pane-title { display: flex; align-items: baseline; gap: 4px; }
-  .bracket { color: var(--accent); }
-  .task-pane-title-label {
-    font-weight: 400; letter-spacing: 0.1em; color: var(--fg);
-  }
-  .task-pane-title-count { color: var(--fg-dim); font-size: 0.9em; margin-left: 2px; }
-
-  .task-pane-search {
+  .task-pane-search-row {
     display: flex; align-items: center; gap: 6px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    transition: border-color 120ms;
   }
-  .task-pane-search:focus-within { border-color: var(--accent-line); }
-  .search-prompt { color: var(--accent); }
-  .search-input {
-    flex: 1; min-width: 0;
-    background: none; border: 0; outline: none;
-    color: var(--fg); font: inherit;
-    padding: 2px 0;
+  .task-add-btn {
+    flex: none;
+    height: 28px;
+    background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg);
+    border-radius: 4px; cursor: pointer; padding: 0 6px;
+    display: flex; align-items: center; justify-content: center;
   }
-  .search-input::placeholder { color: var(--fg-dimmer); }
-  .search-clear {
-    appearance: none; border: 0; background: none; color: var(--fg-dim);
-    cursor: pointer; padding: 0 4px; font-size: 1.5em;
-  }
-  .search-clear:hover { color: var(--fg); }
-
-  .task-pane-controls {
-    display: flex; flex-wrap: wrap; gap: 4px 12px;
-    font-size: 0.86em;
-  }
-  .selector {
-    display: inline-flex; align-items: center; gap: 4px;
-    position: relative;
-    color: var(--fg-dim);
-    cursor: pointer;
-  }
-  .selector-label { color: var(--fg-dim); }
-  .selector-input {
-    appearance: none; -webkit-appearance: none;
-    background: none; border: 0; padding: 1px 14px 1px 2px;
-    color: var(--fg); font: inherit;
-    cursor: pointer;
-  }
-  .selector-input:focus { outline: 1px dotted var(--accent-line); outline-offset: 2px; }
-  .selector-input option { background: var(--bg-surface); color: var(--fg); }
-  .selector-caret { position: absolute; right: 0; pointer-events: none; color: var(--fg-dim); font-size: 0.8em; }
 
   .task-list {
     flex: 1; overflow-y: auto; overflow-x: hidden;
@@ -111,6 +71,14 @@
     font-size: 14px;
     color: var(--fg-dim);
   }
+  .task-row-start-icon {
+    display: inline-block;
+    margin-left: 4px;
+    vertical-align: -2px;
+    color: var(--fg-dim);
+  }
+  .task-row-start-icon.is-past { color: var(--p0); }
+  .task-row-start-icon.is-today { color: var(--fg); }
   .task-row-notes-icon {
     display: inline-block;
     margin-left: 5px;

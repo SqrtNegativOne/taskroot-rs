@@ -57,7 +57,7 @@
                 <span class="tags-count">{groups.length}</span>
             </div>
             <div class="tags-search">
-                <SearchBar placeholder="Search tags..." value={search} onchange={(value) => search = value} />
+                <SearchBar value={search} onchange={(value) => search = value} />
             </div>
         </header>
 

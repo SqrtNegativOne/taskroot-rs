@@ -1,9 +1,7 @@
 <script lang="ts">
     import TaskRow from './TaskRow.svelte';
     import TaskContextMenu from './TaskContextMenu.svelte';
-    import ListManagerModal from './ListManagerModal.svelte';
-    import FilterButton from '../FilterButton.svelte';
-    import SortButton from '../SortButton.svelte';
+    import ViewMenuButton from '../ViewMenuButton.svelte';
     import SearchBar from '../SearchBar.svelte';
     import { calendarsForComponent, computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
     import { taskListQueryArgs, taskListState } from '../../lib/taskList.svelte';
@@ -54,7 +52,6 @@
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
     const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
-    let listModalOpen = $state(false);
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
@@ -137,25 +134,20 @@
 
 <aside class="task-pane">
     <header class="task-pane-hd">
-        <div style="width: 100%; margin-bottom: 8px;">
-            <SearchBar 
-                placeholder="Search tasks..." 
+        <div class="task-pane-search-row">
+            <SearchBar
                 value={query}
                 onchange={(q) => query = q}
             />
-        </div>
-        <div class="task-pane-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
-            <FilterButton bind:filters={taskListState.filters} columns={filterColumns} getValuesForColumn={getFilterValues} />
-            <SortButton bind:sort={taskListState.sort} sortOptions={sortColumns} />
+            <ViewMenuButton
+                bind:filters={taskListState.filters}
+                columns={filterColumns}
+                getValuesForColumn={getFilterValues}
+                bind:sort={taskListState.sort}
+                sortOptions={sortColumns}
+            />
             <button
-                style="margin-left: auto; background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
-                title="Manage lists"
-                onclick={() => { listModalOpen = true; }}
-            >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            </button>
-            <button
-                style="background: var(--bg-surface); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; cursor: pointer; padding: 4px 6px; display: flex; align-items: center; justify-content: center;"
+                class="task-add-btn"
                 title="Add Task"
                 onclick={handleAddTask}
             >
@@ -212,8 +204,4 @@
     />
 {/if}
 
-<ListManagerModal
-    isOpen={listModalOpen}
-    calendars={calendarsQuery.data ?? []}
-    onClose={() => { listModalOpen = false; }}
-/>
+

@@ -79,8 +79,10 @@ in-page drag/drop on Windows. This is not a requirement to enable native file dr
 
 ## Filters and inspector
 
-`FilterButton`/`SortButton` share `FloatingMenu`; filter conditions and sortable
-rows share `FilterSortRow`. `FilterGroupEditor` recursively edits independent
+`FilterButton` shares `FloatingMenu`; filter conditions and sortable rows share
+`FilterSortRow`. `ViewMenuButton` wraps a filter editor plus a sort-row list
+(HTML5 drag reordering) in a single eye_tracking popover — the task list header
+uses it instead of separate filter/sort buttons. `FilterGroupEditor` recursively edits independent
 AND/OR groups: the first child is labelled “Where”, the second child's connector
 selects AND/OR for the whole group, and later connectors display that operator.
 New groups default to AND; groups with fewer than two children have no operator
