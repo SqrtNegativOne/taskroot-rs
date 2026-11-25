@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use ts_rs::TS;
 
+use super::window_lifecycle::WindowLifecycle;
+
+static MINITRACKER_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
+static LAUNCHER_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
+static EFFECT_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/WindowLabel.generated.ts")]
 #[serde(rename_all = "kebab-case")]
@@ -31,21 +37,26 @@ impl WindowLabel {
 /// The launcher, mini tracker and effect windows are declared with
 /// `"create": false` so starting the app does not pay for three extra webviews
 /// before the main window appears.
-fn ensure_window(app: &AppHandle, label: &WindowLabel) -> Option<WebviewWindow> {
+async fn ensure_window(app: &AppHandle, label: &WindowLabel) -> tauri::Result<WebviewWindow> {
     if let Some(window) = app.get_webview_window(label.as_str()) {
-        return Some(window);
+        return Ok(window);
     }
     let config = app
         .config()
         .app
         .windows
         .iter()
-        .find(|window| window.label == label.as_str())?
+        .find(|window| window.label == label.as_str())
+        .ok_or(tauri::Error::WindowNotFound)?
         .clone();
-    WebviewWindowBuilder::from_config(app, &config)
-        .ok()?
-        .build()
-        .ok()
+    let app = app.clone();
+    super::window_creation::create_off_thread(move || {
+        if let Some(window) = app.get_webview_window(&config.label) {
+            return Ok(window);
+        }
+        WebviewWindowBuilder::from_config(&app, &config)?.build()
+    })
+    .await
 }
 
 pub fn restore_main(app: &AppHandle) {
@@ -57,25 +68,28 @@ pub fn restore_main(app: &AppHandle) {
     let _ = main_win.set_focus();
 }
 
-pub fn set_minitracker_visible(app: &AppHandle, visible: bool) {
+/// # Errors
+///
+/// Returns an error if the window cannot be created or its visibility changed.
+pub async fn set_minitracker_visible(app: &AppHandle, visible: bool) -> tauri::Result<()> {
+    let _operation = MINITRACKER_LIFECYCLE.lock().await;
     if !visible {
         if let Some(mini_win) = app.get_webview_window(WindowLabel::Minitracker.as_str()) {
-            let _ = mini_win.hide();
+            mini_win.hide()?;
         }
-        return;
+        return Ok(());
     }
-    let Some(mini_win) = ensure_window(app, &WindowLabel::Minitracker) else {
-        return;
-    };
-    let _ = mini_win.show();
-    let _ = mini_win.unminimize();
-    let _ = mini_win.set_focus();
-    let _ = mini_win.set_always_on_top(true);
+    let mini_win = ensure_window(app, &WindowLabel::Minitracker).await?;
+    mini_win.show()?;
+    mini_win.unminimize()?;
+    mini_win.set_focus()?;
+    mini_win.set_always_on_top(true)?;
     #[cfg(target_os = "windows")]
     {
         square_window_corners(&mini_win);
         force_topmost(&mini_win);
     }
+    Ok(())
 }
 
 /// Keeps the visible mini tracker above the Windows taskbar.
@@ -165,23 +179,28 @@ fn square_window_corners(window: &tauri::WebviewWindow) {
     }
 }
 
-pub fn hide_launcher(app: &AppHandle) {
+pub async fn hide_launcher(app: &AppHandle) {
+    let _operation = LAUNCHER_LIFECYCLE.lock().await;
     if let Some(launcher_win) = app.get_webview_window(WindowLabel::Launcher.as_str()) {
         let _ = launcher_win.hide();
     }
 }
 
 /// Show the full-screen, click-through phase-transition effect overlay.
-pub fn show_screen_effect(app: &AppHandle) {
-    let Some(effect_win) = ensure_window(app, &WindowLabel::Effect) else {
-        return;
-    };
-    let _ = effect_win.set_ignore_cursor_events(true);
-    let _ = effect_win.set_always_on_top(true);
-    let _ = effect_win.show();
+///
+/// # Errors
+///
+/// Returns an error if the overlay cannot be created or shown.
+pub async fn show_screen_effect(app: &AppHandle) -> tauri::Result<()> {
+    let _operation = EFFECT_LIFECYCLE.lock().await;
+    let effect_win = ensure_window(app, &WindowLabel::Effect).await?;
+    effect_win.set_ignore_cursor_events(true)?;
+    effect_win.set_always_on_top(true)?;
+    effect_win.show()
 }
 
-pub fn hide_screen_effect(app: &AppHandle) {
+pub async fn hide_screen_effect(app: &AppHandle) {
+    let _operation = EFFECT_LIFECYCLE.lock().await;
     if let Some(effect_win) = app.get_webview_window(WindowLabel::Effect.as_str()) {
         let _ = effect_win.hide();
     }
@@ -191,19 +210,20 @@ pub fn quit_app(app: &AppHandle) {
     app.exit(0);
 }
 
-pub fn toggle_launcher_window(app: &AppHandle) {
-    let Some(launcher_win) = ensure_window(app, &WindowLabel::Launcher) else {
-        return;
-    };
+/// # Errors
+///
+/// Returns an error if the launcher cannot be created or its visibility changed.
+pub async fn toggle_launcher_window(app: &AppHandle) -> tauri::Result<()> {
+    let _operation = LAUNCHER_LIFECYCLE.lock().await;
+    let launcher_win = ensure_window(app, &WindowLabel::Launcher).await?;
 
     if matches!(launcher_win.is_visible(), Ok(true)) {
-        let _ = launcher_win.hide();
-        return;
+        return launcher_win.hide();
     }
 
-    let _ = launcher_win.center();
-    let _ = launcher_win.show();
-    let _ = launcher_win.set_focus();
+    launcher_win.center()?;
+    launcher_win.show()?;
+    launcher_win.set_focus()
 }
 
 pub fn resize_launcher(app: &AppHandle, width: f64, height: f64) {

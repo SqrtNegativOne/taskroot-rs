@@ -74,15 +74,21 @@ from a test; do not maintain a second verb inventory here.
 Five window labels are configured in `src-tauri/tauri.conf.json`: `main`,
 `launcher`, `minitracker`, `sidebar` and `effect`. They render the same SPA,
 branched by window label. Launcher, mini tracker and effect windows are created
-lazily from that config. Main hides to tray on close; the effect window is a
-transparent click-through phase-transition overlay.
+lazily from that config, with native creation dispatched to a blocking worker
+rather than the event-loop thread. Per-window asynchronous locks serialize
+creation and show/hide/toggle requests. Mini tracker startup is scheduled after the
+managed store is installed. See [Windows window creation](windows-development.md#lazy-window-creation).
+Main hides to tray on close; the effect window is a transparent click-through
+phase-transition overlay.
 
 The launcher shortcut is `CommandOrControl+Shift+Space`. The mini tracker chooses
 a task/custom label and controls the shared Rust stopwatch. That focus is app-local
 (`stopwatch-focus.json`), independent of VTODO status. The Do screen displays it
 read-only, resolving the live task title from an unfiltered query with the shared
-label as fallback. Clock phases and cross-window notifications come from Rust,
-not separate frontend clocks. Main-window audio/overlay feedback lives in
+label as fallback. Rust owns clock phases and broadcasts timestamped snapshots;
+frontends project elapsed/remaining time locally. In flowtime mode, the shared
+frontend engine requests Rust's `complete_break` transition when the countdown
+expires. Main-window audio/overlay feedback lives in
 `src/screens/do/stopwatch/feedback.ts`.
 
 ## Adding a setting

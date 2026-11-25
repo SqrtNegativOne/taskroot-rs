@@ -29,6 +29,12 @@ before changing that seam. Paths below are relative to `src-tauri/src/`.
 - Keep command handlers thin: marshal arguments, resolve state/client and
   delegate. Protocol, merge, query and state-machine behavior belongs below IPC.
   Small Tauri-specific orchestration belongs in IPC/session helpers, not calendar.
+- Lazy desktop window creation goes through `platform::window_creation`'s
+  off-thread helper. Serialize each window's complete create/show/hide/toggle
+  operation with `platform::window_lifecycle`, including hide requests during
+  creation. Never build WebView2 windows in synchronous IPC commands or event
+  callbacks; callbacks must dispatch asynchronous work. See
+  [Windows development](../docs/windows-development.md#lazy-window-creation).
 - Register commands in `bootstrap/mod.rs` and update the relevant seam tests.
   `ipc/tests.rs` checks literal names and recognized supplied keys; it does not
   resolve argument builders/spreads or check omitted required keys. Do not claim

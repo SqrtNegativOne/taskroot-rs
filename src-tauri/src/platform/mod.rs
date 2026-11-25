@@ -4,6 +4,8 @@
 
 mod data_dir;
 mod tray;
+mod window_creation;
+mod window_lifecycle;
 mod windows;
 
 pub use data_dir::{app_data_dir, configure_dev_webview_storage, configure_webview_flags};

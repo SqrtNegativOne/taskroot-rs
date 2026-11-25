@@ -52,8 +52,11 @@ instances before both inline bucketing and span layout. `hideTimed` reads
 `SECONDLY`, `MINUTELY`, `HOURLY`, `DAILY`, `WEEKLY`, ignoring `INTERVAL`.
 Thus “frequent” is a frequency-category label, not a measured interval: a
 `FREQ=WEEKLY;INTERVAL=8` series is also hidden. Monthly/yearly series remain visible.
-Both flags default off, persist under `ui.date_grid.visibility`, and leave task
-markers alone. Do not filter masters/exceptions before backend expansion.
+`hideDoneTasks` hides planned events whose linked task is done and also drops
+task date markers with `status: 'done'`; it applies to both marker kinds
+(start and due) of a completed task. All three flags default off and persist
+under `ui.date_grid.visibility`. Do not filter masters/exceptions before backend
+expansion.
 
 ## Pointer gestures and timeline geometry
 

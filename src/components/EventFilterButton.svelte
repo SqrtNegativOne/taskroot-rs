@@ -20,7 +20,7 @@
 
     const calendarOptions = $derived(calendarsForComponent(calendars, 'VEVENT')
         .map(calendar => ({ label: calendar.summary || calendar.id, value: calendar.id })));
-    const visibilityCount = $derived(Number(visibility?.hideFrequentRecurring ?? false) + Number(visibility?.hideTimed ?? false));
+    const visibilityCount = $derived(Number(visibility?.hideFrequentRecurring ?? false) + Number(visibility?.hideTimed ?? false) + Number(visibility?.hideDoneTasks ?? false));
 
     const filterColumns: FilterColumn<AppEventFilterColumn>[] = [
         { id: 'remotecollectionid', label: 'Calendar' },
@@ -57,6 +57,10 @@
                 <label>
                     <input type="checkbox" bind:checked={visibility.hideTimed} />
                     Hide timed events
+                </label>
+                <label>
+                    <input type="checkbox" bind:checked={visibility.hideDoneTasks} />
+                    Hide completed tasks
                 </label>
             </div>
         {/if}

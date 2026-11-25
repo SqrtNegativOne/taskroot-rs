@@ -21,6 +21,10 @@
 mutates it and emits `stopwatch-updated`. Work counts up and a break counts down
 one fifth of the work done (one fourth once the work reaches the long-break
 threshold). A finished break enters `stopped` and the next start begins a fresh
-session. The label is whatever the mini tracker selected: a task title or a
-custom string. The state machine lives in `state.rs`; IPC orchestrates transitions
+session. Frontends project the countdown from Rust timestamps; in flowtime mode,
+`src/screens/do/stopwatch/engine.svelte.ts` requests `complete_break` at zero.
+The resulting `stopped` update makes the mini tracker gray and triggers the
+main-window break-over alarm without an overlay. The label is whatever the mini
+tracker selected: a task title or a custom string. The state machine lives in
+`state.rs`; IPC orchestrates transitions
 and their Tauri notifications, so this feature never imports `ipc` or `bootstrap`.

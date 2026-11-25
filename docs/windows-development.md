@@ -72,6 +72,25 @@ output; documentation-only changes under `src/` can also invalidate it. Do not
 use a stamp match as proof that the binary contains every current edit. When in
 doubt, rebuild explicitly. The helper's path list must track build inputs.
 
+## Lazy window creation
+
+`platform/windows.rs` resolves configured windows; `platform/window_creation.rs`
+runs native creation on a blocking worker. `platform/window_lifecycle.rs` provides
+per-window asynchronous locks covering creation and visibility changes, so an
+overlapping hide waits for creation and duplicate show requests reuse one window.
+The effect, launcher and mini tracker IPC commands are asynchronous, and the
+launcher shortcut dispatches asynchronous work instead of building a window
+inside its event callback.
+
+Tauri [documents a Windows WebView2 deadlock](https://github.com/tauri-apps/wry/issues/583)
+when a window is built in a synchronous command or event handler. A break's first
+transition lazily opens the effect overlay, so violating this constraint can stop
+IPC and native window/tray actions while the frontend countdown continues locally.
+The non-visual regression tests model creation waiting for an event-loop request
+and overlapping lifecycle operations; they do not exercise WebView2 itself.
+Verify first-break, first-launcher and first
+mini-tracker behavior manually on Windows without agent-launched visual inspection.
+
 ## Tray and z-order diagnostics
 
 The mini tracker's Windows topmost guard and DWM square-corner setup live in

@@ -23,7 +23,7 @@
         paused: '#808080',
         running: '#ffffff',
         breaking: '#2ecc71',
-        stopped: '#e74c3c',
+        stopped: '#808080',
     } as const;
     const CUSTOM_FORM_HEIGHT = 45;
 

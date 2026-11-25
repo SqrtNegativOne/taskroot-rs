@@ -44,7 +44,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        platform::toggle_launcher_window(app);
+                        toggle_launcher_from_shortcut(app);
                     }
                 })
                 .build(),
@@ -118,6 +118,15 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
         ])
 }
 
+fn toggle_launcher_from_shortcut(app: &tauri::AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = platform::toggle_launcher_window(&app).await {
+            eprintln!("Failed to toggle launcher: {error}");
+        }
+    });
+}
+
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
     app.manage(reminders::ReminderState::default());
@@ -131,9 +140,15 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let store = calendar::Store::load(data_dir);
     let focus_feed_enabled = store.settings.focus_feed_enabled;
     let focus_feed_port = store.settings.focus_feed_port;
-    platform::set_minitracker_visible(&handle, store.settings.mini_tracker_enabled);
+    let minitracker_enabled = store.settings.mini_tracker_enabled;
     platform::start_minitracker_topmost_guard(&handle);
     handle.manage(calendar::StoreState::new(store));
+    let mini_handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = platform::set_minitracker_visible(&mini_handle, minitracker_enabled).await {
+            eprintln!("Failed to initialize mini tracker: {error}");
+        }
+    });
     ipc::session::start_load(handle.clone());
     if focus_feed_enabled {
         stopwatch::start_focus_feed(handle.clone(), focus_feed_port);

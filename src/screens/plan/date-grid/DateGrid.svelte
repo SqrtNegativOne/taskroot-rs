@@ -39,7 +39,7 @@
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let anchor = $state(new Date());
     let filters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
-    let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false });
+    let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false, hideDoneTasks: false });
     let query = $state('');
     const now = useNow(60_000);
     let today = $derived(new Date(now.ms));
@@ -78,7 +78,9 @@
     let events = $derived((eventsQuery.data ?? []).filter(event => isEventVisible(event, visibility)));
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
     let taskCalendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VTODO'));
-    let taskMarkers = $derived(taskDatesQuery.data ?? []);
+    let taskMarkers = $derived(visibility.hideDoneTasks
+        ? (taskDatesQuery.data ?? []).filter(marker => marker.status !== 'done')
+        : (taskDatesQuery.data ?? []));
 
     let isSingleWeek = $derived(view === DateGridView.OneWeek);
     let is3Weeks = $derived(view === DateGridView.ThreeWeeks);

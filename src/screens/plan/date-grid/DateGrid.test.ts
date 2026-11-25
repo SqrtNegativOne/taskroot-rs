@@ -24,6 +24,7 @@ async function openFilters() {
     return {
         recurring: screen.getByRole('checkbox', { name: 'Hide daily or weekly recurring events' }),
         timed: screen.getByRole('checkbox', { name: 'Hide timed events' }),
+        done: screen.getByRole('checkbox', { name: 'Hide completed tasks' }),
     };
 }
 
@@ -59,9 +60,10 @@ describe('DateGrid visibility filters', () => {
         expect(screen.getByText('Recurring timed')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Recurring span' })).toBeTruthy();
         expect(screen.getByText('Yearly event')).toBeTruthy();
-        const { recurring, timed } = await openFilters();
+        const { recurring, timed, done } = await openFilters();
         expect(recurring).toHaveProperty('checked', false);
         expect(timed).toHaveProperty('checked', false);
+        expect(done).toHaveProperty('checked', false);
         await fireEvent.click(screen.getByRole('button', { name: /add filter/i }));
         await fireEvent.click(screen.getByRole('button', { name: /select\.\.\./i }));
         expect(screen.getByRole('checkbox', { name: 'Event Calendar' })).toBeTruthy();
@@ -110,7 +112,7 @@ describe('DateGrid visibility filters', () => {
         await fireEvent.click(timed);
         mounted.unmount();
         await waitFor(() => {
-            expect(stored.get(persistedKeys.dateGridVisibility)).toEqual({ hideFrequentRecurring: false, hideTimed: true });
+            expect(stored.get(persistedKeys.dateGridVisibility)).toEqual({ hideFrequentRecurring: false, hideTimed: true, hideDoneTasks: false });
         });
         render(DateGrid);
         await screen.findByText('One-off all day');
@@ -130,6 +132,43 @@ describe('DateGrid visibility filters', () => {
         const { recurring, timed } = await openFilters();
         expect(recurring).toHaveProperty('checked', false);
         expect(timed).toHaveProperty('checked', false);
+    });
+});
+
+describe('DateGrid done-task hiding', () => {
+    beforeEach(() => {
+        tauri.reset();
+        const start = startOfWeek(new Date());
+        const startDate = ymd(start);
+        tauri.stubCommandValue('get_active_calendars', calendars);
+        tauri.stubCommandValue('get_ui_state', undefined);
+        tauri.stubCommandValue('query_event_instances', [
+            makeInstance({ id: 'planned-done', title: 'Planned done', taskId: 't1', taskStatus: 'done', timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 1)) } }),
+            makeInstance({ id: 'planned-todo', title: 'Planned todo', taskId: 't2', taskStatus: 'todo', timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 1)) } }),
+            makeInstance({ id: 'plain', title: 'Plain event', timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 1)) } }),
+        ]);
+        tauri.stubCommandValue('query_task_dates', [
+            makeTaskDateInstance({ taskId: 't1', kind: 'due', title: 'Done marker', status: 'done', timing: { kind: 'allDay', date: startDate } }),
+            makeTaskDateInstance({ taskId: 't2', kind: 'due', title: 'Open marker', status: 'todo', timing: { kind: 'allDay', date: ymd(addDays(start, 1)) } }),
+        ]);
+    });
+
+    afterEach(() => { cleanup(); });
+
+    it('hides done planned events and done task markers only after opting in', async () => {
+        render(DateGrid);
+        expect(await screen.findByText('Planned done')).toBeTruthy();
+        expect(await screen.findByText('Done marker')).toBeTruthy();
+
+        const { done } = await openFilters();
+        await fireEvent.click(done);
+
+        expect(screen.queryByText('Planned done')).toBeNull();
+        expect(screen.queryByText('Done marker')).toBeNull();
+        expect(screen.getByText('Planned todo')).toBeTruthy();
+        expect(screen.getByText('Plain event')).toBeTruthy();
+        expect(screen.getByText('Open marker')).toBeTruthy();
+        expect(screen.getByTitle('Filter').textContent?.trim()).toBe('1');
     });
 });
 

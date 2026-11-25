@@ -3,6 +3,7 @@ import type { EventInstance } from './domain';
 export interface EventVisibility {
     hideFrequentRecurring: boolean;
     hideTimed: boolean;
+    hideDoneTasks: boolean;
 }
 
 const FREQUENT_FREQUENCIES = new Set(['SECONDLY', 'MINUTELY', 'HOURLY', 'DAILY', 'WEEKLY']);
@@ -20,10 +21,16 @@ export function isFrequentRecurrence(event: EventInstance): boolean {
 export function isEventVisibility(value: unknown): value is EventVisibility {
     return typeof value === 'object' && value !== null
         && 'hideFrequentRecurring' in value && typeof value.hideFrequentRecurring === 'boolean'
-        && 'hideTimed' in value && typeof value.hideTimed === 'boolean';
+        && 'hideTimed' in value && typeof value.hideTimed === 'boolean'
+        && 'hideDoneTasks' in value && typeof value.hideDoneTasks === 'boolean';
+}
+
+function isDoneTask(event: EventInstance): boolean {
+    return event.taskId !== undefined && event.taskStatus === 'done';
 }
 
 export function isEventVisible(event: EventInstance, visibility: EventVisibility): boolean {
     if (visibility.hideFrequentRecurring && isFrequentRecurrence(event)) return false;
+    if (visibility.hideDoneTasks && isDoneTask(event)) return false;
     return !(visibility.hideTimed && event.timing.kind === 'timed');
 }

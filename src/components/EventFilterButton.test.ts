@@ -64,7 +64,7 @@ describe('EventFilterButton', () => {
     });
 
     it('keeps the Filter button accessible by name when its badge is active', () => {
-        render(EventFilterButton, { props: { calendars, visibility: { hideFrequentRecurring: true, hideTimed: true } } });
+        render(EventFilterButton, { props: { calendars, visibility: { hideFrequentRecurring: true, hideTimed: true, hideDoneTasks: false } } });
         expect(screen.getByRole('button', { name: 'Filter' })).toBeTruthy();
     });
 });
