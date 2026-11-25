@@ -1,0 +1,2 @@
+# Loopback-only disposable test server; never install into the global Python environment.
+Radicale==3.9.2

@@ -14,6 +14,10 @@ action)` reports failures through `notifyError` in `src/lib/toast.ts`.
 toast is mounted in each window except the effect overlay.
 
 `safeInvoke.svelte.ts` supplies `ResultAsync`, `useTauriQuery` and `useAutoQuery`.
+`useTauriQuery` re-fetches on `STORE_UPDATED` (emitted after every successful
+account command too), so account switches refresh live queries without navigation.
+`AccountBoundary` re-keys routes on `account-changed` to discard stale drafts;
+see [CalDAV accounts](caldav.md#accounts-and-switching).
 `asyncState.svelte.ts` supplies stale-response guards, flushable/cancellable
 debouncers and effect-based hydration (`hydrateOnce` can rerun when its loader
 reads reactive dependencies). `persistState` uses fixed-key hydration to read

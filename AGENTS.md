@@ -1,8 +1,9 @@
 # Taskroot agent guide
 
 Taskroot is a desktop task manager: Svelte 5 + SvelteKit SPA (TypeScript, Vite,
-Bun), wrapped by Tauri v2 (Rust). One CalDAV server is the source of truth;
-calendar data lives in an in-memory Rust store, with immediate server writes.
+Bun), wrapped by Tauri v2 (Rust). Saved CalDAV profiles have one active account;
+its server is the source of truth. Calendar data lives in an in-memory Rust store,
+with immediate server writes.
 Settings and UI state use JSON files. There is no local calendar database,
 offline queue or background calendar sync.
 
@@ -76,6 +77,21 @@ only for the affected subsystem.
 | Tests | [Testing reference](docs/testing.md), [test-review skill](.agents/skills/avoid-change-detector-tests/SKILL.md) |
 | Known bugs / proposed simplifications | [Audited follow-ups](docs/known-limitations.md) (not rules to preserve) |
 | Windows build/access issues | [Windows development](docs/windows-development.md) |
+
+## Dummy accounts
+
+The disposable fixture at `http://127.0.0.1:15232` uses **test-only** credentials:
+
+| Username | Password |
+|---|---|
+| `taskroot-dummy-a` | `dummy-a-only` |
+| `taskroot-dummy-b` | `dummy-b-only` |
+
+Start/seed it with [dummy-account setup](docs/dummy-accounts.md), then add the
+profiles in Settings → Account. Agents may use this fixture for non-visual tests;
+never use port 5232, a normal data directory or the user's credentials. The server
+is loopback-only and all fixture storage is under ignored `src-tauri/target/`.
+No real credentials belong in documentation.
 
 [TODO.md](TODO.md) is the inspector/iCalendar backlog, not a description of the
 current implementation. Prefer code and current references when checking claims.

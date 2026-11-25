@@ -106,11 +106,14 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             ipc::settings::get_ui_state,
             ipc::settings::set_ui_state,
             ipc::settings::update_setting,
-            ipc::calendars::is_account_configured,
-            ipc::calendars::get_account,
-            ipc::calendars::test_account,
-            ipc::calendars::connect_account,
-            ipc::calendars::disconnect_account,
+            ipc::accounts::is_account_configured,
+            ipc::accounts::get_account,
+            ipc::accounts::get_accounts,
+            ipc::accounts::test_account,
+            ipc::accounts::connect_account,
+            ipc::accounts::switch_account,
+            ipc::accounts::disconnect_account,
+            ipc::accounts::remove_account,
             ipc::calendars::create_calendar,
             ipc::calendars::rename_calendar,
             ipc::calendars::set_calendar_color,
@@ -130,13 +133,20 @@ fn toggle_launcher_from_shortcut(app: &tauri::AppHandle) {
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let _ = app.global_shortcut().register(LAUNCHER_SHORTCUT);
     app.manage(reminders::ReminderState::default());
-    app.manage(calendar::HttpClient::new()?);
+    let http = calendar::HttpClient::new()?;
     let handle = app.handle().clone();
 
     platform::build_tray(app)?;
 
     let data_dir = platform::app_data_dir(&handle)?;
     app.manage(stopwatch::StopwatchManager::load(&data_dir));
+    handle.manage(calendar::account::AccountService::new(
+        std::sync::Arc::new(calendar::account::JsonAccountRepository::new(
+            data_dir.clone(),
+        )),
+        std::sync::Arc::new(calendar::account::KeychainCredentials),
+        http,
+    ));
     let store = calendar::Store::load(data_dir);
     let focus_feed_enabled = store.settings.focus_feed_enabled;
     let focus_feed_port = store.settings.focus_feed_port;
@@ -145,7 +155,9 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     handle.manage(calendar::StoreState::new(store));
     let mini_handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = platform::set_minitracker_visible(&mini_handle, minitracker_enabled).await {
+        if let Err(error) =
+            platform::set_minitracker_visible(&mini_handle, minitracker_enabled).await
+        {
             eprintln!("Failed to initialize mini tracker: {error}");
         }
     });

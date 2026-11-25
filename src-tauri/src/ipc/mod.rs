@@ -4,6 +4,7 @@
 // handler.
 #![allow(clippy::needless_pass_by_value)]
 
+pub mod accounts;
 pub mod calendars;
 pub mod events;
 pub mod plan;

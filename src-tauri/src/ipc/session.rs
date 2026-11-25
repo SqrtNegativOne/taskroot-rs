@@ -5,9 +5,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::AppError;
-use crate::features::calendar::{
-    CalDavClient, HttpClient, Store, StoreState, connect, fetch_into,
-};
+use crate::features::calendar::{account::ClientLease, StoreState};
 
 pub(crate) use crate::features::calendar::app_calendar;
 
@@ -25,15 +23,8 @@ const STARTUP_LOAD_RETRY_DELAY: Duration = Duration::from_secs(2);
 ///
 /// Returns [`AppError::Auth`] when no account/password is available and
 /// [`AppError::Internal`] when the HTTP client was never initialized.
-pub(crate) async fn client_for(app: &AppHandle) -> Result<CalDavClient, AppError> {
-    let dir = crate::platform::app_data_dir(app)?;
-    let http = app
-        .try_state::<HttpClient>()
-        .ok_or_else(|| AppError::NotReady("The HTTP client is not initialized".to_string()))?
-        .inner()
-        .clone();
-    let (_account, client) = connect::connect(&dir, &http, None)?;
-    Ok(client)
+pub(crate) async fn client_for(app: &AppHandle) -> Result<ClientLease, AppError> {
+    super::accounts::service(app)?.client().await
 }
 
 /// # Errors
@@ -54,21 +45,8 @@ pub(crate) fn store_state(app: &AppHandle) -> Result<State<'_, StoreState>, AppE
 ///
 /// Returns the account/transport/parse failure from the load.
 pub(crate) async fn load_all(app: &AppHandle) -> Result<(), AppError> {
-    let client = client_for(app).await?;
-    let dir = crate::platform::app_data_dir(app)?;
     let state = store_state(app)?;
-    let revision = state.read(Store::revision).await;
-
-    let fetched = fetch_into(&dir, &client).await?;
-
-    let mut store = state.lock().await;
-    if store.revision() != revision {
-        drop(store);
-        eprintln!("Skipping the calendar load: the store changed while fetching");
-        return Ok(());
-    }
-    crate::features::calendar::apply(&mut store, fetched);
-    drop(store);
+    super::accounts::service(app)?.refresh(&state).await?;
 
     let _ = app.emit(crate::ipc_events::STORE_UPDATED, ());
     Ok(())

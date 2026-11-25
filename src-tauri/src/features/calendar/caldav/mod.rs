@@ -9,7 +9,8 @@
 //!   responses.
 //! - [`discovery`] — server URL normalisation and the
 //!   `well-known` → principal → home → collections chain.
-//! - [`account`] — `account.json` (password-free) and the OS keychain password.
+//! - [`account`] — the saved-profile `account.json` registry (password-free) and the
+//!   per-profile OS keychain passwords.
 //! - [`client`] — `sync-collection`, `calendar-multiget`, `PUT`, `DELETE`,
 //!   `MKCALENDAR` and `PROPPATCH`.
 //! - [`calendars`] — collection lifecycle (create, rename, recolour, delete).

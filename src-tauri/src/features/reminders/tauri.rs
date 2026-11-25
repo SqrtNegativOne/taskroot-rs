@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::features::calendar::{Store, StoreState};
+use crate::features::calendar::{account::AccountService, Store, StoreState};
 
-use super::policy::{POLL_SECONDS, alarms_due};
+use super::policy::{alarms_due, POLL_SECONDS};
 
 /// Remembers which trigger instant was last delivered per task/alarm slot.
 #[derive(Default)]
@@ -26,6 +26,12 @@ pub fn start_reminder_engine(app: AppHandle) {
 }
 
 async fn tick(app: &AppHandle) {
+    let Some(accounts) = app.try_state::<AccountService>() else {
+        return;
+    };
+    let Ok(scope) = accounts.scope().await else {
+        return;
+    };
     let Some(state) = app.try_state::<StoreState>() else {
         eprintln!("[reminders] store unavailable");
         return;
@@ -36,10 +42,11 @@ async fn tick(app: &AppHandle) {
 
     let reminder_state = app.state::<ReminderState>();
     for reminder in due {
+        let key = format!("{}:{}", scope.id, reminder.key);
         let already_sent = reminder_state
             .0
             .lock()
-            .is_ok_and(|sent| sent.get(&reminder.key) == Some(&reminder.trigger));
+            .is_ok_and(|sent| sent.get(&key) == Some(&reminder.trigger));
         if already_sent {
             continue;
         }
@@ -55,7 +62,7 @@ async fn tick(app: &AppHandle) {
         }
 
         if let Ok(mut sent) = reminder_state.0.lock() {
-            sent.insert(reminder.key, reminder.trigger);
+            sent.insert(key, reminder.trigger);
         }
     }
 }

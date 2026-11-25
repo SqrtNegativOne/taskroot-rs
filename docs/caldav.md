@@ -1,7 +1,7 @@
 # CalDAV
 
-Taskroot talks to one CalDAV server. The local Radicale instance is the single source of
-truth; Taskroot never reads Radicale's storage folder.
+Taskroot saves one or more CalDAV profiles and has **one active account** whose server
+is the single source of truth; Taskroot never reads Radicale's storage folder.
 
 ## Deployment
 
@@ -9,8 +9,9 @@ truth; Taskroot never reads Radicale's storage folder.
 - The phone reaches the same server through `tailscale serve` at
   `https://sqrt-1.tail03279c.ts.net` with DAVx5 (tasks.org for VTODO, a calendar app for
   VEVENT).
-- Taskroot stores the account in `account.json` and the password in the OS keychain
-  (Windows Credential Manager, macOS Keychain, Secret Service on Linux).
+- Taskroot stores the profile registry in `account.json` and each password in the OS
+  keychain under the `taskroot.caldav.profiles` service (Windows Credential Manager,
+  macOS Keychain, Secret Service on Linux), keyed by profile id.
 - Plain `http` is accepted only for loopback or `*.ts.net`; any other host must use `https`.
 
 The app data directory (`<app_data>/taskroot/` on Linux, the identifier directory on
@@ -20,7 +21,7 @@ Windows/macOS) contains:
 |---|---|
 | `settings.json` | `AppSettings`, one object. Malformed → renamed `settings.json.bad`, defaults used. |
 | `ui-state.json` | Flat `{ "<key>": <value> }` map for per-component UI state. |
-| `account.json` | Server URL, username, home-set, principal and discovered collections. No password. |
+| `account.json` | `AccountRegistry`: the saved profiles (server URL, username, home-set, principal, discovered collections) and which one is active. No passwords. |
 
 Debug and release builds share this directory. Only a debug build whose app-data
 directory is not writable (a sandboxed dev run) keeps it next to the executable in
@@ -29,6 +30,33 @@ once. `TASKROOT_DATA_DIR` overrides both.
 
 Discovery runs at account setup and on every load (startup, Refresh, and after a list is
 created) to pick up the server-assigned collection. There is no background sync.
+
+## Accounts and switching
+
+`account.json` holds an `AccountRegistry` of saved profiles plus `activeId`. Passwords
+live only in the OS keychain (service `taskroot.caldav.profiles`, key = profile id), so
+two profiles with the same username on different servers never collide;
+`TASKROOT_CALDAV_PASSWORD` overrides the keychain for headless use.
+
+Switching (`connect`, `activate`, reconnect) fully fetches the target account first, then
+persists the registry and applies the store; any failure keeps the previous active
+account, its data and its credentials. `AccountService` guards this with a read/write
+gate: every command runs under a `ClientLease`/`AccountScope` that pins the active
+profile, so a switch cannot commit while an operation is in flight. Disconnect keeps the
+saved profiles; removing a profile deletes its password and clears the store only if it
+was active. Switching accounts clears stopwatch focus and emits `account-changed`; the
+frontend re-keys routes (except Settings) through `AccountBoundary` so cross-account
+drafts are discarded. Settings and UI state are global, not per-account.
+
+There is no schema migration: a pre-registry single-account `account.json` fails to
+parse as a registry and reports a `store` error at startup. Recover by hand — rewrite
+the file as a one-profile registry (same `serverUrl`/hrefs keep list settings working)
+and copy the keychain password from the legacy service `taskroot.caldav` (keyed by
+username) to `taskroot.caldav.profiles` (keyed by profile id), or simply delete the
+file and reconnect.
+
+For testing, a disposable loopback Radicale with two dummy accounts is available; see
+[dummy accounts](dummy-accounts.md).
 
 ## Lists
 

@@ -80,11 +80,16 @@ shapes. Reuse `test_support::caldav::{start_server, start_http_server}` and
 `test_support::ics::{series, all_day, with_exception}` for server/ICS fixtures.
 `clippy.toml` permits `unwrap`/`expect` in tests; do not add repetitive module allows.
 
+For real multi-account behavior there is a disposable loopback Radicale fixture
+with documented test-only credentials; see [dummy accounts](dummy-accounts.md).
+Its backend contract is `caldav/tests/dummy_accounts.rs`, ignored by default and
+run through the fixture script (`--check-backend`), like the Radicale e2e example:
+
 The live Radicale check is `src-tauri/examples/e2e_caldav.rs`. It exercises
 create/edit/move/delete and preservation through a real server, is not part of CI,
 and needs deliberate access to a **disposable data directory and server fixture**:
 it recursively deletes the selected data directory and edits/restores a server
-task fixture. An interrupted/erroring run may not restore it. Never point this
+task fixture. Never point this
 example at the user's normal data directory/account as a harmless check:
 
 ```sh

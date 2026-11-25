@@ -15,7 +15,7 @@ use super::caldav::account;
 use super::caldav::client::CalDavClient;
 use super::caldav::discovery;
 use super::caldav::model::CalendarInfo;
-use super::store::{Store, ops};
+use super::store::{ops, Store};
 use ops::FetchedCollection;
 
 /// A complete load that has not touched any store yet.
@@ -33,7 +33,7 @@ pub struct Fetched {
 ///
 /// Returns the account, transport or parse failure.
 pub async fn fetch_into(dir: &Path, client: &CalDavClient) -> Result<Fetched, AppError> {
-    let mut account = account::read_account(dir)?
+    let mut account = account::read_client_account(dir, client)?
         .ok_or_else(|| AppError::Auth("No CalDAV account is configured".to_string()))?;
     let calendars = discovery::refresh_collections(dir, client, &mut account).await;
     let collections = ops::fetch_collections(client, &calendars).await?;

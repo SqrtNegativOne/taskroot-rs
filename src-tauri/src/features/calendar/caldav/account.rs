@@ -1,33 +1,30 @@
-//! The single `CalDAV` account: `account.json` plus the OS keychain password.
-//!
-//! `account.json` never contains the password. It is written atomically (a
-//! sibling `.tmp` file is renamed over it) and a malformed file is a
-//! [`AppError::Store`] failure rather than a silent reset, so a broken account
-//! cannot be mistaken for "no account configured".
-//!
-//! The password lives in the OS keychain under [`KEYRING_SERVICE`], keyed by
-//! the username.
+//! Saved `CalDAV` profiles and the active-account registry (no passwords).
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::model::CalendarInfo;
 use crate::error::AppError;
 
-use super::model::CalendarInfo;
+mod credentials;
+mod leases;
+mod management;
+mod service;
+mod storage;
 
-/// File name of the account record inside the app data directory.
+pub use credentials::{CredentialStore, KeychainCredentials};
+pub use leases::{AccountScope, ClientLease};
+pub use service::AccountService;
+pub use storage::{AccountRepository, JsonAccountRepository};
+
 pub const ACCOUNT_FILE: &str = "account.json";
-/// Keychain service name for the `CalDAV` password.
-pub const KEYRING_SERVICE: &str = "taskroot.caldav";
-
-const TEMP_FILE: &str = "account.json.tmp";
 
 /// The persisted account. Contains no credentials.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/bindings/Account.generated.ts")]
-#[serde(rename_all = "camelCase", default)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
     pub server_url: String,
     pub username: String,
@@ -36,126 +33,115 @@ pub struct Account {
     pub calendars: Vec<CalendarInfo>,
 }
 
-/// `<dir>/account.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/AccountProfile.generated.ts"
+)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountProfile {
+    pub id: String,
+    pub account: Account,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(
+    export,
+    export_to = "../../src/lib/bindings/AccountRegistry.generated.ts"
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AccountRegistry {
+    pub active_id: Option<String>,
+    pub profiles: Vec<AccountProfile>,
+}
+
+impl AccountRegistry {
+    #[must_use]
+    pub fn active(&self) -> Option<&AccountProfile> {
+        self.active_id
+            .as_ref()
+            .and_then(|id| self.profiles.iter().find(|profile| &profile.id == id))
+    }
+
+    pub(super) fn profile(&self, id: &str) -> Result<&AccountProfile, AppError> {
+        self.profiles
+            .iter()
+            .find(|profile| profile.id == id)
+            .ok_or_else(|| AppError::NotFound(format!("Account {id}")))
+    }
+}
+
 #[must_use]
 pub fn account_path(dir: &Path) -> PathBuf {
     dir.join(ACCOUNT_FILE)
 }
 
-/// Read the account, or `None` when no account has been configured.
+/// Read the active account; malformed registries are errors, not silent resets.
 ///
 /// # Errors
-///
-/// Returns [`AppError::Store`] when the file exists but cannot be read or
-/// parsed.
+/// Returns a storage error when the registry cannot be read or validated.
 pub fn read_account(dir: &Path) -> Result<Option<Account>, AppError> {
-    let path = account_path(dir);
-    match std::fs::read_to_string(&path) {
-        Ok(raw) => serde_json::from_str(&raw).map(Some).map_err(|error| {
-            AppError::Store(format!(
-                "Malformed account file `{}`: {error}",
-                path.display()
-            ))
-        }),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(AppError::Store(format!(
-            "Could not read account file `{}`: {error}",
-            path.display()
-        ))),
-    }
+    Ok(JsonAccountRepository::new(dir.to_path_buf())
+        .read()?
+        .active()
+        .map(|profile| profile.account.clone()))
 }
 
-/// Write the account atomically: a `.tmp` file is renamed over `account.json`.
+/// Read metadata for the client's pinned server/user, even after disk activation changes.
+/// # Errors
+/// Returns registry storage failures.
+pub fn read_client_account(
+    dir: &Path,
+    client: &super::client::CalDavClient,
+) -> Result<Option<Account>, AppError> {
+    let registry = JsonAccountRepository::new(dir.to_path_buf()).read()?;
+    Ok(registry
+        .profiles
+        .into_iter()
+        .find(|profile| {
+            profile.account.server_url.trim_end_matches('/')
+                == client.base_url().as_str().trim_end_matches('/')
+                && profile.account.username == client.username()
+        })
+        .map(|profile| profile.account))
+}
+
+/// Update discovery metadata without changing the active profile.
+/// An empty registry is initialized for headless fixture setup.
 ///
 /// # Errors
-///
-/// Returns [`AppError::Store`] when the file cannot be serialised or written.
+/// Returns a storage error or rejects an account no longer in the registry.
 pub fn write_account(dir: &Path, account: &Account) -> Result<(), AppError> {
-    let path = account_path(dir);
-    let temp_path = dir.join(TEMP_FILE);
-    let json = serde_json::to_vec_pretty(account)
-        .map_err(|error| AppError::Store(format!("Could not encode the account: {error}")))?;
-
-    std::fs::write(&temp_path, json).map_err(|error| {
-        AppError::Store(format!(
-            "Could not write account file `{}`: {error}",
-            temp_path.display()
-        ))
-    })?;
-
-    std::fs::rename(&temp_path, &path).map_err(|error| {
-        if let Err(cleanup_error) = std::fs::remove_file(&temp_path) {
-            eprintln!(
-                "[caldav] could not remove `{}` after a failed rename: {cleanup_error}",
-                temp_path.display()
-            );
-        }
-        AppError::Store(format!(
-            "Could not replace account file `{}`: {error}",
-            path.display()
-        ))
-    })
+    let repository = JsonAccountRepository::new(dir.to_path_buf());
+    let mut registry = repository.read()?;
+    if let Some(profile) = registry.profiles.iter_mut().find(|profile| {
+        profile.account.server_url == account.server_url
+            && profile.account.username == account.username
+    }) {
+        profile.account = account.clone();
+    } else if registry.profiles.is_empty() {
+        let id = uuid::Uuid::new_v4().to_string();
+        registry.active_id = Some(id.clone());
+        registry.profiles.push(AccountProfile {
+            id,
+            account: account.clone(),
+        });
+    } else {
+        return Err(AppError::NotFound("The account was removed".to_string()));
+    }
+    repository.write(&registry)
 }
 
-/// Delete `account.json`. A missing file counts as success.
+/// Remove a disposable registry file. Does not touch credentials.
 ///
 /// # Errors
-///
-/// Returns [`AppError::Store`] when the file exists but cannot be removed.
+/// Returns a storage error on filesystem failure.
 pub fn delete_account_file(dir: &Path) -> Result<(), AppError> {
-    let path = account_path(dir);
-    match std::fs::remove_file(&path) {
+    match std::fs::remove_file(account_path(dir)) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(AppError::Store(format!(
-            "Could not remove account file `{}`: {error}",
-            path.display()
+            "Could not remove account file: {error}"
         ))),
     }
-}
-
-/// Store the password in the OS keychain.
-///
-/// # Errors
-///
-/// Returns [`AppError::Store`] when the keychain rejects the write.
-pub fn save_password(username: &str, password: &str) -> Result<(), AppError> {
-    let entry =
-        keyring::Entry::new(KEYRING_SERVICE, username).map_err(|error| keychain_error(&error))?;
-    entry
-        .set_password(password)
-        .map_err(|error| keychain_error(&error))
-}
-
-/// Load the password from the OS keychain, or `None` when it is absent.
-///
-/// # Errors
-///
-/// Returns [`AppError::Store`] when the keychain cannot be queried.
-pub fn load_password(username: &str) -> Result<Option<String>, AppError> {
-    let entry =
-        keyring::Entry::new(KEYRING_SERVICE, username).map_err(|error| keychain_error(&error))?;
-    match entry.get_password() {
-        Ok(password) => Ok(Some(password)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(keychain_error(&error)),
-    }
-}
-
-/// Delete the keychain password. A missing entry counts as success.
-///
-/// # Errors
-///
-/// Returns [`AppError::Store`] when the keychain cannot be updated.
-pub fn delete_password(username: &str) -> Result<(), AppError> {
-    let entry =
-        keyring::Entry::new(KEYRING_SERVICE, username).map_err(|error| keychain_error(&error))?;
-    match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(keychain_error(&error)),
-    }
-}
-
-fn keychain_error(error: &keyring::Error) -> AppError {
-    AppError::Store(format!("OS keychain error: {error}"))
 }

@@ -8,8 +8,8 @@ use std::path::Path;
 
 use uuid::Uuid;
 
-use crate::features::calendar::domain::Color;
 use crate::error::AppError;
+use crate::features::calendar::domain::Color;
 use crate::features::calendar::store::Store;
 
 use super::account;
@@ -31,7 +31,7 @@ pub async fn create(
     component: CalendarComponent,
 ) -> Result<(), AppError> {
     let name = require_name(display_name)?;
-    let account = account::read_account(dir)?
+    let account = account::read_client_account(dir, client)?
         .ok_or_else(|| AppError::Auth("No CalDAV account is configured".to_string()))?;
     let href = format!(
         "{}/{}/",
@@ -41,7 +41,7 @@ pub async fn create(
 
     client.mkcalendar(&href, name, component).await?;
     let calendars = discovery::fetch_calendars(client, &account.home_href).await?;
-    replace_calendars(dir, store, calendars)
+    replace_calendars(dir, client, store, calendars)
 }
 
 /// Rename a collection.
@@ -66,7 +66,7 @@ pub async fn rename(
     if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
         calendar.display_name = name.to_string();
     }
-    replace_calendars(dir, store, calendars)
+    replace_calendars(dir, client, store, calendars)
 }
 
 /// Set (or clear, with `None`) a collection's colour.
@@ -93,7 +93,7 @@ pub async fn set_color(
     if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
         calendar.color = color;
     }
-    replace_calendars(dir, store, calendars)
+    replace_calendars(dir, client, store, calendars)
 }
 
 /// Delete a collection and every resource in it.
@@ -121,7 +121,7 @@ pub async fn delete(
         .filter(|calendar| calendar.href != href)
         .cloned()
         .collect();
-    replace_calendars(dir, store, calendars)?;
+    replace_calendars(dir, client, store, calendars)?;
     Ok(())
 }
 
@@ -143,10 +143,11 @@ fn ensure_writable(store: &Store, href: &str) -> Result<(), AppError> {
 
 fn replace_calendars(
     dir: &Path,
+    client: &CalDavClient,
     store: &mut Store,
     calendars: Vec<CalendarInfo>,
 ) -> Result<(), AppError> {
-    if let Some(mut account) = account::read_account(dir)? {
+    if let Some(mut account) = account::read_client_account(dir, client)? {
         account.calendars.clone_from(&calendars);
         account::write_account(dir, &account)?;
     }

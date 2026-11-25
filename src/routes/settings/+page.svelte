@@ -1,9 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { goto } from '$app/navigation';
-    import { resolve } from '$app/paths';
+
     import { safeInvoke } from '$lib/safeInvoke.svelte';
-    import { Routes } from '$lib/routes';
+
     import { STORE_UPDATED } from '$lib/ipcEvents';
     import SettingRow from './SettingRow.svelte';
     import AccountPanel from './AccountPanel.svelte';
@@ -103,7 +102,7 @@
             {#if activeTabId === ACCOUNT_TAB_ID}
                 <div class="tab-content">
                     <h1>Account</h1>
-                    <AccountPanel onSignedOut={() => void goto(resolve(Routes.CONNECT))} />
+                    <AccountPanel />
                 </div>
             {:else}
                 {#each schema.tabs as tab (tab.id)}

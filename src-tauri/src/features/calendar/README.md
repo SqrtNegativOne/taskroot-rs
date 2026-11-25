@@ -7,7 +7,8 @@ other feature, `bootstrap`, `ipc`, `platform`, or Tauri.
 
 - `domain/` — DTOs, ids, typed recursive AND/OR filter groups, recurrence and the
   `EventTiming` normalization boundary.
-- `caldav/` — HTTP transport, XML, discovery, account setup and resource CRUD.
+- `caldav/` — HTTP transport, XML, discovery, saved-account profiles, switching
+  (`account/`) and resource CRUD.
 - `ics/` — byte-level `.ics` read/write. Never serialize a DTO into a resource.
 - `store/` — the in-memory resource map, query path (`query/matcher.rs` for
   recursive filters, `columns.rs` for comparisons, `sorting.rs` for order),
@@ -48,7 +49,8 @@ unfinished-condition handling and multi-value inclusion/exclusion.
 
 ## Loading and writes
 
-`load::fetch_into` re-reads the account, refreshes discovery and fetches every
+`load::fetch_into` re-reads the client's account metadata, refreshes discovery and
+fetches every
 collection without touching a store; `apply` swaps a complete snapshot in.
 `ipc::session::load_all` applies under a revision guard after fetching outside the
 store lock. Collection-list refresh uses a three-second timeout and falls back

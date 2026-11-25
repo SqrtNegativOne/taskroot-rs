@@ -6,8 +6,12 @@
 //! server is `#[ignore]`d.
 
 mod account;
+mod account_failures;
+mod account_support;
+mod accounts;
 mod client;
 mod discovery;
+mod dummy_accounts;
 mod transport;
 mod xml;
 

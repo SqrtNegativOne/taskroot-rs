@@ -19,8 +19,9 @@ This is a navigation reference, not a file-by-file inventory. Read the applicabl
   [known limitations](known-limitations.md). Writes merge into raw ICS and go to
   the server immediately. See [CalDAV](caldav.md).
 - `settings.json` holds typed `AppSettings`; `ui-state.json` holds per-component
-  state. `account.json` holds connection/discovery information, not the password;
-  credentials use the OS keychain. `TASKROOT_CALDAV_PASSWORD` can override the
+  state. The `account.json` registry holds saved CalDAV profiles with one active
+  account; passwords use the OS keychain (service `taskroot.caldav.profiles`, keyed by
+  profile id). `TASKROOT_CALDAV_PASSWORD` can override the
   password for headless/development use. See [Windows development](windows-development.md)
   for the data-directory override and debug fallback.
 - `src/lib/bindings/*.generated.ts` comes from Rust `ts-rs` export tests;
@@ -32,7 +33,7 @@ This is a navigation reference, not a file-by-file inventory. Read the applicabl
 |---|---|
 | SPA/window routing, toasts and daily startup redirect | `src/routes/+layout.svelte`, `src/lib/dailyStartup.ts`, `src/lib/routes.ts` |
 | Routing/chunk-load recovery | `src/routes/+error.svelte` |
-| Settings and CalDAV account/list management | `src/routes/settings/`, `src/components/CalendarManager.svelte` |
+| Settings, CalDAV account profiles/switching and list management | `src/routes/settings/`, `src/components/accounts/`, `src/components/CalendarManager.svelte` |
 | Backend mutations, queries and persistence | `src/lib/store.svelte.ts`, `src/lib/safeInvoke.svelte.ts`, `src/lib/queries.ts`, `src/lib/persisted.svelte.ts`, `src/lib/asyncState.svelte.ts` |
 | Shared task-list definition | `src/lib/taskList.svelte.ts`, `src/lib/TaskListState.svelte`, `src/components/tasklist/` |
 | Task/event inspector, recurrence scope, event-to-task conversion | `src/components/inspector-pane/` |
@@ -55,7 +56,7 @@ All backend paths below are under `src-tauri/src/`.
 | Module/lint wiring | `lib.rs` |
 | Tauri composition, plugins, setup and command registration | `bootstrap/` |
 | Desktop windows, tray and data-directory resolution | `platform/` |
-| Command wrappers and Tauri calendar-session adapter | `ipc/`, especially `session.rs`; contract tests in `ipc/tests.rs` |
+| Command wrappers and Tauri calendar-session adapter | `ipc/`, especially `session.rs`; account service wiring in `ipc/accounts.rs`; contract tests in `ipc/tests.rs` |
 | Calendar domain, transport, ICS, in-memory store and projections | [Calendar feature](../src-tauri/src/features/calendar/README.md) |
 | Shared clock, persisted focus/history and optional localhost feed | [Stopwatch feature](../src-tauri/src/features/stopwatch/README.md), [focus-feed API](focus-feed.md) |
 | Task alarm policy and notification polling | [Reminders feature](../src-tauri/src/features/reminders/README.md) |

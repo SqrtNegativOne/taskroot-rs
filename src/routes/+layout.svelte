@@ -11,6 +11,7 @@
     import { Routes } from '$lib/routes';
     import { claimFirstOpenOfDay } from '$lib/dailyStartup';
     import { LAUNCHER_NAVIGATE } from '$lib/ipcEvents';
+    import AccountBoundary from '../components/accounts/AccountBoundary.svelte';
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
     import LauncherPalette from '$lib/launcher/LauncherPalette.svelte';
@@ -101,10 +102,10 @@
 </script>
 
 {#if isLauncher}
-    <LauncherPalette />
+    <AccountBoundary><LauncherPalette /></AccountBoundary>
 {:else if isSidebar}
     <div class="sidebar-shell">
-        {@render children()}
+        <AccountBoundary>{@render children()}</AccountBoundary>
     </div>
 {:else if isEffect}
     <div class="effect-shell">
@@ -120,7 +121,9 @@
         {#if !isMinitracker}
             <TitleBar />
         {/if}
-        {@render children()}
+        <AccountBoundary preserve={page.url.pathname === Routes.SETTINGS}>
+            {@render children()}
+        </AccountBoundary>
     </div>
 {/if}
 

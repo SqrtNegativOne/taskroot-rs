@@ -5,6 +5,20 @@ use crate::features::stopwatch::{
     with_manager, StopwatchLabelSource, StopwatchManager, StopwatchState,
 };
 
+pub(crate) fn clear_account_focus(app: &tauri::AppHandle) {
+    let result = with_manager(app, |manager| {
+        let snapshot = manager.snapshot()?;
+        snapshot
+            .task_id
+            .map_or(Ok(None), |id| manager.clear_task_if(&id))
+    });
+    match result {
+        Ok(Some(updated)) => emit(app, &updated),
+        Ok(None) => {}
+        Err(error) => eprintln!("Could not clear the previous account's stopwatch focus: {error}"),
+    }
+}
+
 fn emit(app: &tauri::AppHandle, state: &StopwatchState) {
     let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, state);
 }

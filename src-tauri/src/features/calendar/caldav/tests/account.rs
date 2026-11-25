@@ -5,7 +5,8 @@
 //! testable branch beyond `NoEntry`).
 
 use crate::features::calendar::caldav::account::{
-    account_path, delete_account_file, read_account, write_account, Account,
+    account_path, delete_account_file, read_account, read_client_account, write_account, Account,
+    AccountProfile, AccountRegistry, AccountRepository, JsonAccountRepository,
 };
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 
@@ -75,14 +76,51 @@ fn unparsable_json_is_a_store_error() {
 }
 
 #[test]
-fn an_empty_object_uses_the_serde_defaults() {
+fn an_incomplete_registry_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let dir = dir.path();
     std::fs::write(account_path(dir), "{}").unwrap();
 
-    let account = read_account(dir).unwrap().expect("an empty object parses");
+    let account = read_account(dir).unwrap_err();
 
-    assert_eq!(account, Account::default());
+    assert_eq!(account.code(), "store");
+}
+
+#[test]
+fn client_metadata_updates_do_not_target_the_newly_active_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut first = sample_account();
+    let second = Account {
+        server_url: "http://127.0.0.1:15233".to_string(),
+        ..sample_account()
+    };
+    let repository = JsonAccountRepository::new(dir.path().to_path_buf());
+    repository
+        .write(&AccountRegistry {
+            active_id: Some("second".to_string()),
+            profiles: vec![
+                AccountProfile {
+                    id: "first".to_string(),
+                    account: first.clone(),
+                },
+                AccountProfile {
+                    id: "second".to_string(),
+                    account: second.clone(),
+                },
+            ],
+        })
+        .unwrap();
+    let http = crate::features::calendar::HttpClient::new().unwrap();
+    let client =
+        crate::features::calendar::CalDavClient::from_account(&http, &first, "fake").unwrap();
+    first.calendars.first_mut().unwrap().display_name = "Changed on first".to_string();
+    write_account(dir.path(), &first).unwrap();
+    assert_eq!(read_account(dir.path()).unwrap(), Some(second));
+    assert_eq!(
+        read_client_account(dir.path(), &client).unwrap(),
+        Some(first)
+    );
+    assert_eq!(repository.read().unwrap().profiles.len(), 2);
 }
 
 #[test]
@@ -95,3 +133,4 @@ fn deleting_the_account_file_is_idempotent() {
     assert!(!account_path(dir).exists());
     delete_account_file(dir).unwrap();
 }
+
