@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { splitTime, type StopwatchState } from './engine.svelte';
+    import { stopwatchDisplay, type StopwatchState } from './engine.svelte';
     import { useNow } from '../../../lib/useNow.svelte';
 
     const NOW_INTERVAL_MS = 250;
@@ -13,32 +13,7 @@
 
     let displayData = $derived.by(() => {
         void now.ms;
-        if (engine.isPaused) {
-            const { m, s } = splitTime(engine.pauseRemainingMs);
-            return {
-                primaryText: `PAUSED ${m}:${s}`,
-                showPlayIcon: false
-            };
-        }
-        if (engine.isBreak) {
-            const value = engine.isCountdown ? engine.breakRemainingMs : engine.breakElapsedMs;
-            const { m, s } = splitTime(value);
-            return {
-                primaryText: `${m}:${s}`,
-                showPlayIcon: false
-            };
-        }
-        if (engine.isStopped) {
-            return {
-                primaryText: '00:00',
-                showPlayIcon: false
-            };
-        }
-        const { m } = splitTime(engine.workMs);
-        return {
-            primaryText: m,
-            showPlayIcon: engine.isPristine
-        };
+        return stopwatchDisplay(engine);
     });
 </script>
 

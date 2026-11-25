@@ -3,7 +3,6 @@
     import './inspector.css';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
     import InspectorEventFields from './InspectorEventFields.svelte';
-    import InspectorField from './InspectorField.svelte';
     import InspectorTaskFields from './InspectorTaskFields.svelte';
     import InspectorTitle from './InspectorTitle.svelte';
     import RecurringActionModal from '../RecurringActionModal.svelte';
@@ -75,17 +74,16 @@
                 onchange={inspector.handleTitleChange}
                 disabled={isReadOnly}
             />
-        </header>
-
-        <div class="inspector-body">
-            <InspectorField icon="notes" label="Description" multiline>
+            <div class="inspector-description">
                 <DescriptionInput
                     value={currentTask ? currentTask.notes : currentEvent?.description}
                     onchange={inspector.handleDescriptionChange}
                     disabled={isReadOnly}
                 />
-            </InspectorField>
+            </div>
+        </header>
 
+        <div class="inspector-body">
             {#if currentTask}
                 <InspectorTaskFields
                     task={currentTask}

@@ -47,7 +47,7 @@
 .filter-sort-row.is-draggable {
     background: var(--bg-surface);
     padding: 2px;
-    border-radius: 4px;
+    border-radius: 0;
     cursor: grab;
 }
 
@@ -78,20 +78,5 @@
 
 .filter-remove-button:hover {
     opacity: 1;
-}
-
-.filter-sort-row :global(.form-select),
-.filter-sort-row :global(.form-input) {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--fg);
-    border-radius: 4px;
-    padding: 4px;
-    outline: none;
-}
-
-.filter-sort-row :global(.form-select:focus),
-.filter-sort-row :global(.form-input:focus) {
-    border-color: var(--accent);
 }
 </style>

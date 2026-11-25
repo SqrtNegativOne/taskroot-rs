@@ -2,7 +2,7 @@
     import FloatingMenu from './FloatingMenu.svelte';
     import FilterGroupEditor from './filters/FilterGroupEditor.svelte';
     import FilterSortRow from './FilterSortRow.svelte';
-    import { useAutoQuery } from '../lib/safeInvoke.svelte';
+    import { useTagOptions } from '../lib/filterOptions.svelte';
     import type { FilterGroup } from '../lib/bindings/FilterGroup.generated';
     import { countFilters, emptyFilterGroup, type FilterColumn, type FilterCondition, type FilterOption } from '../lib/domain/filterTree';
 
@@ -26,13 +26,12 @@
         onOpenChange?: (open: boolean) => void;
     } = $props();
 
-    const tagsQuery = useAutoQuery<string[]>('list_tags', () => ({}));
-    const tagOptions = $derived((tagsQuery.data ?? []).map(name => ({ label: name, value: name })));
+    const tagOptions = useTagOptions();
 
     const badge = $derived(countFilters(filters) + sort.length);
 
     function valuesForColumn(column: string): FilterOption[] {
-        return column === 'tags' ? tagOptions : getValuesForColumn(column);
+        return column === 'tags' ? tagOptions() : getValuesForColumn(column);
     }
 
     function addSort() {

@@ -33,12 +33,6 @@
     let ref: HTMLDivElement | null = $state(null);
     let selectedOption = $derived(options.find(o => o.value === value));
 
-    const buttonStyle = $derived(
-        variant === 'bare'
-            ? `min-height: 24px; display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; font-family: inherit; font-size: inherit; padding: 2px 0; cursor: ${disabled ? 'not-allowed' : 'pointer'}; opacity: ${disabled ? 0.5 : 1};`
-            : `padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-app); color: var(--fg); cursor: ${disabled ? 'not-allowed' : 'pointer'}; opacity: ${disabled ? 0.5 : 1}; min-height: 24px; display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; font-family: inherit; font-size: inherit;`,
-    );
-
     function handleClickOutside(e: PointerEvent) {
         if (ref && !(e.target instanceof Node && ref.contains(e.target))) {
             open = false;
@@ -57,41 +51,44 @@
     }
 </script>
 
-<div bind:this={ref} style={`position: relative; ${style}`} class={className}>
+<div bind:this={ref} class={`select-input ${className}`.trim()} {style}>
     <button
         type="button"
         class="selector-input"
         class:is-bare={variant === 'bare'}
         {disabled}
         aria-label={ariaLabel}
-        style={buttonStyle}
         onclick={() => { if (!disabled) open = !open; }}
     >
         {#if selectedOption?.color}
             <span
                 aria-hidden="true"
-                style="width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: {selectedOption.color};"
+                class="swatch"
+                style:background={selectedOption.color}
             ></span>
         {/if}
-        <span style="color: {selectedOption?.color ?? 'inherit'};">
+        <span style:color={selectedOption?.color}>
             {selectedOption ? selectedOption.label : value}
         </span>
-        <span class="material-symbols-outlined" style="font-size: 16px; margin-left: auto; opacity: 0.5;">
+        <span class="material-symbols-outlined arrow">
             arrow_drop_down
         </span>
     </button>
     {#if open}
-        <div style="position: absolute; top: 100%; left: 0; right: 0; z-index: 1001; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <div class="dropdown">
             {#each options as o (o.value)}
                 <button
                     type="button"
                     onclick={(e) => handleSelect(o, e)}
-                    style={`padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; background: ${value === o.value ? 'var(--accent-soft)' : 'transparent'}; width: 100%; border: none; text-align: left; color: ${o.color ?? 'inherit'}; font-family: inherit; font-size: inherit;`}
+                    class="option"
+                    class:is-selected={value === o.value}
+                    style:color={o.color}
                 >
                     {#if o.color}
                         <span
                             aria-hidden="true"
-                            style="width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: {o.color};"
+                            class="swatch"
+                            style:background={o.color}
                         ></span>
                     {/if}
                     {o.label}
@@ -102,12 +99,89 @@
 </div>
 
 <style>
-    .selector-input.is-bare {
-        background: transparent;
-        border: none;
-        border-radius: 4px;
+    .select-input {
+        position: relative;
     }
+
+    .selector-input {
+        padding: 4px 8px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg-surface);
+        color: var(--fg);
+        cursor: pointer;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        text-align: left;
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .selector-input:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .selector-input.is-bare {
+        padding: 2px 0;
+        border: none;
+        background: transparent;
+        gap: 6px;
+    }
+
     .selector-input.is-bare:hover:not(:disabled) {
         color: var(--fg);
+    }
+
+    .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .arrow {
+        font-size: 16px;
+        margin-left: auto;
+        opacity: 0.5;
+    }
+
+    .dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1001;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        margin-top: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .option {
+        padding: 6px 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        color: inherit;
+        font-family: inherit;
+        font-size: inherit;
+        background: transparent;
+    }
+
+    .option.is-selected {
+        background: var(--accent-soft);
     }
 </style>

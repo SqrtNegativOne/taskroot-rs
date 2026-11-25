@@ -38,14 +38,14 @@
         gap: 12px;
         width: 100%;
         padding: 12px 16px;
-        color: #ffffff;
+        color: var(--danger-fg);
         font-family: inherit;
         font-size: 0.95rem;
         font-weight: 500;
         text-align: left;
-        background: rgba(220, 38, 38, 0.9);
-        border: 1px solid rgba(248, 113, 113, 0.5);
-        border-radius: 8px;
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-border);
+        border-radius: 0;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
@@ -61,13 +61,13 @@
         word-break: break-word;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0;
         cursor: pointer;
         transition: background 0.15s ease;
     }
 
     .copyable-toast-message.copied {
-        background: rgba(255, 255, 255, 0.2);
+        background: color-mix(in oklch, var(--danger-fg) 20%, transparent);
     }
 
     .copyable-toast-dismiss {
@@ -80,7 +80,7 @@
         line-height: 1;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 0;
         opacity: 0.7;
         cursor: pointer;
     }

@@ -3,7 +3,12 @@ import { flushSync } from 'svelte';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { SCREEN_EFFECT } from '../../../lib/ipcEvents';
 import { mockTauriInvoke } from '../../../test/tauriMock';
-import { StopwatchState, stopwatchState } from './engine.svelte';
+import {
+    StopwatchState,
+    stopwatchDisplay,
+    stopwatchState,
+    type StopwatchDisplaySource,
+} from './engine.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
     const { mockTauriInvoke } = await import('../../../test/tauriMock');
@@ -93,6 +98,40 @@ describe('stopwatch clock projection', () => {
         expect(stopwatchState.isPaused).toBe(false);
         expect(stopwatchState.currentMs).toBe(35_000);
     });
+});
+
+describe('stopwatch display', () => {
+    function source(overrides: Partial<StopwatchDisplaySource> = {}): StopwatchDisplaySource {
+        return {
+            isPaused: false,
+            pauseRemainingMs: 0,
+            isBreak: false,
+            isCountdown: false,
+            breakRemainingMs: 0,
+            breakElapsedMs: 0,
+            isStopped: false,
+            workMs: 0,
+            isPristine: false,
+            ...overrides,
+        };
+    }
+
+    it('shows whole minutes while working', () => {
+        expect(stopwatchDisplay(source({ workMs: 125_000 })).primaryText).toBe('02');
+    });
+
+    it('shows total elapsed seconds during a break', () => {
+        expect(stopwatchDisplay(source({
+            isBreak: true, breakElapsedMs: 65_000, breakRemainingMs: 0,
+        })).primaryText).toBe('65');
+    });
+
+    it('shows remaining seconds for a countdown break', () => {
+        expect(stopwatchDisplay(source({
+            isBreak: true, isCountdown: true, breakElapsedMs: 15_000, breakRemainingMs: 45_000,
+        })).primaryText).toBe('45');
+    });
+
 });
 
 describe('stopwatch feedback', () => {

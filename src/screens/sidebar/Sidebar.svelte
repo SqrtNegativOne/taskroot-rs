@@ -320,7 +320,6 @@
         font-family: inherit;
         line-height: 1.5;
         outline: none;
-        scrollbar-width: thin;
         scrollbar-color: var(--border) transparent;
     }
 

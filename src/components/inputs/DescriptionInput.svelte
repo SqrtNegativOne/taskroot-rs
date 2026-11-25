@@ -77,7 +77,7 @@
             {disabled}
             onkeydown={handleKeyDown}
             onclick={startEditing}
-            class={`inspector-description-display ${className}`.trim()}
+            class={`description-display ${className}`.trim()}
             class:is-empty={!hasContent}
             aria-label={ariaLabel}
             style={style}
@@ -91,7 +91,7 @@
             oninput={handleTextareaChange}
             onblur={handleBlur}
             rows="5"
-            class={`inspector-description-editor ${className}`.trim()}
+            class={`description-editor ${className}`.trim()}
             style={style}
             aria-label={ariaLabel}
             placeholder={placeholder}
@@ -118,6 +118,49 @@
         width: 100%;
     }
 
+    .description-display {
+        display: block;
+        width: 100%;
+        min-height: 24px;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        cursor: text;
+    }
+
+    .description-display.is-empty {
+        color: var(--fg-dim);
+    }
+
+    .description-display:disabled {
+        color: var(--fg);
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .description-editor {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 0;
+        background: var(--bg-surface);
+        color: var(--fg);
+        font-family: inherit;
+        font-size: inherit;
+        resize: vertical;
+    }
+
+    .description-editor:focus {
+        border-color: var(--accent);
+        outline: none;
+    }
+
     .description-copy {
         position: absolute;
         top: 0;
@@ -127,7 +170,7 @@
         justify-content: center;
         padding: 2px;
         border: none;
-        border-radius: 4px;
+        border-radius: 0;
         background: none;
         color: var(--fg-dim);
         cursor: pointer;

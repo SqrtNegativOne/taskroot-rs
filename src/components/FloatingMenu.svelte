@@ -96,7 +96,7 @@
     gap: 8px;
     padding: 10px;
     background: var(--bg-surface);
-    border-radius: 6px;
+    border-radius: 0;
     border: 1px solid var(--border);
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     animation: sharedFloatingMenuOpen 0.15s ease-out forwards;

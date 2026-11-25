@@ -43,6 +43,7 @@
                         aria-label="Group operator"
                         value={group.operator}
                         onchange={event => onchange({ ...group, operator: event.currentTarget.value === 'or' ? 'or' : 'and' })}
+                        class="form-select"
                     >
                         <option value="and">AND</option>
                         <option value="or">OR</option>
@@ -88,9 +89,8 @@
 
 <style>
     .filter-group { display: flex; flex-direction: column; gap: 8px; min-width: 440px; }
-    .nested { border: 1px solid var(--border); border-radius: 4px; padding: 10px; background: var(--bg); }
-    select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--fg); border-radius: 4px; padding: 4px; font: inherit; }
-    select:focus { outline-color: var(--accent); }
+    .nested { border: 1px solid var(--border); border-radius: 0; padding: 10px; background: var(--bg); }
+    .connector select { width: 100%; }
     .filter-entry { display: flex; align-items: flex-start; gap: 6px; }
     .connector { flex: 0 0 58px; min-height: 28px; display: flex; align-items: center; font-size: 0.85em; color: var(--fg-muted); }
     .entry-content { flex: 1; min-width: 0; }

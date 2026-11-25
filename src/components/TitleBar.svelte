@@ -21,14 +21,13 @@
 
 <header class="topbar">
     <div class="drag-region"></div>
-    <div class="topbar-left" style="display: flex; align-items: center; gap: 8px;">
+    <div class="topbar-left">
         <button onclick={() => navigate('settings')} class="stage {page.url.pathname === Routes.SETTINGS ? 'is-current' : ''}" style="padding: 0 4px; display: flex; background: none; border: none; cursor: pointer; color: inherit;" aria-label="Settings">
             <span class="material-symbols-outlined" style="font-size: 18px;">settings</span>
         </button>
         <StageIndicator />
         <MoreScreensDropdown />
     </div>
-    <div class="topbar-right"></div>
 
     <WindowControls {isMinitracker}>
         <RefreshButton />

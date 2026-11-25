@@ -134,6 +134,7 @@
     });
 
     let timeParts = $derived(splitTime(currentMs));
+    let timeText = $derived(stopwatchState.isBreak ? timeParts.sec : timeParts.m);
 
     let textColor = $derived(PHASE_COLORS[stopwatchState.phase]);
     let customLabel = $derived(
@@ -367,7 +368,7 @@
             onpointermove={controller.pointerMove}
             onpointerup={controller.pointerUp}
             onpointercancel={controller.pointerUp}
-        >{timeParts.m}</span>
+        >{timeText}</span>
 
         <button
             type="button"

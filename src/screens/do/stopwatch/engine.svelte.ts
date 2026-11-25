@@ -195,13 +195,44 @@ export class StopwatchState {
 export const stopwatchState = new StopwatchState();
 
 export function splitTime(ms: number) {
-    const totalSec = Math.floor(ms / 1000);
-    const totalMin = Math.floor(totalSec / 60);
-    const remSec = totalSec % 60;
+    const totalSeconds = Math.floor(ms / 1000);
+    const totalMin = Math.floor(totalSeconds / 60);
+    const remSec = totalSeconds % 60;
     return {
         m: totalMin.toString().padStart(2, '0'),
         s: remSec.toString().padStart(2, '0'),
+        sec: totalSeconds.toString().padStart(2, '0'),
     };
+}
+
+export interface StopwatchDisplaySource {
+    isPaused: boolean;
+    pauseRemainingMs: number;
+    isBreak: boolean;
+    isCountdown: boolean;
+    breakRemainingMs: number;
+    breakElapsedMs: number;
+    isStopped: boolean;
+    workMs: number;
+    isPristine: boolean;
+}
+
+export function stopwatchDisplay(source: StopwatchDisplaySource): {
+    primaryText: string;
+    showPlayIcon: boolean;
+} {
+    if (source.isPaused) {
+        const { m, s } = splitTime(source.pauseRemainingMs);
+        return { primaryText: `PAUSED ${m}:${s}`, showPlayIcon: false };
+    }
+    if (source.isBreak) {
+        const value = source.isCountdown ? source.breakRemainingMs : source.breakElapsedMs;
+        return { primaryText: splitTime(value).sec, showPlayIcon: false };
+    }
+    if (source.isStopped) {
+        return { primaryText: '00:00', showPlayIcon: false };
+    }
+    return { primaryText: splitTime(source.workMs).m, showPlayIcon: source.isPristine };
 }
 
 let lastInBreak: boolean | undefined;
