@@ -46,13 +46,15 @@
     color: var(--fg-dim);
     background: var(--bg);
     white-space: nowrap;
-    overflow: hidden;
+    /* clip, not hidden: hidden makes the cell a scroll container, which
+       swallows the wheel (overscroll-behavior: none blocks chaining). */
+    overflow: clip;
     text-overflow: ellipsis;
   }
   .day-head-cell.is-today { color: var(--accent); }
   .day-head-label {
     display: block;
-    overflow: hidden;
+    overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -275,7 +277,9 @@
     border-left: 3px solid var(--ev-color, var(--fg-dimmer));
     border-radius: 6px;
     padding: 4px 8px 0 8px;
-    overflow: hidden;
+    /* clip, not hidden: hidden makes the block a scroll container, which
+       swallows the wheel (overscroll-behavior: none blocks chaining). */
+    overflow: clip;
     cursor: grab;
     transition: background 80ms;
   }
