@@ -4,6 +4,19 @@ Read [frontend instructions](../src/AGENTS.md) for the mandatory conventions.
 This document maps shared behavior to its implementation rather than prescribing
 individual control labels, colours or dimensions.
 
+## Colour schemes
+
+Bundled palettes live in `src/lib/themes/`; [colour schemes](themes.md) explains
+selection, tokens and adding a palette. `src/app.css` imports their CSS, while
+`Theme.svelte` is mounted once in the shared layout and applies
+`store.settings.colour_scheme` to the root element. It defaults to Slate during
+settings bootstrap. Saving from Settings uses the existing `STORE_UPDATED` path
+to refresh every window's store. Components use semantic variables, including
+priority colours, translucent floating surfaces and primary-action text. Today
+and current-time indicators use shared red `--today` tokens rather than the theme
+accent, so their colours do not change with the palette.
+Calendar/event colour overrides remain server-owned and are not rewritten.
+
 ## Backend-backed state
 
 `src/lib/store.svelte.ts` wraps calendar mutations. A successful command finishes
@@ -75,10 +88,11 @@ Planning paths here are under `src/screens/plan/`:
   Recurring drags ask for `this` or `all`; `following` moves are unsupported.
 - `hooks/taskDrag.svelte.ts`: a task-row grid drop sets date-only `start`; a
   timeline drop creates a linked event, using the estimate or default duration.
-- `snapping.ts` owns snapping/duration clamping. `day-timeline.css` owns horizontal
-  geometry: inherited `--day-label-offset`, event lane variables and a 24px
-  pointer-creation gutter. Grid lines and previews share that geometry; event
-  borders are left accents only.
+- `snapping.ts` owns snapping/duration clamping. `day-timeline.css` owns shared
+  header/day grid tracks with a separate hour gutter; it imports
+  `timeline-events.css` for event lanes and the 24px pointer-creation space, and
+  `timeline-controls.css` for the eye menu. Previews share the day grid's geometry;
+  event borders are left accents only.
 
 Sort-menu row reordering uses native HTML5 drag events instead of that pointer
 pipeline. Keep Tauri `dragDropEnabled: false`: the native handler interferes with

@@ -53,6 +53,12 @@ struct SectionDef {
 
 const SETTING_SECTIONS: &[SectionDef] = &[
     SectionDef {
+        key: "app_appearance",
+        tab: "appearance",
+        tab_label: "Appearance",
+        name: "Theme",
+    },
+    SectionDef {
         key: "plan_calendar",
         tab: "plan_screen",
         tab_label: "Plan screen",

@@ -49,6 +49,55 @@ async fn update_setting_rejects_a_wrongly_typed_known_setting_without_writing() 
 }
 
 #[tokio::test]
+async fn colour_scheme_defaults_to_slate() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+    let settings = serde_json::to_value(storage::read_settings(&state).await.unwrap()).unwrap();
+
+    assert_eq!(settings["colour_scheme"], "slate");
+}
+
+#[tokio::test]
+async fn colour_scheme_choices_survive_reopening_the_store() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+    let meta = AppSettings::setting_metadata()
+        .into_iter()
+        .find(|meta| meta.id == "colour_scheme")
+        .expect("colour scheme setting must be available in Settings");
+
+    for option in meta.options.expect("theme choices") {
+        storage::write_setting(&state, "colour_scheme", &option.value)
+            .await
+            .unwrap();
+        let reopened = StoreState::new(Store::load(dir.path().to_path_buf()));
+        let settings = serde_json::to_value(storage::read_settings(&reopened).await.unwrap()).unwrap();
+        assert_eq!(settings["colour_scheme"], option.value);
+    }
+}
+
+#[tokio::test]
+async fn invalid_colour_scheme_does_not_change_saved_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+    storage::write_setting(&state, "colour_scheme", &json!("ember"))
+        .await
+        .unwrap();
+    let path = dir.path().join("settings.json");
+    let saved = std::fs::read_to_string(&path).unwrap();
+
+    for invalid in [json!("not-a-theme"), json!(42), Value::Null] {
+        let error = storage::write_setting(&state, "colour_scheme", &invalid)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "invalid-input");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), saved);
+        let settings = serde_json::to_value(storage::read_settings(&state).await.unwrap()).unwrap();
+        assert_eq!(settings["colour_scheme"], "ember");
+    }
+}
+
+#[tokio::test]
 async fn ui_state_round_trips_and_is_absent_until_written() {
     let dir = tempfile::tempdir().unwrap();
     let state = StoreState::new(Store::load(dir.path().to_path_buf()));

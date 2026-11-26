@@ -69,8 +69,11 @@ harness is appropriate for rune/lifecycle behavior that cannot run from plain TS
 prefer mocking the backend over mounting an entire screen.
 
 `tests/e2e/day-timeline.spec.ts` checks stylesheet geometry with DOM fixtures,
-bounding boxes and hit-testing. It neither captures screenshots nor starts the
-native desktop app.
+bounding boxes and hit-testing. `themes.spec.ts` checks representative text
+contrast, palette switching across styled surfaces and preservation of server
+event colours. These are non-visual browser checks: they neither capture
+screenshots nor start the native desktop app, and do not replace manual theme
+inspection.
 
 ## Rust behavior tests
 

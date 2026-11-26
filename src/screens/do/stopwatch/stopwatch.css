@@ -41,16 +41,16 @@
 }
 .sw-digits {
   font-size: clamp(120px, 24vw, 320px);
-  color: var(--fg-dim, #888);
+  color: var(--fg-dim);
   font-feature-settings: 'ss01';
   transition: color 200ms, opacity 200ms;
   opacity: 1;
 }
 .stopwatch-display:hover .sw-digits { opacity: 0.6; }
-.stopwatch-display.is-running .sw-digits { color: var(--fg, #fff); }
+.stopwatch-display.is-running .sw-digits { color: var(--fg); }
 .stopwatch-display.is-running:hover .sw-digits { opacity: 0.6; }
-.stopwatch-display.is-breaking .sw-digits { color: #2ecc71; }
-.stopwatch-display.is-stopped .sw-digits { color: #e74c3c; }
+.stopwatch-display.is-breaking .sw-digits { color: var(--success); }
+.stopwatch-display.is-stopped .sw-digits { color: var(--p0); }
 .stopwatch-display.is-paused .sw-digits {
   font-size: clamp(44px, 9vw, 120px);
   color: var(--fg-muted);
@@ -98,7 +98,7 @@
   border-top: 1px solid var(--border);
 }
 .sw-tick.is-active { background: var(--bg-surface-hover); border-top-color: var(--accent-dim); }
-.sw-tick.is-current { background: var(--accent); box-shadow: 0 0 8px oklch(81.32% 0.1084 77.46 / 0.5); }
+.sw-tick.is-current { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
 
 .stopwatch-controls {
   display: flex; align-items: center; gap: 12px;
@@ -130,12 +130,12 @@
   justify-content: center;
 }
 .sw-btn-primary:hover:not(:disabled) {
-  background: oklch(81.32% 0.1084 77.46 / 0.16);
+  background: var(--accent-hover);
   border-color: var(--accent);
 }
 .sw-btn-primary.is-running {
-  background: oklch(67.24% 0.1308 38.76 / 0.14);
-  border-color: oklch(67.24% 0.1308 38.76 / 0.4);
+  background: var(--p0-soft);
+  border-color: var(--p0-line);
   color: var(--p0);
 }
 .sw-btn-primary.is-running:hover { background: var(--p0-hover); }
@@ -179,13 +179,13 @@
 .active-task-label {
   margin-top: 16px;
   font-size: 18px;
-  color: var(--fg, #fff);
+  color: var(--fg);
   text-align: center;
   padding: 4px 12px;
   font: inherit;
 }
 .active-task-verb {
-  color: var(--fg-dim, #888);
+  color: var(--fg-dim);
   margin-right: 8px;
 }
 .active-task-title {
@@ -194,7 +194,7 @@
 .no-active-task {
   margin-top: 16px;
   font-size: 18px;
-  color: var(--fg-dim, #888);
+  color: var(--fg-dim);
   text-align: center;
 }
 

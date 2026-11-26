@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { AppSettings } from '../../src/lib/bindings/AppSettings.generated';
 
 const settings: AppSettings = {
+  colour_scheme: 'slate',
   default_calendar_view: 'month',
   default_task_list: '',
   default_event_list: '',

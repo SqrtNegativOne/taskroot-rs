@@ -4,8 +4,6 @@
     import { safeInvoke } from '$lib/safeInvoke.svelte';
     import { SCREEN_EFFECT } from '$lib/ipcEvents';
 
-    const SWEEP_COLOR = '#00ffcc';
-    const FLASH_COLOR = '#ffffff';
     const FRAME_MS = 16;
     const FLASH_MS = 80;
     const FADE_MS = 30;
@@ -80,17 +78,20 @@
         opacity = 1;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        const theme = getComputedStyle(document.documentElement);
+        const sweepColor = theme.getPropertyValue('--effect-sweep').trim();
+        const flashColor = theme.getPropertyValue('--effect-flash').trim();
 
         for (let progress = 0; progress <= 1.0001; progress += 0.02) {
             if (token !== animationToken) return;
-            draw(progress, SWEEP_COLOR, 2);
+            draw(progress, sweepColor, 2);
             await delay(FRAME_MS);
         }
 
         for (let flash = 0; flash < 6; flash += 1) {
             if (token !== animationToken) return;
             const bright = flash % 2 === 0;
-            draw(1, bright ? FLASH_COLOR : SWEEP_COLOR, bright ? 3 : 2);
+            draw(1, bright ? flashColor : sweepColor, bright ? 3 : 2);
             await delay(FLASH_MS);
         }
 

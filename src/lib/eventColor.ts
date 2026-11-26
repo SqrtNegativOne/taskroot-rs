@@ -1,5 +1,3 @@
-const HEX_RGB_PATTERN = /^#[0-9a-fA-F]{6}$/;
-
 export interface EventColorSource {
     readonly color?: string;
     /** `EventInstance` calendar reference. */

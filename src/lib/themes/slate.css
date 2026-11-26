@@ -1,0 +1,30 @@
+/* Default palette also covers the initial frame before settings have loaded. */
+:root,
+:root[data-theme='slate'] {
+    color-scheme: dark;
+    --bg: #181e28;
+    --bg-highlight: #1d2531;
+    --bg-surface: #222b38;
+    --bg-surface-hover: #2b3646;
+    --bg-active: #344258;
+    --border: #3b4b61;
+    --border-soft: #2e3b4d;
+    --border-strong: #536880;
+    --fg: #e3eaf4;
+    --fg-muted: #a9b8cc;
+    --fg-dim: #8195b1;
+    --fg-dimmer: #5d708c;
+    --fg-dimmest: #435672;
+    --accent: #8ab4f8;
+    --tag-red: #ee8795;
+    --tag-yellow: #d8bf85;
+    --tag-green: #86c9b0;
+    --tag-purple: #b5a4e3;
+    --tag-gold: #c8b38f;
+    --danger: #d83e56;
+    --priority-0: #7f9abd;
+    --priority-1: #88bca6;
+    --priority-2: #d8bf85;
+    --priority-3: #e3a080;
+    --priority-4: #dc8fa7;
+}

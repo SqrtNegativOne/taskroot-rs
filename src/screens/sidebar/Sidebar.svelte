@@ -9,6 +9,7 @@
     import { useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { activeCalendars } from '../../lib/queries';
     import { createSidebarState, saveTabTop } from './state.svelte';
+    import './sidebar.css';
 
     const TAB_WIDTH = 18;
     const TAB_HEIGHT = 52;
@@ -160,7 +161,7 @@
 </script>
 
 <div
-    class="widget"
+    class="sidebar-widget"
     class:open
     style="--tab-width: {TAB_WIDTH}px; --tab-height: {TAB_HEIGHT}px; --panel-width: {PANEL_WIDTH}px;"
 >
@@ -202,149 +203,3 @@
         </button>
     </div>
 </div>
-
-<style>
-    .widget {
-        position: fixed;
-        top: 0;
-        right: 0;
-        height: 100vh;
-        display: flex;
-        z-index: 1000;
-        pointer-events: none;
-        overflow: hidden;
-        width: 100%;
-        justify-content: flex-end;
-    }
-
-    .tab {
-        align-self: flex-start;
-        width: var(--tab-width);
-        height: var(--tab-height);
-        background: rgba(12, 12, 10, 0.75);
-        border: 1px solid var(--border);
-        border-right: none;
-        border-radius: 6px 0 0 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        pointer-events: auto;
-        color: var(--fg-muted);
-        font-size: 13px;
-        transition: color 150ms, background 150ms;
-        flex-shrink: 0;
-    }
-    .tab:hover {
-        color: var(--fg);
-        background: rgba(12, 12, 10, 0.85);
-    }
-    .tab .arrow {
-        transition: transform 200ms ease;
-    }
-
-    .panel {
-        width: 0;
-        min-width: 0;
-        overflow: hidden;
-        background: rgba(12, 12, 10, 0.75);
-        border-left: none;
-        transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1);
-        pointer-events: none;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-    }
-    .open .panel {
-        width: var(--panel-width);
-        border-left: 1px solid var(--border);
-        pointer-events: auto;
-    }
-
-    .panel-status {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
-        padding: 1.5rem;
-        text-align: center;
-        font-size: 0.8rem;
-        color: var(--fg-muted);
-    }
-
-    .calendar-wrap {
-        flex: 1;
-        overflow: hidden;
-        min-height: 0;
-        transition: height 250ms cubic-bezier(0.4, 0, 0.2, 1);
-        display: flex;
-        flex-direction: column;
-    }
-    .calendar-wrap.half {
-        flex: none;
-        height: 50%;
-    }
-    
-    :global(.calendar-wrap .day-pane) {
-        flex: 1;
-        height: 100%;
-        border-radius: 0;
-        background: transparent !important;
-    }
-    :global(.calendar-wrap .timeline-header) {
-        border-radius: 0 !important;
-        background: transparent !important;
-    }
-
-    .notes-wrap {
-        height: 50%;
-        border-top: 1px solid var(--border);
-        display: flex;
-        flex-direction: column;
-        background: rgba(0, 0, 0, 0.2);
-        min-height: 0;
-    }
-
-    .notes-textarea {
-        flex: 1;
-        background: transparent;
-        border: none;
-        color: var(--fg);
-        padding: 12px;
-        padding-bottom: 38px;
-        padding-right: 38px;
-        resize: none;
-        font-size: 0.85rem;
-        font-family: inherit;
-        line-height: 1.5;
-        outline: none;
-        scrollbar-color: var(--border) transparent;
-    }
-
-    .notes-toggle-btn {
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 32px;
-        height: 32px;
-        background: rgba(12, 12, 10, 0.75);
-        border-top: 1px solid var(--border);
-        border-left: 1px solid var(--border);
-        border-bottom: none;
-        border-right: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: var(--fg-muted);
-        z-index: 100;
-        transition: color 150ms, background 150ms;
-        pointer-events: auto;
-    }
-    .notes-toggle-btn:hover {
-        color: var(--fg);
-        background: rgba(12, 12, 10, 0.85);
-    }
-</style>

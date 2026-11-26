@@ -14,6 +14,7 @@
     import AccountBoundary from '../components/accounts/AccountBoundary.svelte';
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
+    import Theme from '$lib/themes/Theme.svelte';
     import LauncherPalette from '$lib/launcher/LauncherPalette.svelte';
     import { Toaster } from 'svelte-sonner';
 
@@ -100,6 +101,8 @@
         };
     });
 </script>
+
+<Theme scheme={store.settings?.colour_scheme} />
 
 {#if isLauncher}
     <AccountBoundary><LauncherPalette /></AccountBoundary>

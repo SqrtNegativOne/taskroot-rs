@@ -1,42 +1,29 @@
-  /* ── Day calendar ───────────────────────────────────────────────────── */
+@import './timeline-controls.css';
+@import './timeline-events.css';
 
-  .day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; font-size: calc(14px * var(--font-scale, 1)); }
-  .day-pane-stats {
-    font-size: 0.85em; color: var(--fg-dim);
-    font-variant-numeric: tabular-nums;
-  }
-  .day-scroll {
-    flex: 1; min-height: 0;
-    overflow-y: auto;
-    padding: 4px 16px 48px 16px;
-  }
+/* Day columns and hour gutter geometry. */
+.day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; font-size: calc(14px * var(--font-scale, 1)); }
+.day-pane-stats { font-size: 0.85em; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.day-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 48px 16px; scrollbar-width: none; }
+.day-scroll::-webkit-scrollbar { display: none; }
+.day-cols { display: flex; flex-direction: column; min-width: min-content; }
 
-  .day-cols {
-    display: flex;
-    flex-direction: column;
-    min-width: min-content;
-  }
-  /* Day headers and day columns share one grid definition so the gutter track
-     and every day column line up vertically across the two rows. */
-  .day-head,
-  .day-row {
+/* Headers and day columns share the same grid tracks. */
+.day-head,
+.day-row {
     display: grid;
     grid-template-columns: var(--day-gutter-w, 44px) repeat(var(--day-count, 1), minmax(200px, 1fr));
-  }
-  .day-head {
+}
+.day-head {
     position: sticky;
-    /* Chrome pins sticky boxes to the scrollport's content edge, so back off the
-       scroller's 4px top padding to sit flush with the viewport (flow keeps it). */
+    /* Back off the scroller's top padding to pin flush to its viewport. */
     top: -4px;
     z-index: 7;
     background: var(--bg);
     border-bottom: 1px solid var(--border-soft);
-  }
-  .day-gutter {
-    position: relative;
-    border-right: 1px solid var(--border-soft);
-  }
-  .day-head-cell {
+}
+.day-gutter { position: relative; border-right: 1px solid var(--border-soft); }
+.day-head-cell {
     border-right: 1px solid var(--border-soft);
     padding: 5px 8px;
     text-align: center;
@@ -46,199 +33,32 @@
     color: var(--fg-dim);
     background: var(--bg);
     white-space: nowrap;
-    /* clip, not hidden: hidden makes the cell a scroll container, which
-       swallows the wheel (overscroll-behavior: none blocks chaining). */
+    /* clip avoids making the header a wheel-swallowing scroll container. */
     overflow: clip;
     text-overflow: ellipsis;
-  }
-  .day-head-cell.is-today { color: var(--accent); }
-  .day-head-label {
-    display: block;
-    overflow: clip;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+}
+.day-head-cell.is-today { color: var(--today); }
+.day-head-label { display: block; overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* ── Timeline controls (eye in the hour gutter) ─────────────────────── */
-
-  .timeline-controls {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    z-index: 3;
-  }  .timeline-eye {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    border-right: 1px solid var(--border-soft);
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fg-dim);
-    cursor: pointer;
-  }
-  .timeline-eye:hover,
-  .timeline-controls.is-open .timeline-eye { color: var(--fg); }
-  .timeline-controls.is-pinned .timeline-eye { color: var(--accent); }
-  .timeline-eye-icon {
-    transform: scaleY(0.62);
-    opacity: 0.75;
-    transition: transform 200ms cubic-bezier(0.2, 0.9, 0.25, 1), opacity 140ms ease;
-  }
-  .timeline-controls.is-open .timeline-eye-icon {
-    transform: scaleY(1);
-    opacity: 1;
-  }
-  .timeline-eye-pupil {
-    transform-origin: center;
-    transition: r 200ms ease;
-  }
-
-  .timeline-eye-panel {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    width: 44px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 0 8px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-top: 0;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 10px 24px var(--shadow-dark, rgba(0, 0, 0, 0.28));
-    transform-origin: top center;
-    transform: scaleY(0.12);
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform 120ms ease-in,
-      opacity 90ms ease-in;
-    z-index: 20;
-  }
-  /* The lid opens from the eye, revealing the stacked controls over the hour
-     labels only — the event area to the right is never covered. */
-  .timeline-controls.is-open .timeline-eye-panel {
-    transform: scaleY(1);
-    opacity: 1;
-    pointer-events: auto;
-    transition:
-      transform 190ms cubic-bezier(0.2, 0.9, 0.25, 1),
-      opacity 120ms ease;
-  }
-  .timeline-controls-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    width: 100%;
-    padding: 4px 0;
-  }
-  .timeline-controls-group + .timeline-controls-group { border-top: 1px solid var(--border-soft); }
-  .timeline-controls .filter-sort-container { justify-content: center; }
-  /* Match the filter trigger to the borderless nav/view buttons. */
-  .timeline-controls .timeline-eye-panel .menu-trigger-button {
-    border: 0;
-    border-radius: 4px;
-    width: 30px;
-    height: 26px;
-    padding: 0;
-    justify-content: center;
-    color: var(--fg-dim);
-    background: transparent;
-  }
-  .timeline-controls .timeline-eye-panel .menu-trigger-button:hover,
-  .timeline-controls .timeline-eye-panel .menu-trigger-button.is-active {
-    background: var(--bg-surface-hover);
-    color: var(--fg);
-  }
-  .timeline-control-btn {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    border-radius: 4px;
-    width: 30px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fg-dim);
-    font: inherit;
-    font-size: 0.8em;
-    cursor: pointer;
-  }
-  .timeline-control-btn:hover,
-  .timeline-control-btn.is-active {
-    background: var(--bg-surface-hover);
-    color: var(--fg);
-  }
-  .timeline-view { position: relative; }
-  .timeline-view-menu {
-    position: absolute;
-    top: 0;
-    left: calc(100% + 6px);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    min-width: 110px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-  }
-  .timeline-view-menu button {
-    padding: 8px 12px;
-    text-align: left;
-    background: transparent;
-    border: 0;
-    color: var(--fg);
-    font: inherit;
-    font-size: 0.9em;
-    cursor: pointer;
-  }
-  .timeline-view-menu button:hover { background: var(--bg-surface-hover); }
-  .timeline-view-menu button.is-active { background: var(--accent-soft); color: var(--accent); }
-
-  .day-grid {
-    position: relative;
-    width: 100%;
-  }
-  .day-hour {
-    position: absolute; left: 0; right: 0;
-    border-top: 1px solid var(--border-soft);
-  }
-  .day-hour:first-child { border-top-color: var(--border); }
-  .day-hour-line { display: none; }
-  .day-hour-half {
+.day-grid { position: relative; width: 100%; }
+.day-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border-soft); }
+.day-hour:first-child { border-top-color: var(--border); }
+.day-hour-line { display: none; }
+.day-hour-half {
     position: absolute; left: 0; right: 0;
     top: 50%;
     border-top: 1px dashed var(--border-soft);
     opacity: 0.6;
-  }
-  .day-now {
-    position: absolute; left: 0; right: 0;
-    pointer-events: none;
-    z-index: 5;
-  }
-  .day-now-line {
+}
+.day-now { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 5; }
+.day-now-line {
     position: absolute; left: 0; right: 0; top: 0;
-    border-top: 1px solid var(--accent);
-    box-shadow: 0 0 8px var(--accent-glow);
-  }
+    border-top: 1px solid var(--today);
+    box-shadow: 0 0 8px var(--today-glow);
+}
 
-  /* ── Hour gutter: eye sits above this strip; labels live here ───────── */
-
-  .day-gutter-hours .day-hour-label {
+.day-gutter-hours .day-hour-label,
+.day-gutter-hours .day-now-label {
     position: absolute; left: 0; top: 0;
     transform: translateY(-50%);
     font-size: 0.7em;
@@ -250,164 +70,5 @@
     padding: 0 6px 0 0;
     font-variant-numeric: tabular-nums;
     z-index: 1;
-  }
-  .day-gutter-hours .day-now-label {
-    position: absolute; left: 0; top: 0;
-    transform: translateY(-50%);
-    font-size: 0.7em;
-    color: var(--accent);
-    background: var(--bg);
-    letter-spacing: 0.02em;
-    width: 100%;
-    text-align: right;
-    padding: 0 6px 0 0;
-    font-variant-numeric: tabular-nums;
-    z-index: 2;
-  }
-
-  .day-event {
-    --event-lane: 0;
-    --event-lanes: 1;
-    font-family: var(--sans);
-    position: absolute;
-    left: calc((100% / var(--event-lanes)) * var(--event-lane));
-    width: calc((100% / var(--event-lanes)) - 24px);
-    background: var(--ev-bg, var(--bg-surface));
-    border: 0;
-    border-left: 3px solid var(--ev-color, var(--fg-dimmer));
-    border-radius: 6px;
-    padding: 4px 8px 0 8px;
-    /* clip, not hidden: hidden makes the block a scroll container, which
-       swallows the wheel (overscroll-behavior: none blocks chaining). */
-    overflow: clip;
-    cursor: grab;
-    transition: background 80ms;
-  }
-  .day-event.ev-plan {
-    background: var(--ev-bg, linear-gradient(180deg, var(--bg-surface-hover), var(--bg-surface)));
-    border-left-color: var(--ev-color, var(--accent));
-  }
-  .day-event.ev-meeting {
-    background: var(--ev-bg, var(--bg-surface));
-    border-left-color: var(--ev-color, var(--fg-muted));
-  }
-  .day-event.pri-bar-0 { border-left-color: #6a7c92; }
-  .day-event.pri-bar-1 { border-left-color: #719379; }
-  .day-event.pri-bar-2 { border-left-color: #b59864; }
-  .day-event.pri-bar-3 { border-left-color: #c47e68; }
-  .day-event.pri-bar-4 { border-left-color: #c96b7f; }
-  .day-event.is-done { opacity: 0.75; background: var(--bg-surface-hover); border-left-color: var(--border); }
-  .day-event.is-done .day-event-title { color: white; text-decoration: line-through; }
-  .day-event.is-done .day-event-title-text { text-decoration: line-through; }
-  .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-left-style: dashed; background: transparent !important; }
-  .day-event.is-readonly { opacity: 0.6; cursor: default; }
-  .day-event.is-selected {
-    outline: 1px solid var(--accent);
-    outline-offset: -1px;
-    filter: brightness(1.1);
-  }
-  .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0.95; cursor: grabbing; }
-  .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
-  .day-event-inner .task-circle { pointer-events: auto; }
-  .day-event .day-event-inner .task-circle { border-color: rgba(255, 255, 255, 0.6); }
-  .day-event .day-event-inner .task-circle:hover { border-color: var(--accent); }
-  .day-event-time {
-    font-family: var(--mono);
-    font-size: 0.74em;
-    color: white;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.02em;
-  }
-  .day-event-title {
-    font-size: 0.88em;
-    color: white;
-    line-height: 1.25;
-    display: flex; align-items: baseline; gap: 5px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .day-event-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .day-event-tags { display: flex; gap: 6px; font-size: 0.74em; color: white; margin-top: 2px; }
-  .day-event-tag { color: white; }
-  .day-event.is-compact .day-event-time { display: none; }
-  .day-event.is-compact { padding: 1px 8px; }
-  .day-event.is-compact .day-event-title { font-size: 0.78em; }
-  
-  .day-event.is-short .day-event-inner {
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-  }
-  .day-event.is-short .day-event-title {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-  .day-event.is-short .day-event-time {
-    flex: 0 0 auto;
-  }
-  .day-event.is-short .day-event-tags {
-    display: none;
-  }
-
-  .day-event-handle {
-    position: absolute; left: 0; right: 0;
-    height: 6px;
-    cursor: ns-resize;
-    z-index: 2;
-  }
-  .day-event-handle-top { top: 0; }
-  .day-event-handle-bottom { bottom: 0; }
-
-  .day-drop-preview {
-    position: absolute;
-    left: 0;
-    right: 0;
-    border: 1px dashed var(--accent);
-    background: var(--accent-soft);
-    pointer-events: none;
-    z-index: 4;
-    display: flex; align-items: flex-start;
-    padding: 4px 8px;
-  }
-  .day-drop-preview-label {
-    font-size: 0.78em;
-    color: var(--accent);
-    letter-spacing: 0.03em;
-  }
-
-  /* ── Drag ghost ─────────────────────────────────────────────────────── */
-
-  .drag-ghost {
-    position: fixed;
-    z-index: 9999;
-    pointer-events: none;
-    background: var(--bg-surface);
-    border: 1px solid var(--accent-line);
-    box-shadow: 0 8px 32px var(--shadow-dark), 0 0 0 1px var(--bg) inset;
-    padding: 8px 12px;
-    max-width: 320px;
-  }
-  .drag-ghost.is-bracket {
-    background: var(--bg-surface);
-    border: 1px dashed var(--accent);
-  }
-  .drag-ghost.is-bracket::before {
-    content: '▌';
-    color: var(--accent);
-    position: absolute; left: -1px; top: 0; bottom: 0;
-    display: flex; align-items: center;
-  }
-  .drag-ghost-inner {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.92em;
-  }
-  .drag-ghost-title {
-    color: var(--fg);
-    max-width: 240px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .drag-ghost-meta {
-    font-size: 0.74em;
-    color: var(--fg-dim);
-    margin-top: 3px;
-  }
-
+}
+.day-gutter-hours .day-now-label { color: var(--today); z-index: 2; }

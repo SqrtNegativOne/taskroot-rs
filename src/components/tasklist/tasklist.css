@@ -57,11 +57,11 @@
   }
 
   .pri { font-size: 0.85em; flex-shrink: 0; line-height: 1; }
-  .pri-0 { color: #6a7c92; }
-  .pri-1 { color: #719379; }
-  .pri-2 { color: #b59864; }
-  .pri-3 { color: #c47e68; }
-  .pri-4 { color: #c96b7f; }
+  .pri-0 { color: var(--priority-0); }
+  .pri-1 { color: var(--priority-1); }
+  .pri-2 { color: var(--priority-2); }
+  .pri-3 { color: var(--priority-3); }
+  .pri-4 { color: var(--priority-4); }
   .task-row-title {
     flex: 1; color: var(--fg);
     white-space: pre-wrap; word-wrap: break-word;
@@ -78,7 +78,7 @@
     color: var(--fg-dim);
   }
   .task-row-start-icon.is-past { color: var(--p0); }
-  .task-row-start-icon.is-today { color: var(--fg); }
+  .task-row-start-icon.is-today { color: var(--today); }
   .task-row-notes-icon {
     display: inline-block;
     margin-left: 5px;
@@ -98,7 +98,7 @@
   .status-pill.status-nextup {
     border-color: var(--fg-dim);
     color: var(--fg-muted);
-    background: oklch(67.67% 0.0283 82.34 / 0.08);
+    background: var(--fg-soft);
   }
 
   .task-row-line2 {

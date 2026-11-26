@@ -19,6 +19,7 @@
 //! This module is split into [`storage`] (the store-level command bodies) and
 //! [`metadata`] (schema assembly); the IPC commands live in `commands::settings`.
 
+mod colour_scheme;
 pub mod metadata;
 pub mod storage;
 
@@ -29,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use taskroot_macros::SettingsMeta;
 use ts_rs::TS;
 
+pub use colour_scheme::ColourScheme;
 pub use metadata::{SettingMeta, SettingOption};
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, SettingsMeta)]
@@ -36,6 +38,15 @@ pub use metadata::{SettingMeta, SettingOption};
 #[serde(default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct AppSettings {
+    #[setting(
+        label = "Colour scheme",
+        description = "Application palette for all windows. Slate uses dark blue-grey surfaces and cool blue accents; Ember uses warm charcoal and gold.",
+        keywords = ["theme", "colour", "color", "dark", "slate", "appearance"],
+        kind = "select",
+        section = "app_appearance",
+        options = [("slate", "Slate"), ("ember", "Ember")]
+    )]
+    pub colour_scheme: ColourScheme,
     #[setting(
         label = "Default View",
         keywords = ["calendar", "view", "month", "week"],
@@ -173,6 +184,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            colour_scheme: ColourScheme::default(),
             default_calendar_view: "month".to_string(),
             default_task_list: String::new(),
             default_event_list: String::new(),

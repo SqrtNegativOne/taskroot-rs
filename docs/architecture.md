@@ -2,7 +2,8 @@
 
 Taskroot is a desktop task manager for planning, working and resting. The frontend
 is Svelte 5 + TypeScript, with SvelteKit's static adapter in SPA mode (`ssr = false`),
-Vite on port 1420, vanilla CSS and Bun. The native backend is Tauri v2 + Rust.
+Vite on port 1420, vanilla CSS with bundled [colour schemes](themes.md), and Bun.
+The native backend is Tauri v2 + Rust.
 
 This is a navigation reference, not a file-by-file inventory. Read the applicable
 [root](../AGENTS.md), [frontend](../src/AGENTS.md) or
@@ -33,6 +34,7 @@ This is a navigation reference, not a file-by-file inventory. Read the applicabl
 |---|---|
 | SPA/window routing, toasts and daily startup redirect | `src/routes/+layout.svelte`, `src/lib/dailyStartup.ts`, `src/lib/routes.ts` |
 | Routing/chunk-load recovery | `src/routes/+error.svelte` |
+| Application palette / saved colour scheme | `src/lib/themes/`, [theme reference](themes.md) |
 | Settings, CalDAV account profiles/switching and list management | `src/routes/settings/`, `src/components/accounts/`, `src/components/CalendarManager.svelte` |
 | Backend mutations, queries and persistence | `src/lib/store.svelte.ts`, `src/lib/safeInvoke.svelte.ts`, `src/lib/queries.ts`, `src/lib/persisted.svelte.ts`, `src/lib/asyncState.svelte.ts` |
 | Shared task-list definition | `src/lib/taskList.svelte.ts`, `src/lib/TaskListState.svelte`, `src/components/tasklist/` |

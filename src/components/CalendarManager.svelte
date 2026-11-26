@@ -235,9 +235,9 @@
     }
 
     .add-row button {
-        background: var(--accent, #3b82f6);
+        background: var(--accent);
         border: none;
-        color: #fff;
+        color: var(--on-accent);
         border-radius: 4px;
         padding: 6px 14px;
         cursor: pointer;

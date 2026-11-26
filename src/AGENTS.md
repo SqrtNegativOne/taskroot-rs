@@ -50,6 +50,11 @@ Read [the frontend reference](../docs/frontend.md) for the affected feature and
 - Grid visibility filters operate on projected instances before bucketing **and**
   span layout, never on raw recurrence context. Task date markers are
   non-draggable but allow completion toggles; task-list-row dragging is separate.
+- Application colours use semantic CSS variables from `lib/themes/`; palettes
+  own base colours, and `tokens.css` owns shared derived tints. See
+  [colour schemes](../docs/themes.md). Today/current-time indicators use the
+  shared red `--today` tokens, not the theme accent. Keep server-owned calendar
+  colours separate.
 - Reuse the shared event colors, timeline CSS geometry, snapping/duration helpers
   and pointer gesture registry; retain cancellation/teardown safety.
 - Keep `dragDropEnabled: false` in Tauri config for in-page HTML5 sort-row drags

@@ -47,10 +47,10 @@
 <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
     <Dialog.Portal>
         <Dialog.Overlay
-            style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 99999;"
+            style="position: fixed; inset: 0; background-color: var(--shadow-dark); z-index: 99999;"
         />
         <Dialog.Content
-            style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-panel, #1e1e1e); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: var(--fg); z-index: 100000;"
+            style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-surface); padding: 24px; border-radius: 8px; width: 320px; box-shadow: 0 4px 12px var(--shadow-medium); color: var(--fg); z-index: 100000;"
         >
             <Dialog.Title level={3} style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">
                 {actionText} recurring event
@@ -86,7 +86,7 @@
                 </button>
                 <button 
                     onclick={handleConfirm}
-                    style="background: var(--accent, #3b82f6); border: none; color: #fff; cursor: pointer; padding: 6px 16px; border-radius: 4px; font-weight: 500; font-size: 14px;"
+                    style="background: var(--accent); border: none; color: var(--on-accent); cursor: pointer; padding: 6px 16px; border-radius: 4px; font-weight: 500; font-size: 14px;"
                 >
                     OK
                 </button>

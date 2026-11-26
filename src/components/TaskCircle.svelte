@@ -43,7 +43,7 @@
             class="task-circle-play"
             viewBox="0 0 24 24"
             fill="currentColor"
-            style="width: 12px; height: 12px; color: var(--bg);"
+            style="width: 12px; height: 12px; color: var(--on-priority);"
         >
             <path d="M8 5v14l11-7z" />
         </svg>
@@ -99,7 +99,7 @@
     .task-circle-check {
         width: 12px;
         height: 12px;
-        color: #fff;
+        color: var(--on-priority);
         stroke-dasharray: 24;
         stroke-dashoffset: 24;
         animation: dash 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
@@ -114,9 +114,9 @@
         to { stroke-dashoffset: 0; }
     }
 
-    .pri-bg-0 { --circle-fill: #3e4a5b; --circle-border: #6a7c92; }
-    .pri-bg-1 { --circle-fill: #435b49; --circle-border: #719379; }
-    .pri-bg-2 { --circle-fill: #735e38; --circle-border: #b59864; }
-    .pri-bg-3 { --circle-fill: #784838; --circle-border: #c47e68; }
-    .pri-bg-4 { --circle-fill: #783a48; --circle-border: #c96b7f; }
+    .pri-bg-0 { --circle-fill: var(--priority-fill-0); --circle-border: var(--priority-0); }
+    .pri-bg-1 { --circle-fill: var(--priority-fill-1); --circle-border: var(--priority-1); }
+    .pri-bg-2 { --circle-fill: var(--priority-fill-2); --circle-border: var(--priority-2); }
+    .pri-bg-3 { --circle-fill: var(--priority-fill-3); --circle-border: var(--priority-3); }
+    .pri-bg-4 { --circle-fill: var(--priority-fill-4); --circle-border: var(--priority-4); }
 </style>

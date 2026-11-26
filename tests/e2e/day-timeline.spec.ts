@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
-const stylesheet = await readFile('src/screens/plan/day-timeline/day-timeline.css', 'utf8');
+const stylesheet = (await Promise.all(
+  ['day-timeline.css', 'timeline-controls.css', 'timeline-events.css'].map((file) =>
+    readFile(`src/screens/plan/day-timeline/${file}`, 'utf8')),
+)).join('\n');
 
 for (const columnWidth of [200, 480]) {
   for (const labelOffset of [0, 56]) {
@@ -11,13 +14,18 @@ for (const columnWidth of [200, 480]) {
           <style>
             * { box-sizing: border-box; }
             ${stylesheet}
-            .day-grid { width: ${columnWidth}px; height: 200px; --day-label-offset: ${labelOffset}px; }
+            .day-grid { height: 200px; }
             .day-event { top: 0; height: 100px; }
           </style>
-          <div class="day-grid">
-            ${Array.from({ length: lanes }, (_, lane) => `
-              <div class="day-event" style="--event-lane: ${lane}; --event-lanes: ${lanes};">Event</div>
-            `).join('')}
+          <div class="day-cols" style="--day-count: 1; --day-gutter-w: ${labelOffset}px; width: ${columnWidth + labelOffset}px;">
+            <div class="day-row">
+              <div class="day-gutter"></div>
+              <div class="day-grid">
+                ${Array.from({ length: lanes }, (_, lane) => `
+                  <div class="day-event" style="--event-lane: ${lane}; --event-lanes: ${lanes};">Event</div>
+                `).join('')}
+              </div>
+            </div>
           </div>
         `);
 
@@ -25,13 +33,17 @@ for (const columnWidth of [200, 480]) {
         expect(grid).not.toBeNull();
         if (!grid) return;
 
-        const laneWidth = (grid.width - labelOffset) / lanes;
+        const gutter = await page.locator('.day-gutter').boundingBox();
+        if (!gutter) throw new Error('missing hour gutter');
+        expect(gutter.width).toBe(labelOffset);
+        expect(grid.x).toBeCloseTo(gutter.x + gutter.width, 0);
+        const laneWidth = grid.width / lanes;
         for (let lane = 0; lane < lanes; lane++) {
           const event = await page.locator('.day-event').nth(lane).boundingBox();
           expect(event).not.toBeNull();
           if (!event) return;
 
-          const laneStart = grid.x + labelOffset + lane * laneWidth;
+          const laneStart = grid.x + lane * laneWidth;
           const laneEnd = laneStart + laneWidth;
           expect(event.x).toBeCloseTo(laneStart, 0);
           expect(event.width).toBeGreaterThan(0);
@@ -95,16 +107,18 @@ function dayTimelineFixture(css: string): string {
       ${css}
     </style>
     <div class="day-scroll">
-      <div class="day-cols">
+      <div class="day-cols" style="--day-count: 3;">
         <div class="day-head">
+          <div class="day-gutter"></div>
           <div class="day-head-cell" data-day="d1">Mon, Nov 2</div>
           <div class="day-head-cell" data-day="d2">Tue, Nov 3</div>
           <div class="day-head-cell" data-day="d3">Wed, Nov 4</div>
         </div>
         <div class="day-row">
-          <div class="day-grid" data-drop-date="d1" style="flex: 1; min-width: 200px; height: 1300px;"></div>
-          <div class="day-grid" data-drop-date="d2" style="flex: 1; min-width: 200px; height: 1300px;"></div>
-          <div class="day-grid" data-drop-date="d3" style="flex: 1; min-width: 200px; height: 1300px;"></div>
+          <div class="day-gutter day-gutter-hours"></div>
+          <div class="day-grid" data-drop-date="d1" style="height: 1300px;"></div>
+          <div class="day-grid" data-drop-date="d2" style="height: 1300px;"></div>
+          <div class="day-grid" data-drop-date="d3" style="height: 1300px;"></div>
         </div>
       </div>
     </div>
@@ -143,10 +157,11 @@ test('day headers stay pinned directly above their columns while the timeline sc
 });
 
 test('the timeline snaps sideways onto a day boundary after a horizontal scroll', async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate((css) => {
-    document.body.innerHTML = css;
-  }, dayTimelineFixture('.day-scroll { width: 400px; height: 300px; }'));
+  await page.route('**/__timeline-fixture', (route) => route.fulfill({
+    contentType: 'text/html',
+    body: dayTimelineFixture('.day-scroll { width: 400px; height: 300px; }'),
+  }));
+  await page.goto('/__timeline-fixture');
 
   await page.addScriptTag({
     type: 'module',

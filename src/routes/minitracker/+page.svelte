@@ -20,10 +20,10 @@
     import './minitracker.css';
 
     const PHASE_COLORS = {
-        paused: '#808080',
-        running: '#ffffff',
-        breaking: '#2ecc71',
-        stopped: '#808080',
+        paused: 'var(--fg-muted)',
+        running: 'var(--fg)',
+        breaking: 'var(--success)',
+        stopped: 'var(--fg-muted)',
     } as const;
     const CUSTOM_FORM_HEIGHT = 45;
 

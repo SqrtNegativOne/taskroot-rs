@@ -1,0 +1,45 @@
+/* Derived roles stay in sync when a palette changes its base colours. */
+:root {
+    --accent-dim: color-mix(in srgb, var(--accent) 60%, var(--bg));
+    --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+    --accent-hover: color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-line: color-mix(in srgb, var(--accent) 32%, transparent);
+    --accent-glow: color-mix(in srgb, var(--accent) 40%, transparent);
+    --on-accent: var(--bg);
+    --today: #f06a79;
+    --today-bg: #c43245;
+    --on-today: #fff;
+    --today-glow: color-mix(in srgb, var(--today) 40%, transparent);
+    --p0: var(--tag-red);
+    --p1: var(--tag-yellow);
+    --p2: var(--tag-green);
+    --p3: var(--fg-dim);
+    --p0-soft: color-mix(in srgb, var(--p0) 14%, transparent);
+    --p0-hover: color-mix(in srgb, var(--p0) 20%, transparent);
+    --p0-line: color-mix(in srgb, var(--p0) 40%, transparent);
+    --danger-bg: color-mix(in srgb, var(--danger) 90%, transparent);
+    --danger-border: color-mix(in srgb, var(--danger) 50%, transparent);
+    --danger-fg: #fff;
+    --success: var(--tag-green);
+    --fg-soft: color-mix(in srgb, var(--fg-muted) 8%, transparent);
+    --bg-glass: color-mix(in srgb, var(--bg) 75%, transparent);
+    --bg-glass-hover: color-mix(in srgb, var(--bg) 85%, transparent);
+    --priority-fill-0: color-mix(in srgb, var(--priority-0) 45%, var(--bg));
+    --priority-fill-1: color-mix(in srgb, var(--priority-1) 45%, var(--bg));
+    --priority-fill-2: color-mix(in srgb, var(--priority-2) 45%, var(--bg));
+    --priority-fill-3: color-mix(in srgb, var(--priority-3) 45%, var(--bg));
+    --priority-fill-4: color-mix(in srgb, var(--priority-4) 45%, var(--bg));
+    --circle-border: var(--border);
+    --circle-fill: transparent;
+    --on-priority: var(--fg);
+    /* Calendar colours are server-owned and can override the background. */
+    --on-event: #fff;
+    --effect-sweep: var(--accent);
+    --effect-flash: var(--fg);
+    --shadow-soft: rgb(0 0 0 / 0.2);
+    --shadow-medium: rgb(0 0 0 / 0.3);
+    --shadow-dark: rgb(0 0 0 / 0.5);
+    --shadow-heavy: rgb(0 0 0 / 0.6);
+    --shadow-btn: 0 2px 8px var(--shadow-soft);
+    --shadow-btn-hover: 0 4px 12px var(--shadow-soft);
+}

@@ -1,7 +1,8 @@
 # Taskroot agent guide
 
 Taskroot is a desktop task manager: Svelte 5 + SvelteKit SPA (TypeScript, Vite,
-Bun), wrapped by Tauri v2 (Rust). Saved CalDAV profiles have one active account;
+Bun), wrapped by Tauri v2 (Rust). Application colours use bundled CSS-variable
+palettes; see [colour schemes](docs/themes.md). Saved CalDAV profiles have one active account;
 its server is the source of truth. Calendar data lives in an in-memory Rust store,
 with immediate server writes.
 Settings and UI state use JSON files. There is no local calendar database,
@@ -69,6 +70,7 @@ only for the affected subsystem.
 | Task | Guidance |
 |---|---|
 | Frontend | [src/AGENTS.md](src/AGENTS.md), [frontend reference](docs/frontend.md) |
+| Appearance / colour schemes | [Theme reference](docs/themes.md), palettes in `src/lib/themes/` |
 | Backend | [src-tauri/AGENTS.md](src-tauri/AGENTS.md), feature READMEs linked below |
 | Locate modules / settings / window ownership | [Architecture map](docs/architecture.md) |
 | Calendar, recurrence, filters, transport, ICS | [Calendar feature](src-tauri/src/features/calendar/README.md), [CalDAV](docs/caldav.md) |

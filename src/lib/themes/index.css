@@ -1,0 +1,4 @@
+/* Palettes define colours only; components consume the shared semantic tokens. */
+@import './slate.css';
+@import './ember.css';
+@import './tokens.css';

@@ -1,0 +1,29 @@
+/* Taskroot's original warm charcoal/gold palette. */
+:root[data-theme='ember'] {
+    color-scheme: dark;
+    --bg: oklch(17.98% 0.0094 75.03);
+    --bg-highlight: oklch(19.46% 0.0102 67.17);
+    --bg-surface: oklch(21.32% 0.0124 67.08);
+    --bg-surface-hover: oklch(24.35% 0.0172 74.79);
+    --bg-active: oklch(26.87% 0.0189 76.15);
+    --border: oklch(28.08% 0.0167 74.94);
+    --border-soft: oklch(23.41% 0.0150 76.15);
+    --border-strong: oklch(33.40% 0.0217 75.67);
+    --fg: oklch(92.81% 0.0235 90.76);
+    --fg-muted: oklch(67.67% 0.0283 82.34);
+    --fg-dim: oklch(50.27% 0.0251 83.20);
+    --fg-dimmer: oklch(38.62% 0.0217 81.17);
+    --fg-dimmest: oklch(30.38% 0.0157 79.59);
+    --accent: oklch(81.32% 0.1084 77.46);
+    --tag-red: #d97757;
+    --tag-yellow: #e9b96e;
+    --tag-green: #8caa9a;
+    --tag-purple: #a8a4d2;
+    --tag-gold: #c9a978;
+    --danger: oklch(57.65% 0.2148 27.33);
+    --priority-0: #6a7c92;
+    --priority-1: #719379;
+    --priority-2: #b59864;
+    --priority-3: #c47e68;
+    --priority-4: #c96b7f;
+}
