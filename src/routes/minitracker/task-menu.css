@@ -8,54 +8,69 @@
     border-top: 1px solid var(--border);
 }
 
-.task-menu .menu-search,
-.task-menu .custom-form {
+.task-menu .menu-input {
+    display: flex;
     flex: none;
+    align-items: stretch;
+    gap: 6px;
     padding: 6px 8px;
     border-bottom: 1px solid var(--border-soft);
 }
 
-.task-menu .custom-form {
+.task-menu .search-field {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
 }
 
-.task-menu .menu-search input,
-.task-menu .custom-form input {
+.task-menu .search-field:focus-within { border-color: var(--accent); }
+
+.task-menu .search-icon {
+    flex: none;
+    color: var(--fg-dim);
+    font-size: 18px;
+    pointer-events: none;
+}
+
+.task-menu .search-field input {
+    flex: 1;
     min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 7px 10px;
-    border: 1px solid var(--border);
+    padding: 7px 0;
+    border: none;
     border-radius: 0;
     outline: none;
-    background: var(--bg-surface);
+    background: transparent;
     color: var(--fg);
     font: inherit;
     font-size: 13px;
 }
 
-.task-menu .custom-form input { flex: 1; }
-.task-menu input:focus { border-color: var(--accent); }
-.task-menu input::placeholder { color: var(--fg-dim); }
+.task-menu .search-field input::placeholder { color: var(--fg-dim); }
 
-.task-menu .custom-submit,
-.task-menu .custom-clear {
+.task-menu .track-button {
+    display: flex;
     flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 33px;
     border: 1px solid var(--border-strong);
     background: var(--bg-surface-hover);
     color: var(--fg);
-    font: inherit;
-    font-size: 12px;
     cursor: pointer;
 }
 
-.task-menu .custom-submit { height: 31px; padding: 0 12px; }
-.task-menu .custom-submit:disabled { opacity: 0.4; cursor: default; }
-.task-menu .custom-clear { width: 31px; height: 31px; padding: 0; font-size: 16px; line-height: 1; }
-.task-menu .custom-submit:hover:not(:disabled),
-.task-menu .custom-clear:hover { background: var(--bg-active); }
+.task-menu .track-button:hover,
+.task-menu .track-button:focus-visible {
+    background: var(--bg-active);
+    outline: none;
+}
+
+.task-menu .track-button .material-symbols-outlined { font-size: 18px; }
 
 .task-menu .menu-list { flex: 1; min-height: 0; overflow-y: auto; }
 .task-menu ul { list-style: none; margin: 0; padding: 4px 0; }

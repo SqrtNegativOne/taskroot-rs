@@ -162,6 +162,15 @@
                                 onEventDragStart={startEventDrag}
                                 {onAddEvent}
                                 {onEventClick}
+                                onEventResize={(instance, range) => {
+                                    reschedulePrompt.request(
+                                        instance,
+                                        range.startDate,
+                                        range.endDateExclusive,
+                                        true,
+                                        'Failed to resize event',
+                                    );
+                                }}
                                 onTaskClick={(marker) => {
                                     inspectorState = { type: 'task', id: marker.taskId };
                                 }}

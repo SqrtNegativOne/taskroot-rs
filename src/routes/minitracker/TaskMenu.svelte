@@ -21,11 +21,10 @@
         onToggleDone: (task: AppTask) => void;
     } = $props();
 
-    let search = $state('');
-    let custom = $state(untrack(() => customLabel ?? ''));
+    let query = $state(untrack(() => customLabel ?? ''));
 
     let visibleTasks = $derived.by(() => {
-        const needle = search.trim().toLowerCase();
+        const needle = query.trim().toLowerCase();
         if (needle === '') return tasks;
         return tasks.filter((task) => task.title.toLowerCase().includes(needle));
     });
@@ -40,39 +39,30 @@
     onpointerdown={(e) => e.stopPropagation()}
     ondblclick={(e) => e.stopPropagation()}
 >
-    <div class="menu-search">
-        <input
-            type="search"
-            placeholder="Search tasks..."
-            aria-label="Search tasks"
-            bind:value={search}
-            autofocus
-        />
-    </div>
-
     <form
-        class="custom-form"
+        class="menu-input"
         onsubmit={(event) => {
             event.preventDefault();
-            onSetCustom(custom);
+            onSetCustom(query);
         }}
     >
-        <input
-            type="text"
-            placeholder="Or type your own label..."
-            aria-label="Custom label"
-            bind:value={custom}
-        />
-        <button type="submit" class="custom-submit" disabled={custom.trim() === ''}>Track</button>
-        {#if customLabel}
-            <button
-                type="button"
-                class="custom-clear"
-                aria-label="Clear custom label"
-                title="Clear custom label"
-                onclick={() => onSetCustom('')}
-            >×</button>
-        {/if}
+        <div class="search-field">
+            <span class="search-icon material-symbols-outlined" aria-hidden="true">search</span>
+            <input
+                type="search"
+                aria-label="Search tasks or type a label to track"
+                bind:value={query}
+                autofocus
+            />
+        </div>
+        <button
+            type="submit"
+            class="track-button"
+            aria-label="Track typed label"
+            title="Track typed label"
+        >
+            <span class="material-symbols-outlined" aria-hidden="true">track_changes</span>
+        </button>
     </form>
 
     {#if activeTask}
@@ -101,7 +91,7 @@
 
     <div class="menu-list">
         {#if visibleTasks.length === 0}
-            <p class="empty">{search.trim() === '' ? 'No tasks' : 'No matching tasks'}</p>
+            <p class="empty">{query.trim() === '' ? 'No tasks' : 'No matching tasks'}</p>
         {:else}
             <ul>
                 {#each visibleTasks as task (task.id)}

@@ -198,7 +198,7 @@ impl Default for AppSettings {
             keybinding_open_settings: "Ctrl+,".to_string(),
             keybinding_restore_app: "Ctrl+Alt+R".to_string(),
             tracker_show_border: true,
-            tracker_opacity: 80,
+            tracker_opacity: 85,
             focus_feed_enabled: false,
             focus_feed_port: 8765,
         }

@@ -102,12 +102,19 @@
     overflow: hidden;
   }
   .day-cell-events-scroll {
+    position: relative;
     display: flex; flex-direction: column;
     gap: 2px;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    overflow: hidden;
+  }
+  .day-cell-chip-probe {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
+    top: 0;
+    left: 0;
   }
   .cal-span {
     position: absolute;
@@ -120,7 +127,7 @@
     padding: 0 5px;
     border: none;
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));
-    border-radius: 3px;
+    border-radius: 4px;
     background: var(--ev-bg, var(--bg-surface));
     color: var(--on-event);
     font: inherit;
@@ -138,6 +145,19 @@
   .cal-span:hover { filter: brightness(1.15); }
   .cal-span.is-readonly { opacity: 0.6; cursor: default; }
   .cal-span.is-dragging { opacity: 0.4; }
+  .cal-span.is-resizing { opacity: 0.9; }
+  .cal-span-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 7px;
+    z-index: 2;
+    cursor: ew-resize;
+    background: transparent;
+  }
+  .cal-span-handle.is-start { left: 0; }
+  .cal-span-handle.is-end { right: 0; }
+  .cal-span-handle:hover { background: color-mix(in srgb, var(--on-event) 28%, transparent); }
   .cal-span.is-selected,
   .day-cell-event.is-selected {
     outline: 1px solid var(--accent);
@@ -153,6 +173,7 @@
     padding: 1px 4px 1px 5px;
     color: var(--on-event);
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));
+    border-radius: 4px;
     background: var(--ev-bg, var(--bg-surface));
     overflow: hidden;
     white-space: nowrap;
@@ -182,9 +203,10 @@
     font-size: 0.74em;
     line-height: 1.25;
     padding: 1px 4px 1px 5px;
-    color: var(--fg-muted);
-    border-left: 2px solid var(--ev-color, var(--fg-dimmer));
-    background: transparent;
+    color: var(--fg);
+    border-left: 2px solid var(--ev-color, var(--accent));
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ev-color, var(--accent)) 16%, var(--bg-surface));
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -201,9 +223,17 @@
   .day-cell-task-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--fg-dim); }
   .day-cell-task-title { overflow: hidden; text-overflow: ellipsis; }
   .day-cell-more {
-    font-size: 0.7em;
+    font-family: var(--sans);
+    font-size: 0.72em;
+    line-height: 1.25;
+    padding: 1px 5px;
     color: var(--fg-dim);
-    padding-left: 5px;
+    background: var(--bg-surface);
+    border-radius: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
   }
   .day-cell-drop-hint {
     position: absolute; left: 6px; bottom: 4px;

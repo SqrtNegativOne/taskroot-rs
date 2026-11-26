@@ -25,7 +25,6 @@
         breaking: 'var(--success)',
         stopped: 'var(--fg-muted)',
     } as const;
-    const CUSTOM_FORM_HEIGHT = 45;
 
     type ShortcutAction = 'toggleDimmed' | 'restoreMainWindow';
 
@@ -66,7 +65,7 @@
     let leftShiftDown = false;
     let rightShiftDown = false;
     let shiftBreakFired = false;
-    let baseAlpha = $state(0.8);
+    let baseAlpha = $state(0.85);
     let menuBarHeight = $state(DEFAULT_BAR_HEIGHT);
     let barElement: HTMLDivElement | undefined = $state();
     let savedPosition = $state<StoredPosition>({ x: 0, y: 0 });
@@ -170,7 +169,6 @@
         controller.toggleMenu(
             tasks.length + (activeTask ? 1 : 0),
             { width: rect.width, height: rect.height },
-            CUSTOM_FORM_HEIGHT,
         );
     }
 
