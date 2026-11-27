@@ -30,8 +30,8 @@ pub async fn open(dir: PathBuf) -> Result<Session, AppError> {
     let mut store = Store::load(dir.clone());
     let http = HttpClient::new()?;
     let (mut account, client) = connect::connect(&dir, &http, None)?;
-    let calendars = discovery::refresh_collections(&dir, &client, &mut account).await;
-    store.calendars.clone_from(&calendars);
+    let calendars = discovery::refresh_collections(&dir, &client, &mut account).await?;
+    store.set_calendars(calendars);
     ops::full_load(&mut store, &client).await?;
     Ok(Session { dir, store, client })
 }

@@ -63,10 +63,9 @@
     role="menu"
     tabindex="-1"
     aria-label={task.title}
-    style="left: min({x}px, calc(100vw - 190px)); top: min({y}px, calc(100vh - 130px));"
+    style="left: min({x}px, calc(100vw - 190px)); top: min({y}px, calc(100vh - 100px));"
     oncontextmenu={(e) => e.preventDefault()}
 >
-    <div class="task-context-title" title={task.title}>{task.title}</div>
     <button type="button" role="menuitem" class="task-context-item" onclick={doTask}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
         Do
@@ -91,17 +90,6 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
         font-family: var(--sans);
         font-size: calc(13px * var(--font-scale, 1));
-    }
-
-    .task-context-title {
-        padding: 5px 8px 6px;
-        margin-bottom: 4px;
-        border-bottom: 1px dashed var(--border-soft);
-        color: var(--fg-dim);
-        max-width: 240px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     .task-context-item {

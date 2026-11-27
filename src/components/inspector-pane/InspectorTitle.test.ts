@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import InspectorTitle from './InspectorTitle.svelte';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
+vi.useRealTimers();
 });
 
 describe('InspectorTitle', () => {

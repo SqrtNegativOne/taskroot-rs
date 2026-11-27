@@ -5,7 +5,8 @@
     import DayCell from './DayCell.svelte';
     import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
     import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
-    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
+    import { resolveEventColor } from '../../../lib/eventColor';
+    import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
     import { isMultiDayAllDay, layoutWeekSpans, type WeekSpan } from './spanLayout';
     import { addDays, getWeekNumber, isoWeeksInYear, isoWeekYear, parseLocalYmd, ymd } from '../../../lib/time';
     import { buildDateGrid, shiftDateGridAnchor, type GridCell } from './dates';

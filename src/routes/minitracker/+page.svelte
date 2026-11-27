@@ -4,7 +4,6 @@
     import { store } from '../../lib/store.svelte';
     import { safeInvoke, useAutoQuery, useTauriQuery } from '../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
-    import { useNow } from '../../lib/useNow.svelte';
     import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
@@ -125,12 +124,7 @@
 
     let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
 
-    const now = useNow();
-
-    let currentMs = $derived.by(() => {
-        void now.ms;
-        return stopwatchState.isPaused ? stopwatchState.pauseRemainingMs : stopwatchState.currentMs;
-    });
+    let currentMs = $derived(stopwatchState.currentMs);
 
     let timeParts = $derived(splitTime(currentMs));
     let timeText = $derived(stopwatchState.isBreak ? timeParts.sec : timeParts.m);

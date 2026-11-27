@@ -35,7 +35,7 @@ pub struct Fetched {
 pub async fn fetch_into(dir: &Path, client: &CalDavClient) -> Result<Fetched, AppError> {
     let mut account = account::read_client_account(dir, client)?
         .ok_or_else(|| AppError::Auth("No CalDAV account is configured".to_string()))?;
-    let calendars = discovery::refresh_collections(dir, client, &mut account).await;
+    let calendars = discovery::refresh_collections(dir, client, &mut account).await?;
     let collections = ops::fetch_collections(client, &calendars).await?;
     Ok(Fetched {
         calendars,
@@ -45,7 +45,7 @@ pub async fn fetch_into(dir: &Path, client: &CalDavClient) -> Result<Fetched, Ap
 
 /// Replace the store with a fetched snapshot.
 pub fn apply(store: &mut Store, fetched: Fetched) {
-    store.calendars = fetched.calendars;
+    store.set_calendars(fetched.calendars);
     ops::apply_full_load(store, fetched.collections);
 }
 

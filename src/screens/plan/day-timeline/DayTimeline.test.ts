@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { filterGroup } from '../../../lib/domain';
 import type { AppEventFilter, FilterGroup } from '../../../lib/domain';
 import { persistedKeys } from '../../../lib/persisted.svelte';
@@ -47,10 +47,6 @@ describe('DayTimeline day headers', () => {
         );
     });
 
-    afterEach(() => {
-        cleanup();
-    });
-
     it('marks the header of today like the timeline does', async () => {
         const { container } = render(DayTimeline);
 
@@ -93,8 +89,6 @@ describe('DayTimeline nested filters', () => {
         tauri.stubCommandValue('get_active_calendars', []);
         tauri.stubCommandValue('list_tags', []);
     });
-    afterEach(() => { cleanup(); });
-
     it.each(['plan', 'sidebar'] as const)('restores, queries and saves a tree in the %s timeline', async variant => {
         const key = variant === 'plan' ? persistedKeys.dayTimelineFilters : persistedKeys.sidebarTimelineFilters;
         tauri.stubCommand('get_ui_state', args => args?.key === key ? nestedFilters : undefined);

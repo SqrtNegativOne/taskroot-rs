@@ -2,7 +2,8 @@
     import { onMount } from 'svelte';
     import type { EventInstance, AppCalendar, TaskDateInstance } from '../../../lib/domain';
     import { isEventReadOnly } from '../../../lib/domain';
-    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
+    import { resolveEventColor } from '../../../lib/eventColor';
+    import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
     import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import TaskCircle from '../../../components/TaskCircle.svelte';
     import { chipOverflow } from './overflow';

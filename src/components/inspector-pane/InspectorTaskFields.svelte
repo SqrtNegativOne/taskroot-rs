@@ -186,7 +186,7 @@
     </div>
 </InspectorField>
 
-<InspectorField icon="event" label="Due" disabled={readOnly}>
+<InspectorField icon="hourglass" label="Deadline" disabled={readOnly}>
     <div class="inspector-inline">
         <DateField
             value={getFormattedDate(task.due)}

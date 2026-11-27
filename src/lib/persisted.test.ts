@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../test/tauriMock';
 import Harness from './persistedHarness.svelte';
 
@@ -24,10 +24,6 @@ function updateWrites(): unknown[][] {
 describe('persistState', () => {
     beforeEach(() => {
         tauri.reset();
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('hydrates component state from the stored setting instead of the fallback', async () => {

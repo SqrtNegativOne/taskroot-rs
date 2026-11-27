@@ -32,7 +32,8 @@
     --circle-border: var(--border);
     --circle-fill: transparent;
     --on-priority: var(--fg);
-    /* Calendar colours are server-owned and can override the background. */
+    /* Calendar colours are server-owned; events tint the surface by default. */
+    --event-style: tint;
     --on-event: #fff;
     --effect-sweep: var(--accent);
     --effect-flash: var(--fg);

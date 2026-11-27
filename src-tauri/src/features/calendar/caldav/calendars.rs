@@ -112,9 +112,7 @@ pub async fn delete(
     ensure_writable(store, href)?;
 
     client.delete_collection(href).await?;
-    store
-        .resources
-        .retain(|_, resource| resource.collection != href);
+    store.remove_collection_resources(href);
     let calendars = store
         .calendars
         .iter()
@@ -151,6 +149,6 @@ fn replace_calendars(
         account.calendars.clone_from(&calendars);
         account::write_account(dir, &account)?;
     }
-    store.calendars = calendars;
+    store.set_calendars(calendars);
     Ok(())
 }

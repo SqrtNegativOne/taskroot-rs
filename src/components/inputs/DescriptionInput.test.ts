@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import DescriptionInput from './DescriptionInput.svelte';
 
 function stubClipboard() {
@@ -13,10 +13,6 @@ function stubClipboard() {
 }
 
 describe('DescriptionInput copy', () => {
-    afterEach(() => {
-        cleanup();
-    });
-
     it('copies the description when the copy icon is pressed', async () => {
         const writeText = stubClipboard();
         render(DescriptionInput, {

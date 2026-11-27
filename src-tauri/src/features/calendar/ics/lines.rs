@@ -241,16 +241,29 @@ impl Document {
             .extend(extra.iter().cloned().map(RawLine::new));
     }
 
-    /// Apply a [`NestedSpec`] to `span`'s child components of that kind.
+    /// Apply a [`NestedSpec`] to `span`'s managed child components of that kind.
     ///
-    /// Instances are matched by position, so the DTO's order is the document's
-    /// order. Existing instances keep every line the specs do not own; surplus
-    /// instances are removed; missing ones are appended from their block.
+    /// When `spec.managed` is set, only children whose position in `all_children`
+    /// is marked `true` are matched, rewritten or removed; unmanaged children stay
+    /// byte-identical. Managed instances are matched by position, keeping every
+    /// line the specs do not own; surplus managed instances are removed; missing
+    /// ones are appended from their block.
     fn apply_nested(&self, span: &ComponentSpan, spec: &NestedSpec, edits: &mut Edits) {
-        let existing = span
+        let all_children = span
             .children
             .iter()
             .filter(|child| child.kind == spec.kind)
+            .collect::<Vec<_>>();
+        let existing = all_children
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(idx, _)| {
+                spec.managed
+                    .as_ref()
+                    .is_none_or(|mask| mask.get(*idx).copied().unwrap_or(false))
+            })
+            .map(|(_, child)| child)
             .collect::<Vec<_>>();
         let mut pending: Vec<RawLine> = Vec::new();
         for (position, instance) in spec.instances.iter().enumerate() {
@@ -275,7 +288,7 @@ impl Document {
             }
         }
         if !pending.is_empty() {
-            let anchor = existing
+            let anchor = all_children
                 .last()
                 .map_or(span.end, |child| child.end.saturating_add(1));
             edits
@@ -365,6 +378,9 @@ impl PropertySpec {
 #[derive(Debug, Clone)]
 pub(super) struct NestedSpec {
     pub(super) kind: &'static str,
+    /// Optional per-child mask selecting which existing children of `kind` are
+    /// managed. `None` manages every child of `kind`.
+    pub(super) managed: Option<Vec<bool>>,
     /// The desired instances, in document order.
     pub(super) instances: Vec<NestedInstance>,
 }
@@ -373,8 +389,14 @@ impl NestedSpec {
     pub(super) const fn new(kind: &'static str) -> Self {
         Self {
             kind,
+            managed: None,
             instances: Vec::new(),
         }
+    }
+
+    pub(super) fn with_managed(mut self, mask: Vec<bool>) -> Self {
+        self.managed = Some(mask);
+        self
     }
 }
 
@@ -661,6 +683,7 @@ mod tests {
         let span = task_span(&document);
         let nested = NestedSpec {
             kind: "VALARM",
+            managed: None,
             instances: vec![NestedInstance::new(
                 vec![PropertySpec::new(
                     OwnedKind::Name("TRIGGER"),
@@ -686,6 +709,7 @@ mod tests {
         let span = task_span(&document);
         let nested = NestedSpec {
             kind: "VALARM",
+            managed: None,
             instances: vec![NestedInstance::new(
                 Vec::new(),
                 vec!["BEGIN:VALARM", "ACTION:DISPLAY", "END:VALARM"]
@@ -711,6 +735,7 @@ mod tests {
         let span = task_span(&document);
         let nested = NestedSpec {
             kind: "VALARM",
+            managed: None,
             instances: vec![NestedInstance::new(Vec::new(), Vec::new())],
         };
         let edited = document.edit_component(&span, &[], &[nested]);

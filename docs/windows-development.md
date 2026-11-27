@@ -1,45 +1,35 @@
 # Windows development and troubleshooting
 
-These notes describe implemented mitigations and conditional diagnostics.
-Sandbox access depends on the current harness policy; old observations about
-executable locations, timings or integrity labels are not universal guarantees.
-Do not copy binaries, change ACLs or alter real user data to reproduce them.
+Implemented Windows mitigations and conditional diagnostics. Inspect actual
+symptoms and logs before changing permissions, integrity labels or build flags.
 
 ## Data directories
 
-`src-tauri/src/platform/data_dir.rs` resolves app data:
+`src-tauri/src/platform/data_dir.rs` resolves the app data directory once per
+process:
 
-1. `TASKROOT_DATA_DIR` wins when set.
-2. Otherwise debug/release use the normal platform directory
-   (`%APPDATA%\com.arkma.taskroot` on Windows).
-3. In **debug** builds, a failed write probe can select `<exe dir>/dev-data`,
-   copying currently missing `account.json`, `settings.json` and `ui-state.json`
-   best-effort from the normal directory. Existing files are not overwritten;
-   stopwatch focus/history are not copied. This is not calendar-data caching or
-   a schema migration.
+1. `TASKROOT_DATA_DIR`, if set (errors if it cannot be created).
+2. The platform app-data directory (`%APPDATA%\com.arkma.taskroot` on Windows).
+3. In **debug** builds, if the platform directory cannot be created or fails a
+   write probe, fallback to `<exe dir>/dev-data`, best-effort seeding missing
+   `account.json`, `settings.json` and `ui-state.json` without overwriting
+   existing files.
 
-The app caches its resolved directory for the process. Creation of the preferred
-directory happens before the fallback probe, so a creation failure can return an
-error without falling back. The CLI has a separate resolver and no automatic
-debug fallback; set `TASKROOT_DATA_DIR` explicitly when app/CLI must share a
-fallback data home.
+The CLI has no automatic debug fallback; set `TASKROOT_DATA_DIR` explicitly if
+the app and CLI need to share a fallback directory.
 
-WebView2 profile-directory access has a separate debug fallback implemented in
-`platform/data_dir.rs` and called before Tauri construction. It respects
-`WEBVIEW2_USER_DATA_FOLDER` and is independent of `TASKROOT_DATA_DIR`.
-A warning identifies the selected fallback, not successful persistence or the
-reason access failed.
-Distinguish sandbox policy, filesystem permissions and process integrity before
-changing anything. `run.bat` does not set `TASKROOT_DATA_DIR`.
+`configure_dev_webview_storage` independently redirects `WEBVIEW2_USER_DATA_FOLDER`
+to `<exe dir>/dev-data/EBWebView` in debug builds when `%LOCALAPPDATA%\<id>` is
+unwritable (respecting an explicit `WEBVIEW2_USER_DATA_FOLDER`).
 
 ## Temporary directories
 
-`build.bat` and the dev branch of `run.bat` set both `TMP` and `TEMP` to
-`src-tauri/target/cargo-tmp`. Use a writable temp directory when a confined MSVC
-linker fails opening `lnk*.tmp` at final link; compiling all objects does not
-prove the linker can access its scratch files.
+`build.bat` and the dev branch of `run.bat` point `TMP` and `TEMP` at
+`src-tauri/target/cargo-tmp` so confined MSVC linkers can create `lnk*.tmp`.
 
-For tests in a confined Windows/MSYS shell (Rust tests also use system temp):
+If tests fail with temp-directory access errors in a confined Windows/MSYS
+shell, set both variables separately (Node on Windows reads `TEMP`; `TMPDIR`
+alone is not enough):
 
 ```sh
 T="$PWD/src-tauri/target/vitest-tmp"
@@ -47,65 +37,42 @@ mkdir -p "$T"
 export TMP="$T"
 export TEMP="$T"
 bun run test:unit
-# Rust alternative: cd src-tauri && cargo nextest run
+# Rust: cd src-tauri && cargo nextest run
 ```
-
-Set the two variables separately. `export TMP="$T" TEMP="$TMP"` can bind `TEMP`
-to the previous `TMP` value, and Windows Node temp resolution uses `TEMP`.
-Setting only `TMPDIR` is not a substitute. This workaround is conditional on
-temp access failing; it is not necessary for every development environment.
 
 ## Release selection
 
-`build.bat` builds the release and writes
-`src-tauri/target/release/.build-stamp` using `scripts/build-state.cmd`.
-`run.bat` compares a freshly generated stamp and launches the release executable
-on a match, otherwise Tauri dev. A release built outside `build.bat` has no new
-stamp, and an old stamp may remain. These scripts are launch/build actions, not
-read-only checks: the dev branch of `run.bat` terminates `taskroot.exe` by image
-name before launching.
-
-**The stamp is a Git-status heuristic, not a content fingerprint.** It includes
-HEAD and status records for selected build paths. Successive edits to an already
-dirty file, or changes to an already-untracked file, can leave identical status
-output; documentation-only changes under `src/` can also invalidate it. Do not
-use a stamp match as proof that the binary contains every current edit. When in
-doubt, rebuild explicitly. The helper's path list must track build inputs.
+`build.bat` builds the release binary and writes a content-safe fingerprint to
+`src-tauri/target/release/.build-stamp` via `scripts/build-state.cmd` (`HEAD` +
+tracked diff hash + untracked file hashes under build inputs). It skips writing
+the stamp if sources changed mid-build. `run.bat` compares the current
+fingerprint against `.build-stamp` and launches the release binary on a match,
+otherwise kills `taskroot.exe` and starts `bun run tauri dev`. Keep
+`BUILD_PATHS` in `scripts/build-state.cmd` aligned with build inputs.
 
 ## Lazy window creation
 
-`platform/windows.rs` resolves configured windows; `platform/window_creation.rs`
-runs native creation on a blocking worker. `platform/window_lifecycle.rs` provides
-per-window asynchronous locks covering creation and visibility changes, so an
-overlapping hide waits for creation and duplicate show requests reuse one window.
-The effect, launcher and mini tracker IPC commands are asynchronous, and the
-launcher shortcut dispatches asynchronous work instead of building a window
-inside its event callback.
+Tauri/WebView2 deadlocks on Windows if a window is created inside a synchronous
+IPC command or event callback
+([wry#583](https://github.com/tauri-apps/wry/issues/583)). Because the `effect`,
+`launcher` and `minitracker` windows are created lazily (e.g., on the first
+break transition):
 
-Tauri [documents a Windows WebView2 deadlock](https://github.com/tauri-apps/wry/issues/583)
-when a window is built in a synchronous command or event handler. A break's first
-transition lazily opens the effect overlay, so violating this constraint can stop
-IPC and native window/tray actions while the frontend countdown continues locally.
-The non-visual regression tests model creation waiting for an event-loop request
-and overlapping lifecycle operations; they do not exercise WebView2 itself.
-Verify first-break, first-launcher and first
-mini-tracker behavior manually on Windows without agent-launched visual inspection.
+- `platform/window_creation.rs` runs native creation on a blocking worker.
+- `platform/window_lifecycle.rs` serializes create/show/hide/toggle per window
+  with async locks so overlapping hides wait for creation and duplicate shows
+  reuse one window.
+- Commands and shortcut handlers that open lazy windows must stay asynchronous.
 
-## Tray and z-order diagnostics
+Unit tests cover the async lifecycle state machine, not WebView2 itself; verify
+first-break, first-launcher and first mini-tracker opens manually on Windows.
 
-The mini tracker's Windows topmost guard and DWM square-corner setup live in
-`src-tauri/src/platform/windows.rs`. These are implemented desktop workarounds;
-code presence alone does not establish that a particular machine still needs
-periodic topmost reassertion.
+## Tray, z-order and PowerShell
 
-If the tray is missing alongside access errors, inspect labels non-destructively
-with `icacls .` and `icacls src-tauri\target\debug\taskroot.exe`. A Low mandatory
-label is a diagnostic clue, not proof of the process's integrity or of the cause
-of a tray failure. Check actual process integrity and logs. Do not recommend
-administrator mode or recursively relabel the repository without evidence and
-user approval.
-
-## Editing from PowerShell
-
-`-replace` is case-insensitive. Use exact replacements or `-creplace` for bulk
-source edits so identifier casing is not silently rewritten.
+- The mini tracker's Windows topmost guard and DWM square-corner setup live in
+  `src-tauri/src/platform/windows.rs`.
+- If the tray icon is missing alongside access errors, inspect labels
+  non-destructively with `icacls .` and
+  `icacls src-tauri\target\debug\taskroot.exe` before taking action.
+- In PowerShell, `-replace` is case-insensitive; use `-creplace` for bulk source
+  edits so identifier casing is preserved.

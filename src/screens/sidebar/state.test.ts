@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { sidebarUiKeys } from './state.svelte';
 import Harness from './sidebarStateHarness.svelte';
@@ -22,10 +22,6 @@ function stubBackend(values: Record<string, unknown>): void {
 describe('createSidebarState', () => {
     beforeEach(() => {
         tauri.reset();
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('hydrates notes, visibility and tab position from the backend', async () => {

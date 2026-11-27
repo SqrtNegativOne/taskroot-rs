@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../../test/tauriMock';
 import { makeEvent } from '../../test/factories';
 import type { AppCalendar, AppTask } from '../../lib/domain';
@@ -32,10 +32,6 @@ describe('InspectorPane convert to task', () => {
         tauri.stubCommandValue('query_tasks', []);
         tauri.stubCommandValue('get_active_calendars', calendars);
         tauri.stubCommandValue('get_ui_state', undefined);
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('creates a task from the event date and removes the event', async () => {

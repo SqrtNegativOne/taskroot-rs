@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import AccountPanel from './AccountPanel.svelte';
 import type { AccountRegistry } from '../../lib/bindings/AccountRegistry.generated';
@@ -44,7 +44,7 @@ describe('AccountPanel', () => {
         vi.spyOn(window, 'confirm').mockReturnValue(true);
     });
 
-    afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+    afterEach(() => {vi.restoreAllMocks(); });
 
     it('switches to a saved account in place without disconnecting or entering a password', async () => {
         render(AccountPanel);

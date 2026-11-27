@@ -7,7 +7,10 @@ use crate::error::AppError;
 use crate::features::calendar::ics;
 
 use super::super::model::{Resource, Store};
-use super::{collection_for, refetch_resource, require_uid, resource_href, writable_calendar};
+use super::{
+    collection_for, ensure_source_writable, refetch_resource, require_uid, resource_href,
+    writable_calendar,
+};
 
 /// Create one event resource.
 ///
@@ -58,6 +61,7 @@ pub async fn update_event(
     let merged = ics::write_event_resource(&resource.raw, &event)?;
 
     if target.href != resource.collection {
+        ensure_source_writable(store, &resource.collection)?;
         let href = resource_href(&target.href, event.id.as_str());
         let etag = client.put_resource(&href, &merged, None, true).await?;
         client
@@ -114,6 +118,7 @@ pub async fn delete_event(
     let Some((resource, event)) = series_resource(store, id) else {
         return Ok(());
     };
+    ensure_source_writable(store, &resource.collection)?;
     let master = master_event(store, &event);
     let is_series = master.as_ref().is_some_and(AppEvent::is_recurring);
 

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import DayColumn from './DayColumn.svelte';
 import { makeInstance } from '../../../../test/factories';
 import type { LaidEvent } from '../types';
@@ -25,10 +25,6 @@ async function pressAndRelease(grid: Element) {
 }
 
 describe('DayColumn creation ghost', () => {
-    afterEach(() => {
-        cleanup();
-    });
-
     it('shows the ghost as soon as the grid is pressed, before any movement', async () => {
         const { container } = render(DayColumn, {
             props: { date, today, laid: [], onAddEvent: vi.fn() },

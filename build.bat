@@ -7,12 +7,21 @@ set "TMP=%~dp0src-tauri\target\cargo-tmp"
 set "TEMP=%TMP%"
 if not exist "%TMP%" mkdir "%TMP%"
 
+set "STAMP=%~dp0src-tauri\target\release\.build-stamp"
+set "BEFORE=%TMP%\build-state-before.txt"
+set "AFTER=%TMP%\build-state-after.txt"
+del /q "%STAMP%" >nul 2>&1
+call "%~dp0scripts\build-state.cmd" > "%BEFORE%"
+set "HAS_BEFORE=%ERRORLEVEL%"
+
 bun run tauri build
 if errorlevel 1 exit /b 1
 
-rem Record the exact git state this release was built from so run.bat can tell,
-rem in milliseconds, whether the release exe still matches the sources.
-set "STAMP=%~dp0src-tauri\target\release\.build-stamp"
-call "%~dp0scripts\build-state.cmd" > "%STAMP%"
-if errorlevel 1 del /q "%STAMP%" >nul 2>&1
+rem Record the build-state fingerprint only if sources did not change mid-build.
+if not "%HAS_BEFORE%"=="0" exit /b 0
+call "%~dp0scripts\build-state.cmd" > "%AFTER%"
+if errorlevel 1 exit /b 0
+fc /b "%BEFORE%" "%AFTER%" >nul 2>&1
+if errorlevel 1 exit /b 0
+copy /y "%AFTER%" "%STAMP%" >nul
 exit /b 0

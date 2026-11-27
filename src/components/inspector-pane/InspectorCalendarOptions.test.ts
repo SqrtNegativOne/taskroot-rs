@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { makeEvent } from '../../test/factories';
 import type { AppCalendar, AppTask } from '../../lib/domain';
@@ -22,10 +22,6 @@ describe('inspector calendar options', () => {
     beforeEach(() => {
         tauri.reset();
         tauri.stubCommandValue('get_active_calendars', calendars);
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('offers only event calendars to an event', async () => {

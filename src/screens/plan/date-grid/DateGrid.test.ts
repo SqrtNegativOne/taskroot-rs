@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../../test/tauriMock';
 import { makeInstance, makeTaskDateInstance } from '../../../test/factories';
 import { addDays, startOfWeek, ymd } from '../../../lib/time';
@@ -50,8 +50,6 @@ describe('DateGrid visibility filters', () => {
             makeInstance({ id: 'yearly', title: 'Yearly event', recurring: true, rrule: 'RRULE:FREQ=YEARLY', timing }),
         ]);
     });
-
-    afterEach(() => { cleanup(); });
 
     it('shows all event kinds by default and offers only event calendars', async () => {
         render(DateGrid);
@@ -153,8 +151,6 @@ describe('DateGrid done-task hiding', () => {
         ]);
     });
 
-    afterEach(() => { cleanup(); });
-
     it('hides done planned events and done task markers only after opting in', async () => {
         render(DateGrid);
         expect(await screen.findByText('Planned done')).toBeTruthy();
@@ -186,8 +182,6 @@ describe('DateGrid event titles', () => {
             }),
         ]);
     });
-
-    afterEach(() => { cleanup(); });
 
     it('labels an unnamed event instead of rendering an empty box', async () => {
         render(DateGrid);
@@ -224,8 +218,6 @@ describe('DateGrid task dates', () => {
             }),
         ]);
     });
-
-    afterEach(() => { cleanup(); });
 
     it('renders a start and due marker even when they land on the same day', async () => {
         const onTaskClick = vi.fn();

@@ -88,7 +88,8 @@ pub fn write_task_resource(raw: &str, task: &AppTask) -> Result<String, AppError
     let nested = if previous.is_some_and(|previous| previous.alarms == task.alarms) {
         Vec::new()
     } else {
-        vec![task_alarm_spec(task)]
+        let managed = read::task_alarm_support(raw, position)?;
+        vec![task_alarm_spec(task).with_managed(managed)]
     };
     Ok(document.edit_component(span, &task_specs(task), &nested))
 }

@@ -126,3 +126,35 @@ fn create_task_resource_emits_a_valarm_block() {
     ));
     assert_eq!(read_task(&created).alarms, task.alarms);
 }
+
+#[test]
+fn editing_a_mixed_alarm_list_preserves_unmodelled_alarms_and_identities() {
+    let raw = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:a\r\n\
+BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER;RELATED=END:-PT45S\r\nDESCRIPTION:unmodelled\r\nEND:VALARM\r\n\
+BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT15M\r\nDESCRIPTION:supported\r\nEND:VALARM\r\n\
+END:VTODO\r\nEND:VCALENDAR\r\n";
+    let mut task = read_task(raw);
+    assert_eq!(
+        task.alarms,
+        Some(vec![TaskAlarmTrigger::Relative {
+            minutes_before: 15,
+            anchor: TaskAlarmAnchor::End,
+        }])
+    );
+
+    task.alarms = Some(vec![TaskAlarmTrigger::Relative {
+        minutes_before: 30,
+        anchor: TaskAlarmAnchor::End,
+    }]);
+    let edited = write_task_resource(raw, &task).unwrap();
+
+    assert!(edited.contains("BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER;RELATED=END:-PT45S\r\nDESCRIPTION:unmodelled\r\nEND:VALARM"));
+    assert!(edited.contains("BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT30M\r\nDESCRIPTION:supported\r\nEND:VALARM"));
+    assert!(!edited.contains("-PT15M"));
+
+    task.alarms = None;
+    let cleared = write_task_resource(&edited, &task).unwrap();
+    assert!(cleared.contains("BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER;RELATED=END:-PT45S\r\nDESCRIPTION:unmodelled\r\nEND:VALARM"));
+    assert!(!cleared.contains("DESCRIPTION:supported"));
+    assert_eq!(read_task(&cleared).alarms, None);
+}

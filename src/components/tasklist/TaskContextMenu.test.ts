@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { AppTask } from '../../lib/domain';
 import TaskContextMenu from './TaskContextMenu.svelte';
 
@@ -16,10 +16,6 @@ function renderMenu(task: AppTask) {
     });
     return { onClose, onDelete, onDo };
 }
-
-afterEach(() => {
-    cleanup();
-});
 
 describe('TaskContextMenu', () => {
     it('starts the task and closes the menu', async () => {

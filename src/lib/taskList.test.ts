@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import TaskListState from './TaskListState.svelte';
 import { defaultTaskListFilters, reloadTaskListState, taskListQueryArgs, taskListState } from './taskList.svelte';
@@ -26,8 +26,6 @@ beforeEach(() => {
     taskListState.filters = defaultTaskListFilters();
     taskListState.sort = [];
 });
-afterEach(() => { cleanup(); });
-
 describe('shared task-list filters', () => {
     it('hydrates a nested tree and sends it unchanged to list queries', async () => {
         tauri.stubCommand('get_ui_state', args => args?.key === persistedKeys.taskListFilters ? nested : []);

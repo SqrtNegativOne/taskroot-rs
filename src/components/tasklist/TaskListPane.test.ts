@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import type { AppCalendar, AppTaskColumnDef, AppTaskFilter, FilterGroup } from '../../lib/domain';
 import { filterGroup } from '../../lib/domain';
@@ -32,10 +32,6 @@ describe('TaskListPane calendar filter', () => {
         tauri.stubCommandValue('query_tasks', []);
         tauri.stubCommandValue('get_past_due_task_ids', []);
         tauri.stubCommandValue('get_ui_state', undefined);
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('offers only task lists as calendar filter values from the view menu', async () => {

@@ -129,7 +129,7 @@
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));
     border-radius: 4px;
     background: var(--ev-bg, var(--bg-surface));
-    color: var(--on-event);
+    color: var(--ev-text, var(--on-event));
     font: inherit;
     font-family: var(--sans);
     font-size: 0.74em;
@@ -157,7 +157,7 @@
   }
   .cal-span-handle.is-start { left: 0; }
   .cal-span-handle.is-end { right: 0; }
-  .cal-span-handle:hover { background: color-mix(in srgb, var(--on-event) 28%, transparent); }
+  .cal-span-handle:hover { background: color-mix(in srgb, var(--ev-text, var(--on-event)) 28%, transparent); }
   .cal-span.is-selected,
   .day-cell-event.is-selected {
     outline: 1px solid var(--accent);
@@ -171,7 +171,7 @@
     line-height: 1.25;
     min-height: 1.25em;
     padding: 1px 4px 1px 5px;
-    color: var(--on-event);
+    color: var(--ev-text, var(--on-event));
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));
     border-radius: 4px;
     background: var(--ev-bg, var(--bg-surface));
@@ -184,7 +184,7 @@
   .day-cell-event:hover {
     filter: brightness(1.15);
   }
-  .day-cell-event.ev-plan { border-left-color: var(--ev-color, var(--accent)); background: var(--ev-bg, var(--accent-soft)); color: var(--on-event); }
+  .day-cell-event.ev-plan { border-left-color: var(--ev-color, var(--accent)); background: var(--ev-bg, var(--accent-soft)); color: var(--ev-text, var(--on-event)); }
   .day-cell-event.ev-meeting { border-left-color: var(--ev-color, var(--fg-dim)); background: var(--ev-bg, var(--bg-surface)); }
   .day-cell-event.pri-bar-0 { border-left-color: var(--priority-0); }
   .day-cell-event.pri-bar-1 { border-left-color: var(--priority-1); }
@@ -193,7 +193,7 @@
   .day-cell-event.pri-bar-4 { border-left-color: var(--priority-4); }
   .day-cell-event.is-done { opacity: 0.45; text-decoration: line-through; }
   .day-cell-event.is-done .day-cell-event-title-text { text-decoration: line-through; }
-  .day-cell-event-time { color: var(--on-event); flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .day-cell-event-time { color: var(--ev-secondary, var(--on-event)); flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
   .day-cell-event-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .day-cell .day-cell-events .task-circle { border-color: currentColor; opacity: 0.6; }
@@ -203,10 +203,10 @@
     font-size: 0.74em;
     line-height: 1.25;
     padding: 1px 4px 1px 5px;
-    color: var(--fg);
+    color: var(--ev-text, var(--fg));
     border-left: 2px solid var(--ev-color, var(--accent));
     border-radius: 4px;
-    background: color-mix(in srgb, var(--ev-color, var(--accent)) 16%, var(--bg-surface));
+    background: var(--ev-bg, color-mix(in srgb, var(--ev-color, var(--accent)) 16%, var(--bg-surface)));
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -220,7 +220,7 @@
   .day-cell-task.is-done { opacity: 0.45; text-decoration: line-through; }
   .day-cell-task.is-done .day-cell-task-title { text-decoration: line-through; }
   .day-cell-task.is-due { border-left-color: var(--p0); }
-  .day-cell-task-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--fg-dim); }
+  .day-cell-task-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ev-secondary, var(--fg-dim)); }
   .day-cell-task-title { overflow: hidden; text-overflow: ellipsis; }
   .day-cell-more {
     font-family: var(--sans);

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import Harness from '../../test/FilterEditorHarness.svelte';
 import { filterGroup } from '../../lib/domain';
 import type { FilterColumn, FilterCondition } from '../../lib/domain';
@@ -24,8 +24,6 @@ beforeEach(() => {
     tauri.reset();
     tauri.stubCommandValue('list_tags', ['work']);
 });
-afterEach(() => { cleanup(); });
-
 async function openFilter(initial: FilterCondition) {
     render(Harness, { props: { columns, initial: filterGroup([initial]) } });
     await fireEvent.click(screen.getByRole('button', { name: 'Filter' }));

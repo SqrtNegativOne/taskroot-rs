@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import FilterButton from './FilterButton.svelte';
 import { mockTauriInvoke } from '../test/tauriMock';
 
@@ -19,8 +19,6 @@ beforeEach(() => {
     tauri.reset();
     tauri.stubCommandValue('list_tags', []);
 });
-
-afterEach(() => { cleanup(); });
 
 async function openWithFilter() {
     render(FilterButton, { props: { columns } });

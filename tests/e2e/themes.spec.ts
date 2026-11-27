@@ -28,7 +28,7 @@ const fixture = `
     <div class="minitracker-container"><button class="minitracker-task has-task">Tracking</button></div>
     <div class="task-menu"><span class="task-badge">Current</span></div>
     <div class="sidebar-widget"><button class="tab">Sidebar</button></div>
-    <div class="day-event" style="--ev-color: #a03260; --ev-bg: #a03260">Server colour</div>
+    <div class="day-event" style="--ev-color: #a03260; --ev-bg: color-mix(in srgb, var(--bg-surface) 82%, #a03260); --ev-text: var(--fg); --ev-secondary: var(--fg-muted)">Server colour</div>
 `;
 
 function luminance(rgb: number[]): number {
@@ -109,13 +109,15 @@ test('today and current-time markers stay red when the theme changes', async ({ 
     }
 });
 
-test('switching palettes recolours app surfaces but preserves server event colours', async ({ page }) => {
+test('switching palettes recolours app surfaces and event fills but preserves the server colour bar', async ({ page }) => {
     await page.setContent(fixture);
     const probes = ['#surface', '#accent', '.pri-2', '.minitracker-task', '.task-badge', '.tab'];
+    const eventFill = () => page.locator('.day-event').evaluate((element) => getComputedStyle(element).backgroundColor);
     const before = await page.locator(probes.join(',')).evaluateAll((elements) => elements.map((element) => {
         const style = getComputedStyle(element);
         return `${style.color} ${style.backgroundColor}`;
     }));
+    const fillBefore = await eventFill();
 
     await page.evaluate(() => { document.documentElement.dataset.theme = 'ember'; });
     const after = await page.locator(probes.join(',')).evaluateAll((elements) => elements.map((element) => {
@@ -124,6 +126,6 @@ test('switching palettes recolours app surfaces but preserves server event colou
     }));
     expect(after).toHaveLength(before.length);
     for (let index = 0; index < before.length; index += 1) expect(after[index]).not.toBe(before[index]);
-    await expect(page.locator('.day-event')).toHaveCSS('background-color', 'rgb(160, 50, 96)');
+    expect(await eventFill()).not.toBe(fillBefore);
     await expect(page.locator('.day-event')).toHaveCSS('border-left-color', 'rgb(160, 50, 96)');
 });

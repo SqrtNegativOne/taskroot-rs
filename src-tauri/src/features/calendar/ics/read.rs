@@ -444,6 +444,32 @@ fn read_geo(component: &Component<'_>) -> Option<GeoPoint> {
     })
 }
 
+/// For each `VALARM` inside the `task_index`-th `VTODO`, whether this crate
+/// models its trigger. Used by the writer so unmodelled alarms stay untouched
+/// when editing a mixed alarm list.
+pub(super) fn task_alarm_support(raw: &str, task_index: usize) -> Result<Vec<bool>, AppError> {
+    let unfolded = unfold(raw);
+    let calendar = parse(&unfolded, "task resource")?;
+    let Some(component) = calendar
+        .components
+        .iter()
+        .filter(|component| component.name.as_str() == "VTODO")
+        .nth(task_index)
+    else {
+        return Ok(Vec::new());
+    };
+    Ok(component
+        .components
+        .iter()
+        .filter(|child| child.name.as_str() == "VALARM")
+        .map(|child| {
+            property(child, "TRIGGER")
+                .and_then(alarm_trigger)
+                .is_some()
+        })
+        .collect())
+}
+
 /// The `VALARM` triggers of a task, in document order.
 ///
 /// Alarms this module cannot express are left out; the writer only rewrites the

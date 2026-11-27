@@ -144,14 +144,9 @@ impl AccountService {
         let client = self.profile_client(profile)?;
         let revision = state.read(Store::revision).await;
         let mut account = profile.account.clone();
-        if let Ok(Ok(calendars)) = tokio::time::timeout(
-            std::time::Duration::from_secs(3),
-            discovery::fetch_calendars(&client, &account.home_href),
-        )
-        .await
-        {
-            account.calendars = calendars;
-        }
+        account.calendars =
+            discovery::refresh_calendar_list(&client, &account.home_href, &account.calendars)
+                .await?;
         let fetched = fetch(&client, &account).await?;
         let mut store = state.lock().await;
         if store.revision() != revision {

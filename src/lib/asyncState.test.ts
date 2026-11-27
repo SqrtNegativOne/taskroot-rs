@@ -1,13 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/svelte';
+import { render } from '@testing-library/svelte';
 import { createDebouncer, createStaleGuard } from './asyncState.svelte';
 import HydrateHarness from './hydrateOnceHarness.svelte';
 
 describe('hydrateOnce', () => {
-    afterEach(() => {
-        cleanup();
-    });
-
     it('applies a load that resolves while the component is alive', async () => {
         const onApplied = vi.fn();
         render(HydrateHarness, {

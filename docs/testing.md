@@ -1,54 +1,46 @@
 # Testing reference
 
-Test behavior and interoperability, not a transcription of implementation details.
-Read the [test-review skill](../.agents/skills/avoid-change-detector-tests/SKILL.md)
-when writing or reviewing tests. Do not add coverage thresholds.
+Test behavior and interoperability, not copies of the implementation; see
+[avoid-change-detector-tests](../.agents/skills/avoid-change-detector-tests/SKILL.md).
+Do not add coverage thresholds.
 
 ## Commands
 
 From the repository root:
 
 ```sh
-bun run check
-bun run lint
-bun run test:unit
-bun run test                 # Playwright; boots the Vite dev server
+bun run check              # svelte-check --tsgo
+bun run lint               # Oxlint then ESLint
+bun run test:unit          # Vitest (jsdom)
+bun run test               # Playwright (boots Vite dev server)
 bun run coverage:frontend
 ```
-
-`bun run check` uses `svelte-check --tsgo`; `bun run lint` runs Oxlint then
-ESLint. `package.json` and `.github/workflows/ci.yml` own the exact invocations.
 
 From `src-tauri/`:
 
 ```sh
 cargo clippy --all-targets -- -D warnings
-cargo nextest run            # also exports ts-rs bindings and docs/cli.md
+cargo nextest run          # also regenerates src/lib/bindings/ and docs/cli.md
 ```
 
-`bun run coverage:backend` runs `cargo llvm-cov nextest` (requires
-`cargo-llvm-cov`). CI uses frontend coverage and backend llvm-cov/nextest, then
-checks tracked generated-binding and CLI-reference drift. New generated files must
-also be added to version control—the diff gate alone does not detect untracked
-outputs. See [Windows development](windows-development.md) if temp-directory
-access fails; that workaround applies to backend tests too.
+`bun run coverage:backend` runs `cargo llvm-cov nextest`. CI runs coverage and
+checks tracked drift on `src/lib/bindings/` and `docs/cli.md` (new generated
+files must still be `git add`ed). If temp-directory access fails on Windows, see
+[temporary directories](windows-development.md#temporary-directories).
 
-## Vitest and Svelte
+## Vitest, Svelte and Playwright
 
-Tests live next to code as `*.test.ts`; component tests use
-`@testing-library/svelte` with jsdom. Shared utilities are in `src/test/`.
+Unit/component tests live beside code as `*.test.ts` using
+`@testing-library/svelte` + jsdom. Shared test utilities live in `src/test/`:
 
-- `makeEvent`/`makeInstance` from `factories.ts` supply domain fixtures with partial
-  overrides, including nested timing.
-- `vite.config.js` selects Svelte's browser build for Vitest. Removing that
-  condition can resolve the server build and prevent component mounting.
-- `setup.ts` installs Tauri runtime/event globals used by the externalized event
-  API. Reuse it rather than inventing globals in each test. These no-op globals
-  are scaffolding, not an event-delivery simulation; event behavior needs an
-  explicit event mock.
-- `tauriMock.ts` shares the IPC mock between the test and its module factory
-  within each isolated test environment. Keep the factory top-level so Vitest
-  hoists it; register commands and reset in `beforeEach`:
+- `factories.ts`: `makeEvent` / `makeInstance` fixtures with partial overrides.
+- `vite.config.js`: sets `conditions: ['browser']` under Vitest so Svelte
+  resolves its browser build and components can mount.
+- `setup.ts`: enables automatic Testing Library DOM cleanup
+  (`@testing-library/svelte/vitest`) and installs no-op Tauri runtime/event
+  globals (mock events explicitly when testing event delivery).
+- `tauriMock.ts`: shared per-environment IPC mock. Keep the `vi.mock` factory
+  top-level so Vitest hoists it, then reset and stub commands in `beforeEach`:
 
 ```ts
 vi.mock('@tauri-apps/api/core', async () => {
@@ -59,75 +51,45 @@ vi.mock('@tauri-apps/api/core', async () => {
 const tauri = mockTauriInvoke();
 // beforeEach: tauri.reset();
 // Register: tauri.stubCommand(cmd, handler) / stubCommandValue(cmd, value).
-// Assert calls through tauri.invoke. Adjust the import path for the test location.
 ```
 
-Unregistered commands resolve to `undefined`. Vitest globals are disabled, so
-Testing Library's automatic cleanup does not register: import `afterEach` from
-Vitest and explicitly call `cleanup()` in component tests. A small `.svelte`
-harness is appropriate for rune/lifecycle behavior that cannot run from plain TS;
-prefer mocking the backend over mounting an entire screen.
+Unregistered commands resolve to `undefined`. Prefer small `.svelte` test
+harnesses over mounting whole screens.
 
-`tests/e2e/day-timeline.spec.ts` checks stylesheet geometry with DOM fixtures,
-bounding boxes and hit-testing. `themes.spec.ts` checks representative text
-contrast, palette switching across styled surfaces and preservation of server
-event colours. These are non-visual browser checks: they neither capture
-screenshots nor start the native desktop app, and do not replace manual theme
-inspection.
+Playwright specs (`tests/e2e/day-timeline.spec.ts` for CSS geometry/hit-testing,
+`themes.spec.ts` for contrast and palette switching) are non-visual browser
+checks — they do not take screenshots or launch the Tauri binary.
 
 ## Rust behavior tests
 
-Write tests first for backend behavior. Existing coverage includes CalDAV XML
-parsers, ICS preservation invariants, store/query behavior, settings and error
-shapes. Reuse `test_support::caldav::{start_server, start_http_server}` and
-`test_support::ics::{series, all_day, with_exception}` for server/ICS fixtures.
-`clippy.toml` permits `unwrap`/`expect` in tests; do not add repetitive module allows.
+Write backend tests first. Reuse `test_support::caldav::{start_server, start_http_server}`
+and `test_support::ics::{series, all_day, with_exception}`. `clippy.toml` allows
+`unwrap`/`expect` in tests; do not add per-module allows.
 
-For real multi-account behavior there is a disposable loopback Radicale fixture
-with documented test-only credentials; see [dummy accounts](dummy-accounts.md).
-Its backend contract is `caldav/tests/dummy_accounts.rs`, ignored by default and
-run through the fixture script (`--check-backend`), like the Radicale e2e example:
-
-The live Radicale check is `src-tauri/examples/e2e_caldav.rs`. It exercises
-create/edit/move/delete and preservation through a real server, is not part of CI,
-and needs deliberate access to a **disposable data directory and server fixture**:
-it recursively deletes the selected data directory and edits/restores a server
-task fixture. Never point this
-example at the user's normal data directory/account as a harmless check:
+- Multi-account integration: disposable loopback Radicale in
+  [dummy accounts](dummy-accounts.md) (`caldav/tests/dummy_accounts.rs`, run via
+  `--check-backend`).
+- Live Radicale smoke test: `src-tauri/examples/e2e_caldav.rs` (not in CI).
+  **Destructive**: recursively deletes `TASKROOT_DATA_DIR` and edits a server
+  task. Run only against a disposable directory and server fixture:
 
 ```sh
 TASKROOT_DATA_DIR=target/e2e-data cargo run --example e2e_caldav -- --user … --password …
 ```
 
-## IPC source contract: what it does and does not prove
+## IPC source contract
 
-`ipc/tests.rs` checks registration uniqueness, agreement between registered and
-annotated handlers, literal frontend command names and recognized supplied keys
-against camelCased Rust parameter names. `test_support/source_scan.rs` parses Rust;
-`frontend_scan.rs` parses frontend call sites, including later `query.execute({…})`
-for a locally bound query. Test sources are excluded.
+`ipc/tests.rs` (via `test_support/source_scan.rs` and `frontend_scan.rs`) checks
+handler registration uniqueness, `#[tauri::command]` ↔ `generate_handler!`
+agreement, literal frontend command names, and recognized argument keys
+(including `query.execute({…})` bindings) against camelCased Rust parameters.
 
-These are shallow source scans, **not end-to-end handler tests or a fully typed
-IPC contract**:
+These are shallow source scans, **not** end-to-end runtime tests:
 
-- Computed command names are not checked.
-- Argument builders, non-literal objects and spread members are not resolved.
-  For example, `query.execute(allTasks())` exposes no argument keys to this scan.
-- Only recognized supplied keys are checked; missing required arguments are not.
-- Rust signature parsing splits on commas; generic types containing commas can
-  confuse it. Handler-table parsing stops at the first closing `]`.
-- Query-binding matching is text-based, not scope-aware. A green run does not
-  exercise handler state/client resolution, networking or event emission.
-
-Current handlers use the default concrete `AppHandle` runtime. Tauri's mock IPC
-entry point requires `MockRuntime`-compatible handlers, so the production table
-cannot simply be installed into a mock app unchanged. Tauri's `test` feature is
-not enabled here today; a future mock suite must also enable it and adapt the
-relevant helpers, or use a smaller compatible table. This is a constraint of
-this test setup, not proof that runtime-level testing is impossible. Behavior
-belongs below the command seam; pure adapter decisions can also be tested directly.
-Source checks supplement those tests.
-
-If extending the wire surface, review scanner coverage explicitly rather than
-assuming a new wrapper/builder is followed automatically. Do not genericize all
-production commands solely to work around this test harness.
+- Computed command names, spreads and argument builders (`allTasks()`, etc.) are
+  not resolved; missing required arguments are not caught.
+- Signature and query-binding scans are text-based (generic types with commas
+  can confuse parameter splitting).
+- Handlers use concrete `AppHandle` (Tauri's `test` feature / `MockRuntime` is
+  not enabled). Keep behavior testable below the command seam and review scanner
+  coverage when adding wire wrappers rather than inlining good builders.

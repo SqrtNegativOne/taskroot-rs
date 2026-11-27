@@ -260,7 +260,9 @@ async fn a_refresh_persists_the_list_the_server_actually_has() {
     };
     write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(dir, &client, &mut account).await;
+    let calendars = refresh_collections(dir, &client, &mut account)
+        .await
+        .unwrap();
 
     assert_eq!(calendars.len(), 2);
     assert_eq!(
@@ -295,8 +297,34 @@ async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
     };
     write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(dir, &client, &mut account).await;
+    let calendars = refresh_collections(dir, &client, &mut account)
+        .await
+        .unwrap();
 
     assert_eq!(calendars, cached, "an offline start must still have lists");
     assert_eq!(read_account(dir).unwrap().unwrap().calendars, cached);
+}
+
+#[tokio::test]
+async fn a_refresh_with_no_cached_lists_surfaces_discovery_failure() {
+    let (server, client) = start_server().await;
+    Mock::given(method("PROPFIND"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut account = Account {
+        server_url: server.uri(),
+        username: "me".to_string(),
+        principal_href: "/me/".to_string(),
+        home_href: "/me/".to_string(),
+        calendars: Vec::new(),
+    };
+    write_account(dir.path(), &account).expect("seed the account file");
+
+    let error = refresh_collections(dir.path(), &client, &mut account)
+        .await
+        .expect_err("empty cache must not mask an unreachable server");
+    assert_eq!(error.code(), "remote");
 }

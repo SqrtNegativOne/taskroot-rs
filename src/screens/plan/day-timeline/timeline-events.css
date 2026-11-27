@@ -30,7 +30,7 @@
 .day-event.pri-bar-3 { border-left-color: var(--priority-3); }
 .day-event.pri-bar-4 { border-left-color: var(--priority-4); }
 .day-event.is-done { opacity: 0.75; background: var(--bg-surface-hover); border-left-color: var(--border); }
-.day-event.is-done .day-event-title { color: var(--on-event); text-decoration: line-through; }
+.day-event.is-done .day-event-title { color: var(--ev-text, var(--on-event)); text-decoration: line-through; }
 .day-event.is-done .day-event-title-text { text-decoration: line-through; }
 .day-event.is-ghost { opacity: 0.35; pointer-events: none; border-left-style: dashed; background: transparent !important; }
 .day-event.is-readonly { opacity: 0.6; cursor: default; }
@@ -42,25 +42,25 @@
 .day-event.is-floating { z-index: 50; box-shadow: 0 8px 24px var(--shadow-medium); opacity: 0.95; cursor: grabbing; }
 .day-event-inner { display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
 .day-event-inner .task-circle { pointer-events: auto; }
-.day-event .day-event-inner .task-circle { border-color: var(--on-event); }
+.day-event .day-event-inner .task-circle { border-color: var(--ev-text, var(--on-event)); }
 .day-event .day-event-inner .task-circle:hover { border-color: var(--accent); }
 .day-event-time {
     font-family: var(--mono);
     font-size: 0.74em;
-    color: var(--on-event);
+    color: var(--ev-secondary, var(--on-event));
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
 }
 .day-event-title {
     font-size: 0.88em;
-    color: var(--on-event);
+    color: var(--ev-text, var(--on-event));
     line-height: 1.25;
     display: flex; align-items: baseline; gap: 5px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .day-event-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.day-event-tags { display: flex; gap: 6px; font-size: 0.74em; color: var(--on-event); margin-top: 2px; }
-.day-event-tag { color: var(--on-event); }
+.day-event-tags { display: flex; gap: 6px; font-size: 0.74em; color: var(--ev-text, var(--on-event)); margin-top: 2px; }
+.day-event-tag { color: var(--ev-text, var(--on-event)); }
 .day-event.is-compact .day-event-time { display: none; }
 .day-event.is-compact { padding: 1px 8px; }
 .day-event.is-compact .day-event-title { font-size: 0.78em; }

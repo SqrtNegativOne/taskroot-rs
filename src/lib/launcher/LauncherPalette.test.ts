@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { emptyFilterGroup, filterGroup } from '../domain';
 import { ymd } from '../time';
@@ -61,7 +61,9 @@ describe('LauncherPalette', () => {
         tauri.stubCommandValue('query_tasks', []);
     });
 
-    afterEach(cleanup);
+    afterEach(() => {
+        vi.useRealTimers();
+    });
 
     it("queries today's agenda while the input is empty", async () => {
         render(LauncherPalette);
@@ -152,5 +154,28 @@ describe('LauncherPalette', () => {
         await fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
 
         await waitFor(() => expect(callFor('hide_launcher')).toBeDefined());
+    });
+
+    it('refreshes the agenda date range after midnight when reopened without remounting', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 10, 20, 23, 59, 0));
+
+        render(LauncherPalette);
+        await waitFor(() => {
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'query_event_instances',
+                expect.objectContaining({ startDate: '2026-11-20', endDate: '2026-11-20' }),
+            );
+        });
+
+        vi.setSystemTime(new Date(2026, 10, 21, 0, 1, 0));
+        window.dispatchEvent(new Event('focus'));
+
+        await waitFor(() => {
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'query_event_instances',
+                expect.objectContaining({ startDate: '2026-11-21', endDate: '2026-11-21' }),
+            );
+        });
     });
 });

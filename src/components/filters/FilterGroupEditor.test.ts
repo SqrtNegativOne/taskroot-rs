@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import Harness from '../../test/FilterEditorHarness.svelte';
 import { filterGroup } from '../../lib/domain';
 import type { FilterCondition } from '../../lib/domain';
@@ -18,8 +18,6 @@ beforeEach(() => {
     tauri.reset();
     tauri.stubCommandValue('list_tags', []);
 });
-afterEach(() => { cleanup(); });
-
 describe('inline filter group editing', () => {
     it('uses only the second rule to choose AND/OR for the whole group', async () => {
         render(Harness, { props: { columns } });

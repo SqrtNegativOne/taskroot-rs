@@ -1,14 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
+import { render } from '@testing-library/svelte';
 import EventBlock from './EventBlock.svelte';
 import { EVENT_INSET_PX, PX_PER_MIN } from './constants';
 import { makeInstance } from '../../../test/factories';
 
 describe('EventBlock geometry', () => {
-    afterEach(() => {
-        cleanup();
-    });
-
     it('renders the event slightly inside its time slot so back-to-back events keep a gap', () => {
         const first = render(EventBlock, {
             props: { event: makeInstance(), startMins: 60, endMins: 120, lane: 0, lanes: 1 },

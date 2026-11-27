@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../test/tauriMock';
 import CalendarManager from './CalendarManager.svelte';
 import type { AppCalendar } from '../lib/domain';
@@ -44,8 +44,7 @@ describe('CalendarManager', () => {
     });
 
     afterEach(() => {
-        cleanup();
-        vi.restoreAllMocks();
+vi.restoreAllMocks();
     });
 
     it('labels each list by what it actually holds', async () => {

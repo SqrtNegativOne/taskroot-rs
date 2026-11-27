@@ -6,9 +6,9 @@ trigger: model_decision
 
 # Generated TypeScript bindings
 
-Follow [the root guide](../../AGENTS.md#working-rules) and
-[backend generated-type rules](../../src-tauri/AGENTS.md#settings-and-generated-types).
+Follow [AGENTS.md](../../AGENTS.md#working-rules) and
+[src-tauri/AGENTS.md](../../src-tauri/AGENTS.md#calendar-settings-and-generated-types).
 
-Run `cargo nextest run` in `src-tauri/` after shared `#[derive(TS)]` changes and
-include regenerated `src/lib/bindings/*.generated.ts`. These are generated files,
-not a hand-maintained or complete runtime IPC contract.
+Keep timestamps as JS `number` (`#[ts(type = "number")]`), run
+`cargo nextest run` in `src-tauri/` after `#[derive(TS)]` changes, and commit
+regenerated `src/lib/bindings/*.generated.ts`. Never hand-edit generated files.

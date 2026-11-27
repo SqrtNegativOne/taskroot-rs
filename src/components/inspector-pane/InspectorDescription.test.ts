@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import { fireEvent } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../../test/tauriMock';
 import type { AppTask } from '../../lib/domain';
@@ -34,10 +34,6 @@ describe('inspector description persistence', () => {
         tauri.stubCommandValue('query_events', []);
         tauri.stubCommandValue('get_active_calendars', []);
         tauri.stubCommandValue('get_ui_state', undefined);
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it('sends the edited description to update_task', async () => {

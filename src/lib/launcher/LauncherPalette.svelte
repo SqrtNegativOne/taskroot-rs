@@ -8,15 +8,22 @@
     import { Routes } from '$lib/routes';
     import { eventInstances } from '$lib/queries';
     import { createDebouncer, createStaleGuard } from '$lib/asyncState.svelte';
+    import { useNow } from '$lib/useNow.svelte';
     import { addDays, formatHhMm, minutesSinceMidnight, parseLocalYmd, sameDay, ymd } from '$lib/time';
     import type { AppTask, AppTaskFilter, EventInstance, FilterGroup, QuickCapturePreview } from '$lib/domain';
     import { emptyFilterGroup, filterGroup } from '$lib/domain';
 
     const PARSE_DEBOUNCE_MS = 160;
+    const DAY_CHECK_INTERVAL_MS = 60_000;
 
-    const today = new Date();
-    const todayIso = ymd(today);
-    const todayRange = { startDate: todayIso, endDate: todayIso };
+    const now = useNow(DAY_CHECK_INTERVAL_MS);
+    let todayIso = $derived(ymd(now.value));
+    let today = $derived(parseLocalYmd(todayIso));
+    let todayRange = $derived({ startDate: todayIso, endDate: todayIso });
+
+    function refreshToday(): void {
+        todayIso = ymd(new Date());
+    }
 
     const OPEN_TASK_FILTERS: FilterGroup<AppTaskFilter> = filterGroup([
         { column: 'status', operator: 'is not', value: ['done'] },
@@ -117,6 +124,15 @@
     onMount(() => {
         inputEl?.focus();
         void safeInvoke('resize_launcher', { width: 720, height: 520 });
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') refreshToday();
+        };
+        window.addEventListener('focus', refreshToday);
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => {
+            window.removeEventListener('focus', refreshToday);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     });
 
     onDestroy(() => {

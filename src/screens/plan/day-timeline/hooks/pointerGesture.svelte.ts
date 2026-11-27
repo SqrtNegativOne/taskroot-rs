@@ -1,5 +1,3 @@
-import { SvelteSet } from 'svelte/reactivity';
-
 export interface PointerGestureHandlers {
     onMove?: (e: PointerEvent) => void;
     onEnd?: (e: PointerEvent) => void;
@@ -13,7 +11,7 @@ export type PointerGestureRecognizer = (
 ) => PointerGestureTeardown;
 
 export function createPointerGestureRecognizer(): PointerGestureRecognizer {
-    const activeTeardowns = new SvelteSet<PointerGestureTeardown>();
+    const activeTeardowns = new Set<PointerGestureTeardown>();
 
     $effect(() => {
         return () => {

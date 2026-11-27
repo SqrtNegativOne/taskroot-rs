@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import AccountBoundaryHarness from '../../test/AccountBoundaryHarness.svelte';
 import { ACCOUNT_CHANGED } from '../../lib/ipcEvents';
 
@@ -12,8 +12,6 @@ vi.mock('@tauri-apps/api/event', () => ({
 }));
 
 beforeEach(() => events.clear());
-afterEach(() => cleanup());
-
 describe('account boundary', () => {
     it('discards old account drafts on an account-change event', async () => {
         render(AccountBoundaryHarness);

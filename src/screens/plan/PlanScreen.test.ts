@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { toast } from 'svelte-sonner';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { store } from '../../lib/store.svelte';
@@ -43,8 +43,7 @@ describe('PlanScreen task list', () => {
     });
 
     afterEach(() => {
-        cleanup();
-        store.loaded = false;
+store.loaded = false;
     });
 
     it('completes the task when its circle is clicked', async () => {

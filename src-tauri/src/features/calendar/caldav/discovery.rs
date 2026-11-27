@@ -167,6 +167,32 @@ pub async fn fetch_calendars(
 /// only bites when the server is wedged.
 const REFRESH_TIMEOUT: Duration = Duration::from_secs(3);
 
+/// Re-read collections under `home_href` with a short timeout.
+///
+/// Falls back to `cached` when the server cannot be asked and at least one
+/// cached collection exists. When `cached` is empty, the failure is returned so
+/// callers (such as startup retries) do not mistake an unreachable server for a
+/// successful empty load.
+///
+/// # Errors
+///
+/// Returns the transport/parse failure when `cached` is empty and the server
+/// cannot be reached.
+pub async fn refresh_calendar_list(
+    client: &CalDavClient,
+    home_href: &str,
+    cached: &[CalendarInfo],
+) -> Result<Vec<CalendarInfo>, AppError> {
+    match tokio::time::timeout(REFRESH_TIMEOUT, fetch_calendars(client, home_href)).await {
+        Ok(Ok(calendars)) => Ok(calendars),
+        Ok(Err(error)) if cached.is_empty() => Err(error),
+        Err(_) if cached.is_empty() => Err(AppError::Remote(
+            "Timed out refreshing calendars from the CalDAV server".to_string(),
+        )),
+        Ok(Err(_)) | Err(_) => Ok(cached.to_vec()),
+    }
+}
+
 /// Re-read the account's collection list, persisting it when it changed.
 ///
 /// `account.json` is a cache of what the server has, not the truth: a list
@@ -175,27 +201,27 @@ const REFRESH_TIMEOUT: Duration = Duration::from_secs(3);
 /// `404`. Called at startup, on Refresh and by the CLI, so one `PROPFIND` per
 /// load.
 ///
-/// When the server cannot be asked (offline, slow, malformed) the cached list is
-/// returned unchanged.
+/// When the server cannot be asked and cached collections exist, the cached
+/// list is returned unchanged; when no cached collections exist, the failure is
+/// propagated.
+///
+/// # Errors
+///
+/// Returns the discovery failure when the server cannot be reached and
+/// `account.calendars` is empty.
 pub async fn refresh_collections(
     dir: &Path,
     client: &CalDavClient,
     account: &mut Account,
-) -> Vec<CalendarInfo> {
-    let fetched =
-        tokio::time::timeout(REFRESH_TIMEOUT, fetch_calendars(client, &account.home_href)).await;
-
-    let Ok(Ok(calendars)) = fetched else {
-        return account.calendars.clone();
-    };
-
+) -> Result<Vec<CalendarInfo>, AppError> {
+    let calendars = refresh_calendar_list(client, &account.home_href, &account.calendars).await?;
     if calendars != account.calendars {
         account.calendars.clone_from(&calendars);
         if let Err(error) = account::write_account(dir, account) {
             eprintln!("Could not persist the refreshed list of calendars: {error}");
         }
     }
-    calendars
+    Ok(calendars)
 }
 
 async fn discover_principal(client: &CalDavClient) -> Result<String, AppError> {

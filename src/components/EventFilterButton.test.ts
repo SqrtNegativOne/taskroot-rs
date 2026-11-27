@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import EventFilterButton from './EventFilterButton.svelte';
 import { mockTauriInvoke } from '../test/tauriMock';
 import type { AppCalendar } from '../lib/domain';
@@ -20,8 +20,6 @@ beforeEach(() => {
     tauri.reset();
     tauri.stubCommandValue('list_tags', ['home', 'work']);
 });
-
-afterEach(() => { cleanup(); });
 
 describe('EventFilterButton', () => {
     it('keeps timeline filters calendar-only when no visibility choices are supplied', async () => {

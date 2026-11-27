@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../../test/tauriMock';
 import { makeEvent } from '../../test/factories';
 import InspectorPane from './InspectorPane.svelte';
@@ -49,10 +49,6 @@ describe('InspectorPane pending creation', () => {
         tauri.stubCommandValue('get_ui_state', undefined);
     });
 
-    afterEach(() => {
-        cleanup();
-    });
-
     it('opens with the draft event before the backend query returns it', async () => {
         const draft = makeEvent({ id: 'draft-1', title: 'New Event' });
         const { container } = render(InspectorPane, {
@@ -74,10 +70,6 @@ describe('InspectorPane recurring delete', () => {
         tauri.stubCommandValue('query_events', [master]);
         tauri.stubCommandValue('get_active_calendars', []);
         tauri.stubCommandValue('get_ui_state', undefined);
-    });
-
-    afterEach(() => {
-        cleanup();
     });
 
     it.each([

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { EventCallback } from '@tauri-apps/api/event';
 import type { AppTask, StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
 import { STOPWATCH_UPDATED, STORE_UPDATED } from '../../../lib/ipcEvents';
@@ -66,8 +66,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-    cleanup();
-    store.loaded = false;
+store.loaded = false;
 });
 
 describe('Do screen shared focus', () => {

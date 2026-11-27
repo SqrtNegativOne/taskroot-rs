@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { AppTask } from '../../lib/domain';
 import { ymd } from '../../lib/time';
 import TaskRow from './TaskRow.svelte';
@@ -13,10 +13,6 @@ function renderRow(task: AppTask) {
         props: { task, updateTask: vi.fn() },
     });
 }
-
-afterEach(() => {
-    cleanup();
-});
 
 describe('TaskRow', () => {
     it('marks a recurring task with the recurrence icon', () => {

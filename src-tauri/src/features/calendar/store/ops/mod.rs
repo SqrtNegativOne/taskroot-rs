@@ -20,7 +20,7 @@ use crate::features::calendar::caldav::client::CalDavClient;
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::error::AppError;
 
-use super::model::{Resource, Store};
+use super::model::{parse_items, Resource, Store};
 
 async fn refetch_resource(
     client: &CalDavClient,
@@ -38,10 +38,22 @@ async fn refetch_resource(
     };
     let mut clone = store.resources.get(&resource.href).cloned();
     if let Some(clone) = clone.as_mut() {
+        clone.items = parse_items(&raw, &clone.href, &clone.collection)?;
         clone.raw.clone_from(&raw);
         clone.etag.clone_from(&fetched.etag);
     }
     Ok(clone)
+}
+
+fn ensure_source_writable(store: &Store, collection_href: &str) -> Result<(), AppError> {
+    if let Some(calendar) = store.calendar(collection_href) {
+        if !calendar.writable {
+            return Err(AppError::InvalidInput(
+                "the source calendar is read-only".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn collection_for(

@@ -91,6 +91,22 @@ impl Store {
         self.bump_revision();
     }
 
+    /// Replace the discovered calendar list, recording the change for in-flight loads.
+    pub fn set_calendars(&mut self, calendars: Vec<CalendarInfo>) {
+        self.calendars = calendars;
+        self.bump_revision();
+    }
+
+    /// Drop every resource belonging to `collection`, recording the change for in-flight loads.
+    pub fn remove_collection_resources(&mut self, collection: &str) {
+        let before = self.resources.len();
+        self.resources
+            .retain(|_, resource| resource.collection != collection);
+        if self.resources.len() != before {
+            self.bump_revision();
+        }
+    }
+
     /// Replace (or insert) one resource and re-parse its components.
     ///
     /// # Errors
@@ -249,7 +265,7 @@ impl Store {
     }
 }
 
-fn parse_items(raw: &str, href: &str, collection: &str) -> Result<ResourceItems, AppError> {
+pub(super) fn parse_items(raw: &str, href: &str, collection: &str) -> Result<ResourceItems, AppError> {
     if raw.contains("BEGIN:VTODO") && !raw.contains("BEGIN:VEVENT") {
         return Ok(ResourceItems::Tasks(
             crate::features::calendar::ics::read_task_resource(raw, href, collection)?,

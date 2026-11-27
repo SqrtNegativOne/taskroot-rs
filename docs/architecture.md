@@ -1,113 +1,77 @@
 # Architecture map
 
-Taskroot is a desktop task manager for planning, working and resting. The frontend
-is Svelte 5 + TypeScript, with SvelteKit's static adapter in SPA mode (`ssr = false`),
-Vite on port 1420, vanilla CSS with bundled [colour schemes](themes.md), and Bun.
-The native backend is Tauri v2 + Rust.
-
-This is a navigation reference, not a file-by-file inventory. Read the applicable
+Navigation map for Taskroot (Svelte 5 + SvelteKit SPA on Bun/Vite port 1420,
+vanilla CSS themes, Tauri v2 + Rust backend). Read the relevant
 [root](../AGENTS.md), [frontend](../src/AGENTS.md) or
-[backend](../src-tauri/AGENTS.md) instructions before editing.
+[backend](../src-tauri/AGENTS.md) guide before editing.
 
-## Data and ownership
+## Storage and data files
 
-- One CalDAV server (normally local Radicale) owns calendar/task data. The Rust
-  store keeps fetched resources, ETags, raw ICS and typed rows in memory. There is
-  no on-disk calendar cache, offline write queue or background calendar sync.
-- Startup, account connection and manual Refresh load collections. Network fetches
-  run outside the store lock; a resource-revision guard protects application from
-  tracked concurrent writes. Collection mutations have coverage gaps listed in
-  [known limitations](known-limitations.md). Writes merge into raw ICS and go to
-  the server immediately. See [CalDAV](caldav.md).
-- `settings.json` holds typed `AppSettings`; `ui-state.json` holds per-component
-  state. The `account.json` registry holds saved CalDAV profiles with one active
-  account; passwords use the OS keychain (service `taskroot.caldav.profiles`, keyed by
-  profile id). `TASKROOT_CALDAV_PASSWORD` can override the
-  password for headless/development use. See [Windows development](windows-development.md)
-  for the data-directory override and debug fallback.
-- `src/lib/bindings/*.generated.ts` comes from Rust `ts-rs` export tests;
-  `src/lib/domain.ts` is the frontend domain barrel.
+One active CalDAV server (typically local Radicale) owns calendar and task data.
+Rust holds fetched resources, ETags, raw ICS and typed rows in memory — there is
+no on-disk calendar cache, offline queue or background sync.
+
+All local JSON files live in the app data directory (`<app_data>/taskroot/` on
+Linux; the Tauri identifier directory on Windows/macOS; overridden by
+`TASKROOT_DATA_DIR`, with a debug `dev-data/` fallback — see
+[Windows development](windows-development.md#data-directories)):
+
+| File | Purpose |
+|---|---|
+| `account.json` | `AccountRegistry` of saved CalDAV profiles (URL, username, principal, home-set, cached collections) and `activeId`. No passwords. |
+| `settings.json` | Typed `AppSettings` object. Global, not per-account. See [settings](settings.md). |
+| `ui-state.json` | Flat `{ "<key>": value }` map for per-component UI state. Global. |
+| `stopwatch-focus.json` | Active focus task ID, label and label source (independent of VTODO status). |
+| `stopwatch-history.json` | Append-only log of completed work and break segments. |
+
+Passwords live in the OS keychain under service `taskroot.caldav.profiles`
+(keyed by profile id); `TASKROOT_CALDAV_PASSWORD` overrides it for headless use.
+Shared TS types are generated into `src/lib/bindings/*.generated.ts` and
+re-exported via `src/lib/domain.ts`.
 
 ## Frontend entry points
 
 | Area | Start here |
 |---|---|
-| SPA/window routing, toasts and daily startup redirect | `src/routes/+layout.svelte`, `src/lib/dailyStartup.ts`, `src/lib/routes.ts` |
-| Routing/chunk-load recovery | `src/routes/+error.svelte` |
-| Application palette / saved colour scheme | `src/lib/themes/`, [theme reference](themes.md) |
-| Settings, CalDAV account profiles/switching and list management | `src/routes/settings/`, `src/components/accounts/`, `src/components/CalendarManager.svelte` |
-| Backend mutations, queries and persistence | `src/lib/store.svelte.ts`, `src/lib/safeInvoke.svelte.ts`, `src/lib/queries.ts`, `src/lib/persisted.svelte.ts`, `src/lib/asyncState.svelte.ts` |
-| Shared task-list definition | `src/lib/taskList.svelte.ts`, `src/lib/TaskListState.svelte`, `src/components/tasklist/` |
-| Task/event inspector, recurrence scope, event-to-task conversion | `src/components/inspector-pane/` |
-| Recursive filter/sort UI and defaults | `src/components/filters/`, `src/components/FilterButton.svelte`, `src/lib/domain/filterTree.ts`, `src/lib/domain/filters.ts` |
-| Planning, spanning events and drag/drop | `src/screens/plan/date-grid/`, `src/screens/plan/day-timeline/`, `src/screens/plan/hooks/`, `src/screens/plan/snapping.ts` |
-| Do screen and shared stopwatch feedback | `src/screens/do/stopwatch/` |
-| Quick-capture palette | `src/lib/launcher/LauncherPalette.svelte` |
-| Mini tracker dragging/menu geometry | `src/routes/minitracker/controller.svelte.ts`, `src/routes/minitracker/menuLayout.ts` |
-| Sidebar notes/tab position | `src/screens/sidebar/state.svelte.ts` |
-
-[Frontend reference](frontend.md) explains the behavior shared across these areas;
-[test setup](testing.md) documents the existing fixtures and mocks.
+| SPA/window routing, toasts, daily startup redirect | `src/routes/+layout.svelte`, `src/lib/dailyStartup.ts`, `src/lib/routes.ts`, `src/routes/+error.svelte` |
+| Colour schemes & tokens | `src/lib/themes/`, [themes](themes.md) |
+| Settings, CalDAV accounts & list manager | `src/routes/settings/`, `src/components/accounts/`, `src/components/CalendarManager.svelte` |
+| Store, IPC, queries, persistence, async helpers | `src/lib/store.svelte.ts`, `src/lib/safeInvoke.svelte.ts`, `src/lib/queries.ts`, `src/lib/persisted.svelte.ts`, `src/lib/asyncState.svelte.ts` |
+| Shared task list | `src/lib/taskList.svelte.ts`, `src/lib/TaskListState.svelte`, `src/components/tasklist/` |
+| Inspector & event-to-task conversion | `src/components/inspector-pane/` |
+| Recursive filters & defaults | `src/components/filters/`, `src/components/FilterButton.svelte`, `src/lib/domain/filterTree.ts`, `src/lib/domain/filters.ts` |
+| Plan screen, date grid, timeline, drag/drop | `src/screens/plan/`, [planning UI](planning-ui.md) |
+| Do screen & stopwatch feedback | `src/screens/do/stopwatch/` |
+| Quick-capture launcher | `src/lib/launcher/LauncherPalette.svelte` |
+| Mini tracker & sidebar | `src/routes/minitracker/`, `src/screens/sidebar/state.svelte.ts` |
 
 ## Backend entry points
 
-All backend paths below are under `src-tauri/src/`.
+Paths below are under `src-tauri/src/`.
 
 | Area | Start here |
 |---|---|
-| Module/lint wiring | `lib.rs` |
-| Tauri composition, plugins, setup and command registration | `bootstrap/` |
-| Desktop windows, tray and data-directory resolution | `platform/` |
-| Command wrappers and Tauri calendar-session adapter | `ipc/`, especially `session.rs`; account service wiring in `ipc/accounts.rs`; contract tests in `ipc/tests.rs` |
-| Calendar domain, transport, ICS, in-memory store and projections | [Calendar feature](../src-tauri/src/features/calendar/README.md) |
-| Shared clock, persisted focus/history and optional localhost feed | [Stopwatch feature](../src-tauri/src/features/stopwatch/README.md), [focus-feed API](focus-feed.md) |
-| Task alarm policy and notification polling | [Reminders feature](../src-tauri/src/features/reminders/README.md) |
-| Typed settings, field metadata and persistence adapter | `settings/mod.rs`, `settings/metadata.rs`, `settings/storage.rs`; derive in `../taskroot-macros/` |
-| Headless CLI | `bin/taskroot-cli.rs`, `cli/`; [generated CLI reference](cli.md) |
-| Shared fixtures and source-contract scans | `test_support/`; [testing reference](testing.md) |
+| Module & lint wiring | `lib.rs` |
+| Tauri setup, plugins & command table | `bootstrap/` |
+| Desktop windows, tray & data-dir resolution | `platform/` |
+| Command wrappers & Tauri calendar adapter | `ipc/`, `ipc/session.rs`, `ipc/accounts.rs`, `ipc/tests.rs` |
+| Calendar domain, CalDAV, ICS, store & queries | [calendar feature](../src-tauri/src/features/calendar/README.md), [CalDAV](caldav.md), [iCalendar mapping](icalendar-mapping.md) |
+| Stopwatch, focus persistence & focus feed | [stopwatch feature](../src-tauri/src/features/stopwatch/README.md), [focus feed](focus-feed.md) |
+| Task alarm polling & desktop notifications | [reminders feature](../src-tauri/src/features/reminders/README.md) |
+| Typed settings & derive macro | `settings/`, `../taskroot-macros/`, [settings](settings.md) |
+| Headless CLI | `bin/taskroot-cli.rs`, `cli/`, [CLI reference](cli.md) |
+| Test fixtures & source-contract scans | `test_support/`, [testing](testing.md) |
 
-The CLI loads a private store for data commands and shares calendar query/write
-operations with the app. It does not parse or serialize ICS itself. Its writes
-appear in an already-running app on Refresh/restart, not through cross-process
-notifications. `cli/help.rs` owns the verb/option tables and generates `docs/cli.md`
-from a test; do not maintain a second verb inventory here.
+The CLI opens a private `Session` (`features/calendar/session.rs`) and shares
+all store/ICS write operations with the app. Its writes show up in a running app
+after Refresh or restart. `cli/help.rs` owns the verb tables and generates
+`docs/cli.md`.
 
-## Windows and stopwatch focus
+## Desktop windows
 
-Five window labels are configured in `src-tauri/tauri.conf.json`: `main`,
-`launcher`, `minitracker`, `sidebar` and `effect`. They render the same SPA,
-branched by window label. Launcher, mini tracker and effect windows are created
-lazily from that config, with native creation dispatched to a blocking worker
-rather than the event-loop thread. Per-window asynchronous locks serialize
-creation and show/hide/toggle requests. Mini tracker startup is scheduled after the
-managed store is installed. See [Windows window creation](windows-development.md#lazy-window-creation).
-Main hides to tray on close; the effect window is a transparent click-through
-phase-transition overlay.
-
-The launcher shortcut is `CommandOrControl+Shift+Space`. The mini tracker chooses
-a task/custom label and controls the shared Rust stopwatch. That focus is app-local
-(`stopwatch-focus.json`), independent of VTODO status. The Do screen displays it
-read-only, resolving the live task title from an unfiltered query with the shared
-label as fallback. Rust owns clock phases and broadcasts timestamped snapshots;
-frontends project elapsed/remaining time locally. In flowtime mode, the shared
-frontend engine requests Rust's `complete_break` transition when the countdown
-expires. Main-window audio/overlay feedback lives in
-`src/screens/do/stopwatch/feedback.ts`.
-
-## Adding a setting
-
-Declare the `AppSettings` field, its default and a `#[setting(..)]` attribute in
-`src-tauri/src/settings/mod.rs`. `SettingsMeta` derives the schema and reads default
-values from `AppSettings::default()`; a field without metadata fails compilation.
-Add new sections to `SETTING_SECTIONS` in `settings/metadata.rs`. Field order sets
-row order and section order sets tab order.
-
-`kind = "calendar"` renders a component-specific writable-list select.
-`default_task_list`/`default_event_list` store collection hrefs; an empty value means
-the first writable collection of the right kind. Regenerate bindings after changes.
-
-`store/persist.rs` deserializes the whole settings file: malformed or wrongly typed
-settings fall back to the complete default object (with a `.bad` rename for parse
-failure). `apply_setting` rejects a known key with an invalid type; unknown keys
-are accepted but ignored. This is not an arbitrary settings-key store—use UI state
-for per-component values.
+`src-tauri/tauri.conf.json` configures five windows sharing one SPA branched by
+window label: `main` (hides to tray on close), `launcher` (global shortcut
+`CommandOrControl+Shift+Space`), `minitracker` (always-on-top stopwatch/focus
+bar), `sidebar` and `effect` (transparent click-through phase-transition
+overlay). `launcher`, `minitracker` and `effect` are created lazily off-thread;
+see [lazy window creation](windows-development.md#lazy-window-creation).

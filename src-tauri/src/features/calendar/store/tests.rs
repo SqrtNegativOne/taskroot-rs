@@ -602,3 +602,133 @@ fn an_invalid_explicit_calendar_request_falls_through_to_the_configured_default(
         Some("/cal/tasks2/")
     );
 }
+
+#[tokio::test]
+async fn conflict_retry_revalidates_recurring_task_completion_against_refetched_body() {
+    use super::ops;
+    use crate::features::calendar::domain::AppTaskStatus;
+
+    const TASK_HREF: &str = "/cal/tasks/t1.ics";
+    const INITIAL: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:Pay rent\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+    const REMOTE_RECURRING: &str = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VTODO\nUID:t1\nSUMMARY:Pay rent\nSTATUS:NEEDS-ACTION\nRRULE:FREQ=MONTHLY\nEND:VTODO\nEND:VCALENDAR\n";
+
+    let (server, client) = start_server().await;
+    Mock::given(method("PUT"))
+        .and(path(TASK_HREF))
+        .respond_with(ResponseTemplate::new(412))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let multiget = format!(
+        "<?xml version='1.0' encoding='utf-8'?><multistatus xmlns=\"DAV:\" \
+         xmlns:C=\"urn:ietf:params:xml:ns:caldav\"><response><href>{TASK_HREF}</href>\
+         <propstat><prop><getetag>\"v2\"</getetag><C:calendar-data>{REMOTE_RECURRING}</C:calendar-data></prop>\
+         <status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"
+    );
+    Mock::given(method("REPORT"))
+        .and(path("/cal/tasks/"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(multiget))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let mut store = store_with_calendars();
+    store
+        .set_resource(TASK_HREF, "/cal/tasks/", Some("\"v1\""), INITIAL)
+        .unwrap();
+    let mut updated = store.task("t1").unwrap().clone();
+    updated.status = Some(AppTaskStatus::Done);
+
+    let error = ops::update_task(&mut store, &client, updated)
+        .await
+        .expect_err("a remotely added RRULE must block completion on retry");
+    assert_eq!(error.code(), "invalid-input");
+}
+
+#[tokio::test]
+async fn read_only_source_collections_reject_deletes_and_moves_before_network_io() {
+    use super::ops;
+    use crate::features::calendar::domain::CollectionId;
+
+    let (_server, client) = start_server().await;
+    let mut store = store_with_calendars();
+    store.calendars.push(calendar(
+        "/cal/ro-events/",
+        "Read-only events",
+        CalendarComponent::VEvent,
+        false,
+    ));
+    let raw_task = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:ro-task\r\nSUMMARY:Locked\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+    store
+        .set_resource("/cal/readonly/ro-task.ics", "/cal/readonly/", Some("\"e\""), raw_task)
+        .unwrap();
+    store
+        .set_resource("/cal/ro-events/ev.ics", "/cal/ro-events/", Some("\"e\""), all_day())
+        .unwrap();
+
+    assert_eq!(
+        ops::delete_task(&mut store, &client, "ro-task")
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+    let mut moved_task = store.task("ro-task").unwrap().clone();
+    moved_task.remote_collection_id = Some(CollectionId::from("/cal/tasks/"));
+    assert_eq!(
+        ops::update_task(&mut store, &client, moved_task)
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+
+    let event_id = store.events().first().unwrap().id.to_string();
+    assert_eq!(
+        ops::delete_event(&mut store, &client, &event_id, EventScope::All, None)
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+    let mut moved_event = store.event(&event_id).unwrap().clone();
+    moved_event.remote_collection_id = Some(CollectionId::from("/cal/events/"));
+    assert_eq!(
+        ops::update_event(&mut store, &client, moved_event)
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+}
+
+#[tokio::test]
+async fn collection_mutations_bump_store_revision() {
+    use crate::features::calendar::caldav::calendars;
+
+    let (server, client) = start_server().await;
+    Mock::given(method("PROPPATCH"))
+        .and(path("/cal/tasks/"))
+        .respond_with(ResponseTemplate::new(207))
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path("/cal/tasks/"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+
+    let mut store = store_with_calendars();
+    let dir = store.data_dir.clone();
+    let before_rename = store.revision();
+    calendars::rename(&dir, &client, &mut store, "/cal/tasks/", "Renamed")
+        .await
+        .unwrap();
+    let after_rename = store.revision();
+    assert_ne!(after_rename, before_rename);
+
+    calendars::delete(&dir, &client, &mut store, "/cal/tasks/")
+        .await
+        .unwrap();
+    assert_ne!(store.revision(), after_rename);
+}

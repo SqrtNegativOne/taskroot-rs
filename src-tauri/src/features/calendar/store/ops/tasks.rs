@@ -9,7 +9,10 @@ use crate::error::AppError;
 use crate::features::calendar::ics;
 
 use super::super::model::{Resource, Store};
-use super::{collection_for, refetch_resource, require_uid, resource_href, writable_calendar};
+use super::{
+    collection_for, ensure_source_writable, refetch_resource, require_uid, resource_href,
+    writable_calendar,
+};
 
 /// Create one task resource.
 ///
@@ -61,6 +64,7 @@ pub async fn update_task(
     let merged = ics::write_task_resource(&resource.raw, &task)?;
 
     if target.href != resource.collection {
+        ensure_source_writable(store, &resource.collection)?;
         let href = resource_href(&target.href, task.id.as_str());
         let etag = client.put_resource(&href, &merged, None, true).await?;
         client
@@ -80,6 +84,7 @@ pub async fn update_task(
             let fresh = refetch_resource(client, store, &resource)
                 .await?
                 .ok_or_else(|| AppError::NotFound(format!("task {}", task.id)))?;
+            ensure_not_ending_a_series(&fresh, &task)?;
             let merged = ics::write_task_resource(&fresh.raw, &task)?;
             let etag = client
                 .put_resource(&resource.href, &merged, fresh.etag.as_deref(), false)
@@ -111,6 +116,7 @@ pub async fn delete_task(
     let Some(resource) = store.resource_for_task(id).cloned() else {
         return Ok(());
     };
+    ensure_source_writable(store, &resource.collection)?;
     let Some(task) = resource
         .as_tasks()
         .and_then(|tasks| tasks.iter().find(|task| task.id.as_str() == id))

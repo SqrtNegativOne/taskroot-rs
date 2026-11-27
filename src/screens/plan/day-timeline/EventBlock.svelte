@@ -7,7 +7,8 @@
         SNAP_MIN,
     } from './constants';
     import type { AppCalendar, EventInstance } from '../../../lib/domain';
-    import { eventColorVars, resolveEventColor } from '../../../lib/eventColor';
+    import { resolveEventColor } from '../../../lib/eventColor';
+    import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
     import { formatHhMm } from '../../../lib/time';
     import { MINUTES_PER_DAY, snapPixels } from '../snapping';
     import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';

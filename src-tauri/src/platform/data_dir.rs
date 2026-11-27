@@ -30,18 +30,34 @@ pub fn app_data_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
             .app_data_dir()
             .map_err(|e| AppError::Internal(format!("Failed to resolve app data dir: {e}")))?,
     };
-    std::fs::create_dir_all(&preferred)
-        .map_err(|e| AppError::Internal(format!("Failed to create app data dir: {e}")))?;
-    let dir = if configured.is_some() {
-        preferred
-    } else {
-        std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(Path::to_path_buf))
-            .and_then(|exe_dir| dev_data_fallback(&preferred, &exe_dir))
-            .unwrap_or(preferred)
-    };
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf));
+    let dir = resolve_data_dir(preferred, configured.is_some(), exe_dir.as_deref())?;
     Ok(DATA_DIR.get_or_init(|| dir).clone())
+}
+
+fn resolve_data_dir(
+    preferred: PathBuf,
+    explicit: bool,
+    exe_dir: Option<&Path>,
+) -> Result<PathBuf, AppError> {
+    match std::fs::create_dir_all(&preferred) {
+        Ok(()) if explicit || !cfg!(debug_assertions) || is_writable(&preferred) => Ok(preferred),
+        Ok(()) => Ok(exe_dir
+            .and_then(|dir| dev_data_fallback(&preferred, dir))
+            .unwrap_or(preferred)),
+        Err(error) => {
+            if !explicit && cfg!(debug_assertions) {
+                if let Some(fallback) = exe_dir.and_then(|dir| dev_data_fallback(&preferred, dir)) {
+                    return Ok(fallback);
+                }
+            }
+            Err(AppError::Internal(format!(
+                "Failed to create app data dir: {error}"
+            )))
+        }
+    }
 }
 
 /// A sandboxed dev run can read the real app-data directory but not write it, so
@@ -197,5 +213,21 @@ mod tests {
             std::fs::read_to_string(target.join("settings.json")).expect("kept settings"),
             "{\"kept\":true}"
         );
+    }
+
+    #[test]
+    fn a_preferred_dir_that_cannot_be_created_falls_back_in_debug() {
+        let root = scratch_dir("create-fail");
+        let blocker = root.join("file-blocker");
+        std::fs::write(&blocker, b"").expect("create blocking file");
+        let preferred = blocker.join("child");
+        let exe_dir = root.join("bin");
+        std::fs::create_dir_all(&exe_dir).expect("create fake exe dir");
+
+        assert_eq!(
+            resolve_data_dir(preferred.clone(), false, Some(&exe_dir)).expect("fallback"),
+            exe_dir.join("dev-data")
+        );
+        assert!(resolve_data_dir(preferred, true, Some(&exe_dir)).is_err());
     }
 }
