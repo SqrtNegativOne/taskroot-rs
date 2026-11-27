@@ -13,14 +13,17 @@ use crate::features::calendar::ics::{
 // -------------------------------------------------------- I1 round-trips -----
 
 #[test]
-fn event_round_trip_is_byte_identical() {
+fn event_round_trip_is_semantically_lossless() {
     for name in [MOZILLA, ALL_DAY] {
         let raw = fixture(name);
         let event = read_one(&raw);
+        let written = write_event_resource(&raw, &event).unwrap();
+        assert_only_owned_changed(&raw, &written, EVENT_PROPERTIES);
+        assert_nested_preserved(&raw, &written);
         assert_eq!(
-            write_event_resource(&raw, &event).unwrap(),
-            raw,
-            "{name} must survive an unedited write unchanged"
+            serde_json::to_value(read_one(&written)).unwrap(),
+            serde_json::to_value(&event).unwrap(),
+            "{name} must survive an unedited write semantically unchanged"
         );
     }
 }
@@ -141,11 +144,13 @@ fn retitling_an_all_day_event_keeps_its_categories_line() {
 
     let written = write_event_resource(&raw, &event).unwrap();
 
-    assert_eq!(
-        written.replace("SUMMARY:Durga Puja", "SUMMARY:First Day of Durga"),
-        raw
-    );
+    assert_only_owned_changed(&raw, &written, EVENT_PROPERTIES);
+    assert_nested_preserved(&raw, &written);
     assert!(written.contains("CATEGORIES:Holiday"));
+    assert_eq!(
+        serde_json::to_value(read_one(&written)).unwrap(),
+        serde_json::to_value(&event).unwrap()
+    );
 }
 
 #[test]

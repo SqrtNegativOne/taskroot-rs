@@ -1,18 +1,5 @@
 # Architecture & Simplification Plan
 
-## Phase 1 — Quick wins (low risk, immediate cleanup)
-
-- [ ] **Remove unused / stray dependencies**
-  - Drop unused `tauri-plugin-store` from [src-tauri/Cargo.toml](src-tauri/Cargo.toml) and [src-tauri/src/bootstrap/mod.rs](src-tauri/src/bootstrap/mod.rs).
-  - Replace the single `color-eyre` usage in [recurrence.rs](src-tauri/src/features/calendar/domain/timing/recurrence.rs) with `AppError` and drop `color-eyre`.
-- [ ] **Make local JSON persistence atomic**
-  - Move `tempfile` from `[dev-dependencies]` to `[dependencies]` and write temp-file + rename in [persist.rs](src-tauri/src/features/calendar/store/persist.rs) so crashes cannot truncate `settings.json`, `ui-state.json`, or `account.json`.
-- [ ] **Split oversized files & inline tests**
-  - Split inline tests out of [stopwatch/state.rs](src-tauri/src/features/stopwatch/state.rs) (843 LOC) into a dedicated test module.
-  - Remove legacy `X-TASKROOT-*` stripping lines from [ics/write.rs](src-tauri/src/features/calendar/ics/write.rs) (per the no-legacy-compatibility rule) and fix the stale retry comment in [store.svelte.ts](src/lib/store.svelte.ts).
-
----
-
 ## Phase 2 — Fix real write-path & concurrency bugs
 
 - [ ] **Switch inspector edits from full-DTO `PUT` to field patches**
@@ -33,10 +20,6 @@
 
 ## Phase 3 — Replace high-maintenance hand-rolled subsystems
 
-- [ ] **Spike & replace custom ICS line editor (~2,100 LOC)**
-  - Why: byte-identical folding/order is unnecessary — CalDAV only needs **semantic lossless round-tripping** (preserving unknown properties, parameters, `VTIMEZONE`, unmodelled `VALARM`s, and sibling components). Current `icalendar` `0.17` breaks round-tripping; custom [ics/lines.rs](src-tauri/src/features/calendar/ics/lines.rs) has its own RFC 5545 edge cases (case-sensitive matching, naive `split_once(':')` on quoted params, dual-parser `nth_kind` index coupling).
-  - Spike **`calcard-next`** (community fork of Stalwart's `calcard`) and **`ical-rs`** behind `ics/` against the existing Mozilla + tasks.org fixtures in `ics/tests/`.
-  - Relax assertions from byte-identical folding/order to semantic preservation; delete `ics/lines.rs`, the hand-rolled ISO-8601 duration parser, and `icalendar` once green.
 - [ ] **Migrate headless CLI to `clap`**
   - Replace hand-rolled [cli/args.rs](src-tauri/src/cli/args.rs), [cli/help.rs](src-tauri/src/cli/help.rs), and manual option parsing in `cli/commands/` with `clap` (`derive`) + generated `docs/cli.md`.
   - Fixes silent unknown-flag typos, missing `--key=value` / `--` handling, and doc/code drift (e.g. `task-show <id>...` currently ignoring extra IDs).

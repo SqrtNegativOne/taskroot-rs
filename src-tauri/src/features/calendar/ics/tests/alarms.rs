@@ -149,8 +149,11 @@ END:VTODO\r\nEND:VCALENDAR\r\n";
     let edited = write_task_resource(raw, &task).unwrap();
 
     assert!(edited.contains("BEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER;RELATED=END:-PT45S\r\nDESCRIPTION:unmodelled\r\nEND:VALARM"));
-    assert!(edited.contains("BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER;RELATED=END:-PT30M\r\nDESCRIPTION:supported\r\nEND:VALARM"));
+    assert!(edited.contains("ACTION:DISPLAY"));
+    assert!(edited.contains("DESCRIPTION:supported"));
+    assert!(edited.contains("TRIGGER;RELATED=END:-PT30M"));
     assert!(!edited.contains("-PT15M"));
+    assert_eq!(read_task(&edited).alarms, task.alarms);
 
     task.alarms = None;
     let cleared = write_task_resource(&edited, &task).unwrap();

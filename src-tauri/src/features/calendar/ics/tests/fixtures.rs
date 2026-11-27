@@ -1,8 +1,8 @@
-//! Shared fixtures and line-comparison helpers for the I1–I3 tests.
+//! Shared fixtures and comparison helpers for the I1–I3 round-trip tests.
 
 use crate::features::calendar::domain::{AppEvent, AppTask};
-use crate::features::calendar::ics::lines::property_name;
 use crate::features::calendar::ics::{read_event_resource, read_task_resource};
+use ical::tree::cst::{IcalCst, IcalItem};
 
 pub(super) const MOZILLA: &str = "mozilla-event-with-vtimezone.ics";
 pub(super) const ALL_DAY: &str = "all-day-event.ics";
@@ -89,9 +89,17 @@ pub(super) fn content_lines(raw: &str) -> Vec<String> {
     lines
 }
 
-/// Assert that every line outside `owned` is unchanged, in order.
+fn line_property_name(line: &str) -> &str {
+    let end = line.find([';', ':']).unwrap_or(line.len());
+    line.get(..end).unwrap_or(line)
+}
+
+/// Assert that every property outside `owned` is unchanged, in order.
 pub(super) fn assert_only_owned_changed(before: &str, after: &str, owned: &[&str]) {
-    let is_owned = |line: &str| owned.contains(&property_name(line));
+    let is_owned = |line: &str| {
+        let name = line_property_name(line);
+        owned.iter().any(|item| item.eq_ignore_ascii_case(name))
+    };
     let kept = |raw: &str| {
         content_lines(raw)
             .into_iter()
@@ -105,35 +113,28 @@ pub(super) fn assert_only_owned_changed(before: &str, after: &str, owned: &[&str
     );
 }
 
-/// Lines inside a component that is nested in a resource component — a `VALARM`
-/// inside a `VTODO`, a `STANDARD` inside a `VTIMEZONE`. The writer owns property
-/// names only, so these lines are the ones a name filter would hide.
-fn nested_component_lines(raw: &str) -> Vec<String> {
-    let mut enclosing = 0_usize;
-    let mut lines = Vec::new();
-    for line in content_lines(raw) {
-        if line.starts_with("END:") {
-            if enclosing >= 3 {
-                lines.push(line);
+fn collect_nested_components(cst: &IcalCst<'_>, depth: usize, out: &mut Vec<String>) {
+    for item in &cst.items {
+        if let IcalItem::Component(child) = item {
+            if depth >= 1 {
+                out.push(child.to_string());
+            } else {
+                collect_nested_components(child, depth.saturating_add(1), out);
             }
-            enclosing = enclosing.saturating_sub(1);
-            continue;
-        }
-        if enclosing >= 3 {
-            lines.push(line.clone());
-        }
-        if line.starts_with("BEGIN:") {
-            enclosing = enclosing.saturating_add(1);
         }
     }
-    lines
 }
 
 pub(super) fn assert_nested_preserved(before: &str, after: &str) {
+    let before_cst = IcalCst::parse(before).expect("valid before ICS");
+    let after_cst = IcalCst::parse(after).expect("valid after ICS");
+    let mut before_nested = Vec::new();
+    let mut after_nested = Vec::new();
+    collect_nested_components(&before_cst, 0, &mut before_nested);
+    collect_nested_components(&after_cst, 0, &mut after_nested);
     assert_eq!(
-        nested_component_lines(before),
-        nested_component_lines(after),
-        "a line inside a nested component changed"
+        before_nested, after_nested,
+        "a nested component changed"
     );
 }
 

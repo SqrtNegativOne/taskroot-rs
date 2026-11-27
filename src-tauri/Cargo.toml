@@ -37,7 +37,7 @@ rrule = "0.14.0"
 chrono-tz = "0.10"
 serde_repr = "0.1.21"
 color-eyre = "0.6.5"
-icalendar = "0.17"
+ical-rs = { version = "0.7", default-features = false, features = ["parser"] }
 roxmltree = "0.21"
 tauri-plugin-notification = "2"
 

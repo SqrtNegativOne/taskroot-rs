@@ -80,11 +80,12 @@ byte-identical.
 exceptions share a UID in one resource. Editing or deleting one component never
 drops sibling components.
 
-**I3 — Unknown components never round-trip through `icalendar`.** Taskroot reads
-with `icalendar` and writes with a line-preserving editor (`ics/lines.rs`) that
-tracks `BEGIN`/`END` depth (so nested `VALARM` lines never collide with parent
-properties), preserves original folds and LF/CRLF, and folds newly created lines
-at 75 octets. Only brand-new resources use `icalendar`'s builder.
+**I3 — Single byte-faithful CST for reads and writes.** Taskroot parses and
+edits resources through `ical-rs`'s `IcalCst` concrete syntax tree, mutating
+only owned properties in place so nested components (`VALARM`, `VTIMEZONE`),
+unknown properties, parameters, original folds and LF/CRLF line endings survive
+verbatim, while edited or newly created lines fold at 75 octets. Brand-new
+resources are built on the same `IcalCst` model.
 
 `DTSTAMP` is generated on new events, inserted exceptions and task writes, and
 preserved on ordinary event edits.
