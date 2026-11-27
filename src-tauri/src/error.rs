@@ -1,4 +1,32 @@
 use serde::{Serialize, Serializer};
+use specta::Type;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "kebab-case")]
+pub enum BackendErrorCode {
+    NotFound,
+    Auth,
+    Remote,
+    InvalidInput,
+    Store,
+    Conflict,
+    Gone,
+    NotReady,
+    Internal,
+}
+
+mod wire {
+    use super::BackendErrorCode;
+    use specta::Type;
+
+    #[derive(Type)]
+    pub(super) struct AppError {
+        #[allow(dead_code)]
+        code: BackendErrorCode,
+        #[allow(dead_code)]
+        message: String,
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -44,12 +72,6 @@ impl AppError {
     }
 }
 
-impl From<color_eyre::eyre::Error> for AppError {
-    fn from(err: color_eyre::eyre::Error) -> Self {
-        Self::Internal(err.to_string())
-    }
-}
-
 impl Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -60,6 +82,12 @@ impl Serialize for AppError {
         state.serialize_field("code", self.code())?;
         state.serialize_field("message", &self.to_string())?;
         state.end()
+    }
+}
+
+impl Type for AppError {
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        wire::AppError::definition(types)
     }
 }
 
@@ -82,11 +110,7 @@ mod tests {
         assert_eq!(AppError::Conflict("x".into()).code(), "conflict");
         assert_eq!(AppError::Gone("x".into()).code(), "gone");
         assert_eq!(AppError::NotReady("x".into()).code(), "not-ready");
-
-        assert_eq!(
-            AppError::from(color_eyre::eyre::eyre!("boom")).code(),
-            "internal"
-        );
+        assert_eq!(AppError::Internal("boom".into()).code(), "internal");
     }
 
     #[test]

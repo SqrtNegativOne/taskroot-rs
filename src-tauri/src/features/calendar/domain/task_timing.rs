@@ -2,14 +2,10 @@ use super::event_timing::{is_date_only, wall_clock_to_utc};
 use super::{AppTaskStatus, CollectionId, TaskId};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
 /// Which of a task's two calendar dates a marker represents.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/TaskDateKind.generated.ts"
-)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TaskDateKind {
     Start,
@@ -27,21 +23,13 @@ impl TaskDateKind {
 }
 
 /// A task date normalized for rendering: a floating day or a timed instant.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/TaskDateTiming.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum TaskDateTiming {
     #[serde(rename_all = "camelCase")]
-    AllDay {
-        #[ts(type = "string")]
-        date: NaiveDate,
-    },
+    AllDay { date: NaiveDate },
     #[serde(rename_all = "camelCase")]
     Timed {
-        #[ts(type = "string")]
         start: DateTime<Utc>,
         timezone: Option<String>,
     },
@@ -70,11 +58,7 @@ impl TaskDateTiming {
 ///
 /// A task with both dates produces two markers, so the same task can appear
 /// twice in the date grid.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/TaskDateInstance.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskDateInstance {
     pub task_id: TaskId,
@@ -83,9 +67,9 @@ pub struct TaskDateInstance {
     pub occurrence_key: String,
     pub title: String,
     pub timing: TaskDateTiming,
-    #[ts(optional)]
+    #[specta(optional)]
     pub status: Option<AppTaskStatus>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub calendar_id: Option<CollectionId>,
 }
 

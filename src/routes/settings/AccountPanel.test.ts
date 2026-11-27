@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import AccountPanel from './AccountPanel.svelte';
-import type { AccountRegistry } from '../../lib/bindings/AccountRegistry.generated';
+import type { AccountRegistry } from '../../lib/domain';
 
 vi.mock('@tauri-apps/api/core', async () => {
     const { mockTauriInvoke } = await import('../../test/tauriMock');
@@ -51,7 +51,7 @@ describe('AccountPanel', () => {
         const row = await dummyRow();
         await fireEvent.click(row.getByRole('button', { name: 'Switch' }));
         await waitFor(() => expect(row.getByText('Active')).toBeTruthy());
-        expect(tauri.invoke).toHaveBeenCalledWith('switch_account', { accountId: 'dummy' });
+        expect(tauri.invoke).toHaveBeenCalledWith('switch_account', { accountId: 'dummy' }, undefined);
         expect(invoked('disconnect_account')).toBe(false);
         expect(screen.queryByLabelText('Password')).toBeNull();
         expect(screen.getByText('normal')).toBeTruthy();
@@ -72,7 +72,7 @@ describe('AccountPanel', () => {
         render(AccountPanel);
         await fireEvent.click((await dummyRow()).getByRole('button', { name: 'Forget' }));
         await waitFor(() => expect(screen.queryByText('dummy')).toBeNull());
-        expect(tauri.invoke).toHaveBeenCalledWith('remove_account', { accountId: 'dummy' });
+        expect(tauri.invoke).toHaveBeenCalledWith('remove_account', { accountId: 'dummy' }, undefined);
         expect(screen.getByText('Active')).toBeTruthy();
     });
 

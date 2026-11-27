@@ -16,27 +16,11 @@
   - Emit `STORE_UPDATED` solely from Rust (not split between [store.svelte.ts](src/lib/store.svelte.ts) and Rust IPC).
   - Stop re-fetching `settings.json` on every calendar mutation, and remove duplicate `get_active_calendars` queries (e.g. [inspector-pane/state.svelte.ts](src/components/inspector-pane/state.svelte.ts) vs. [InspectorTaskFields.svelte](src/components/inspector-pane/InspectorTaskFields.svelte)).
 
----
-
-## Phase 3 — Replace high-maintenance hand-rolled subsystems
-
-- [ ] **Migrate headless CLI to `clap`**
-  - Replace hand-rolled [cli/args.rs](src-tauri/src/cli/args.rs), [cli/help.rs](src-tauri/src/cli/help.rs), and manual option parsing in `cli/commands/` with `clap` (`derive`) + generated `docs/cli.md`.
-  - Fixes silent unknown-flag typos, missing `--key=value` / `--` handling, and doc/code drift (e.g. `task-show <id>...` currently ignoring extra IDs).
-- [ ] **Replace `ts-rs` + IPC text scanner with `tauri-specta` v2**
-  - Generate typed frontend `commands.*` invoke wrappers and event types directly from Rust.
-  - Delete ~400 LOC of heuristic TS scanning in [ipc/tests.rs](src-tauri/src/ipc/tests.rs), [frontend_scan.rs](src-tauri/src/test_support/frontend_scan.rs), and [source_scan.rs](src-tauri/src/test_support/source_scan.rs).
-
----
-
 ## Phase 4 — Evaluate later (only if pain grows)
 
 - [ ] **CalDAV client (`libdav`)** — consider replacing ~1,000 LOC in `caldav/{xml,discovery,transport,client}.rs` if targeting servers beyond Radicale (Fastmail, Nextcloud, iCloud, Baïkal).
-- [ ] **Simplify [taskroot-macros](src-tauri/taskroot-macros/src/lib.rs) (418 LOC)** — evaluate replacing the custom `syn` proc-macro crate (used by only 3 structs: `AppTask`, `AppEvent`, `AppSettings`) with plain Rust tables or small `macro_rules!`.
 - [ ] **Typed dates/times across domain DTOs** — consolidate duplicated `ICAL_DATE`/`DTO_DATE`/`wall_clock`/`is_all_day` parsing across `ics/`, `event_timing.rs`, and `recurrence.rs`.
-- [ ] **Optional frontend ergonomics** — `paneforge` for [SplitPane.svelte](src/components/SplitPane.svelte) if resize edge cases appear; `chrono-node` (TS) if quick-capture needs richer natural-language dates; JS `rrule` `toText()` if recurrence UX expands beyond the 6 presets.
-
----
+- [ ] **Optional frontend ergonomics** `chrono-node` (TS) if quick-capture needs richer natural-language dates; JS `rrule` `toText()` if recurrence UX expands beyond the 6 presets.
 
 ## Library & Language Decision Notes
 

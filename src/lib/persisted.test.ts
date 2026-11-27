@@ -40,7 +40,7 @@ describe('persistState', () => {
         render(Harness, { props: { storageKey: KEY, fallback: ['fallback'], debounceMs: 5 } });
 
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY }, undefined);
         });
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(screen.getByTestId('value').textContent).toBe('fallback');
@@ -67,7 +67,7 @@ describe('persistState', () => {
             expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: KEY,
                 value: ['fallback', 'added'],
-            });
+            }, undefined);
         });
     });
 
@@ -85,7 +85,7 @@ describe('persistState', () => {
             expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: KEY,
                 value: ['added', 'added', 'added'],
-            });
+            }, undefined);
         });
 
         const writes = updateWrites();
@@ -98,7 +98,7 @@ describe('persistState', () => {
 
         render(Harness, { props: { storageKey: KEY, fallback: ['fallback'], debounceMs: 5 } });
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY }, undefined);
         });
         await fireEvent.click(screen.getByText('add'));
         expect(screen.getByTestId('value').textContent).toBe('fallback,added');
@@ -109,7 +109,7 @@ describe('persistState', () => {
             expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: KEY,
                 value: ['fallback', 'added'],
-            });
+            }, undefined);
         });
         expect(screen.getByTestId('value').textContent).toBe('fallback,added');
     });
@@ -121,13 +121,13 @@ describe('persistState', () => {
             props: { storageKey: KEY, fallback: [], debounceMs: 10_000 },
         });
         await waitFor(() => {
-            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY });
+            expect(invoke).toHaveBeenCalledWith('get_ui_state', { key: KEY }, undefined);
         });
         await new Promise((resolve) => setTimeout(resolve, 0));
         await fireEvent.click(screen.getByText('add'));
 
         unmount();
 
-        expect(invoke).toHaveBeenCalledWith('set_ui_state', { key: KEY, value: ['added'] });
+        expect(invoke).toHaveBeenCalledWith('set_ui_state', { key: KEY, value: ['added'] }, undefined);
     });
 });

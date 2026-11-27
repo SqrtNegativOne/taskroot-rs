@@ -2,8 +2,8 @@ use super::{AppEvent, AppTaskStatus, CollectionId, Color, EventId, EventStatus, 
 use chrono::{DateTime, Days, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz as ChronoTz;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::str::FromStr;
-use ts_rs::TS;
 
 const YMD_LENGTH: usize = 10;
 
@@ -11,22 +11,17 @@ const YMD_LENGTH: usize = 10;
 ///
 /// Nothing outside this module may interpret `AppEvent::start_time` /
 /// `end_time`; those remain wire-format strings for the push path only.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/EventTiming.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum EventTiming {
     #[serde(rename_all = "camelCase")]
     AllDay {
-        #[ts(type = "string")]
         start_date: NaiveDate,
-        #[ts(type = "string")]
         end_date_exclusive: NaiveDate,
     },
     #[serde(rename_all = "camelCase")]
     Timed {
-        #[ts(type = "string")]
         start: DateTime<Utc>,
-        #[ts(type = "string")]
         end: DateTime<Utc>,
         timezone: Option<String>,
     },
@@ -124,11 +119,7 @@ fn parse_date(value: &str) -> Option<NaiveDate> {
 }
 
 /// A single render-ready occurrence produced by the projection boundary.
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/EventInstance.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventInstance {
     /// Row id for this occurrence: the master for rule-expanded instances, or
@@ -141,23 +132,23 @@ pub struct EventInstance {
     /// Excluding it removes exactly this occurrence.
     pub occurrence_start: String,
     pub title: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub description: Option<String>,
     pub timing: EventTiming,
     /// True when this instance came from a recurrence rule.
     pub recurring: bool,
     /// The rule of the series this occurrence belongs to (the master's rule
     /// for a moved exception); `None` for a one-off event.
-    #[ts(optional)]
+    #[specta(optional)]
     pub rrule: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub calendar_id: Option<CollectionId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub color: Option<Color>,
     pub status: EventStatus,
-    #[ts(optional)]
+    #[specta(optional)]
     pub task_id: Option<TaskId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub task_status: Option<AppTaskStatus>,
 }
 

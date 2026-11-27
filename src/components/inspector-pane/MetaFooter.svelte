@@ -2,8 +2,8 @@
     import { formatTimestamp } from './format';
 
     interface Props {
-        created?: string;
-        modified?: string;
+        created?: string | null;
+        modified?: string | null;
         onDelete?: () => void;
         deleteLabel?: string;
         deleteDisabled?: boolean;

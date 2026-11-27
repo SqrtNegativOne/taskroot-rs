@@ -8,7 +8,7 @@
     import StageIndicator from './shell/StageIndicator.svelte';
     import MoreScreensDropdown from './shell/MoreScreensDropdown.svelte';
     import WindowControls from './shell/WindowControls.svelte';
-    import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
+    import type { WindowLabel } from '$lib/domain';
 
     const appWindow = getCurrentWindow();
     const label = appWindow.label as WindowLabel;

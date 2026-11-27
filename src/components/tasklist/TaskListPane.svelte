@@ -3,11 +3,10 @@
     import TaskContextMenu from './TaskContextMenu.svelte';
     import ViewMenuButton from '../ViewMenuButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import { calendarsForComponent, computeFilterDefaults, type AppCalendar, type AppTask } from '../../lib/domain';
+    import { calendarsForComponent, computeFilterDefaults, type AppTask } from '../../lib/domain';
     import { taskListQueryArgs, taskListState } from '../../lib/taskList.svelte';
     import './tasklist.css';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { activeCalendars } from '../../lib/queries';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
@@ -48,17 +47,15 @@
         contextMenu = { task, x: e.clientX, y: e.clientY };
     }
     
-    let pastDueQuery = useAutoQuery<string[]>('get_past_due_task_ids', () => ({}));
+    let pastDueQuery = useAutoQuery(commands.getPastDueTaskIds);
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
-    import type { AppTaskColumnDef } from '../../lib/bindings/AppTaskColumnDef.generated';
-
-    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({ ...taskListQueryArgs(), query }), { debounceMs: TASK_QUERY_DEBOUNCE_MS });
-    let schemaQuery = useAutoQuery<AppTaskColumnDef[]>('get_task_schema', () => ({}));
+    let tasksQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(query), { debounceMs: TASK_QUERY_DEBOUNCE_MS });
+    let schemaQuery = useAutoQuery(commands.getTaskSchema);
     
     let schema = $derived(schemaQuery.data ?? []);
     
@@ -71,7 +68,7 @@
                 .map(c => ({ label: c.summary || c.id, value: c.id }));
         }
         const col = schema.find(c => c.id === colId);
-        if (col && typeof col.filter_type === 'object' && 'Enum' in col.filter_type) {
+        if (col && typeof col.filter_type === 'object' && 'Enum' in col.filter_type && col.filter_type.Enum) {
             return col.filter_type.Enum.map(v => ({ label: v, value: v }));
         }
         return [];

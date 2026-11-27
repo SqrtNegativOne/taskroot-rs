@@ -4,10 +4,8 @@
     import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
     import { store } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
-    import type { AppCalendar } from '../../lib/domain';
     import { buildNewEvent } from '../../lib/domain';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { activeCalendars } from '../../lib/queries';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { createSidebarState, saveTabTop } from './state.svelte';
     import './sidebar.css';
 
@@ -146,7 +144,7 @@
         });
     });
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     function onAddEvent(date: Date, startMins?: number, endMins?: number): Promise<string | undefined> {
         const newEvent = buildNewEvent(date, {

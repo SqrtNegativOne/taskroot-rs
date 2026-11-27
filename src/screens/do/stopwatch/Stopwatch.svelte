@@ -5,20 +5,19 @@
     import { store } from '../../../lib/store.svelte';
     import './stopwatch.css';
 
-    import { useTauriQuery } from '../../../lib/safeInvoke.svelte';
+    import { commands, useTauriQuery } from '../../../lib/safeInvoke.svelte';
     import { allTasks as allTasksQueryArgs } from '../../../lib/queries';
-    import type { AppTask } from '../../../lib/domain';
 
     let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
 
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
-    let allTasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let allTasksQuery = useTauriQuery(commands.queryTasks);
     let allTasks = $derived(allTasksQuery.data ?? []);
 
     $effect(() => {
         if (!store.loaded) return;
-        void allTasksQuery.execute(allTasksQueryArgs());
+        void allTasksQuery.execute(...allTasksQueryArgs());
     });
 
     let activeTask = $derived(

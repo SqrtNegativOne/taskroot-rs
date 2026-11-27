@@ -1,30 +1,25 @@
 use crate::features::calendar::domain::TaskPriority;
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/ParsedSigils.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ParsedSigils {
     pub clean_title: String,
     pub properties: SigilProperties,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/SigilProperties.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SigilProperties {
-    #[ts(optional)]
+    #[specta(optional)]
     pub priority: Option<TaskPriority>,
     pub tags: Vec<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub duration: Option<i32>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub day: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub list: Option<String>,
 }
 

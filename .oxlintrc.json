@@ -9,7 +9,8 @@
     "src-tauri/",
     "node_modules/",
     "build/",
-    "coverage/"
+    "coverage/",
+    "src/lib/bindings/"
   ],
   "jsPlugins": ["oxlint-plugin-complexity"],
   "rules": {

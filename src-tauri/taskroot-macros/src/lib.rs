@@ -91,21 +91,14 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
         }
     }
 
-    let file_name = format!("../../src/lib/bindings/{}.generated.ts", enum_name);
-    let col_def_file = format!("../../src/lib/bindings/{}.generated.ts", col_def_name);
-    let filter_file = format!("../../src/lib/bindings/{}.generated.ts", filter_name);
-    let sort_file = format!("../../src/lib/bindings/{}.generated.ts", sort_name);
-
     let gen = quote! {
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, ts_rs::TS)]
-        #[ts(export, export_to = #file_name)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, specta::Type)]
         #[serde(rename_all = "camelCase")]
         pub enum #enum_name {
             #(#enum_variants),*
         }
 
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
-        #[ts(export, export_to = #col_def_file)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
         pub struct #col_def_name {
             pub id: #enum_name,
             pub label: String,
@@ -113,17 +106,14 @@ pub fn queryable_derive(input: TokenStream) -> TokenStream {
             pub sortable: bool,
         }
 
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
-        #[ts(export, export_to = #filter_file)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
         pub struct #filter_name {
             pub column: Option<#enum_name>,
             pub operator: Option<crate::features::calendar::domain::FilterOperator>,
-            #[ts(type = "unknown")]
             pub value: Option<serde_json::Value>,
         }
 
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
-        #[ts(export, export_to = #sort_file)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
         pub struct #sort_name {
             pub column: Option<#enum_name>,
             pub direction: Option<crate::features::calendar::domain::SortDirection>,

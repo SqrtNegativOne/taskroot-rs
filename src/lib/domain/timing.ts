@@ -1,5 +1,4 @@
-import type { EventInstance } from '../bindings/EventInstance.generated';
-import type { TaskDateInstance } from '../bindings/TaskDateInstance.generated';
+import type { EventInstance, TaskDateInstance } from '../bindings/index.generated';
 import { addDays, ymd } from '../time';
 
 /**

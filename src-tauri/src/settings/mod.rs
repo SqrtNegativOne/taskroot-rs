@@ -27,14 +27,13 @@ pub mod storage;
 mod tests;
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use taskroot_macros::SettingsMeta;
-use ts_rs::TS;
 
 pub use colour_scheme::ColourScheme;
 pub use metadata::{SettingMeta, SettingOption};
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, SettingsMeta)]
-#[ts(export, export_to = "../../src/lib/bindings/AppSettings.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, SettingsMeta)]
 #[serde(default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct AppSettings {

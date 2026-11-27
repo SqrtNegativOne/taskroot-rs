@@ -6,8 +6,8 @@ import {
     isEventReadOnly,
     isRecurring,
 } from '../../lib/domain';
-import { activeCalendars, allEvents, allTasks } from '../../lib/queries';
-import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+import { allEvents, allTasks } from '../../lib/queries';
+import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
 import { store } from '../../lib/store.svelte';
 import { notifyError } from '../../lib/toast';
 import { eventStartDate } from './eventDates';
@@ -36,9 +36,9 @@ export class InspectorPaneState {
     private eventPendingAction = $state<AppEvent | undefined>(undefined);
     private eventPendingStart = $state<string | undefined>(undefined);
 
-    private readonly tasksQuery = useAutoQuery<AppTask[]>('query_tasks', allTasks);
-    private readonly eventsQuery = useAutoQuery<AppEvent[]>('query_events', allEvents);
-    private readonly calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    private readonly tasksQuery = useAutoQuery(commands.queryTasks, allTasks);
+    private readonly eventsQuery = useAutoQuery(commands.queryEvents, allEvents);
+    private readonly calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     constructor(
         private readonly getTarget: () => InspectorTarget | undefined,

@@ -1,15 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use specta::Type;
 use taskroot_macros::Queryable;
-use ts_rs::TS;
 
 use super::{CollectionId, RemoteId, TaskId};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AppTaskStatus.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum AppTaskStatus {
     Todo,
@@ -30,9 +26,7 @@ impl AppTaskStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/TaskPriority.generated.ts")]
-#[ts(type = "0 | 1 | 2 | 3 | 4")]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
 #[repr(i32)]
 pub enum TaskPriority {
     None = 0,
@@ -42,18 +36,38 @@ pub enum TaskPriority {
     Urgent = 4,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/Tag.generated.ts")]
+mod priority_wire {
+    use specta::Type;
+
+    pub(super) struct Literal;
+
+    impl Type for Literal {
+        fn definition(_types: &mut specta::Types) -> specta::datatype::DataType {
+            specta::datatype::DataType::Reference(specta_typescript::define("0 | 1 | 2 | 3 | 4"))
+        }
+    }
+
+    #[derive(Type)]
+    #[specta(transparent)]
+    pub(super) struct TaskPriority(#[allow(dead_code)] Literal);
+}
+
+impl Type for TaskPriority {
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        priority_wire::TaskPriority::definition(types)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 pub struct Tag {
     pub id: String,
     pub name: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub color: Option<String>,
 }
 
 /// `GEO` (`RFC 5545` §3.8.1.6), the point tasks.org stores a geofence at.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../src/lib/bindings/GeoPoint.generated.ts")]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GeoPoint {
     pub latitude: f64,
@@ -61,11 +75,7 @@ pub struct GeoPoint {
 }
 
 /// What a relative reminder counts from.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/TaskAlarmAnchor.generated.ts"
-)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum TaskAlarmAnchor {
     /// `TRIGGER;RELATED=START` (the default): the task's start, or its due time
@@ -76,11 +86,7 @@ pub enum TaskAlarmAnchor {
 }
 
 /// One `VALARM` trigger, in the two shapes tasks.org writes.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/TaskAlarmTrigger.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -97,66 +103,65 @@ pub enum TaskAlarmTrigger {
     Absolute { at: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, Queryable)]
-#[ts(export, export_to = "../../src/lib/bindings/AppTask.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Queryable)]
 #[serde(rename_all = "camelCase")]
 pub struct AppTask {
     #[query(label = "ID")]
     pub id: TaskId,
     #[query(sortable)]
     pub title: String,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(filter_type = "enum:AppTaskStatus")]
     pub status: Option<AppTaskStatus>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(sortable, filter_type = "number")]
     pub priority: Option<TaskPriority>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(filter_type = "relation:task_tags")]
     pub tags: Option<Vec<Tag>>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub parent_task: Option<TaskId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub dependencies: Option<Vec<TaskId>>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub est: Option<i32>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(sortable, filter_type = "date", label = "Created")]
     pub added: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub remote_id: Option<RemoteId>,
     /// Collection href this task lives in, matching `AppEvent`.
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(label = "Collection")]
     pub remote_collection_id: Option<CollectionId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub notes: Option<String>,
     /// `DTSTART`: the task's start, which tasks.org also uses as "hide until".
     /// Canonical form matches [`Self::due`].
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(filter_type = "date")]
     pub start: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(sortable, filter_type = "date")]
     pub due: Option<String>,
     /// The `COMPLETED` timestamp, ISO 8601 UTC.
-    #[ts(optional)]
+    #[specta(optional)]
     pub completed_at: Option<String>,
     /// The raw `RRULE` line(s), wire form (`RRULE:FREQ=…`).
-    #[ts(optional)]
+    #[specta(optional)]
     pub rrule: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub geo: Option<GeoPoint>,
     /// `VALARM` triggers, in document order.
-    #[ts(optional)]
+    #[specta(optional)]
     pub alarms: Option<Vec<TaskAlarmTrigger>>,
     /// IANA timezone `DTSTART`/`DUE` are written in; `None` writes them floating
     /// and `Some("UTC")` keeps a UTC-suffixed value's instant.
-    #[ts(optional)]
+    #[specta(optional)]
     pub timezone: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub updated_at: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub etag: Option<String>,
 }
 

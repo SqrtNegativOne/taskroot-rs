@@ -1,19 +1,17 @@
 //! Thin Tauri adapters for saved accounts. Lifecycle behavior lives in calendar.
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
-use ts_rs::TS;
+use specta::Type;
+use tauri::{AppHandle, Manager, State};
+use tauri_specta::Event;
 
 use crate::error::AppError;
 use crate::features::calendar::account::{Account, AccountRegistry, AccountService};
 use crate::features::calendar::CalendarInfo;
+use crate::ipc_events::{AccountChanged, StoreUpdated};
 
 /// What the connect screen and the settings account card display.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AccountSummary.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountSummary {
     pub server_url: String,
@@ -41,6 +39,7 @@ pub(crate) fn service(app: &AppHandle) -> Result<State<'_, AccountService>, AppE
 /// # Errors
 /// Returns registry storage failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn is_account_configured(app: AppHandle) -> Result<bool, AppError> {
     Ok(service(&app)?.registry().await?.active().is_some())
 }
@@ -48,6 +47,7 @@ pub async fn is_account_configured(app: AppHandle) -> Result<bool, AppError> {
 /// # Errors
 /// Returns registry storage failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_accounts(app: AppHandle) -> Result<AccountRegistry, AppError> {
     service(&app)?.registry().await
 }
@@ -55,6 +55,7 @@ pub async fn get_accounts(app: AppHandle) -> Result<AccountRegistry, AppError> {
 /// # Errors
 /// Returns registry storage failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_account(app: AppHandle) -> Result<Option<Account>, AppError> {
     Ok(service(&app)?
         .registry()
@@ -66,6 +67,7 @@ pub async fn get_account(app: AppHandle) -> Result<Option<Account>, AppError> {
 /// # Errors
 /// Returns discovery failures. Does not persist credentials or account data.
 #[tauri::command]
+#[specta::specta]
 pub async fn test_account(
     app: AppHandle,
     server_url: String,
@@ -81,6 +83,7 @@ pub async fn test_account(
 /// # Errors
 /// Returns discovery, fetch, credential or persistence failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn connect_account(
     app: AppHandle,
     server_url: String,
@@ -98,6 +101,7 @@ pub async fn connect_account(
 /// # Errors
 /// Returns missing-profile, credential, fetch or persistence failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn switch_account(app: AppHandle, account_id: String) -> Result<(), AppError> {
     let state = super::session::store_state(&app)?;
     let accounts = service(&app)?;
@@ -113,6 +117,7 @@ pub async fn switch_account(app: AppHandle, account_id: String) -> Result<(), Ap
 /// # Errors
 /// Returns registry storage failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn disconnect_account(app: AppHandle) -> Result<(), AppError> {
     let state = super::session::store_state(&app)?;
     service(&app)?.disconnect(&state).await?;
@@ -123,6 +128,7 @@ pub async fn disconnect_account(app: AppHandle) -> Result<(), AppError> {
 /// # Errors
 /// Returns missing-profile, credential or persistence failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn remove_account(app: AppHandle, account_id: String) -> Result<(), AppError> {
     let accounts = service(&app)?;
     let was_active = accounts.registry().await?.active_id.as_deref() == Some(&account_id);
@@ -135,7 +141,7 @@ pub async fn remove_account(app: AppHandle, account_id: String) -> Result<(), Ap
 fn changed(app: &AppHandle, clear_focus: bool) {
     if clear_focus {
         super::stopwatch::clear_account_focus(app);
-        let _ = app.emit(crate::ipc_events::ACCOUNT_CHANGED, ());
+        let _ = AccountChanged.emit(app);
     }
-    let _ = app.emit(crate::ipc_events::STORE_UPDATED, ());
+    let _ = StoreUpdated.emit(app);
 }

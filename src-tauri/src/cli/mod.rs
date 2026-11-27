@@ -9,77 +9,60 @@
 //! Output is JSON on stdout; failures are `AppError` text on stderr with a
 //! non-zero exit code.
 
-pub mod args;
 pub mod commands;
-pub mod help;
+pub mod docs;
 pub mod output;
 pub mod session;
+pub mod spec;
 
-use args::Cli;
-use error::AppError;
+use clap::{CommandFactory, Parser};
 
-use crate::error;
+use crate::error::AppError;
+use spec::{Cli, Command};
 
 /// Run one invocation from the process arguments.
 ///
 /// # Errors
 ///
-/// Propagates the verb's [`AppError`]; the binary turns it into stderr text and a
-/// non-zero exit code.
+/// Propagates argument parsing and verb [`AppError`] failures; the binary turns
+/// them into stderr text and a non-zero exit code.
 pub async fn run() -> Result<(), AppError> {
-    let cli = Cli::from_env();
-    let Some(command) = cli.positional(0) else {
-        help::print_help();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => {
+            if matches!(
+                error.kind(),
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+            ) {
+                let _ = error.print();
+                return Ok(());
+            }
+            let rendered = error.to_string();
+            let message = rendered
+                .strip_prefix("error: ")
+                .unwrap_or(&rendered)
+                .trim_end();
+            return Err(AppError::InvalidInput(message.to_string()));
+        }
+    };
+
+    let Some(command) = cli.command else {
+        let _ = Cli::command().print_help();
+        println!();
         return Ok(());
     };
 
     match command {
-        "help" => {
-            help::print_help();
-            Ok(())
-        }
-        "lists" => commands::calendars::list_calendars().await,
-        "list-rm" => commands::calendars::remove_list(&cli).await,
-        "tasks" => commands::tasks::list_tasks(&cli).await,
-        "task-show" => commands::tasks::show_task(&cli).await,
-        "task-add" => commands::tasks::add_task(&cli).await,
-        "task-set" => commands::tasks::set_task(&cli).await,
-        "task-done" => commands::tasks::done_task(&cli).await,
-        "task-rm" => commands::tasks::remove_task(&cli).await,
-        "events" => commands::events::list_events(&cli).await,
-        "event-add" => commands::events::add_event(&cli).await,
-        "event-rm" => commands::events::remove_event(&cli).await,
-        other => Err(AppError::InvalidInput(format!(
-            "unknown command `{other}`; run `taskroot help`"
-        ))),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_dispatched_verb_is_documented() {
-        let source = include_str!("mod.rs");
-        let arms = source
-            .split_once("match command {")
-            .and_then(|(_, rest)| rest.split_once("other =>"))
-            .map(|(arms, _)| arms)
-            .unwrap();
-
-        let mut dispatched: Vec<&str> = arms
-            .lines()
-            .filter_map(|line| line.trim().strip_prefix('"'))
-            .filter_map(|rest| rest.split_once("\" =>").map(|(name, _)| name))
-            .collect();
-        let mut documented: Vec<&str> = help::VERBS
-            .iter()
-            .filter_map(|verb| verb.usage.split_whitespace().next())
-            .collect();
-        dispatched.sort_unstable();
-        documented.sort_unstable();
-
-        assert_eq!(dispatched, documented);
+        Command::Lists => commands::calendars::list_calendars().await,
+        Command::ListRm { list } => commands::calendars::remove_list(&list).await,
+        Command::Tasks(args) => commands::tasks::list_tasks(&args).await,
+        Command::TaskShow { ids } => commands::tasks::show_task(&ids).await,
+        Command::TaskAdd(args) => commands::tasks::add_task(&args).await,
+        Command::TaskSet(args) => commands::tasks::set_task(&args).await,
+        Command::TaskDone { ids } => commands::tasks::done_task(&ids).await,
+        Command::TaskRm { ids } => commands::tasks::remove_task(&ids).await,
+        Command::Events(args) => commands::events::list_events(&args).await,
+        Command::EventAdd(args) => commands::events::add_event(&args).await,
+        Command::EventRm { id } => commands::events::remove_event(&id).await,
     }
 }

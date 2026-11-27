@@ -1,9 +1,10 @@
-use tauri::Emitter;
+use tauri_specta::Event;
 
 use crate::error::AppError;
 use crate::features::stopwatch::{
     with_manager, StopwatchLabelSource, StopwatchManager, StopwatchState,
 };
+use crate::ipc_events::StopwatchUpdated;
 
 pub(crate) fn clear_account_focus(app: &tauri::AppHandle) {
     let result = with_manager(app, |manager| {
@@ -20,7 +21,7 @@ pub(crate) fn clear_account_focus(app: &tauri::AppHandle) {
 }
 
 fn emit(app: &tauri::AppHandle, state: &StopwatchState) {
-    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, state);
+    let _ = StopwatchUpdated(state.clone()).emit(app);
 }
 
 /// # Errors
@@ -28,6 +29,7 @@ fn emit(app: &tauri::AppHandle, state: &StopwatchState) {
 /// Returns [`AppError::Internal`] when the stopwatch state is not managed yet or
 /// the system clock cannot be read.
 #[tauri::command]
+#[specta::specta]
 pub fn get_stopwatch_state(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     with_manager(&app, StopwatchManager::snapshot)
 }
@@ -38,6 +40,7 @@ pub fn get_stopwatch_state(app: tauri::AppHandle) -> Result<StopwatchState, AppE
 ///
 /// Returns [`AppError::InvalidInput`] while a break is active.
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, StopwatchManager::toggle_work)?;
     emit(&app, &updated);
@@ -51,6 +54,7 @@ pub fn toggle_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppErro
 /// Returns [`AppError::InvalidInput`] when the session is too short or its break
 /// already finished.
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_break(app: tauri::AppHandle, break_divisor: u32) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, |manager| manager.toggle_break(break_divisor))?;
     emit(&app, &updated);
@@ -63,6 +67,7 @@ pub fn toggle_break(app: tauri::AppHandle, break_divisor: u32) -> Result<Stopwat
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn complete_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, StopwatchManager::complete_break)?;
     emit(&app, &updated);
@@ -76,6 +81,7 @@ pub fn complete_break(app: tauri::AppHandle) -> Result<StopwatchState, AppError>
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_pause(app: tauri::AppHandle, pause_minutes: u64) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, |manager| manager.toggle_pause(pause_minutes))?;
     emit(&app, &updated);
@@ -89,6 +95,7 @@ pub fn toggle_pause(app: tauri::AppHandle, pause_minutes: u64) -> Result<Stopwat
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, |manager| manager.adjust_pause(delta_minutes))?;
     emit(&app, &updated);
@@ -102,6 +109,7 @@ pub fn adjust_pause(app: tauri::AppHandle, delta_minutes: i64) -> Result<Stopwat
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn set_stopwatch_label(
     app: tauri::AppHandle,
     label: Option<String>,
@@ -119,6 +127,7 @@ pub fn set_stopwatch_label(
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn set_stopwatch_task(
     app: tauri::AppHandle,
     task_id: Option<String>,
@@ -133,6 +142,7 @@ pub fn set_stopwatch_task(
 ///
 /// Returns [`AppError::Internal`] when the stopwatch state is unavailable.
 #[tauri::command]
+#[specta::specta]
 pub fn reset_stopwatch(app: tauri::AppHandle) -> Result<StopwatchState, AppError> {
     let updated = with_manager(&app, StopwatchManager::reset)?;
     emit(&app, &updated);

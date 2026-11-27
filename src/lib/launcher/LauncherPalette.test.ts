@@ -73,11 +73,13 @@ describe('LauncherPalette', () => {
             expect(tauri.invoke).toHaveBeenCalledWith(
                 'query_event_instances',
                 expect.objectContaining({ startDate: today, endDate: today, filters: emptyFilterGroup() }),
+                undefined,
             );
         });
         expect(tauri.invoke).toHaveBeenCalledWith(
             'query_tasks',
             { filters: filterGroup([{ column: 'status', operator: 'is not', value: ['done'] }]), sort: [], query: '' },
+            undefined,
         );
     });
 
@@ -165,6 +167,7 @@ describe('LauncherPalette', () => {
             expect(tauri.invoke).toHaveBeenCalledWith(
                 'query_event_instances',
                 expect.objectContaining({ startDate: '2026-11-20', endDate: '2026-11-20' }),
+                undefined,
             );
         });
 
@@ -175,6 +178,7 @@ describe('LauncherPalette', () => {
             expect(tauri.invoke).toHaveBeenCalledWith(
                 'query_event_instances',
                 expect.objectContaining({ startDate: '2026-11-21', endDate: '2026-11-21' }),
+                undefined,
             );
         });
     });

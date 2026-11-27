@@ -77,19 +77,14 @@ and `test_support::ics::{series, all_day, with_exception}`. `clippy.toml` allows
 TASKROOT_DATA_DIR=target/e2e-data cargo run --example e2e_caldav -- --user … --password …
 ```
 
-## IPC source contract
+## IPC bindings and contracts
 
-`ipc/tests.rs` (via `test_support/source_scan.rs` and `frontend_scan.rs`) checks
-handler registration uniqueness, `#[tauri::command]` ↔ `generate_handler!`
-agreement, literal frontend command names, and recognized argument keys
-(including `query.execute({…})` bindings) against camelCased Rust parameters.
+`src-tauri/src/ipc/mod.rs` registers all `#[tauri::command]` + `#[specta::specta]`
+handlers and typed `tauri_specta::Event` structs once in `specta_builder()`.
+`src-tauri/tests/export_bindings.rs` exports `src/lib/bindings/index.generated.ts`
+during `cargo nextest run`, and `bun run check` enforces command names,
+argument shapes, return types, and event payloads end-to-end.
 
-These are shallow source scans, **not** end-to-end runtime tests:
-
-- Computed command names, spreads and argument builders (`allTasks()`, etc.) are
-  not resolved; missing required arguments are not caught.
-- Signature and query-binding scans are text-based (generic types with commas
-  can confuse parameter splitting).
-- Handlers use concrete `AppHandle` (Tauri's `test` feature / `MockRuntime` is
-  not enabled). Keep behavior testable below the command seam and review scanner
-  coverage when adding wire wrappers rather than inlining good builders.
+Handlers still use concrete `AppHandle` (Tauri's `test` feature / `MockRuntime`
+is not enabled), so keep behavior testable below the command seam in the store,
+ICS, CalDAV, and settings layers.

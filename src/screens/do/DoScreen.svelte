@@ -2,15 +2,14 @@
     import Collapsible from '../../components/Collapsible.svelte';
     import Stopwatch from './stopwatch/Stopwatch.svelte';
 
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
     import { taskListQueryArgs } from '../../lib/taskList.svelte';
-    import type { AppTask } from '../../lib/domain';
 
     let isBreak = $state(false);
     let showRestOverride = $state(false);
 
-    let tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
+    let tasksQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(tasksQuery.data ?? []);
 
     function handleBreakStatusChange(status: boolean) {

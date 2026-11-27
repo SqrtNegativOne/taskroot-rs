@@ -1,7 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { StopwatchPhase } from '../../../lib/domain';
-import { SCREEN_EFFECT } from '../../../lib/ipcEvents';
-import { safeInvoke } from '../../../lib/safeInvoke.svelte';
+import { commands, events, safeInvoke } from '../../../lib/safeInvoke.svelte';
 
 const soundCache = new Map<string, HTMLAudioElement>();
 
@@ -22,10 +21,9 @@ function playSound(file: string): void {
 
 async function triggerScreenEffect(): Promise<void> {
     if (!isMainWindow()) return;
-    const result = await safeInvoke('show_screen_effect');
+    const result = await safeInvoke(commands.showScreenEffect());
     if (result.isErr()) return;
-    const { emit } = await import('@tauri-apps/api/event');
-    void emit(SCREEN_EFFECT);
+    void events.screenEffect.emit();
 }
 
 export function playErrorSound(): void {

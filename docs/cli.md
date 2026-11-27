@@ -1,48 +1,89 @@
 # taskroot CLI
 
-<!-- Generated from the VERBS and OPTIONS tables in src-tauri/src/cli/help.rs by `cargo nextest run`. Do not edit. -->
+<!-- Generated from the clap CLI definition in src-tauri/src/cli/spec.rs by `cargo nextest run`. Do not edit. -->
 
 Headless Taskroot for agents and scripts: JSON on stdout, `AppError` text on
 stderr with a non-zero exit code.
 
 ```
-bun run cli -- <verb>
+bun run cli -- <command>
 ```
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
-| `help` | this text |
-| `lists` | calendars this account can see |
-| `list-rm <list>` | delete a list and everything in it |
-| `tasks [--search S] [--status S] [--open]` | list tasks |
-| `task-show <id>...` | print tasks exactly as stored |
-| `task-add --title T [options]` | create a task |
-| `task-set <id>... [options]` | change tasks; --list moves them |
-| `task-done <id>...` | mark tasks done |
-| `task-rm <id>...` | delete tasks |
-| `events [--start D] [--end D] [--search S]` | event instances in a date range (default: today + 14 days) |
-| `event-add --title T --start S --end E [options]` | create an event |
-| `event-rm <id>` | delete an event |
+| `lists` | List calendars this account can see |
+| `list-rm <list>` | Delete a list and everything in it |
+| `tasks [options]` | List tasks |
+| `task-show <id>...` | Print tasks exactly as stored |
+| `task-add --title <TITLE> [options]` | Create a task |
+| `task-set <id>... [options]` | Change tasks; --list moves them |
+| `task-done <id>...` | Mark tasks done |
+| `task-rm <id>...` | Delete tasks |
+| `events [options]` | Event instances in a date range (default: today + 14 days) |
+| `event-add --title <TITLE> --start <DATE> --end <DATE> [options]` | Create an event |
+| `event-rm <id>` | Delete an event |
 
-## Options
+## Command options
+
+### `tasks`
 
 | Flag | Meaning |
 | --- | --- |
-| `--title T` | title (required for the add verbs) |
-| `--notes N` | description |
-| `--due D` | task due date |
-| `--start D, --end E` | task start date; event start and end |
-| `--priority P` | 0-4, or none/low/medium/high/urgent |
-| `--status S` | todo, next-up, done or cancelled |
-| `--tz ZONE` | IANA zone for timed values |
-| `--list NAME` | target list; on task-set this moves the task |
-| `--clear-due, --clear-start` | drop a date |
-| `--all-day` | event has no time of day |
-| `--rrule R` | recurrence rule |
-| `--search S` | substring filter |
-| `--open` | only tasks that are not done |
+| `--search <TEXT>` | Substring filter |
+| `--status <STATUS>` | Filter by task status (values: todo, next-up, done, cancelled) |
+| `--open` | Only tasks that are not done |
+
+### `task-add`
+
+| Flag | Meaning |
+| --- | --- |
+| `--title <TITLE>` | Task title *(required)* |
+| `--notes <TEXT>` | Description |
+| `--due <DATE>` | Task due date |
+| `--start <DATE>` | Task start date |
+| `--priority <PRIORITY>` | Priority (0-4 or none/low/medium/high/urgent) (values: none, low, medium, high, urgent) |
+| `--status <STATUS>` | Task status (values: todo, next-up, done, cancelled) |
+| `--tz <ZONE>` | IANA zone for timed values |
+| `--list <NAME>` | Target list; on task-set this moves the task |
+
+### `task-set`
+
+| Flag | Meaning |
+| --- | --- |
+| `--title <TITLE>` | New task title |
+| `--clear-due` | Drop the due date |
+| `--clear-start` | Drop the start date |
+| `--notes <TEXT>` | Description |
+| `--due <DATE>` | Task due date |
+| `--start <DATE>` | Task start date |
+| `--priority <PRIORITY>` | Priority (0-4 or none/low/medium/high/urgent) (values: none, low, medium, high, urgent) |
+| `--status <STATUS>` | Task status (values: todo, next-up, done, cancelled) |
+| `--tz <ZONE>` | IANA zone for timed values |
+| `--list <NAME>` | Target list; on task-set this moves the task |
+
+### `events`
+
+| Flag | Meaning |
+| --- | --- |
+| `--start <DATE>` | Range start (default: today) |
+| `--end <DATE>` | Range end (default: today + 14 days) |
+| `--search <TEXT>` | Substring filter |
+
+### `event-add`
+
+| Flag | Meaning |
+| --- | --- |
+| `--title <TITLE>` | Event title *(required)* |
+| `--start <DATE>` | Event start *(required)* |
+| `--end <DATE>` | Event end *(required)* |
+| `--notes <TEXT>` | Description |
+| `--priority <PRIORITY>` | Priority (0-4 or none/low/medium/high/urgent) (values: none, low, medium, high, urgent) |
+| `--tz <ZONE>` | IANA zone for timed values |
+| `--list <NAME>` | Target list |
+| `--all-day` | Event has no time of day |
+| `--rrule <RULE>` | Recurrence rule |
 
 An id may be a unique prefix. Verbs that take <id>... accept several ids and do
 one load for all of them; they print a JSON array of results. Dates are

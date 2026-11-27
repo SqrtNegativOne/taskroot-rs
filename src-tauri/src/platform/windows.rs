@@ -1,8 +1,8 @@
 //! Window labels and window lifecycle helpers.
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder, WindowEvent};
-use ts_rs::TS;
 
 use super::window_lifecycle::WindowLifecycle;
 
@@ -10,8 +10,7 @@ static MINITRACKER_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
 static LAUNCHER_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
 static EFFECT_LIFECYCLE: WindowLifecycle = WindowLifecycle::new();
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/WindowLabel.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum WindowLabel {
     Main,

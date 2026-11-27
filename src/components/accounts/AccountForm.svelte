@@ -1,7 +1,7 @@
 <script lang="ts">
     import { untrack } from 'svelte';
-    import type { AccountSummary } from '../../lib/bindings/AccountSummary.generated';
-    import { describeAppError, safeInvoke } from '../../lib/safeInvoke.svelte';
+    import type { AccountSummary } from '../../lib/domain';
+    import { commands, describeAppError, safeInvoke } from '../../lib/safeInvoke.svelte';
 
     interface Props {
         server?: string;
@@ -25,10 +25,9 @@
         preview = null;
         busy = connect ? 'connect' : 'test';
         onBusyChange?.(true);
-        const args = { serverUrl, username, password };
         const result = connect
-            ? await safeInvoke<AccountSummary>('connect_account', args)
-            : await safeInvoke<AccountSummary>('test_account', args);
+            ? await safeInvoke(commands.connectAccount(serverUrl, username, password))
+            : await safeInvoke(commands.testAccount(serverUrl, username, password));
         busy = null;
         onBusyChange?.(false);
         if (result.isErr()) {

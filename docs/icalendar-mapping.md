@@ -43,9 +43,8 @@ Events own `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`,
 ### Preservation and guards
 
 - Unowned properties (`SEQUENCE`, `LOCATION`, `URL`, `CLASS`, `CONTACT`,
-  unknown `X-*`) pass through untouched. Legacy `X-TASKROOT-*` UI/status
-  properties are stripped on write; per-component UI state lives in
-  `ui-state.json`.
+  unknown `X-*`) pass through untouched. Per-component UI state lives in
+  `ui-state.json`, not in `VTODO` `X-*` properties.
 - `VALARM` blocks are skipped when `alarms` did not change. When `alarms`
   changes, only modelled alarms are matched/rewritten/removed; unmodelled
   triggers (such as `-PT45S`) stay byte-identical.

@@ -3,7 +3,7 @@
     import { onMount, untrack } from 'svelte';
     import type { DragState } from './types';
     import { PX_PER_MIN, NUM_DAYS_OPTIONS } from './constants';
-    import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup } from '../../../lib/domain';
+    import type { EventInstance, AppEventFilter, FilterGroup } from '../../../lib/domain';
     import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, isEventReadOnly } from '../../../lib/domain';
     import { addDays, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
     import { bucketEventsByDay } from './bucketing';
@@ -11,8 +11,8 @@
     import DayColumn from './components/DayColumn.svelte';
     import HourGutter from './components/HourGutter.svelte';
     import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
-    import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
-    import { activeCalendars, eventInstances } from '../../../lib/queries';
+    import { commands, useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
     import { createReschedulePrompt } from '../hooks/reschedule.svelte';
@@ -110,10 +110,10 @@
         return { startDate: ymd(dates[0]), endDate: ymd(dates[dates.length - 1]) };
     });
 
-    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
+    const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(dateRange, eventFilters, eventQuery), { debounceMs: 150 });
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 

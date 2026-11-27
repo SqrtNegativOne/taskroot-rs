@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import type { StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
-import { SCREEN_EFFECT } from '../../../lib/ipcEvents';
+const SCREEN_EFFECT = 'screen-effect';
 import { mockTauriInvoke } from '../../../test/tauriMock';
 import {
     StopwatchState,
@@ -67,7 +67,7 @@ beforeEach(async () => {
     await stopwatchState.init();
     flushSync();
     if (wasInBreak) {
-        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT); });
+        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT, undefined); });
     }
     tauri.reset();
     runtime.emit.mockClear();
@@ -140,7 +140,7 @@ describe('stopwatch feedback', () => {
         apply({ phase: 'breaking', breakStartedAt: runtime.now, breakDuration: 120_000 });
 
         expect(playedSounds).toEqual(['/sounds/work_to_break.wav']);
-        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT); });
+        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT, undefined); });
         expect(runtime.emit).toHaveBeenCalledTimes(1);
     });
 
@@ -153,7 +153,7 @@ describe('stopwatch feedback', () => {
         apply({ phase: 'running', workRunningSince: runtime.now });
 
         expect(playedSounds).toEqual(['/sounds/break_to_work.wav']);
-        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT); });
+        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT, undefined); });
     });
 
     it('rings the break-over alarm without an overlay when the break stops', async () => {
@@ -167,7 +167,7 @@ describe('stopwatch feedback', () => {
 
         expect(stopwatchState.currentMs).toBe(0);
         expect(playedSounds).toEqual(['/sounds/wine-glass-alarm.ogg']);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('show_screen_effect', undefined);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('show_screen_effect', undefined, undefined);
         expect(runtime.emit).not.toHaveBeenCalled();
     });
 
@@ -178,7 +178,7 @@ describe('stopwatch feedback', () => {
 
         expect(playedSounds).toEqual([]);
         expect(runtime.emit).not.toHaveBeenCalled();
-        expect(tauri.invoke).not.toHaveBeenCalledWith('show_screen_effect', undefined);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('show_screen_effect', undefined, undefined);
     });
 
     it('does not emit an overlay event when opening the effect window fails', async () => {
@@ -186,7 +186,7 @@ describe('stopwatch feedback', () => {
         apply({ phase: 'breaking', breakStartedAt: runtime.now, breakDuration: 60_000 });
         await vi.dynamicImportSettled();
 
-        expect(tauri.invoke).toHaveBeenCalledWith('show_screen_effect', undefined);
+        expect(tauri.invoke).toHaveBeenCalledWith('show_screen_effect', undefined, undefined);
         expect(playedSounds).toEqual(['/sounds/work_to_break.wav']);
         expect(runtime.emit).not.toHaveBeenCalled();
     });
@@ -211,7 +211,7 @@ describe('stopwatch task selection', () => {
 
         await stopwatchState.startTask({ id: 'proposal', title: 'Write proposal' });
 
-        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined, undefined);
         expect(stopwatchState.phase).toBe('paused');
     });
 
@@ -226,7 +226,7 @@ describe('stopwatch task selection', () => {
 
         await stopwatchState.startTask({ id: 'proposal', title: 'Write proposal' });
 
-        expect(tauri.invoke).toHaveBeenCalledWith('toggle_stopwatch', undefined);
+        expect(tauri.invoke).toHaveBeenCalledWith('toggle_stopwatch', undefined, undefined);
         expect(stopwatchState.phase).toBe('running');
     });
 });

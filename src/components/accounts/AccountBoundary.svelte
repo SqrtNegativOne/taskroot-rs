@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount, type Snippet } from 'svelte';
-    import { listen } from '@tauri-apps/api/event';
-    import { ACCOUNT_CHANGED } from '../../lib/ipcEvents';
+    import { events } from '../../lib/safeInvoke.svelte';
 
     let { children, preserve = false }: { children: Snippet; preserve?: boolean } = $props();
     let generation = $state(0);
@@ -9,7 +8,7 @@
     onMount(() => {
         let disposed = false;
         let unlisten: (() => void) | undefined;
-        void listen(ACCOUNT_CHANGED, () => {
+        void events.accountChanged.listen(() => {
             if (!disposed) generation += 1;
         }).then((stop) => {
             if (disposed) stop();

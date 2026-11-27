@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use serde::Serialize;
-use ts_rs::TS;
+use specta::Type;
 
 use crate::error::AppError;
 use crate::features::calendar::{
@@ -9,11 +9,7 @@ use crate::features::calendar::{
 };
 use crate::ipc::session::store_state;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/QuickCapturePreview.generated.ts"
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct QuickCapturePreview {
     pub title: String,
@@ -33,6 +29,7 @@ pub struct QuickCapturePreview {
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn parse_quick_capture(
     app: tauri::AppHandle,
     text: String,

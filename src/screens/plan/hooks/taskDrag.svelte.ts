@@ -26,7 +26,7 @@ export interface TaskDragControllerOptions {
 export type TaskDragStart = (event: PointerEvent | MouseEvent, task: AppTask) => void;
 
 function blockMinutes(task: AppTask, fallback: number): number {
-    const minutes = task.est !== undefined && task.est > 0 ? task.est : fallback;
+    const minutes = task.est != null && task.est > 0 ? task.est : fallback;
     return clampDuration(minutes);
 }
 

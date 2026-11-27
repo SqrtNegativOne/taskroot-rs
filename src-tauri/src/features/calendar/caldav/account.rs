@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
 use super::model::CalendarInfo;
 use crate::error::AppError;
@@ -22,8 +22,7 @@ pub use storage::{AccountRepository, JsonAccountRepository};
 pub const ACCOUNT_FILE: &str = "account.json";
 
 /// The persisted account. Contains no credentials.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/Account.generated.ts")]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     pub server_url: String,
@@ -33,22 +32,14 @@ pub struct Account {
     pub calendars: Vec<CalendarInfo>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AccountProfile.generated.ts"
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountProfile {
     pub id: String,
     pub account: Account,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/AccountRegistry.generated.ts"
-)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AccountRegistry {
     pub active_id: Option<String>,

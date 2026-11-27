@@ -32,10 +32,14 @@ describe('claimFirstOpenOfDay', () => {
         const claimed = await claimFirstOpenOfDay(new Date(2026, 10, 22, 8, 30));
 
         expect(claimed).toBe(true);
-        expect(tauri.invoke).toHaveBeenCalledWith('set_ui_state', {
-            key: persistedKeys.appLastOpened,
-            value: '2026-11-22',
-        });
+        expect(tauri.invoke).toHaveBeenCalledWith(
+            'set_ui_state',
+            {
+                key: persistedKeys.appLastOpened,
+                value: '2026-11-22',
+            },
+            undefined,
+        );
     });
 
     it('does not claim or write again on a later launch the same day', async () => {
@@ -44,7 +48,7 @@ describe('claimFirstOpenOfDay', () => {
         const claimed = await claimFirstOpenOfDay(new Date(2026, 10, 22, 18, 0));
 
         expect(claimed).toBe(false);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('set_ui_state', expect.anything());
+        expect(tauri.invoke).not.toHaveBeenCalledWith('set_ui_state', expect.anything(), undefined);
     });
 
     it('claims again on the next day', async () => {
@@ -53,10 +57,14 @@ describe('claimFirstOpenOfDay', () => {
         const claimed = await claimFirstOpenOfDay(new Date(2026, 10, 23, 7, 0));
 
         expect(claimed).toBe(true);
-        expect(tauri.invoke).toHaveBeenCalledWith('set_ui_state', {
-            key: persistedKeys.appLastOpened,
-            value: '2026-11-23',
-        });
+        expect(tauri.invoke).toHaveBeenCalledWith(
+            'set_ui_state',
+            {
+                key: persistedKeys.appLastOpened,
+                value: '2026-11-23',
+            },
+            undefined,
+        );
     });
 
     it('leaves the default route in place when the read fails', async () => {
@@ -65,7 +73,7 @@ describe('claimFirstOpenOfDay', () => {
         const claimed = await claimFirstOpenOfDay(new Date(2026, 10, 22, 9, 0));
 
         expect(claimed).toBe(false);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('set_ui_state', expect.anything());
+        expect(tauri.invoke).not.toHaveBeenCalledWith('set_ui_state', expect.anything(), undefined);
     });
 
     it('does not claim the day when recording it fails', async () => {

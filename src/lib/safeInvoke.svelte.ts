@@ -1,59 +1,56 @@
 import { onDestroy } from 'svelte';
-import { invoke, type InvokeArgs } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
-import { STORE_UPDATED } from './ipcEvents';
+import { commands, events } from './bindings/index.generated';
 import { createDebouncer, createStaleGuard } from './asyncState.svelte';
 
+export { commands, events };
 export type { AppError, AppErrorCode } from './errors';
 export { describeAppError, normalizeAppError, unknownAppError } from './errors';
 
 /**
- * A wrapper around Tauri's `invoke` that returns a `ResultAsync` from `neverthrow`.
- * This aligns frontend error handling with the Rust backend's `Result` type.
- *
- * @param cmd The Tauri command name
- * @param args The arguments for the command
- * @returns A ResultAsync containing the success data or the error
+ * Wraps a `tauri-specta` command promise in a `ResultAsync` from `neverthrow`,
+ * aligning frontend error handling with the Rust backend's `Result<T, AppError>`.
  */
-export function safeInvoke<T, E = AppError>(cmd: string, args?: InvokeArgs): ResultAsync<T, E> {
-    return ResultAsync.fromPromise(
-        invoke<T>(cmd, args),
-        (e) => e as E
-    );
+export function safeInvoke<T, E = AppError>(promise: Promise<T>): ResultAsync<T, E> {
+    return ResultAsync.fromPromise(promise, (e) => e as E);
 }
 
-interface UseTauriQueryOptions<T, E> {
-    args?: InvokeArgs;
+interface UseTauriQueryOptions<T, Args extends unknown[], E> {
+    args?: Args;
     debounceMs?: number;
     initialData?: T;
     onError?: (error: E) => void;
 }
 
+export interface AutoQueryResult<T, E = AppError> {
+    readonly data: T | undefined;
+    readonly error: E | undefined;
+    readonly isLoading: boolean;
+}
+
 /**
- * A reactive Svelte 5 Rune wrapper for executing Tauri commands.
+ * A reactive Svelte 5 Rune wrapper for executing a typed `tauri-specta` command.
  * It manages loading, data, and error states automatically. Overlapping
  * executions are stale-guarded: only the most recently requested response is
  * applied. Pass `debounceMs` to coalesce rapid calls (e.g. search keystrokes).
- *
- * @param cmd The Tauri command name
- * @param options Default arguments, debounce window, initial data and an error hook
- * @returns An object with reactive state and an execute function
  */
-export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQueryOptions<T, E> = {}) {
+export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
+    command: (...args: Args) => Promise<T>,
+    options: UseTauriQueryOptions<T, Args, E> = {},
+) {
     let data = $state<T | undefined>(options.initialData);
     let error = $state<E | undefined>(undefined);
     let isLoading = $state(false);
 
     const guard = createStaleGuard();
-    let hasDispatched = false;
-    let lastArgs: InvokeArgs | undefined;
+    let lastArgs: Args | undefined;
     let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
     let resolveScheduled: (() => void) | undefined;
 
     const debouncer = options.debounceMs === undefined
         ? undefined
-        : createDebouncer<InvokeArgs | undefined>((args) => {
+        : createDebouncer<Args>((args) => {
             const resolve = resolveScheduled;
             resolveScheduled = undefined;
             const settled = dispatch(args);
@@ -66,18 +63,16 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
 
     $effect(() => {
         let isCleanedUp = false;
-        
-        void import('@tauri-apps/api/event').then(({ listen }) => {
-            void listen(STORE_UPDATED, () => {
-                if (isCleanedUp) return;
-                const argsToUse = lastArgs ?? options.args;
-                if (argsToUse !== undefined || hasDispatched) {
-                    void dispatch(argsToUse);
-                }
-            }).then((un) => {
-                unlisten = un;
-                if (isCleanedUp) unlisten();
-            });
+
+        void events.storeUpdated.listen(() => {
+            if (isCleanedUp) return;
+            const argsToUse = lastArgs ?? options.args;
+            if (argsToUse !== undefined) {
+                void dispatch(argsToUse);
+            }
+        }).then((un) => {
+            unlisten = un;
+            if (isCleanedUp) unlisten();
         });
 
         return () => {
@@ -93,14 +88,13 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         resolveScheduled = undefined;
     });
 
-    async function dispatch(args: InvokeArgs | undefined): Promise<void> {
+    async function dispatch(args: Args): Promise<void> {
         lastArgs = args;
-        hasDispatched = true;
         const isCurrent = guard.begin();
         isLoading = true;
         error = undefined;
 
-        const result = await safeInvoke<T, E>(cmd, args ?? options.args);
+        const result = await safeInvoke<T, E>(command(...args));
         if (!isCurrent()) return;
 
         result.match(
@@ -111,18 +105,15 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
             (errValue) => {
                 error = errValue;
                 isLoading = false;
-            }
+            },
         );
         if (result.isErr()) options.onError?.(result.error);
     }
 
-    /**
-     * Executes the Tauri command.
-     * @param newArgs Optional overriding arguments
-     */
-    async function execute(newArgs?: InvokeArgs): Promise<void> {
-        lastArgs = newArgs;
-        if (debouncer === undefined) return dispatch(newArgs);
+    async function execute(...args: Args): Promise<void> {
+        const effective = args.length === 0 && options.args !== undefined ? options.args : args;
+        lastArgs = effective;
+        if (debouncer === undefined) return dispatch(effective);
 
         isLoading = true;
         resolveScheduled?.();
@@ -130,7 +121,7 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         const settled = new Promise<void>((resolve) => {
             resolveScheduled = resolve;
         });
-        debouncer.schedule(newArgs);
+        debouncer.schedule(effective);
         return settled;
     }
 
@@ -138,34 +129,49 @@ export function useTauriQuery<T, E = AppError>(cmd: string, options: UseTauriQue
         get data() { return data; },
         get error() { return error; },
         get isLoading() { return isLoading; },
-        execute
+        execute,
     };
 }
 
 /**
- * A wrapper around `useTauriQuery` that automatically executes the query
- * whenever its arguments change. `getArgs` is evaluated inside an `$effect`,
- * meaning Svelte automatically tracks any `$state` variables used inside it.
- *
- * @param cmd The Tauri command name
- * @param getArgs A function returning the arguments for the command
- * @param options Query options
- * @returns An object with reactive state properties
+ * A wrapper around `useTauriQuery` that automatically executes a typed command
+ * whenever its reactive arguments change. `getArgs` is evaluated inside an
+ * `$effect`, so Svelte tracks any `$state` variables read inside it.
  */
-export function useAutoQuery<T, Args extends InvokeArgs = InvokeArgs>(
-    cmd: string,
+export function useAutoQuery<T>(
+    command: () => Promise<T>,
+    options?: Omit<UseTauriQueryOptions<T, [], AppError>, 'args'>,
+): AutoQueryResult<T, AppError>;
+export function useAutoQuery<T, Args extends unknown[]>(
+    command: (...args: Args) => Promise<T>,
     getArgs: () => Args,
-    options: Omit<UseTauriQueryOptions<T, AppError>, 'args'> = {}
-) {
-    const query = useTauriQuery<T>(cmd, options);
+    options?: Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
+): AutoQueryResult<T, AppError>;
+export function useAutoQuery<T, Args extends unknown[]>(
+    command: (...args: Args) => Promise<T>,
+    getArgsOrOptions?: (() => Args) | Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
+    maybeOptions?: Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
+): AutoQueryResult<T, AppError> {
+    if (typeof getArgsOrOptions === 'function') {
+        const query = useTauriQuery<T, Args>(command, maybeOptions ?? {});
+        $effect(() => {
+            void query.execute(...getArgsOrOptions());
+        });
+        return {
+            get data() { return query.data; },
+            get error() { return query.error; },
+            get isLoading() { return query.isLoading; },
+        };
+    }
 
+    const noArgCommand = command as () => Promise<T>;
+    const query = useTauriQuery<T, []>(noArgCommand, getArgsOrOptions ?? {});
     $effect(() => {
-        void query.execute(getArgs());
+        void query.execute();
     });
-
     return {
         get data() { return query.data; },
         get error() { return query.error; },
-        get isLoading() { return query.isLoading; }
+        get isLoading() { return query.isLoading; },
     };
 }

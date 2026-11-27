@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use taskroot_macros::Queryable;
-use ts_rs::TS;
 
 use crate::features::calendar::caldav::model::CalendarComponent;
 
 use super::{Color, CollectionId, EventId, RemoteId, Tag, TaskId, TaskPriority};
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/EventStatus.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum EventStatus {
     Confirmed,
@@ -23,8 +22,7 @@ impl EventStatus {
 }
 
 /// Which occurrences of a recurring event a write applies to.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/EventScope.generated.ts")]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum EventScope {
     /// Only the selected occurrence; every other occurrence is untouched.
@@ -35,13 +33,12 @@ pub enum EventScope {
     All,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../src/lib/bindings/AppCalendar.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppCalendar {
     pub id: CollectionId,
     pub summary: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub color: Option<Color>,
     /// Whether the current account may write to this collection.
     pub writable: bool,
@@ -49,54 +46,53 @@ pub struct AppCalendar {
     pub component: CalendarComponent,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, Queryable)]
-#[ts(export, export_to = "../../src/lib/bindings/AppEvent.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Queryable)]
 #[serde(rename_all = "camelCase")]
 pub struct AppEvent {
     pub id: EventId,
-    #[ts(optional)]
+    #[specta(optional)]
     pub remote_id: Option<RemoteId>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(label = "Calendar")]
     pub remote_collection_id: Option<CollectionId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub task_id: Option<TaskId>,
     #[query(sortable)]
     pub title: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub description: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(sortable, filter_type = "number")]
     pub priority: Option<TaskPriority>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(filter_type = "relation:task_tags")]
     pub tags: Option<Vec<Tag>>,
     pub start_time: String,
     pub end_time: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub rrule: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub exdates: Option<Vec<String>>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub recurring_event_id: Option<EventId>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub original_start_time: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     #[query(filter_type = "enum:EventStatus")]
     pub status: Option<EventStatus>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub updated_at: Option<String>,
     /// The `CREATED` timestamp (falling back to `DTSTAMP`), ISO 8601.
-    #[ts(optional)]
+    #[specta(optional)]
     pub added: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub color: Option<Color>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub etag: Option<String>,
-    #[ts(optional)]
+    #[specta(optional)]
     pub is_all_day: Option<bool>,
     /// IANA timezone of a timed event's wall clock (`None` = UTC).
-    #[ts(optional)]
+    #[specta(optional)]
     pub timezone: Option<String>,
 }
 

@@ -1,9 +1,8 @@
 <script lang="ts">
     import { onMount, untrack } from 'svelte';
     import AccountForm from './AccountForm.svelte';
-    import type { AccountProfile } from '../../lib/bindings/AccountProfile.generated';
-    import type { AccountRegistry } from '../../lib/bindings/AccountRegistry.generated';
-    import { describeAppError, safeInvoke, useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import type { AccountProfile } from '../../lib/domain';
+    import { commands, describeAppError, safeInvoke, useTauriQuery } from '../../lib/safeInvoke.svelte';
     import { store } from '../../lib/store.svelte';
 
     interface Props {
@@ -11,7 +10,7 @@
         showAddInitially?: boolean;
     }
     let { onActivated, showAddInitially = false }: Props = $props();
-    const accounts = useTauriQuery<AccountRegistry>('get_accounts');
+    const accounts = useTauriQuery(commands.getAccounts);
     onMount(() => { void accounts.execute(); });
     let busy = $state<string | null>(null);
     let error = $state<string | null>(null);
@@ -22,7 +21,7 @@
         if (busy) return;
         busy = id;
         error = null;
-        const result = await store.mutate('Could not switch account', async () => safeInvoke<void>('switch_account', { accountId: id }));
+        const result = await store.mutate('Could not switch account', () => safeInvoke(commands.switchAccount(id)));
         busy = null;
         if (result.isErr()) {
             error = describeAppError(result.error);
@@ -37,7 +36,7 @@
         if (busy || !confirm(`Forget ${profile.account.username} on ${profile.account.serverUrl}? This removes its saved password, not its server data.`)) return;
         busy = profile.id;
         error = null;
-        const result = await store.mutate('Could not remove account', async () => safeInvoke<void>('remove_account', { accountId: profile.id }));
+        const result = await store.mutate('Could not remove account', () => safeInvoke(commands.removeAccount(profile.id)));
         busy = null;
         if (result.isErr()) {
             error = describeAppError(result.error);
@@ -51,7 +50,7 @@
         if (busy) return;
         busy = 'disconnect';
         error = null;
-        const result = await store.mutate('Could not disconnect account', async () => safeInvoke<void>('disconnect_account'));
+        const result = await store.mutate('Could not disconnect account', () => safeInvoke(commands.disconnectAccount()));
         busy = null;
         if (result.isErr()) error = describeAppError(result.error);
         else await accounts.execute();

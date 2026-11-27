@@ -54,14 +54,6 @@ const TASK_OWNED: &[&str] = &[
     "CREATED",
     "LAST-MODIFIED",
     "DTSTAMP",
-    "X-NEXT-UP",
-    "X-TASKROOT-STATUS",
-    "X-TASKROOT-DEPENDENCIES",
-    "X-TASKROOT-EST",
-    "X-TASKROOT-CANVAS-X",
-    "X-TASKROOT-CANVAS-Y",
-    "X-TASKROOT-ON-CANVAS",
-    "X-TASKROOT-TABS",
 ];
 
 pub(super) fn is_owned_event_prop(line: &IcalLine<'_>) -> bool {

@@ -61,7 +61,7 @@
     }
 
     function taskColor(marker: TaskDateInstance): string | undefined {
-        return taskCalendars.find((calendar) => calendar.id === marker.calendarId)?.color;
+        return taskCalendars.find((calendar) => calendar.id === marker.calendarId)?.color ?? undefined;
     }
 
     let isToday = $derived(sameDay(cell.date, today));

@@ -1,9 +1,10 @@
-use tauri::Emitter;
+use tauri_specta::Event;
 
 use crate::error::AppError;
 use crate::features::calendar as domain;
 use crate::features::calendar::ops;
 use crate::ipc::session::{client_for, store_state};
+use crate::ipc_events::StopwatchUpdated;
 
 fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
     let Ok(Some(updated)) =
@@ -11,10 +12,11 @@ fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
     else {
         return;
     };
-    let _ = app.emit(crate::ipc_events::STOPWATCH_UPDATED, updated);
+    let _ = StopwatchUpdated(updated).emit(app);
 }
 
 #[tauri::command]
+#[specta::specta]
 #[must_use]
 pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
     domain::parse_sigils(task_name)
@@ -25,6 +27,7 @@ pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
 /// Returns an error when the account/store is unavailable or the `CalDAV` write
 /// fails. The row is never kept locally on failure.
 #[tauri::command]
+#[specta::specta]
 pub async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
@@ -37,6 +40,7 @@ pub async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result
 ///
 /// Returns an error when the task is missing or the `CalDAV` write fails.
 #[tauri::command]
+#[specta::specta]
 pub async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), AppError> {
     let task_id = task.id.0.clone();
     let completed = task.status == Some(domain::AppTaskStatus::Done);
@@ -55,6 +59,7 @@ pub async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result
 ///
 /// Returns an error when the task is missing or the `CalDAV` write fails.
 #[tauri::command]
+#[specta::specta]
 pub async fn toggle_task(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
@@ -84,6 +89,7 @@ pub async fn toggle_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
 ///
 /// Returns an error when the `CalDAV` delete fails.
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
@@ -98,6 +104,7 @@ pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_past_due_task_ids(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
     let state = store_state(&app)?;
     Ok(state.read(ops::past_due_task_ids).await)

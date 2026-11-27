@@ -76,3 +76,7 @@ first-break, first-launcher and first mini-tracker opens manually on Windows.
   `icacls src-tauri\target\debug\taskroot.exe` before taking action.
 - In PowerShell, `-replace` is case-insensitive; use `-creplace` for bulk source
   edits so identifier casing is preserved.
+- `src-tauri/build.rs` attaches the ComCtl32 v6 manifest to Windows MSVC
+  integration-test targets (`cargo:rustc-link-arg-tests`) so
+  `tests/export_bindings.rs` can link `tauri::Wry` without failing at startup
+  with `0xc0000139` (`TaskDialogIndirect`).

@@ -70,7 +70,7 @@ describe('TaskListPane calendar filter', () => {
         taskListState.filters = filters;
         const onAddTask = vi.fn();
         render(TaskListPane, { props: { onAddTask } });
-        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_tasks', { filters, sort: [], query: '' }); });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_tasks', { filters, sort: [], query: '' }, undefined); });
         await fireEvent.click(screen.getByTitle('Add Task'));
         expect(onAddTask).toHaveBeenCalledWith({ status: undefined, priority: 3, tags: [expect.objectContaining({ name: 'work' })] });
     });

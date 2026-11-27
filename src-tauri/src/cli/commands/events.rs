@@ -7,21 +7,22 @@ use crate::features::calendar::{
     AppEvent, CollectionId, EventId, EventScope, EventStatus, FilterGroup,
 };
 
-use super::super::args::Cli;
 use super::super::output::{plus_days, print_json, today};
 use super::super::session::open;
+use super::super::spec::{EventAddArgs, ListEventsArgs};
 use super::{require_component, resolve_list};
 
 /// # Errors
 ///
 /// Propagates session, query, projection and output failures.
-pub async fn list_events(cli: &Cli) -> Result<(), AppError> {
+pub async fn list_events(args: &ListEventsArgs) -> Result<(), AppError> {
     let session = open().await?;
-    let search = cli.option("search").unwrap_or_default();
+    let search = args.search.as_deref().unwrap_or_default();
     let events = session.store.events();
-    let start = cli.option("start").map_or_else(today, ToString::to_string);
-    let end = cli
-        .option("end")
+    let start = args.start.as_deref().map_or_else(today, ToString::to_string);
+    let end = args
+        .end
+        .as_deref()
         .map_or_else(|| plus_days(14), ToString::to_string);
     print_json(&query_event_instances(
         &events,
@@ -35,23 +36,20 @@ pub async fn list_events(cli: &Cli) -> Result<(), AppError> {
 /// # Errors
 ///
 /// Propagates session, option, list-resolution and write failures.
-pub async fn add_event(cli: &Cli) -> Result<(), AppError> {
+pub async fn add_event(args: &EventAddArgs) -> Result<(), AppError> {
     let mut session = open().await?;
     let mut event = AppEvent {
         id: EventId(uuid::Uuid::new_v4().to_string()),
         remote_id: None,
         remote_collection_id: None,
         task_id: None,
-        title: cli.require_option("title")?.to_string(),
-        description: cli.option("notes").map(ToString::to_string),
-        priority: cli
-            .option("priority")
-            .map(super::tasks::parse_priority)
-            .transpose()?,
+        title: args.title.clone(),
+        description: args.notes.clone(),
+        priority: args.priority.map(Into::into),
         tags: None,
-        start_time: cli.require_option("start")?.to_string(),
-        end_time: cli.require_option("end")?.to_string(),
-        rrule: cli.option("rrule").map(ToString::to_string),
+        start_time: args.start.clone(),
+        end_time: args.end.clone(),
+        rrule: args.rrule.clone(),
         exdates: None,
         recurring_event_id: None,
         original_start_time: None,
@@ -60,11 +58,11 @@ pub async fn add_event(cli: &Cli) -> Result<(), AppError> {
         added: None,
         color: None,
         etag: None,
-        is_all_day: Some(cli.has("all-day")),
-        timezone: cli.option("tz").map(ToString::to_string),
+        is_all_day: Some(args.all_day),
+        timezone: args.tz.clone(),
     };
 
-    if let Some(list) = cli.option("list") {
+    if let Some(list) = args.list.as_deref() {
         let (href, component) = resolve_list(&session.store, list)?;
         require_component(component, CalendarComponent::VEvent, list)?;
         event.remote_collection_id = Some(CollectionId(href));
@@ -77,9 +75,8 @@ pub async fn add_event(cli: &Cli) -> Result<(), AppError> {
 /// # Errors
 ///
 /// Propagates session, delete and output failures.
-pub async fn remove_event(cli: &Cli) -> Result<(), AppError> {
+pub async fn remove_event(id: &str) -> Result<(), AppError> {
     let mut session = open().await?;
-    let id = cli.require_positional(1, "<id>")?;
     ops::delete_event(
         &mut session.store,
         &session.client,

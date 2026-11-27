@@ -1,5 +1,5 @@
 import { persistedKeys } from './persisted.svelte';
-import { safeInvoke } from './safeInvoke.svelte';
+import { commands, safeInvoke } from './safeInvoke.svelte';
 import { minutesSinceMidnight, ymd } from './time';
 
 /** Local time (minutes since midnight) the daily startup screen may first open. */
@@ -21,15 +21,11 @@ export async function claimFirstOpenOfDay(now: Date = new Date()): Promise<boole
     if (minutesSinceMidnight(now) < DAILY_STARTUP_OPEN_MINUTES) return false;
 
     const today = ymd(now);
-    const stored = await safeInvoke<string | null>('get_ui_state', {
-        key: persistedKeys.appLastOpened,
-    });
+    const stored = await safeInvoke(commands.getUiState(persistedKeys.appLastOpened));
     if (stored.isErr()) return false;
-    if (!isFirstOpenToday(stored.value, today)) return false;
+    const lastOpened = typeof stored.value === 'string' ? stored.value : null;
+    if (!isFirstOpenToday(lastOpened, today)) return false;
 
-    const saved = await safeInvoke('set_ui_state', {
-        key: persistedKeys.appLastOpened,
-        value: today,
-    });
+    const saved = await safeInvoke(commands.setUiState(persistedKeys.appLastOpened, today));
     return saved.isOk();
 }

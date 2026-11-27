@@ -61,7 +61,7 @@ describe('InspectorPane convert to task', () => {
             expect(invokedArgs('delete_event')).toEqual({
                 id: 'event-1',
                 scope: 'all',
-                occurrenceStart: undefined,
+                occurrenceStart: null,
             });
         });
 

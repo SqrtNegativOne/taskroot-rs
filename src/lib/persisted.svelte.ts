@@ -1,5 +1,6 @@
 import { onDestroy, untrack } from 'svelte';
-import { safeInvoke } from './safeInvoke.svelte';
+import type { JsonValue } from './domain';
+import { commands, safeInvoke } from './safeInvoke.svelte';
 import { createDebouncer, hydrateOnce } from './asyncState.svelte';
 
 /**
@@ -34,7 +35,7 @@ function serialize(value: unknown): string {
 }
 
 function saveSetting(key: string, value: unknown): void {
-    void safeInvoke('set_ui_state', { key, value });
+    void safeInvoke(commands.setUiState(key, value as JsonValue));
 }
 
 interface PersistStateOptions {
@@ -75,7 +76,7 @@ export function persistState<T>(
 
     hydrateOnce(
         async () => {
-            const result = await safeInvoke<unknown>('get_ui_state', { key });
+            const result = await safeInvoke(commands.getUiState(key));
             return result.isOk() ? result.value : null;
         },
         (stored) => {

@@ -340,22 +340,6 @@ fn next_up_writes_in_process_without_a_custom_marker() {
 }
 
 #[test]
-fn writing_a_task_drops_the_retired_next_up_marker() {
-    let raw = fixture(TASK).replace("STATUS:NEEDS-ACTION", "STATUS:NEEDS-ACTION\r\nX-NEXT-UP:TRUE");
-    let task = read_task(&raw);
-    assert_eq!(
-        task.status,
-        Some(AppTaskStatus::Todo),
-        "the reader ignores the retired marker"
-    );
-
-    let written = write_task_resource(&raw, &task).unwrap();
-
-    assert!(!written.contains("X-NEXT-UP"));
-    assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
-}
-
-#[test]
 fn setting_a_date_only_due_date_keeps_the_value_date_form() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
@@ -450,27 +434,6 @@ fn tags_dependencies_and_estimate_round_trip() {
         Some(vec![TaskId::from("a"), TaskId::from("b")])
     );
     assert_eq!(reread.est, Some(25));
-}
-
-#[test]
-fn legacy_taskroot_properties_are_removed_on_the_next_write() {
-    let raw = fixture(TASK).replace(
-        "BEGIN:VTODO\r\n",
-        "BEGIN:VTODO\r\nX-TASKROOT-STATUS:done\r\nX-TASKROOT-DEPENDENCIES:[\"a\"]\r\nX-TASKROOT-EST:25\r\nX-TASKROOT-CANVAS-X:12.5\r\nX-TASKROOT-CANVAS-Y:-3\r\nX-TASKROOT-ON-CANVAS:true\r\nX-TASKROOT-TABS:work\r\n",
-    );
-    let task = read_task(&raw);
-
-    assert_eq!(
-        task.status,
-        Some(AppTaskStatus::Todo),
-        "legacy X-TASKROOT-STATUS is no longer read"
-    );
-    assert_eq!(task.dependencies, None);
-    assert_eq!(task.est, None);
-
-    let written = write_task_resource(&raw, &task).unwrap();
-
-    assert!(!written.contains("X-TASKROOT-"), "{written}");
 }
 
 // ---------------------------------------------------- tasks.org VTODO -------

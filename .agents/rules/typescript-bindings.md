@@ -9,6 +9,8 @@ trigger: model_decision
 Follow [AGENTS.md](../../AGENTS.md#working-rules) and
 [src-tauri/AGENTS.md](../../src-tauri/AGENTS.md#calendar-settings-and-generated-types).
 
-Keep timestamps as JS `number` (`#[ts(type = "number")]`), run
-`cargo nextest run` in `src-tauri/` after `#[derive(TS)]` changes, and commit
-regenerated `src/lib/bindings/*.generated.ts`. Never hand-edit generated files.
+Annotate shared types with `#[derive(specta::Type)]` and IPC handlers with
+`#[specta::specta]`, register commands/events/extra types in
+`src-tauri/src/ipc/mod.rs`, run `cargo nextest run` in `src-tauri/` to
+regenerate `src/lib/bindings/index.generated.ts`, and commit the updated output.
+Never hand-edit generated files.

@@ -8,6 +8,7 @@ use crate::features::calendar::ops;
 /// Returns an error when the account/store is unavailable or the `CalDAV` write
 /// fails. The row is never kept locally on failure.
 #[tauri::command]
+#[specta::specta]
 pub async fn create_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
@@ -20,6 +21,7 @@ pub async fn create_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), 
 ///
 /// Returns an error when the event is missing or the `CalDAV` write fails.
 #[tauri::command]
+#[specta::specta]
 pub async fn update_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
@@ -38,6 +40,7 @@ pub async fn update_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), 
 ///
 /// Returns an error when the `CalDAV` delete or rewrite fails.
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_event(
     app: tauri::AppHandle,
     id: String,
@@ -57,6 +60,7 @@ pub async fn delete_event(
 /// Returns an error when the event is missing, the `CalDAV` write fails, or a
 /// `following` move is requested (unsupported).
 #[tauri::command]
+#[specta::specta]
 pub async fn reschedule_event(
     app: tauri::AppHandle,
     id: String,
@@ -90,6 +94,7 @@ pub async fn reschedule_event(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_active_calendars(
     app: tauri::AppHandle,
 ) -> Result<Vec<AppCalendar>, AppError> {

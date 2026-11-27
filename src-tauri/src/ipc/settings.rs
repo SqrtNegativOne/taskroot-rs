@@ -12,6 +12,7 @@ use crate::settings::{metadata, storage, AppSettings};
 /// The settings screen's tab/section/setting metadata, derived from the
 /// `#[setting(..)]` attributes on [`AppSettings`].
 #[tauri::command]
+#[specta::specta]
 #[must_use]
 pub fn get_settings_schema() -> Value {
     metadata::settings_schema_value()
@@ -22,6 +23,7 @@ pub fn get_settings_schema() -> Value {
 /// Returns an error when the store is not initialized or `settings.json` cannot
 /// be read.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
     let state = store_state(&app)?;
     storage::read_settings(&state).await
@@ -33,6 +35,7 @@ pub async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, AppError
 /// match the field type, and a store error when `settings.json` cannot be
 /// written.
 #[tauri::command]
+#[specta::specta]
 pub async fn update_setting(
     app: tauri::AppHandle,
     key: String,
@@ -50,6 +53,7 @@ pub async fn update_setting(
 /// Returns an error when the store is not initialized or `ui-state.json` cannot
 /// be read.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_ui_state(app: tauri::AppHandle, key: String) -> Result<Value, AppError> {
     let state = store_state(&app)?;
     storage::read_ui_state(&state, &key).await
@@ -62,6 +66,7 @@ pub async fn get_ui_state(app: tauri::AppHandle, key: String) -> Result<Value, A
 /// Returns an error when the store is not initialized or `ui-state.json` cannot
 /// be written.
 #[tauri::command]
+#[specta::specta]
 pub async fn set_ui_state(
     app: tauri::AppHandle,
     key: String,

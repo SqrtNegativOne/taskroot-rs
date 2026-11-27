@@ -1,12 +1,12 @@
 <script lang="ts">
     import { onMount } from 'svelte';
 
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
+    import { commands, events, safeInvoke } from '$lib/safeInvoke.svelte';
 
-    import { STORE_UPDATED } from '$lib/ipcEvents';
     import SettingRow from './SettingRow.svelte';
     import AccountPanel from './AccountPanel.svelte';
     import type { AppSettings, SettingsSchema, SettingValue } from './schema';
+    import { isSettingsSchema } from './schema';
     import type { AppCalendar } from '$lib/domain';
 
     const ACCOUNT_TAB_ID = 'account';
@@ -26,7 +26,7 @@
     }
 
     async function loadCalendars(): Promise<void> {
-        const result = await safeInvoke<AppCalendar[]>('get_active_calendars', {});
+        const result = await safeInvoke(commands.getActiveCalendars());
         result.match(
             (loaded) => {
                 calendars = loaded;
@@ -36,39 +36,38 @@
     }
 
     async function loadSchema(): Promise<void> {
-        const result = await safeInvoke<SettingsSchema>('get_settings_schema');
+        const result = await safeInvoke(commands.getSettingsSchema());
         result.match(
             (loaded) => {
-                schema = loaded;
+                if (isSettingsSchema(loaded)) schema = loaded;
             },
             (error) => console.error('Failed to load schema:', error)
         );
     }
 
     async function loadSettings(): Promise<void> {
-        const result = await safeInvoke<AppSettings>('get_settings');
+        const result = await safeInvoke(commands.getSettings());
         result.match(
-            (loaded) => (settings = loaded),
+            (loaded) => (settings = loaded as AppSettings),
             (error) => console.error('Failed to load settings:', error)
         );
     }
 
     async function handleSettingChange(id: string, value: SettingValue): Promise<void> {
         saveError = null;
-        const result = await safeInvoke('update_setting', { key: id, value });
+        const result = await safeInvoke(commands.updateSetting(id, value));
         if (result.isErr()) {
             console.error(`Failed to update setting ${id}:`, result.error);
             saveError = `Could not save "${id}". The change was discarded.`;
             return;
         }
         if (id === 'mini_tracker_enabled' && typeof value === 'boolean') {
-            const visibility = await safeInvoke('set_minitracker_visible', { visible: value });
+            const visibility = await safeInvoke(commands.setMinitrackerVisible(value));
             if (visibility.isErr()) {
                 saveError = 'Could not update the mini tracker window.';
             }
         }
-        const { emit } = await import('@tauri-apps/api/event');
-        void emit(STORE_UPDATED);
+        void events.storeUpdated.emit();
         await loadSettings();
     }
 </script>

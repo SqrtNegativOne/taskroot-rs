@@ -56,16 +56,10 @@ impl AccountRepository for JsonAccountRepository {
 
     fn write(&self, registry: &AccountRegistry) -> Result<(), AppError> {
         validate(registry)?;
-        let path = account_path(&self.dir);
-        let temp = self.dir.join("account.json.tmp");
-        let json = serde_json::to_vec_pretty(registry)
-            .map_err(|error| AppError::Store(format!("Could not encode accounts: {error}")))?;
-        std::fs::write(&temp, json)
-            .map_err(|error| AppError::Store(format!("Could not write account file: {error}")))?;
-        std::fs::rename(&temp, &path).map_err(|error| {
-            let _ = std::fs::remove_file(&temp);
-            AppError::Store(format!("Could not replace account file: {error}"))
-        })
+        crate::features::calendar::store::persist::write_json_pretty(
+            &account_path(&self.dir),
+            registry,
+        )
     }
 }
 

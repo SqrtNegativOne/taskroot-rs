@@ -1,4 +1,4 @@
-import { safeInvoke } from '../../lib/safeInvoke.svelte';
+import { commands, safeInvoke } from '../../lib/safeInvoke.svelte';
 import { hydrateOnce } from '../../lib/asyncState.svelte';
 import { persistState } from '../../lib/persisted.svelte';
 
@@ -25,7 +25,7 @@ async function readSidebarValue<T>(
     key: string,
     isValid: (value: unknown) => value is T,
 ): Promise<T | undefined> {
-    const result = await safeInvoke<unknown>('get_ui_state', { key });
+    const result = await safeInvoke(commands.getUiState(key));
     if (result.isErr()) return undefined;
     return isValid(result.value) ? result.value : undefined;
 }
@@ -95,5 +95,5 @@ export function createSidebarState(): SidebarState {
 
 /** Persist the dragged tab position; called once when a drag ends. */
 export function saveTabTop(tabTop: number): void {
-    void safeInvoke('set_ui_state', { key: sidebarUiKeys.tabTop, value: tabTop });
+    void safeInvoke(commands.setUiState(sidebarUiKeys.tabTop, tabTop));
 }

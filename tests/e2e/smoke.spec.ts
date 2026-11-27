@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import type { AppSettings } from '../../src/lib/bindings/AppSettings.generated';
+import type { AppSettings } from '../../src/lib/domain';
 
 const settings: AppSettings = {
   colour_scheme: 'slate',

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { EventCallback } from '@tauri-apps/api/event';
 import type { AppTask, StopwatchState as StopwatchSnapshot } from '../../../lib/domain';
-import { STOPWATCH_UPDATED, STORE_UPDATED } from '../../../lib/ipcEvents';
+const STOPWATCH_UPDATED = 'stopwatch-updated';
+const STORE_UPDATED = 'store-updated';
 import { store } from '../../../lib/store.svelte';
 import { mockTauriInvoke } from '../../../test/tauriMock';
 import { stopwatchState } from './engine.svelte';
@@ -170,7 +171,7 @@ describe('Do screen clock shortcuts', () => {
 
         expect(allowedDefault).toBe(true);
         expect(stopwatchState.running).toBe(false);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined, undefined);
     });
 
     it('toggles a timed pause and adjusts its duration with arrow keys', async () => {
@@ -181,19 +182,19 @@ describe('Do screen clock shortcuts', () => {
 
         expect(await fireEvent.keyDown(window, { code: 'KeyP' })).toBe(false);
         await waitFor(() => { expect(stopwatchState.isPaused).toBe(true); });
-        expect(tauri.invoke).toHaveBeenCalledWith('toggle_pause', { pauseMinutes: 10 });
+        expect(tauri.invoke).toHaveBeenCalledWith('toggle_pause', { pauseMinutes: 10 }, undefined);
 
         expect(await fireEvent.keyDown(window, { code: 'ArrowRight' })).toBe(false);
-        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: 1 });
+        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: 1 }, undefined);
         expect(await fireEvent.keyDown(window, { code: 'ArrowDown' })).toBe(false);
-        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: -1 });
+        expect(tauri.invoke).toHaveBeenCalledWith('adjust_pause', { deltaMinutes: -1 }, undefined);
     });
 
     it('leaves arrow keys alone outside a timed pause', async () => {
         render(Stopwatch);
 
         expect(await fireEvent.keyDown(window, { code: 'ArrowUp' })).toBe(true);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('adjust_pause', expect.anything());
+        expect(tauri.invoke).not.toHaveBeenCalledWith('adjust_pause', expect.anything(), undefined);
     });
 
     it('resets through Ctrl+R and stops handling shortcuts after unmount', async () => {
@@ -207,6 +208,6 @@ describe('Do screen clock shortcuts', () => {
         unmount();
         expect(await fireEvent.keyDown(window, { code: 'Space' })).toBe(true);
         expect(stopwatchState.running).toBe(false);
-        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('toggle_stopwatch', undefined, undefined);
     });
 });

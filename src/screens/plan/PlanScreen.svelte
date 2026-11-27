@@ -1,11 +1,10 @@
 <script lang="ts">
     import { store } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
-    import type { AppTask, AppCalendar, EventInstance } from '../../lib/domain';
+    import type { AppTask, EventInstance } from '../../lib/domain';
     import { buildNewEvent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { activeCalendars } from '../../lib/queries';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import type { InspectorTarget } from '../../components/inspector-pane/state.svelte';
 
     import SplitPane from '../../components/SplitPane.svelte';
@@ -38,7 +37,7 @@
 
     let inspectorState = $state<InspectorTarget | undefined>(undefined);
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     let defaultTaskCollection = $derived(
         calendarsQuery.data?.find((c) => c.component === 'VTODO' && c.writable)?.id

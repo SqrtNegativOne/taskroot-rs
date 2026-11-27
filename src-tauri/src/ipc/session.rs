@@ -2,10 +2,12 @@
 
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
+use tauri_specta::Event;
 
 use crate::error::AppError;
 use crate::features::calendar::{account::ClientLease, StoreState};
+use crate::ipc_events::StoreUpdated;
 
 pub(crate) use crate::features::calendar::app_calendar;
 
@@ -48,7 +50,7 @@ pub(crate) async fn load_all(app: &AppHandle) -> Result<(), AppError> {
     let state = store_state(app)?;
     super::accounts::service(app)?.refresh(&state).await?;
 
-    let _ = app.emit(crate::ipc_events::STORE_UPDATED, ());
+    let _ = StoreUpdated.emit(app);
     Ok(())
 }
 

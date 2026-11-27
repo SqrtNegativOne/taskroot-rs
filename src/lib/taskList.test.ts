@@ -30,7 +30,7 @@ describe('shared task-list filters', () => {
     it('hydrates a nested tree and sends it unchanged to list queries', async () => {
         tauri.stubCommand('get_ui_state', args => args?.key === persistedKeys.taskListFilters ? nested : []);
         render(TaskListState);
-        await waitFor(() => { expect(taskListQueryArgs().filters).toEqual(nested); });
+        await waitFor(() => { expect(taskListQueryArgs()[0]).toEqual(nested); });
         expect(tauri.invoke.mock.calls.filter(([command]) => command === 'set_ui_state')).toHaveLength(0);
     });
 
@@ -46,13 +46,13 @@ describe('shared task-list filters', () => {
         await waitFor(() => { expect(stored.get(persistedKeys.taskListFilters)).toEqual(nested); });
         taskListState.filters = defaultTaskListFilters();
         await reloadTaskListState();
-        expect(taskListQueryArgs().filters).toEqual(nested);
+        expect(taskListQueryArgs()[0]).toEqual(nested);
     });
 
     it('rejects an obsolete flat array during hydration and reload', async () => {
         tauri.stubCommand('get_ui_state', args => args?.key === persistedKeys.taskListFilters ? [{ column: 'status', operator: 'is', value: ['done'] }] : []);
         render(TaskListState);
-        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('get_ui_state', { key: persistedKeys.taskListFilters }); });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('get_ui_state', { key: persistedKeys.taskListFilters }, undefined); });
         expect(taskListState.filters).toEqual(defaultTaskListFilters());
         taskListState.filters = nested;
         await reloadTaskListState();

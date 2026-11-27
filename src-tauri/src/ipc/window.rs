@@ -4,6 +4,7 @@ use crate::error::AppError;
 use crate::platform;
 
 #[tauri::command]
+#[specta::specta]
 pub fn window_restore_main(app: tauri::AppHandle) {
     platform::restore_main(&app);
 }
@@ -12,6 +13,7 @@ pub fn window_restore_main(app: tauri::AppHandle) {
 ///
 /// Returns an internal error if the mini tracker cannot be created or shown.
 #[tauri::command]
+#[specta::specta]
 pub async fn set_minitracker_visible(
     app: tauri::AppHandle,
     visible: bool,
@@ -22,6 +24,7 @@ pub async fn set_minitracker_visible(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn hide_launcher(app: tauri::AppHandle) {
     platform::hide_launcher(&app).await;
 }
@@ -30,6 +33,7 @@ pub async fn hide_launcher(app: tauri::AppHandle) {
 ///
 /// Returns an internal error if the screen-effect overlay cannot be created or shown.
 #[tauri::command]
+#[specta::specta]
 pub async fn show_screen_effect(app: tauri::AppHandle) -> Result<(), AppError> {
     platform::show_screen_effect(&app)
         .await
@@ -37,11 +41,13 @@ pub async fn show_screen_effect(app: tauri::AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn hide_screen_effect(app: tauri::AppHandle) {
     platform::hide_screen_effect(&app).await;
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn quit_app(app: tauri::AppHandle) {
     platform::quit_app(&app);
 }
@@ -50,6 +56,7 @@ pub fn quit_app(app: tauri::AppHandle) {
 ///
 /// Returns an internal error if the launcher cannot be created or shown.
 #[tauri::command]
+#[specta::specta]
 pub async fn toggle_launcher(app: tauri::AppHandle) -> Result<(), AppError> {
     platform::toggle_launcher_window(&app)
         .await
@@ -57,6 +64,7 @@ pub async fn toggle_launcher(app: tauri::AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn resize_launcher(app: tauri::AppHandle, width: f64, height: f64) {
     platform::resize_launcher(&app, width, height);
 }

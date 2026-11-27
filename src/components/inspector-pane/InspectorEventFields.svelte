@@ -1,10 +1,8 @@
 <script lang="ts">
-    import type { AppCalendar, AppEvent, AppTask, EventStatus } from '../../lib/domain';
-    import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
+    import type { AppEvent, AppTask, EventStatus, TaskPriority } from '../../lib/domain';
     import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
     import { resolveEventColor } from '../../lib/eventColor';
-    import { activeCalendars } from '../../lib/queries';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { getFormattedTime } from './format';
     import {
         eventEndDate,
@@ -42,7 +40,7 @@
 
     const EVENT_STATUSES = ['confirmed', 'tentative', 'cancelled'] as const;
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
 
     let calendarOptions = $derived.by(() => {

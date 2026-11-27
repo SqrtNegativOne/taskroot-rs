@@ -7,6 +7,7 @@ use tauri::AppHandle;
 /// # Errors
 /// Returns account, MKCALENDAR or discovery failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn create_calendar(
     app: AppHandle,
     display_name: String,
@@ -22,6 +23,7 @@ pub async fn create_calendar(
 /// # Errors
 /// Returns unknown/read-only collection or PROPPATCH failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn rename_calendar(
     app: AppHandle,
     href: String,
@@ -37,6 +39,7 @@ pub async fn rename_calendar(
 /// # Errors
 /// Returns invalid-color, read-only collection or PROPPATCH failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn set_calendar_color(
     app: AppHandle,
     href: String,
@@ -52,6 +55,7 @@ pub async fn set_calendar_color(
 /// # Errors
 /// Returns unknown/read-only collection or DELETE failures.
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_calendar(app: AppHandle, href: String) -> Result<(), AppError> {
     let dir = crate::platform::app_data_dir(&app)?;
     let client = super::session::client_for(&app).await?;

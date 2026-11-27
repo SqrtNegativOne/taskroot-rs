@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import AccountBoundaryHarness from '../../test/AccountBoundaryHarness.svelte';
-import { ACCOUNT_CHANGED } from '../../lib/ipcEvents';
+const ACCOUNT_CHANGED = 'account-changed';
 
-const events = vi.hoisted(() => new Map<string, () => void>());
+const events = vi.hoisted(() => new Map<string, (event: { event: string; id: number; payload: null }) => void>());
 vi.mock('@tauri-apps/api/event', () => ({
-    listen: async (name: string, callback: () => void) => {
+    listen: async (name: string, callback: (event: { event: string; id: number; payload: null }) => void) => {
         events.set(name, callback);
         return () => events.delete(name);
     },
@@ -17,7 +17,7 @@ describe('account boundary', () => {
         render(AccountBoundaryHarness);
         await waitFor(() => expect(events.has(ACCOUNT_CHANGED)).toBe(true));
         await fireEvent.input(screen.getByLabelText('Draft'), { target: { value: 'old account draft' } });
-        events.get(ACCOUNT_CHANGED)?.();
+        events.get(ACCOUNT_CHANGED)?.({ event: ACCOUNT_CHANGED, id: 1, payload: null });
         await waitFor(() => expect((screen.getByLabelText('Draft') as HTMLInputElement).value).toBe(''));
     });
 
@@ -26,7 +26,7 @@ describe('account boundary', () => {
         await waitFor(() => expect(events.has(ACCOUNT_CHANGED)).toBe(true));
         const input = screen.getByLabelText('Draft') as HTMLInputElement;
         await fireEvent.input(input, { target: { value: 'settings state' } });
-        events.get(ACCOUNT_CHANGED)?.();
+        events.get(ACCOUNT_CHANGED)?.({ event: ACCOUNT_CHANGED, id: 1, payload: null });
         await waitFor(() => expect(screen.getByLabelText('Draft')).toBe(input));
         expect(input.value).toBe('settings state');
     });

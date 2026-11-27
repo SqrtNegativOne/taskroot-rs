@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
     import { store } from '../../lib/store.svelte';
-    import { safeInvoke, useAutoQuery, useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, safeInvoke, useAutoQuery, useTauriQuery } from '../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
@@ -88,7 +88,7 @@
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
     $effect(() => {
-        if (store.settings) baseAlpha = store.settings.tracker_opacity / 100;
+        if (store.settings?.tracker_opacity !== undefined) baseAlpha = store.settings.tracker_opacity / 100;
     });
 
     const effectiveOpacity = $derived.by(() => {
@@ -103,7 +103,7 @@
         if (percentage === Math.round(baseAlpha * 100)) return;
         baseAlpha = percentage / 100;
         if (store.settings) store.settings.tracker_opacity = percentage;
-        void safeInvoke('update_setting', { key: 'tracker_opacity', value: percentage });
+        void safeInvoke(commands.updateSetting('tracker_opacity', percentage));
     }
 
     function handleWheel(event: WheelEvent): void {
@@ -112,14 +112,14 @@
         adjustOpacity(event.deltaY < 0 ? 0.05 : -0.05);
     }
 
-    let allTasksQuery = useTauriQuery<AppTask[]>('query_tasks');
+    let allTasksQuery = useTauriQuery(commands.queryTasks);
     let allTasks = $derived(allTasksQuery.data ?? []);
 
     $effect(() => {
-        void allTasksQuery.execute(allTasksQueryArgs());
+        void allTasksQuery.execute(...allTasksQueryArgs());
     });
 
-    let listQuery = useAutoQuery<AppTask[]>('query_tasks', () => taskListQueryArgs(), { debounceMs: 150 });
+    let listQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(listQuery.data ?? []);
 
     let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
@@ -221,7 +221,7 @@
             isDimmed = !isDimmed;
             return;
         }
-        await safeInvoke('window_restore_main');
+        await safeInvoke(commands.windowRestoreMain());
     }
 
     function handleEscape(e: KeyboardEvent): boolean {
@@ -333,7 +333,7 @@
 
     const handleDoubleClick = async (e: MouseEvent) => {
         if (isInteractiveTarget(e.target)) return;
-        await safeInvoke('window_restore_main');
+        await safeInvoke(commands.windowRestoreMain());
     };
 </script>
 

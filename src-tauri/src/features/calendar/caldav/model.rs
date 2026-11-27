@@ -5,14 +5,10 @@
 //! whether the current user may write to it.
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
 /// The component kind stored by a calendar collection.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/CalendarComponent.generated.ts"
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum CalendarComponent {
     #[default]
     #[serde(rename = "VEVENT")]
@@ -39,14 +35,13 @@ impl std::fmt::Display for CalendarComponent {
 }
 
 /// One calendar collection discovered on the server.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/CalendarInfo.generated.ts")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CalendarInfo {
     /// Absolute path on the server, e.g. `/me/2f07…/`.
     pub href: String,
     pub display_name: String,
-    #[ts(optional)]
+    #[specta(optional)]
     pub color: Option<String>,
     pub component: CalendarComponent,
     pub writable: bool,

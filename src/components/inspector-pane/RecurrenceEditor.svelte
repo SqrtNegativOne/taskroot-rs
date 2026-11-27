@@ -8,7 +8,7 @@
     } from './recurrence';
 
     interface Props {
-        value?: string;
+        value?: string | null;
         onchange: (value: string | undefined) => void;
         disabled?: boolean;
     }
@@ -16,7 +16,7 @@
     let { value, onchange, disabled = false }: Props = $props();
 
     let advanced = $state(false);
-    let preset = $derived(presetForRule(value));
+    let preset = $derived(presetForRule(value ?? undefined));
 
     function isRecurrencePreset(candidate: string): candidate is RecurrencePreset {
         return RECURRENCE_OPTIONS.some((option) => option.value === candidate);

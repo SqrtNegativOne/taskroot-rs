@@ -27,8 +27,11 @@ writes and no local calendar database, offline queue or background sync.
 - **Typed IPC errors**: fallible commands return `Result<T, AppError>`
   (`{code, message}`, mirrored in `src/lib/errors.ts`). Use `not-ready` only for
   uninitialized managed state, never for missing accounts or server failures.
-- **Event constants**: import IPC event names from `src-tauri/src/ipc_events.rs`
-  and `src/lib/ipcEvents.ts`, never inline strings.
+- **Typed IPC commands & events**: commands and events are registered once in
+  `src-tauri/src/ipc/mod.rs` (`tauri-specta`) and exported into
+  `src/lib/bindings/index.generated.ts`. Emit typed `src-tauri/src/ipc_events.rs`
+  events in Rust and use generated `commands.*` / `events.*` on the frontend;
+  never inline command or event strings.
 - **ICS preservation**: calendar edits merge owned properties into fetched raw
   ICS bytes and `PUT` conditionally (`If-Match` / `If-None-Match: *`). Never
   re-serialize a DTO into an existing resource. See [CalDAV](docs/caldav.md).

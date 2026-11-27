@@ -1,5 +1,4 @@
-import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
-import type { TaskPriority } from '../bindings/TaskPriority.generated';
+import type { AppTaskStatus, TaskPriority } from '../bindings/index.generated';
 
 const TASK_STATUSES: readonly string[] = ['todo', 'next-up', 'done', 'cancelled'];
 

@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
-    import { SCREEN_EFFECT } from '$lib/ipcEvents';
+    import type { UnlistenFn } from '@tauri-apps/api/event';
+    import { commands, events, safeInvoke } from '$lib/safeInvoke.svelte';
 
     const FRAME_MS = 16;
     const FLASH_MS = 80;
@@ -103,7 +102,7 @@
 
         if (token !== animationToken) return;
         opacity = 1;
-        await safeInvoke('hide_screen_effect');
+        await safeInvoke(commands.hideScreenEffect());
     }
 
     let unlisten: UnlistenFn | undefined;
@@ -111,7 +110,7 @@
     onMount(() => {
         if (!canvas) return;
         ctx = canvas.getContext('2d');
-        void listen(SCREEN_EFFECT, () => {
+        void events.screenEffect.listen(() => {
             animationToken += 1;
             void runEffect(animationToken);
         }).then((un) => {

@@ -1,6 +1,4 @@
-import type { AppTaskStatus } from '../bindings/AppTaskStatus.generated';
-import type { TaskPriority } from '../bindings/TaskPriority.generated';
-import type { FilterGroup } from '../bindings/FilterGroup.generated';
+import type { AppTaskStatus, FilterGroup, TaskPriority } from '../bindings/index.generated';
 import { emptyFilterGroup, isValueFreeOperator } from './filterTree';
 import { isAppTaskStatus } from './models';
 

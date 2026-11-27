@@ -7,38 +7,27 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
 use crate::error::AppError;
 
 use super::state::StopwatchLabelSource;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/StopwatchHistoryKind.generated.ts"
-)]
 pub enum StopwatchHistoryKind {
     Work,
     Break,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/StopwatchHistoryEntry.generated.ts"
-)]
 pub struct StopwatchHistoryEntry {
     pub kind: StopwatchHistoryKind,
     pub label: String,
     pub label_source: StopwatchLabelSource,
-    #[ts(type = "number")]
     pub started_at: u64,
-    #[ts(type = "number")]
     pub ended_at: u64,
-    #[ts(type = "number")]
     pub duration_ms: u64,
 }
 

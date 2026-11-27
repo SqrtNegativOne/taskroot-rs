@@ -57,9 +57,13 @@ store.loaded = false;
         await fireEvent.click(circle!);
 
         await waitFor(() => {
-            expect(tauri.invoke).toHaveBeenCalledWith('update_task', {
-                task: { ...task, status: 'done' },
-            });
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'update_task',
+                {
+                    task: { ...task, status: 'done' },
+                },
+                undefined,
+            );
         });
     });
 

@@ -3,7 +3,7 @@
     import FloatingMenu from './FloatingMenu.svelte';
     import FilterGroupEditor from './filters/FilterGroupEditor.svelte';
     import { useTagOptions } from '../lib/filterOptions.svelte';
-    import type { FilterGroup } from '../lib/bindings/FilterGroup.generated';
+    import type { FilterGroup } from '../lib/domain';
     import { countFilters, emptyFilterGroup, type FilterColumn, type FilterCondition, type FilterOption } from '../lib/domain/filterTree';
 
     let {

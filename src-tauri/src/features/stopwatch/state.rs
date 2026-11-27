@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use specta::Type;
 
 use crate::error::AppError;
 
@@ -22,12 +22,8 @@ pub const LONG_BREAK_THRESHOLD_MS: u64 = 50 * 60 * 1_000;
 
 const MILLIS_PER_MINUTE: u64 = 60_000;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/StopwatchPhase.generated.ts"
-)]
 pub enum StopwatchPhase {
     #[default]
     Paused,
@@ -36,12 +32,8 @@ pub enum StopwatchPhase {
     Stopped,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/StopwatchLabelSource.generated.ts"
-)]
 pub enum StopwatchLabelSource {
     #[default]
     Unset,
@@ -49,28 +41,19 @@ pub enum StopwatchLabelSource {
     Custom,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/StopwatchState.generated.ts"
-)]
 pub struct StopwatchState {
     pub phase: StopwatchPhase,
     /// Work accumulated in the current session, excluding the live run below.
-    #[ts(type = "number")]
     pub work_elapsed: u64,
     /// Start of the live work run, when work is actually ticking.
-    #[ts(type = "number | null")]
     pub work_running_since: Option<u64>,
     /// Total length of the current break countdown.
-    #[ts(type = "number")]
     pub break_duration: u64,
     /// Start of the current break countdown.
-    #[ts(type = "number | null")]
     pub break_started_at: Option<u64>,
     /// Timed pause (`P`); work stops ticking until this instant.
-    #[ts(type = "number | null")]
     pub paused_until: Option<u64>,
     /// Local focus pointer: the task the user is tracking, if any. The task's
     /// own status is independent and never stored in iCalendar.

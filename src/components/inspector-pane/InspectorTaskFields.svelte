@@ -1,14 +1,12 @@
 <script lang="ts">
     import type {
-        AppCalendar,
         AppTask,
         AppTaskStatus,
         TaskAlarmTrigger,
+        TaskPriority,
     } from '../../lib/domain';
-    import type { TaskPriority } from '../../lib/bindings/TaskPriority.generated';
     import { calendarsForComponent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
-    import { activeCalendars } from '../../lib/queries';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { formatTimestamp, getFormattedDate, getFormattedTime, withDate, withTime } from './format';
     import NumberInput from '../inputs/NumberInput.svelte';
     import SelectInput from '../inputs/SelectInput.svelte';
@@ -29,7 +27,7 @@
 
     let { task, tasks, updateTask, readOnly = false, onDelete }: Props = $props();
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     let listOptions = $derived.by(() => {
         const todos = calendarsForComponent(calendarsQuery.data ?? [], 'VTODO');

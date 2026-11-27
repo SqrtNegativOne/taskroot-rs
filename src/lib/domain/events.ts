@@ -1,6 +1,4 @@
-import type { AppCalendar } from '../bindings/AppCalendar.generated';
-import type { AppEvent } from '../bindings/AppEvent.generated';
-import type { CalendarComponent } from '../bindings/CalendarComponent.generated';
+import type { AppCalendar, AppEvent, CalendarComponent } from '../bindings/index.generated';
 import { addDays, ymd } from '../time';
 
 const MS_PER_MINUTE = 60_000;
@@ -9,7 +7,7 @@ const DEFAULT_EVENT_MINUTES = 60;
 export type CalendarLike = AppCalendar | {
     readonly id: string;
     readonly summary?: string;
-    readonly color?: string;
+    readonly color?: string | null;
     readonly backgroundColor?: string;
     readonly writable?: boolean;
     readonly component?: CalendarComponent;
@@ -26,7 +24,7 @@ export interface NewEventOptions {
 }
 
 function resolveEventCalendar(
-    ev: { readonly remoteCollectionId?: string },
+    ev: { readonly remoteCollectionId?: string | null },
     calendars: readonly CalendarLike[] = [],
 ): CalendarLike | undefined {
     if (calendars.length === 0) {
@@ -117,7 +115,7 @@ export function buildNewEvent(
  * (`calendarId`). Events with no calendar are locally authored and editable.
  */
 export function isEventReadOnly(
-    ev: { readonly remoteCollectionId?: string; readonly calendarId?: string },
+    ev: { readonly remoteCollectionId?: string | null; readonly calendarId?: string | null },
     calendars: readonly CalendarLike[] = [],
 ): boolean {
     const collectionId = ev.remoteCollectionId ?? ev.calendarId;

@@ -1,13 +1,10 @@
 <script lang="ts">
     import CalendarManager from '../../components/CalendarManager.svelte';
     import AccountProfiles from '../../components/accounts/AccountProfiles.svelte';
-    import type { AccountRegistry } from '../../lib/bindings/AccountRegistry.generated';
-    import type { AppCalendar } from '../../lib/domain';
-    import { activeCalendars } from '../../lib/queries';
-    import { useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
 
-    const accounts = useAutoQuery<AccountRegistry>('get_accounts', () => ({}));
-    const calendars = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const accounts = useAutoQuery(commands.getAccounts);
+    const calendars = useAutoQuery(commands.getActiveCalendars);
 </script>
 
 <AccountProfiles />

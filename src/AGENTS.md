@@ -21,8 +21,9 @@ affected area.
 
 ## State, queries and errors
 
-- Use `safeInvoke`/`useTauriQuery`/`useAutoQuery` (`lib/safeInvoke.svelte.ts`)
-  and `neverthrow` for expected IPC failures, not `try/catch`.
+- Use `commands`/`events`/`safeInvoke`/`useTauriQuery`/`useAutoQuery`
+  (`lib/safeInvoke.svelte.ts`) and `neverthrow` for expected IPC failures, not
+  raw `invoke` strings or `try/catch`.
 - Wrap user-triggered calendar mutations in `store.mutate(operation, action)`.
   Recoverable errors go to `notifyError` toasts; `store.error` is for fatal
   bootstrap/load failures only.

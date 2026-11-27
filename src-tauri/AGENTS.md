@@ -31,8 +31,9 @@ relative to `src-tauri/src/`. Read the affected reference doc before editing:
   serialize create/show/hide/toggle with `platform::window_lifecycle`. Never
   build WebView2 windows inside synchronous IPC commands or event callbacks; see
   [lazy window creation](../docs/windows-development.md#lazy-window-creation).
-- Register every command in `bootstrap/mod.rs` and review `ipc/tests.rs`
-  coverage; see [IPC source contract](../docs/testing.md#ipc-source-contract).
+- Annotate every command with `#[tauri::command]` + `#[specta::specta]` and
+  register it in `ipc::specta_builder()` (`ipc/mod.rs`); see
+  [testing](../docs/testing.md#ipc-bindings-and-contracts).
 
 ## Calendar, settings and generated types
 
@@ -47,8 +48,10 @@ relative to `src-tauri/src/`. Read the affected reference doc before editing:
 - Keep loading outside the store lock and apply under `Store::revision()`; every
   resource or collection mutation must bump the revision.
 - Follow [settings](../docs/settings.md) for `AppSettings` and `#[setting(..)]`.
-- For shared `#[derive(TS)]` types, keep timestamps as `#[ts(type = "number")]`
-  (not `bigint`) and regenerate bindings with `cargo nextest run`.
+- For shared `#[derive(specta::Type)]` types, timestamps export as JS `number`
+  (via `specta_builder().dangerously_cast_bigints_to_number()`) and bindings
+  regenerate into `src/lib/bindings/index.generated.ts` during
+  `cargo nextest run`.
 
 Write backend tests first using shared `test_support` fixtures, then run the
 backend checks in [AGENTS.md](../AGENTS.md#required-checks).

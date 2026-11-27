@@ -89,7 +89,7 @@ describe('InspectorPane recurring delete', () => {
 
         expect(screen.queryByRole('dialog')).toBeNull();
         await waitFor(() => {
-            expect(invokedArgs('delete_event')).toEqual({ id: 'single', scope: 'all', occurrenceStart: undefined });
+            expect(invokedArgs('delete_event')).toEqual({ id: 'single', scope: 'all', occurrenceStart: null });
             expect(onClose).toHaveBeenCalledOnce();
         });
     });

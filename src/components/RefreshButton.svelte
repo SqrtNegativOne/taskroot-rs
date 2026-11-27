@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
+    import { commands, safeInvoke } from '$lib/safeInvoke.svelte';
     import { describeAppError } from '$lib/errors';
     import { notifyError } from '$lib/toast';
 
@@ -8,7 +8,7 @@
     async function refresh(): Promise<void> {
         if (isRefreshing) return;
         isRefreshing = true;
-        const result = await safeInvoke('refresh_data');
+        const result = await safeInvoke(commands.refreshData());
         isRefreshing = false;
         if (result.isErr()) {
             notifyError(`Refresh failed: ${describeAppError(result.error)}`);

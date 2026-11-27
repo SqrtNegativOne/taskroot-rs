@@ -7,10 +7,9 @@
     import { resolve } from '$app/paths';
     import { page } from '$app/state';
     import { store, describeError } from '$lib/store.svelte';
-    import { safeInvoke } from '$lib/safeInvoke.svelte';
+    import { commands, events, safeInvoke } from '$lib/safeInvoke.svelte';
     import { Routes } from '$lib/routes';
     import { claimFirstOpenOfDay } from '$lib/dailyStartup';
-    import { LAUNCHER_NAVIGATE } from '$lib/ipcEvents';
     import AccountBoundary from '../components/accounts/AccountBoundary.svelte';
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
@@ -18,9 +17,8 @@
     import LauncherPalette from '$lib/launcher/LauncherPalette.svelte';
     import { Toaster } from 'svelte-sonner';
 
-    import { listen } from '@tauri-apps/api/event';
     import type { RouteId } from '$app/types';
-    import type { WindowLabel } from '$lib/bindings/WindowLabel.generated';
+    import type { WindowLabel } from '$lib/domain';
 
     function isRouteId(value: string): value is RouteId {
         return (Object.values(Routes) as string[]).includes(value);
@@ -44,7 +42,7 @@
         let unlistenNav = () => { /* noop */ };
 
         const redirectForAccount = async (): Promise<boolean> => {
-            const configured = await safeInvoke<boolean>('is_account_configured');
+            const configured = await safeInvoke(commands.isAccountConfigured());
             if (configured.isErr()) {
                 store.error = `Could not check the CalDAV account: ${describeError(configured.error)}`;
                 return false;
@@ -82,12 +80,12 @@
             isBooting = false;
 
             if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
-                unlistenNav = await listen(LAUNCHER_NAVIGATE, (event) => {
-                    const route = event.payload as string;
+                unlistenNav = await events.launcherNavigate.listen((event) => {
+                    const route = event.payload;
                     if (isRouteId(route)) {
                         void (async () => {
                             await goto(resolve(route));
-                            await safeInvoke('window_restore_main');
+                            await safeInvoke(commands.windowRestoreMain());
                         })();
                     }
                 });

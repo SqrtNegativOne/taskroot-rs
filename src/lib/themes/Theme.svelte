@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ColourScheme } from '../bindings/ColourScheme.generated';
+    import type { ColourScheme } from '../domain';
     import { notifyEventThemeChanged } from './eventTheme.svelte';
 
     let { scheme }: { scheme?: ColourScheme } = $props();

@@ -16,8 +16,3 @@ remove entries once resolved.
    failure can leave a remote duplicate), and neither moves nor scoped deletes
    retry `412 Conflict` the way same-collection updates do. Start at
    [store/ops/](../src-tauri/src/features/calendar/store/ops/).
-
-3. **IPC source-contract scans are shallow.** `ipc/tests.rs` does not resolve
-   argument builders/spreads or catch omitted required arguments; see
-   [IPC source contract](testing.md#ipc-source-contract). Prefer a typed or
-   generated command-argument contract over more text heuristics.

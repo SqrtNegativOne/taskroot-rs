@@ -1,16 +1,14 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
-    import { emit } from '@tauri-apps/api/event';
-    import { safeInvoke, useAutoQuery } from '$lib/safeInvoke.svelte';
+    import { commands, events, safeInvoke, useAutoQuery } from '$lib/safeInvoke.svelte';
     import { describeError, store } from '$lib/store.svelte';
     import { notifyError } from '$lib/toast';
-    import { LAUNCHER_NAVIGATE } from '$lib/ipcEvents';
     import { Routes } from '$lib/routes';
     import { eventInstances } from '$lib/queries';
     import { createDebouncer, createStaleGuard } from '$lib/asyncState.svelte';
     import { useNow } from '$lib/useNow.svelte';
     import { addDays, formatHhMm, minutesSinceMidnight, parseLocalYmd, sameDay, ymd } from '$lib/time';
-    import type { AppTask, AppTaskFilter, EventInstance, FilterGroup, QuickCapturePreview } from '$lib/domain';
+    import type { AppTask, AppTaskFilter, AppTaskSort, EventInstance, FilterGroup, QuickCapturePreview } from '$lib/domain';
     import { emptyFilterGroup, filterGroup } from '$lib/domain';
 
     const PARSE_DEBOUNCE_MS = 160;
@@ -45,14 +43,14 @@
 
     const guard = createStaleGuard();
 
-    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
+    const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(todayRange, emptyFilterGroup(), ''),
     );
-    const tasksQuery = useAutoQuery<AppTask[]>('query_tasks', () => ({
-        filters: OPEN_TASK_FILTERS,
-        sort: [],
-        query: '',
-    }));
+    const tasksQuery = useAutoQuery(commands.queryTasks, (): [FilterGroup<AppTaskFilter>, AppTaskSort[], string] => [
+        OPEN_TASK_FILTERS,
+        [],
+        '',
+    ]);
 
     let todayEvents = $derived(eventsQuery.data ?? []);
     let todayTasks = $derived(
@@ -123,7 +121,7 @@
 
     onMount(() => {
         inputEl?.focus();
-        void safeInvoke('resize_launcher', { width: 720, height: 520 });
+        void safeInvoke(commands.resizeLauncher(720, 520));
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') refreshToday();
         };
@@ -142,7 +140,7 @@
 
     async function runParse(value: string): Promise<QuickCapturePreview | null> {
         const isCurrent = guard.begin();
-        const result = await safeInvoke<QuickCapturePreview>('parse_quick_capture', { text: value });
+        const result = await safeInvoke(commands.parseQuickCapture(value));
         if (!isCurrent()) return null;
 
         if (result.isErr()) {
@@ -187,11 +185,11 @@
         text = '';
         preview = null;
         previewText = '';
-        await safeInvoke('hide_launcher');
+        await safeInvoke(commands.hideLauncher());
     }
 
     async function navigate(route: string): Promise<void> {
-        await emit(LAUNCHER_NAVIGATE, route);
+        await events.launcherNavigate.emit(route);
         await hide();
     }
 

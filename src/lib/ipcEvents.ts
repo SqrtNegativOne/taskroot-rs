@@ -1,6 +1,0 @@
-export const STOPWATCH_UPDATED = 'stopwatch-updated';
-export const ACCOUNT_CHANGED = 'account-changed';
-export const STORE_UPDATED = 'store-updated';
-export const DEEP_LINK = 'deep-link';
-export const SCREEN_EFFECT = 'screen-effect';
-export const LAUNCHER_NAVIGATE = 'launcher-navigate';

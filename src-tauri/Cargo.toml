@@ -28,15 +28,17 @@ serde_json = "1"
 tokio = { version = "1.53.1", features = ["full"] }
 thiserror = "2.0.16"
 chrono = { version = "0.4.45", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.13.4", features = ["json"] }
-tauri-plugin-store = "2.4.4"
 uuid = { version = "1.24.0", features = ["v4", "serde"] }
-ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }
+specta = { version = "=2.0.0-rc.28", features = ["derive", "chrono", "serde_json"] }
+specta-typescript = "0.0.15"
+tauri-specta = { version = "=2.0.0-rc.29", features = ["derive", "typescript"] }
 tauri-plugin-deep-link = "2"
 rrule = "0.14.0"
 chrono-tz = "0.10"
 serde_repr = "0.1.21"
-color-eyre = "0.6.5"
+tempfile = "3"
 ical-rs = { version = "0.7", default-features = false, features = ["parser"] }
 roxmltree = "0.21"
 tauri-plugin-notification = "2"
@@ -83,7 +85,6 @@ unused_dependencies = "warn"
 
 [dev-dependencies]
 proptest = "1.6.0"
-tempfile = "3"
 wiremock = "0.6"
 
 [profile.dev]

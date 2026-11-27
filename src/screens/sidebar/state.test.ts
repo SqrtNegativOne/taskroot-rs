@@ -53,13 +53,13 @@ describe('createSidebarState', () => {
             expect(invoke).toHaveBeenCalledWith('set_ui_state', {
                 key: sidebarUiKeys.notes,
                 value: '!',
-            });
+            }, undefined);
         });
 
         await fireEvent.click(screen.getByText('save-tab'));
         expect(invoke).toHaveBeenCalledWith('set_ui_state', {
             key: sidebarUiKeys.tabTop,
             value: 42,
-        });
+        }, undefined);
     });
 });

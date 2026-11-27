@@ -15,6 +15,7 @@ use crate::ipc::session::store_state;
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn query_tasks(
     app: tauri::AppHandle,
     filters: FilterGroup<AppTaskFilter>,
@@ -33,6 +34,7 @@ pub async fn query_tasks(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn query_events(
     app: tauri::AppHandle,
     filters: FilterGroup<AppEventFilter>,
@@ -51,6 +53,7 @@ pub async fn query_events(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn query_event_instances(
     app: tauri::AppHandle,
     filters: FilterGroup<AppEventFilter>,
@@ -85,6 +88,7 @@ pub async fn query_event_instances(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn list_tags(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
     let state = store_state(&app)?;
     Ok(state
@@ -98,6 +102,7 @@ pub async fn list_tags(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn query_task_dates(
     app: tauri::AppHandle,
     start_date: String,
@@ -114,6 +119,7 @@ pub async fn query_task_dates(
 ///
 /// Returns an error if the store is not initialized.
 #[tauri::command]
+#[specta::specta]
 pub async fn get_event(app: tauri::AppHandle, id: String) -> Result<Option<AppEvent>, AppError> {
     let state = store_state(&app)?;
     Ok(state.read(|store| store.event(&id).cloned()).await)

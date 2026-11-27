@@ -93,11 +93,11 @@ describe('DayTimeline nested filters', () => {
         const key = variant === 'plan' ? persistedKeys.dayTimelineFilters : persistedKeys.sidebarTimelineFilters;
         tauri.stubCommand('get_ui_state', args => args?.key === key ? nestedFilters : undefined);
         const mounted = render(DayTimeline, { props: { variant } });
-        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_event_instances', expect.objectContaining({ filters: nestedFilters })); });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('query_event_instances', expect.objectContaining({ filters: nestedFilters }), undefined); });
         await fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
         expect(screen.getAllByRole('combobox', { name: 'Group operator' })).toHaveLength(2);
         await fireEvent.change(screen.getAllByRole('combobox', { name: 'Group operator' })[0]!, { target: { value: 'or' } });
         mounted.unmount();
-        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('set_ui_state', { key, value: { ...nestedFilters, operator: 'or' } }); });
+        await waitFor(() => { expect(tauri.invoke).toHaveBeenCalledWith('set_ui_state', { key, value: { ...nestedFilters, operator: 'or' } }, undefined); });
     });
 });

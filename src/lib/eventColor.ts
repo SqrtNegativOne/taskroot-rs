@@ -17,16 +17,16 @@ export interface EventColors {
 }
 
 export interface EventColorSource {
-    readonly color?: string;
+    readonly color?: string | null;
     /** `EventInstance` calendar reference. */
-    readonly calendarId?: string;
+    readonly calendarId?: string | null;
     /** `AppEvent` calendar reference. */
-    readonly remoteCollectionId?: string;
+    readonly remoteCollectionId?: string | null;
 }
 
 export interface CalendarColorSource {
     readonly id: string;
-    readonly color?: string;
+    readonly color?: string | null;
 }
 
 const DEFAULT_CALENDAR_COLOR: Rgb = [138, 180, 248];
@@ -150,5 +150,5 @@ export function resolveEventColor(
     if (event.color) return event.color;
     const calendarId = event.calendarId ?? event.remoteCollectionId;
     if (!calendarId) return undefined;
-    return calendars.find((calendar) => calendar.id === calendarId)?.color;
+    return calendars.find((calendar) => calendar.id === calendarId)?.color ?? undefined;
 }

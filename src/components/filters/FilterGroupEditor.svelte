@@ -1,8 +1,7 @@
 <script lang="ts" generics="C extends string">
     import FilterGroupEditor from './FilterGroupEditor.svelte';
     import FilterConditionRow from './FilterConditionRow.svelte';
-    import type { FilterGroup } from '../../lib/bindings/FilterGroup.generated';
-    import type { FilterNode } from '../../lib/bindings/FilterNode.generated';
+    import type { FilterGroup, FilterNode } from '../../lib/domain';
     import { newFilterCondition, type FilterColumn, type FilterCondition, type FilterOption } from '../../lib/domain/filterTree';
 
     let { group, columns, valuesForColumn, onchange, onremove }: {

@@ -3,7 +3,7 @@
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { EventInstance, AppCalendar, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
+    import type { EventInstance, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
     import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
     import { resolveEventColor } from '../../../lib/eventColor';
     import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
@@ -15,8 +15,8 @@
     import { createSpanResizeController, type SpanResizePreview } from '../hooks/spanResize.svelte';
     import { previewColumns, type AllDayRange, type SpanEdge } from './spanResize';
     
-    import { useAutoQuery } from '../../../lib/safeInvoke.svelte';
-    import { activeCalendars, eventInstances, taskDates } from '../../../lib/queries';
+    import { commands, useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { eventInstances, taskDates } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
     import { store } from '../../../lib/store.svelte';
@@ -72,13 +72,13 @@
     let grid = $derived(buildDateGrid(anchor, view));
     let cells = $derived(grid.cells);
 
-    const eventsQuery = useAutoQuery<EventInstance[]>('query_event_instances', () =>
+    const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(grid.range, filters, query), { debounceMs: 150 });
 
-    const taskDatesQuery = useAutoQuery<TaskDateInstance[]>('query_task_dates', () =>
+    const taskDatesQuery = useAutoQuery(commands.queryTaskDates, () =>
         taskDates(grid.range), { debounceMs: 150 });
 
-    const calendarsQuery = useAutoQuery<AppCalendar[]>('get_active_calendars', activeCalendars);
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
 
     let events = $derived((eventsQuery.data ?? []).filter(event => isEventVisible(event, visibility)));
     let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));

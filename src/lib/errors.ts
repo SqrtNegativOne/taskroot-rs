@@ -1,3 +1,7 @@
+import type { BackendErrorCode } from './bindings/index.generated';
+
+export type { BackendErrorCode };
+
 export const BACKEND_ERROR_CODES = [
     'not-found',
     'auth',
@@ -8,9 +12,7 @@ export const BACKEND_ERROR_CODES = [
     'gone',
     'not-ready',
     'internal',
-] as const;
-
-export type BackendErrorCode = (typeof BACKEND_ERROR_CODES)[number];
+] as const satisfies readonly BackendErrorCode[];
 
 export type AppErrorCode = BackendErrorCode | 'unknown';
 

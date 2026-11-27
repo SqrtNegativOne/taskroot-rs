@@ -1,6 +1,5 @@
 use chrono::{DateTime, Days, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz as ChronoTz;
-use color_eyre::Result;
 use rrule::RRuleSet;
 use std::str::FromStr;
 
@@ -109,7 +108,7 @@ pub fn get_occurrences(
     exdates: &[String],
     range_start: &DateTime<Utc>,
     range_end: &DateTime<Utc>,
-) -> Result<Vec<DateTime<Utc>>> {
+) -> Result<Vec<DateTime<Utc>>, AppError> {
     let tz = resolve_tz(timezone);
     let named = timezone.is_some_and(|_| tz != rrule::Tz::UTC);
     let mut full_rrule = rrule_str.to_string();
@@ -131,7 +130,7 @@ pub fn get_occurrences(
     }
 
     let rrule_set = RRuleSet::from_str(&full_rrule)
-        .map_err(|e| color_eyre::eyre::eyre!("Failed to parse rrule: {e:?}"))?
+        .map_err(|e| invalid(format!("Failed to parse rrule: {e:?}")))?
         .limit();
 
     Ok((&rrule_set)
@@ -158,7 +157,7 @@ pub fn get_all_day_occurrences(
     exdates: &[String],
     range_start: NaiveDate,
     range_end_inclusive: NaiveDate,
-) -> Result<Vec<NaiveDate>> {
+) -> Result<Vec<NaiveDate>, AppError> {
     let tz = resolve_tz(timezone);
 
     let mut full_rrule = rrule_str.to_string();
@@ -176,13 +175,13 @@ pub fn get_all_day_occurrences(
     }
 
     let rrule_set = RRuleSet::from_str(&full_rrule)
-        .map_err(|e| color_eyre::eyre::eyre!("Failed to parse rrule: {e:?}"))?
+        .map_err(|e| invalid(format!("Failed to parse rrule: {e:?}")))?
         .limit();
 
     let range_start_dt = midnight_in(tz, range_start)?;
     let range_end_exclusive = range_end_inclusive
         .checked_add_days(Days::new(1))
-        .ok_or_else(|| color_eyre::eyre::eyre!("range end overflow"))?;
+        .ok_or_else(|| invalid("range end overflow"))?;
     let range_end_dt = midnight_in(tz, range_end_exclusive)?;
 
     Ok((&rrule_set)
@@ -240,13 +239,13 @@ fn resolve_tz(timezone: Option<&str>) -> rrule::Tz {
         .map_or(rrule::Tz::UTC, rrule::Tz::from)
 }
 
-fn midnight_in(tz: rrule::Tz, date: NaiveDate) -> Result<DateTime<rrule::Tz>> {
+fn midnight_in(tz: rrule::Tz, date: NaiveDate) -> Result<DateTime<rrule::Tz>, AppError> {
     let naive = date
         .and_hms_opt(0, 0, 0)
-        .ok_or_else(|| color_eyre::eyre::eyre!("invalid midnight"))?;
+        .ok_or_else(|| invalid("invalid midnight"))?;
     tz.from_local_datetime(&naive)
         .earliest()
-        .ok_or_else(|| color_eyre::eyre::eyre!("no local midnight for {date}"))
+        .ok_or_else(|| invalid(format!("no local midnight for {date}")))
 }
 
 #[cfg(test)]
@@ -513,5 +512,20 @@ mod tests {
 
         let days: Vec<String> = occ.iter().map(|dt| dt.format("%Y-%m-%d").to_string()).collect();
         assert_eq!(days, vec!["2026-10-19"], "the truncated occurrence is gone");
+    }
+
+    #[test]
+    fn invalid_rrule_returns_invalid_input_error() {
+        let start = Utc.with_ymd_and_hms(2026, 9, 1, 9, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2026, 9, 7, 23, 59, 59).unwrap();
+
+        let timed_err =
+            get_occurrences("RRULE:NOT_A_RULE", &start, None, &[], &start, &end).unwrap_err();
+        assert_eq!(timed_err.code(), "invalid-input");
+
+        let day = NaiveDate::from_ymd_opt(2026, 9, 1).unwrap();
+        let all_day_err =
+            get_all_day_occurrences("RRULE:NOT_A_RULE", day, None, &[], day, day).unwrap_err();
+        assert_eq!(all_day_err.code(), "invalid-input");
     }
 }

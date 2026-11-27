@@ -1,14 +1,20 @@
-import type { AppEventFilter, AppEventFilterColumn, AppTaskFilter, AppTaskFilterColumn } from '../domain';
-import type { FilterGroup } from '../bindings/FilterGroup.generated';
-import type { FilterNode } from '../bindings/FilterNode.generated';
-import type { FilterOperator } from '../bindings/FilterOperator.generated';
-import type { FilterType } from '../bindings/FilterType.generated';
-import type { LogicalOperator } from '../bindings/LogicalOperator.generated';
+import type {
+    AppEventFilter,
+    AppEventFilterColumn,
+    AppTaskFilter,
+    AppTaskFilterColumn,
+    FilterGroup,
+    FilterNode,
+    FilterOperator,
+    FilterType,
+    LogicalOperator,
+    Value as JsonValue,
+} from '../bindings/index.generated';
 
 export interface FilterCondition<C extends string = string> {
     column: C | null;
     operator: FilterOperator | null;
-    value: unknown;
+    value: JsonValue | null;
 }
 
 export interface FilterColumn<C extends string = string> {

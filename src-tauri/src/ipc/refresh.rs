@@ -10,6 +10,7 @@ use crate::error::AppError;
 ///
 /// Returns the account/transport/parse failure from the load.
 #[tauri::command]
+#[specta::specta]
 pub async fn refresh_data(app: AppHandle) -> Result<(), AppError> {
     super::session::load_all(&app).await
 }

@@ -2,11 +2,45 @@
 
 use std::path::{Path, PathBuf};
 
-use super::source_scan::{crate_root, is_test_path, sources};
+fn crate_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn is_test_path(path: &Path) -> bool {
+    let in_test_dir = path.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy();
+        name == "test" || name.starts_with("tests") || name.starts_with("test_")
+    });
+    let is_test_file = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            name.ends_with("tests.rs") || name.ends_with(".test.ts") || name.ends_with(".spec.ts")
+        });
+    in_test_dir || is_test_file
+}
+
+fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(&path, files);
+            continue;
+        }
+        files.push(path);
+    }
+}
 
 fn rust_files(relative: &str) -> Vec<(PathBuf, String)> {
     let root = crate_root().join(relative);
-    sources(&root, &["rs"])
+    let mut files = Vec::new();
+    collect_files(&root, &mut files);
+    files.retain(|path| path.extension().and_then(|ext| ext.to_str()) == Some("rs"));
+    files.sort();
+    files
         .into_iter()
         .map(|path| {
             let source = std::fs::read_to_string(&path).expect("source is readable");

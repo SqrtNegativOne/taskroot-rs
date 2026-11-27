@@ -1,24 +1,18 @@
 use serde::{Deserialize, Serialize};
-
-use ts_rs::TS;
+use specta::Type;
 
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/LogicalOperator.generated.ts"
-)]
 pub enum LogicalOperator {
     #[default]
     And,
     Or,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/FilterGroup.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct FilterGroup<F> {
     pub operator: LogicalOperator,
     pub children: Vec<FilterNode<F>>,
@@ -45,21 +39,21 @@ impl<F> From<Vec<F>> for FilterGroup<F> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+// `specta::Type` expands field types inside a nested item where `Self` is out of scope.
+#[allow(clippy::use_self)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-#[ts(export, export_to = "../../src/lib/bindings/FilterNode.generated.ts")]
 pub enum FilterNode<F> {
     Condition {
         filter: F,
     },
     Group {
         operator: LogicalOperator,
-        children: Vec<Self>,
+        children: Vec<FilterNode<F>>,
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../src/lib/bindings/FilterType.generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub enum FilterType {
     Text,
     Number,
@@ -68,11 +62,7 @@ pub enum FilterType {
     Relation(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/SortDirection.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 pub enum SortDirection {
     #[serde(rename = "asc")]
     Asc,
@@ -80,11 +70,7 @@ pub enum SortDirection {
     Desc,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(
-    export,
-    export_to = "../../src/lib/bindings/FilterOperator.generated.ts"
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 pub enum FilterOperator {
     #[serde(rename = "is")]
     Is,

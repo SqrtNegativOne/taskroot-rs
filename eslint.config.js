@@ -7,7 +7,7 @@ import sonarjs from 'eslint-plugin-sonarjs';
 
 export default tseslint.config(
   {
-    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', 'build/', 'coverage/'],
+    ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', 'build/', 'coverage/', 'src/lib/bindings/'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

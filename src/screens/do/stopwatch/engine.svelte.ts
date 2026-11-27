@@ -1,6 +1,4 @@
-import { listen } from '@tauri-apps/api/event';
-import { safeInvoke } from '../../../lib/safeInvoke.svelte';
-import { STOPWATCH_UPDATED } from '../../../lib/ipcEvents';
+import { commands, events, safeInvoke } from '../../../lib/safeInvoke.svelte';
 import type {
     StopwatchLabelSource,
     StopwatchPhase,
@@ -35,9 +33,11 @@ export class StopwatchState {
     }
 
     async init(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot | undefined>('get_stopwatch_state');
+        const result = await safeInvoke(commands.getStopwatchState());
         if (this.disposed) return;
-        if (result.isOk() && result.value !== undefined) this.updateFromPayload(result.value);
+        if (result.isOk() && (result.value as StopwatchSnapshot | undefined) !== undefined) {
+            this.updateFromPayload(result.value);
+        }
 
         await this.connect();
     }
@@ -51,7 +51,7 @@ export class StopwatchState {
 
     private connect(): Promise<void> {
         if (this.disposed) return Promise.resolve();
-        this.connection ??= listen<StopwatchSnapshot>(STOPWATCH_UPDATED, (event) => {
+        this.connection ??= events.stopwatchUpdated.listen((event) => {
             this.updateFromPayload(event.payload);
         }).then((unlisten) => {
             if (this.disposed) {
@@ -131,7 +131,7 @@ export class StopwatchState {
     }
 
     async toggle(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('toggle_stopwatch');
+        const result = await safeInvoke(commands.toggleStopwatch());
         if (result.isErr()) {
             playErrorSound();
             return;
@@ -140,7 +140,7 @@ export class StopwatchState {
     }
 
     async toggleBreak(breakDivisor: number): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('toggle_break', { breakDivisor });
+        const result = await safeInvoke(commands.toggleBreak(breakDivisor));
         if (result.isErr()) {
             playErrorSound();
             return;
@@ -149,17 +149,17 @@ export class StopwatchState {
     }
 
     async completeBreak(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('complete_break');
+        const result = await safeInvoke(commands.completeBreak());
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
     async setLabel(label: string | null, source: StopwatchLabelSource): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('set_stopwatch_label', { label, source });
+        const result = await safeInvoke(commands.setStopwatchLabel(label, source));
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
     async setTask(taskId: string | null, label: string | null): Promise<boolean> {
-        const result = await safeInvoke<StopwatchSnapshot>('set_stopwatch_task', { taskId, label });
+        const result = await safeInvoke(commands.setStopwatchTask(taskId, label));
         if (result.isErr()) return false;
         this.updateFromPayload(result.value);
         return true;
@@ -177,17 +177,17 @@ export class StopwatchState {
     }
 
     async togglePause(minutes: number): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('toggle_pause', { pauseMinutes: minutes });
+        const result = await safeInvoke(commands.togglePause(minutes));
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
     async adjustPause(deltaMinutes: number): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('adjust_pause', { deltaMinutes });
+        const result = await safeInvoke(commands.adjustPause(deltaMinutes));
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 
     async reset(): Promise<void> {
-        const result = await safeInvoke<StopwatchSnapshot>('reset_stopwatch');
+        const result = await safeInvoke(commands.resetStopwatch());
         if (result.isOk()) this.updateFromPayload(result.value);
     }
 }

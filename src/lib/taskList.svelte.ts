@@ -1,7 +1,7 @@
 import type { AppTaskFilter, AppTaskSort, FilterGroup } from './domain';
 import { filterGroup, isTaskFilterGroup } from './domain';
 import { persistedKeys } from './persisted.svelte';
-import { safeInvoke } from './safeInvoke.svelte';
+import { commands, safeInvoke } from './safeInvoke.svelte';
 
 export function defaultTaskListFilters(): FilterGroup<AppTaskFilter> {
     return filterGroup([{ column: 'status', operator: 'is not', value: ['done'] }]);
@@ -16,9 +16,11 @@ export const taskListState = $state({
     sort: [] as AppTaskSort[],
 });
 
-/** Arguments for `query_tasks` using the shared list definition. */
-export function taskListQueryArgs() {
-    return { filters: taskListState.filters, sort: taskListState.sort, query: '' };
+/** Arguments for `commands.queryTasks` using the shared list definition. */
+export function taskListQueryArgs(
+    query = '',
+): [FilterGroup<AppTaskFilter>, AppTaskSort[], string] {
+    return [taskListState.filters, taskListState.sort, query];
 }
 
 function applyStoredFilters(value: unknown): void {
@@ -32,8 +34,8 @@ function applyStoredSort(value: unknown): void {
 /** Reload the persisted definition, for windows that outlive the editor. */
 export async function reloadTaskListState(): Promise<void> {
     const [filters, sort] = await Promise.all([
-        safeInvoke<unknown>('get_ui_state', { key: persistedKeys.taskListFilters }),
-        safeInvoke<unknown>('get_ui_state', { key: persistedKeys.taskListSort }),
+        safeInvoke(commands.getUiState(persistedKeys.taskListFilters)),
+        safeInvoke(commands.getUiState(persistedKeys.taskListSort)),
     ]);
 
     if (filters.isOk()) applyStoredFilters(filters.value);
