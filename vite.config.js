@@ -1,24 +1,48 @@
 import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
+import { playwright } from "@vitest/browser-playwright";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [sveltekit()],
-  // Under Vitest, resolve the browser build of Svelte so components can mount.
-  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: {
     passWithNoTests: true,
-    include: ["src/**/*.{test,spec}.{js,ts}"],
-    setupFiles: ["./src/test/setup.ts"],
-    environment: "jsdom",
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: ["src/**"],
-      exclude: ["src/lib/bindings/**", "**/*.d.ts"]
-    }
+      exclude: ["src/lib/bindings/**", "**/*.d.ts"],
+    },
+    projects: [
+      {
+        // Pure TypeScript tests: no DOM, no SvelteKit plugin, no setup overhead.
+        test: {
+          name: "unit",
+          environment: "node",
+          isolate: false,
+          include: ["src/**/*.{test,spec}.{js,ts}"],
+          exclude: ["src/**/*.browser.{test,spec}.{js,ts}"],
+        },
+      },
+      {
+        // Component, Svelte-rune, and DOM tests running in real headless Chromium.
+        extends: true,
+        test: {
+          name: "browser",
+          setupFiles: ["./src/test/setup.ts"],
+          include: ["src/**/*.browser.{test,spec}.{js,ts}"],
+          browser: {
+            enabled: true,
+            headless: true,
+            screenshotFailures: false,
+            provider: playwright(),
+            instances: [{ browser: "chromium" }],
+          },
+        },
+      },
+    ],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

@@ -4,7 +4,7 @@
 
 use crate::features::calendar::domain::timing::{get_all_day_occurrences, get_occurrences};
 use crate::features::calendar::domain::{
-    AppEvent, EventId, EventInstance, EventStatus, EventTiming,
+    AppEvent, CalendarDateTime, EventId, EventInstance, EventStatus, EventTiming, DTO_DATE,
 };
 use crate::features::calendar::window::RenderWindow;
 use chrono::Days;
@@ -88,7 +88,7 @@ fn push_override(
         .recurring_event_id
         .clone()
         .unwrap_or_else(|| event.id.clone());
-    let key = event.original_start_time.as_deref().map_or_else(
+    let key = event.original_start_time.map_or_else(
         || occurrence_key(&master, &timing),
         |original| {
             format!(
@@ -100,7 +100,6 @@ fn push_override(
     );
     let start = event
         .original_start_time
-        .clone()
         .unwrap_or_else(|| canonical_start(&timing));
     let mut instance = build_instance(event, timing, key, start, true);
     if instance.rrule.is_none() {
@@ -141,7 +140,7 @@ fn expand_recurring(
                 return;
             };
             for date in occurrences {
-                let key = format!("{}@{}", event.id, date.format("%Y-%m-%d"));
+                let key = format!("{}@{}", event.id, date.format(DTO_DATE));
                 if exceptions.contains(&key) {
                     continue;
                 }
@@ -198,7 +197,7 @@ fn build_instance(
     event: &AppEvent,
     timing: EventTiming,
     occurrence_key: String,
-    occurrence_start: String,
+    occurrence_start: CalendarDateTime,
     recurring: bool,
 ) -> EventInstance {
     EventInstance {

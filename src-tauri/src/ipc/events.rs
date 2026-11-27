@@ -1,7 +1,7 @@
-use crate::ipc::session::{app_calendar, client_for, store_state};
-use crate::features::calendar::{AppCalendar, AppEvent, EventScope};
 use crate::error::AppError;
 use crate::features::calendar::ops;
+use crate::features::calendar::{AppCalendar, AppEvent, CalendarDateTime, EventScope};
+use crate::ipc::session::{app_calendar, client_for, store_state};
 
 /// # Errors
 ///
@@ -45,12 +45,12 @@ pub async fn delete_event(
     app: tauri::AppHandle,
     id: String,
     scope: EventScope,
-    occurrence_start: Option<String>,
+    occurrence_start: Option<CalendarDateTime>,
 ) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
     let mut store = state.lock().await;
-    ops::delete_event(&mut store, &client, &id, scope, occurrence_start.as_deref()).await
+    ops::delete_event(&mut store, &client, &id, scope, occurrence_start).await
 }
 
 /// Move the clicked occurrence or the whole series to a new time.
@@ -64,11 +64,11 @@ pub async fn delete_event(
 pub async fn reschedule_event(
     app: tauri::AppHandle,
     id: String,
-    start_time: String,
-    end_time: String,
+    start_time: CalendarDateTime,
+    end_time: CalendarDateTime,
     is_all_day: bool,
     scope: EventScope,
-    occurrence_start: Option<String>,
+    occurrence_start: Option<CalendarDateTime>,
 ) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;

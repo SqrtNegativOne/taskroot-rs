@@ -2,32 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { AppCalendar } from './domain';
 import {
     buildNewEvent,
-    calendarsForComponent,
-    filterGroup,
     computeFilterDefaults,
-    isAppTaskStatus,
-    isCalendarReadOnly,
+    filterGroup,
     isEventReadOnly,
 } from './domain';
-
-describe('isAppTaskStatus', () => {
-    it('accepts valid task statuses', () => {
-        expect(isAppTaskStatus('todo')).toBe(true);
-        expect(isAppTaskStatus('next-up')).toBe(true);
-        expect(isAppTaskStatus('done')).toBe(true);
-        expect(isAppTaskStatus('cancelled')).toBe(true);
-    });
-
-    it('rejects invalid or non-string values', () => {
-        expect(isAppTaskStatus('doing')).toBe(false);
-        expect(isAppTaskStatus('in-progress')).toBe(false);
-        expect(isAppTaskStatus('completed')).toBe(false);
-        expect(isAppTaskStatus('TODO')).toBe(false);
-        expect(isAppTaskStatus('')).toBe(false);
-        expect(isAppTaskStatus(null)).toBe(false);
-        expect(isAppTaskStatus(undefined)).toBe(false);
-    });
-});
 
 describe('computeFilterDefaults', () => {
     it('returns empty object when no filters are present', () => {
@@ -42,16 +20,15 @@ describe('computeFilterDefaults', () => {
         expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'done', priority: 3 });
     });
 
-    it('picks next fallback status when status is excluded', () => {
-        const filters = [{ column: 'status', operator: 'is not', value: 'todo' }];
-        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'next-up' });
-    });
-
-    it('picks fallback after multiple excluded statuses', () => {
-        const filters = [
-            { column: 'status', operator: 'is not', value: ['todo', 'next-up', 'done'] },
-        ];
-        expect(computeFilterDefaults(filterGroup(filters))).toEqual({ status: 'cancelled' });
+    it('picks next fallback status when statuses are excluded', () => {
+        expect(computeFilterDefaults(filterGroup([{ column: 'status', operator: 'is not', value: 'todo' }]))).toEqual({
+            status: 'next-up',
+        });
+        expect(
+            computeFilterDefaults(
+                filterGroup([{ column: 'status', operator: 'is not', value: ['todo', 'next-up', 'done'] }]),
+            ),
+        ).toEqual({ status: 'cancelled' });
     });
 
     it('does not set field if required value is also excluded', () => {
@@ -68,34 +45,6 @@ describe('computeFilterDefaults', () => {
             { column: 'tags', operator: 'is not', value: 'bug' },
         ];
         expect(computeFilterDefaults(filterGroup(filters))).toEqual({ tags: ['feature'] });
-    });
-});
-
-describe('isCalendarReadOnly', () => {
-    it('treats a non-writable calendar as read-only', () => {
-        expect(isCalendarReadOnly({ writable: false })).toBe(true);
-    });
-
-    it('treats writable and unset calendars as editable', () => {
-        expect(isCalendarReadOnly({ writable: true })).toBe(false);
-        expect(isCalendarReadOnly({ writable: undefined })).toBe(false);
-        expect(isCalendarReadOnly(undefined)).toBe(false);
-    });
-});
-
-describe('calendarsForComponent', () => {
-    const calendars: AppCalendar[] = [
-        { id: 'cal-work', summary: 'Work', writable: true, component: 'VEVENT' },
-        { id: 'cal-tasks', summary: 'Tasks', writable: true, component: 'VTODO' },
-        { id: 'cal-holidays', summary: 'Holidays', writable: false, component: 'VEVENT' },
-    ];
-
-    it('keeps every calendar of the requested component, writable or not', () => {
-        expect(calendarsForComponent(calendars, 'VEVENT').map((c) => c.id)).toEqual([
-            'cal-work',
-            'cal-holidays',
-        ]);
-        expect(calendarsForComponent(calendars, 'VTODO').map((c) => c.id)).toEqual(['cal-tasks']);
     });
 });
 

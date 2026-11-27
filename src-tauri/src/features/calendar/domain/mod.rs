@@ -1,3 +1,4 @@
+pub mod dates;
 pub mod event;
 pub mod event_timing;
 pub mod filters;
@@ -7,6 +8,7 @@ pub mod task;
 pub mod task_timing;
 pub mod timing;
 
+pub use dates::*;
 pub use event::*;
 pub use event_timing::*;
 pub use filters::*;

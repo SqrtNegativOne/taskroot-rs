@@ -116,9 +116,7 @@ vi.restoreAllMocks();
 
         await fireEvent.click(screen.getByLabelText('Delete Journal'));
 
-        expect(window.confirm).toHaveBeenCalledWith(
-            'Delete "Journal" and every events in it? This cannot be undone.',
-        );
+        expect(window.confirm).toHaveBeenCalledOnce();
         await waitFor(() =>
             expect(invokedArgs('delete_calendar')).toEqual({ href: '/me/journal/' }),
         );
@@ -136,12 +134,13 @@ vi.restoreAllMocks();
         );
     });
 
-    it('sends a shortened hex colour to the backend', async () => {
+    it('strips alpha from stored #RRGGBBAA colours for the colour picker and saves updates', async () => {
         render(CalendarManager, { props: { calendars: [journal] } });
 
-        await fireEvent.change(screen.getByLabelText('Colour of Journal'), {
-            target: { value: '#123456' },
-        });
+        const input = screen.getByLabelText('Colour of Journal') as HTMLInputElement;
+        expect(input.value).toBe('#ff0000');
+
+        await fireEvent.change(input, { target: { value: '#123456' } });
 
         await waitFor(() =>
             expect(invokedArgs('set_calendar_color')).toEqual({

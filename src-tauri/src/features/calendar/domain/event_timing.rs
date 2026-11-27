@@ -1,16 +1,11 @@
-use super::{AppEvent, AppTaskStatus, CollectionId, Color, EventId, EventStatus, TaskId};
-use chrono::{DateTime, Days, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use chrono_tz::Tz as ChronoTz;
+use super::{
+    AppEvent, AppTaskStatus, CalendarDateTime, CollectionId, Color, EventId, EventStatus, TaskId,
+};
+use chrono::{DateTime, Days, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use std::str::FromStr;
 
-const YMD_LENGTH: usize = 10;
-
-/// The one place that decides whether a mirrored event is all-day or timed.
-///
-/// Nothing outside this module may interpret `AppEvent::start_time` /
-/// `end_time`; those remain wire-format strings for the push path only.
+/// The one place that normalizes a mirrored event into render-ready timing.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum EventTiming {
@@ -29,12 +24,9 @@ pub enum EventTiming {
 
 impl EventTiming {
     /// Normalize a mirrored event row into render-ready timing.
-    ///
-    /// Returns `None` when the row carries no parseable start, in which case
-    /// the render path drops it rather than guessing.
     #[must_use]
     pub fn from_event(event: &AppEvent) -> Option<Self> {
-        if is_all_day(event) {
+        if event.is_all_day() {
             return Self::all_day_from_event(event);
         }
         Self::timed_from_event(event)
@@ -50,8 +42,8 @@ impl EventTiming {
     }
 
     fn all_day_from_event(event: &AppEvent) -> Option<Self> {
-        let start_date = parse_date(&event.start_time)?;
-        let parsed_end = parse_date(&event.end_time)?;
+        let start_date = event.start_time.date();
+        let parsed_end = event.end_time.date();
         let end_date_exclusive = if parsed_end > start_date {
             parsed_end
         } else {
@@ -64,8 +56,10 @@ impl EventTiming {
     }
 
     fn timed_from_event(event: &AppEvent) -> Option<Self> {
-        let start = wall_clock_to_utc(&event.start_time, event.timezone.as_deref())?;
-        let end = wall_clock_to_utc(&event.end_time, event.timezone.as_deref())
+        let start = event.start_time.to_utc(event.timezone.as_deref())?;
+        let end = event
+            .end_time
+            .to_utc(event.timezone.as_deref())
             .filter(|end| *end > start)
             .unwrap_or(start);
         Some(Self::Timed {
@@ -74,48 +68,6 @@ impl EventTiming {
             timezone: event.timezone.clone(),
         })
     }
-}
-
-/// Interpret a mirrored timed string as an instant.
-///
-/// A naive value (`YYYY-MM-DDTHH:MM:SS`, the ICS wall clock the reader produces) is
-/// resolved in `timezone`, falling back to UTC when the zone is absent or unknown.
-/// An RFC 3339 / trailing-`Z` value already carries its instant and is used as-is.
-/// A local time that does not exist (a DST spring-forward gap) degrades to UTC
-/// rather than dropping the occurrence.
-#[must_use]
-pub fn wall_clock_to_utc(value: &str, timezone: Option<&str>) -> Option<DateTime<Utc>> {
-    if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
-        return Some(datetime.with_timezone(&Utc));
-    }
-    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%SZ") {
-        return Some(naive.and_utc());
-    }
-    let naive = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S")
-        .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S"))
-        .ok()?;
-    let zone = timezone
-        .and_then(|name| ChronoTz::from_str(name).ok())
-        .unwrap_or(ChronoTz::UTC);
-    match zone.from_local_datetime(&naive) {
-        chrono::LocalResult::Single(datetime) => Some(datetime.with_timezone(&Utc)),
-        chrono::LocalResult::Ambiguous(earliest, _) => Some(earliest.with_timezone(&Utc)),
-        chrono::LocalResult::None => Some(naive.and_utc()),
-    }
-}
-
-fn is_all_day(event: &AppEvent) -> bool {
-    event.is_all_day.unwrap_or(false) || is_date_only(&event.start_time)
-}
-
-/// Whether a canonical date/time string is a floating `YYYY-MM-DD` date.
-pub(crate) fn is_date_only(value: &str) -> bool {
-    value.len() == YMD_LENGTH && !value.contains('T') && !value.contains(' ')
-}
-
-fn parse_date(value: &str) -> Option<NaiveDate> {
-    let trimmed = value.split(['T', ' ']).next().unwrap_or(value);
-    NaiveDate::parse_from_str(trimmed, "%Y-%m-%d").ok()
 }
 
 /// A single render-ready occurrence produced by the projection boundary.
@@ -130,7 +82,7 @@ pub struct EventInstance {
     /// The canonical value of this occurrence for `EXDATE` / `RECURRENCE-ID`:
     /// `YYYY-MM-DD` for all-day, wall clock in the event's zone for timed.
     /// Excluding it removes exactly this occurrence.
-    pub occurrence_start: String,
+    pub occurrence_start: CalendarDateTime,
     pub title: String,
     #[specta(optional)]
     pub description: Option<String>,
@@ -166,8 +118,8 @@ mod tests {
             description: None,
             priority: None,
             tags: None,
-            start_time: start.into(),
-            end_time: end.into(),
+            start_time: start.parse().unwrap(),
+            end_time: end.parse().unwrap(),
             rrule: None,
             exdates: None,
             recurring_event_id: None,

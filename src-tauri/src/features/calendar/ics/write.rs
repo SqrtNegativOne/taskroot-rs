@@ -11,14 +11,14 @@ use crate::features::calendar::ics::cst::{
     ALARM_KIND, EVENT_KIND, TASK_KIND, child_components, is_component, parse_calendar, render_cst,
     replace_props, text_line, text_prop,
 };
-use crate::features::calendar::ics::dates::{ICAL_UTC, date_line};
+use crate::features::calendar::ics::dates::{date_line, stamp_line};
 use crate::features::calendar::ics::read::event_from_component;
 use crate::features::calendar::ics::read_task::{
     alarm_trigger_for_component, read_alarms, task_from_component,
 };
 use crate::features::calendar::ics::write_props::{
-    alarm_trigger_line, build_alarm_component, event_lines, is_all_day, is_owned_event_prop,
-    is_owned_task_prop, task_lines, utc_line,
+    alarm_trigger_line, build_alarm_component, event_lines, is_owned_event_prop,
+    is_owned_task_prop, task_lines,
 };
 use chrono::Utc;
 use ical::prop::IcalPropKind;
@@ -131,9 +131,7 @@ pub fn create_task_resource(task: &AppTask) -> Result<String, AppError> {
         component.push_line(line);
     }
     for alarm in task.alarms.as_deref().unwrap_or_default() {
-        if let Some(alarm_cst) = build_alarm_component(alarm) {
-            component.push_component(alarm_cst);
-        }
+        component.push_component(build_alarm_component(alarm));
     }
     Ok(render_new_calendar(component))
 }
@@ -141,18 +139,17 @@ pub fn create_task_resource(task: &AppTask) -> Result<String, AppError> {
 fn build_event_component(event: &AppEvent, uid: &str) -> IcalCst<'static> {
     let mut component = IcalCst::empty(EVENT_KIND);
     component.push_line(text_line(IcalPropKind::Uid, uid));
-    if let Some(original) = event.original_start_time.as_deref() {
+    if let Some(original) = event.original_start_time {
         if let Some(line) = date_line(
             IcalPropKind::RecurrenceId,
             original,
-            is_all_day(event),
+            event.is_all_day(),
             event.timezone.as_deref(),
         ) {
             component.push_line(line);
         }
     }
-    let stamp = Utc::now().format(ICAL_UTC).to_string();
-    component.push_line(utc_line(IcalPropKind::DtStamp, &stamp));
+    component.push_line(stamp_line(IcalPropKind::DtStamp, Utc::now()));
     for line in event_lines(event) {
         component.push_line(line);
     }
@@ -247,7 +244,7 @@ fn apply_alarms(vtodo: &mut IcalCst<'_>, desired: &[TaskAlarmTrigger]) {
 
     let triggers: Vec<(&TaskAlarmTrigger, ical::tree::line::IcalLine<'static>)> = desired
         .iter()
-        .filter_map(|alarm| Some((alarm, alarm_trigger_line(alarm)?)))
+        .map(|alarm| (alarm, alarm_trigger_line(alarm)))
         .collect();
 
     for (&idx, (_, trigger)) in managed.iter().zip(&triggers) {
@@ -263,8 +260,6 @@ fn apply_alarms(vtodo: &mut IcalCst<'_>, desired: &[TaskAlarmTrigger]) {
         vtodo.items.remove(idx);
     }
     for (alarm, _) in triggers.into_iter().skip(managed.len()) {
-        if let Some(alarm_cst) = build_alarm_component(alarm) {
-            vtodo.push_component(alarm_cst);
-        }
+        vtodo.push_component(build_alarm_component(alarm));
     }
 }

@@ -146,7 +146,7 @@ describe('DateGrid done-task hiding', () => {
             makeInstance({ id: 'plain', title: 'Plain event', timing: { kind: 'allDay', startDate, endDateExclusive: ymd(addDays(start, 1)) } }),
         ]);
         tauri.stubCommandValue('query_task_dates', [
-            makeTaskDateInstance({ taskId: 't1', kind: 'due', title: 'Done marker', status: 'done', timing: { kind: 'allDay', date: startDate } }),
+            makeTaskDateInstance({ taskId: 't1', kind: 'due', title: 'Done marker', status: 'done', timing: { kind: 'allDay', date: ymd(addDays(start, 2)) } }),
             makeTaskDateInstance({ taskId: 't2', kind: 'due', title: 'Open marker', status: 'todo', timing: { kind: 'allDay', date: ymd(addDays(start, 1)) } }),
         ]);
     });

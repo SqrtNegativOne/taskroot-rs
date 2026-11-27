@@ -9,14 +9,14 @@
 
 use crate::error::AppError;
 use crate::features::calendar::domain::{
-    AppEvent, AppTask, CollectionId, Color, EventId, EventStatus, RemoteId, Tag, TaskId,
-    TaskPriority,
+    AppEvent, AppTask, CalendarDateTime, CollectionId, Color, EventId, EventStatus, RemoteId, Tag,
+    TaskId, TaskPriority,
 };
 use crate::features::calendar::ics::cst::{
-    EVENT_KIND, TASK_KIND, child_components, parse_calendar, prop, props, text_prop,
+    child_components, parse_calendar, prop, props, text_prop, EVENT_KIND, TASK_KIND,
 };
 use crate::features::calendar::ics::dates::{
-    DTO_DATE, DateValue, all_day_exdate, canonical, iso_line, parse_date_line, parse_date_text,
+    parse_date_line, parse_date_text, stamp_from_line, DateValue,
 };
 use crate::features::calendar::ics::read_task::task_from_component;
 use ical::tree::cst::IcalCst;
@@ -74,21 +74,18 @@ pub(super) fn event_from_component(component: &IcalCst<'_>) -> Result<AppEvent, 
         .ok_or_else(|| AppError::InvalidInput(format!("VEVENT {uid} has no parseable DTSTART")))?;
     let timezone = start.tzid().map(ToString::to_string);
     let is_all_day = start.is_date();
-    let start_time = canonical(&start, timezone.as_deref())
-        .ok_or_else(|| AppError::InvalidInput(format!("VEVENT {uid} has an invalid DTSTART")))?;
+    let start_time = start.canonical(timezone.as_deref());
     let end_time = prop(component, "DTEND")
         .and_then(parse_date_line)
-        .and_then(|end| canonical(&end, timezone.as_deref()))
-        .unwrap_or_else(|| default_end(&start, &start_time, is_all_day));
+        .map_or_else(
+            || default_end(&start, start_time),
+            |end| end.canonical(timezone.as_deref()),
+        );
 
     let recurrence = prop(component, "RECURRENCE-ID").and_then(parse_date_line);
-    let original_start_time = recurrence.and_then(|value| canonical(&value, timezone.as_deref()));
-    let id = original_start_time
-        .as_ref()
-        .map_or_else(|| uid.clone(), |original| format!("{uid}@{original}"));
-    let recurring_event_id = original_start_time
-        .as_ref()
-        .map(|_| EventId::from(uid.clone()));
+    let original_start_time = recurrence.map(|value| value.canonical(timezone.as_deref()));
+    let id = original_start_time.map_or_else(|| uid.clone(), |original| format!("{uid}@{original}"));
+    let recurring_event_id = original_start_time.map(|_| EventId::from(uid.clone()));
 
     Ok(AppEvent {
         id: EventId::from(id),
@@ -106,10 +103,10 @@ pub(super) fn event_from_component(component: &IcalCst<'_>) -> Result<AppEvent, 
         recurring_event_id,
         original_start_time,
         status: prop(component, "STATUS").and_then(event_status),
-        updated_at: prop(component, "LAST-MODIFIED").and_then(iso_line),
+        updated_at: prop(component, "LAST-MODIFIED").and_then(stamp_from_line),
         added: prop(component, "CREATED")
-            .and_then(iso_line)
-            .or_else(|| prop(component, "DTSTAMP").and_then(iso_line)),
+            .and_then(stamp_from_line)
+            .or_else(|| prop(component, "DTSTAMP").and_then(stamp_from_line)),
         color: text_prop(component, "COLOR").and_then(|value| Color::try_from(value).ok()),
         etag: None,
         is_all_day: Some(is_all_day),
@@ -165,22 +162,20 @@ pub(super) fn joined_rrule(component: &IcalCst<'_>) -> Option<String> {
     (!values.is_empty()).then(|| values.join("\n"))
 }
 
-fn default_end(start: &DateValue, start_time: &str, is_all_day: bool) -> String {
-    if is_all_day {
-        if let DateValue::Date(date) = start {
-            if let Some(next) = date.succ_opt() {
-                return next.format(DTO_DATE).to_string();
-            }
+const fn default_end(start: &DateValue, start_time: CalendarDateTime) -> CalendarDateTime {
+    if let DateValue::Date(date) = start {
+        if let Some(next) = date.succ_opt() {
+            return CalendarDateTime::Date(next);
         }
     }
-    start_time.to_string()
+    start_time
 }
 
 fn read_exdates(
     component: &IcalCst<'_>,
     timezone: Option<&str>,
     is_all_day: bool,
-) -> Option<Vec<String>> {
+) -> Option<Vec<CalendarDateTime>> {
     let mut values = Vec::new();
     for line in props(component, "EXDATE") {
         let value_type = line.param::<VALUE>();
@@ -190,14 +185,12 @@ fn read_exdates(
             else {
                 continue;
             };
-            let formatted = if is_all_day {
-                all_day_exdate(&parsed, timezone)
+            let value = if is_all_day {
+                parsed.all_day_exdate(timezone)
             } else {
-                canonical(&parsed, timezone)
+                parsed.canonical(timezone)
             };
-            if let Some(value) = formatted {
-                values.push(value);
-            }
+            values.push(value);
         }
     }
     (!values.is_empty()).then_some(values)

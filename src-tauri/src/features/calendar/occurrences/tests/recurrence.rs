@@ -55,7 +55,7 @@ fn cancelled_all_day_occurrence_is_suppressed() {
     let mut cancelled = event("evt-2", "2026-09-14", "2026-09-15");
     cancelled.is_all_day = Some(true);
     cancelled.recurring_event_id = Some(EventId::from("evt-1"));
-    cancelled.original_start_time = Some("2026-09-14".into());
+    cancelled.original_start_time = Some("2026-09-14".parse().unwrap());
     cancelled.status = Some(EventStatus::Cancelled);
 
     let instances = expand_event_instances(&[master, cancelled], "2026-09-07", "2026-10-04");
@@ -69,7 +69,7 @@ fn an_exdate_suppresses_an_all_day_occurrence() {
     let mut master = event("evt-1", "2026-09-07", "2026-09-08");
     master.rrule = Some("RRULE:FREQ=WEEKLY;BYDAY=MO".into());
     master.is_all_day = Some(true);
-    master.exdates = Some(vec!["2026-09-14".into()]);
+    master.exdates = Some(vec!["2026-09-14".parse().unwrap()]);
 
     let instances = expand_event_instances(&[master], "2026-09-07", "2026-10-04");
 
@@ -81,7 +81,7 @@ fn an_exdate_suppresses_an_all_day_occurrence() {
 fn an_exdate_suppresses_a_timed_occurrence() {
     let mut master = event("evt-1", "2026-09-01T09:00:00Z", "2026-09-01T09:30:00Z");
     master.rrule = Some("RRULE:FREQ=DAILY;COUNT=3".into());
-    master.exdates = Some(vec!["2026-09-02T09:00:00".into()]);
+    master.exdates = Some(vec!["2026-09-02T09:00:00".parse().unwrap()]);
 
     let instances =
         expand_event_instances(&[master], "2026-09-01T00:00:00Z", "2026-09-03T23:59:59Z");
@@ -126,7 +126,7 @@ fn a_wall_clock_exception_moves_its_slot_in_the_event_zone() {
     let mut moved = event("evt-2", "2026-10-28T11:00:00", "2026-10-28T12:00:00");
     moved.timezone = Some("Asia/Kolkata".into());
     moved.recurring_event_id = Some(EventId::from("evt-1"));
-    moved.original_start_time = Some("2026-10-26T11:00:00".into());
+    moved.original_start_time = Some("2026-10-26T11:00:00".parse().unwrap());
 
     let instances = expand_event_instances(
         &[master, moved],
@@ -154,7 +154,7 @@ fn moved_occurrence_renders_once_at_its_new_time() {
 
     let mut moved = event("evt-2", "2026-09-02T14:00:00Z", "2026-09-02T14:30:00Z");
     moved.recurring_event_id = Some(EventId::from("evt-1"));
-    moved.original_start_time = Some("2026-09-02T09:00:00Z".into());
+    moved.original_start_time = Some("2026-09-02T09:00:00Z".parse().unwrap());
 
     let instances = expand_event_instances(
         &[master, moved],
@@ -182,7 +182,7 @@ fn a_moved_occurrence_reports_the_master_rule() {
 
     let mut moved = event("evt-2", "2026-09-02T14:00:00Z", "2026-09-02T14:30:00Z");
     moved.recurring_event_id = Some(EventId::from("evt-1"));
-    moved.original_start_time = Some("2026-09-02T09:00:00Z".into());
+    moved.original_start_time = Some("2026-09-02T09:00:00Z".parse().unwrap());
 
     let instances = expand_event_instances(
         &[master, moved],

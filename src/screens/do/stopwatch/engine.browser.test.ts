@@ -67,7 +67,12 @@ beforeEach(async () => {
     await stopwatchState.init();
     flushSync();
     if (wasInBreak) {
-        await vi.waitFor(() => { expect(runtime.emit).toHaveBeenCalledWith(SCREEN_EFFECT, undefined); });
+        await vi.waitFor(() => {
+            const cleared = runtime.emit.mock.calls.some(
+                ([ev, payload]) => ev === SCREEN_EFFECT && payload === undefined,
+            );
+            if (!cleared) throw new Error('Waiting for break screen effect clear');
+        });
     }
     tauri.reset();
     runtime.emit.mockClear();

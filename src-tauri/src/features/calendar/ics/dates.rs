@@ -1,26 +1,19 @@
 //! Date, date-time and ISO-8601 duration conversions for iCalendar properties.
 
+use crate::features::calendar::domain::{
+    utc_to_wall_clock, CalendarDateTime, ICAL_DATE, ICAL_DATE_TIME, ICAL_UTC,
+};
 use crate::features::calendar::ics::cst::encode;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use chrono_tz::Tz as ChronoTz;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use ical::param::IcalParam;
 use ical::prop::IcalPropKind;
 use ical::tree::line::IcalLine;
 use ical::tree::param::tzid::TZID;
 use ical::tree::param::value::VALUE;
-use ical::value::IcalValue;
 use ical::value::datetime::{IcalDate, IcalDateTime};
 use ical::value::duration::IcalDuration;
+use ical::value::IcalValue;
 use std::borrow::Cow;
-use std::str::FromStr;
-
-pub(super) const ICAL_DATE: &str = "%Y%m%d";
-pub(super) const ICAL_DATE_TIME: &str = "%Y%m%dT%H%M%S";
-pub(super) const ICAL_UTC: &str = "%Y%m%dT%H%M%SZ";
-pub(super) const DTO_DATE: &str = "%Y-%m-%d";
-pub(super) const DTO_DATE_LEN: usize = "YYYY-MM-DD".len();
-pub(super) const DTO_DATE_TIME: &str = "%Y-%m-%dT%H:%M:%S";
-pub(super) const DTO_ISO: &str = "%Y-%m-%dT%H:%M:%SZ";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DateValue {
@@ -52,6 +45,36 @@ impl DateValue {
             }
         }
     }
+
+    pub(super) fn wall_clock(&self, zone: Option<&str>) -> Option<NaiveDateTime> {
+        match self {
+            Self::Date(_) => None,
+            Self::Timed { naive, utc, .. } => Some(if *utc {
+                utc_to_wall_clock(naive.and_utc(), zone)
+            } else {
+                *naive
+            }),
+        }
+    }
+
+    pub(super) fn canonical(&self, zone: Option<&str>) -> CalendarDateTime {
+        match self {
+            Self::Date(date) => CalendarDateTime::Date(*date),
+            Self::Timed { .. } => CalendarDateTime::WallClock(
+                self.wall_clock(zone).unwrap_or_else(|| match self {
+                    Self::Timed { naive, .. } => *naive,
+                    Self::Date(date) => date.and_time(chrono::NaiveTime::MIN),
+                }),
+            ),
+        }
+    }
+
+    pub(super) fn all_day_exdate(&self, zone: Option<&str>) -> CalendarDateTime {
+        match self {
+            Self::Date(date) => CalendarDateTime::Date(*date),
+            Self::Timed { .. } => CalendarDateTime::Date(self.canonical(zone).date()),
+        }
+    }
 }
 
 pub(super) fn parse_date_line(line: &IcalLine<'_>) -> Option<DateValue> {
@@ -81,43 +104,10 @@ pub(super) fn parse_date_text(
     })
 }
 
-pub(super) fn wall_clock(value: &DateValue, zone: Option<&str>) -> Option<NaiveDateTime> {
-    match value {
-        DateValue::Date(_) => None,
-        DateValue::Timed { naive, utc, .. } => Some(if *utc {
-            utc_naive_to_zone(*naive, zone)
-        } else {
-            *naive
-        }),
-    }
-}
-
-pub(super) fn canonical(value: &DateValue, zone: Option<&str>) -> Option<String> {
-    match value {
-        DateValue::Date(date) => Some(date.format(DTO_DATE).to_string()),
-        DateValue::Timed { .. } => {
-            wall_clock(value, zone).map(|naive| naive.format(DTO_DATE_TIME).to_string())
-        }
-    }
-}
-
-pub(super) fn all_day_exdate(value: &DateValue, zone: Option<&str>) -> Option<String> {
-    match value {
-        DateValue::Date(date) => Some(date.format(DTO_DATE).to_string()),
-        DateValue::Timed { .. } => {
-            wall_clock(value, zone).map(|naive| naive.date().format(DTO_DATE).to_string())
-        }
-    }
-}
-
-pub(super) fn iso_line(line: &IcalLine<'_>) -> Option<String> {
+pub(super) fn stamp_from_line(line: &IcalLine<'_>) -> Option<DateTime<Utc>> {
     match parse_date_line(line)? {
-        DateValue::Date(date) => Some(date.format(DTO_DATE).to_string()),
-        DateValue::Timed { naive, utc, .. } => Some(
-            naive
-                .format(if utc { DTO_ISO } else { DTO_DATE_TIME })
-                .to_string(),
-        ),
+        DateValue::Date(date) => date.and_hms_opt(0, 0, 0).map(|dt| dt.and_utc()),
+        DateValue::Timed { naive, .. } => Some(naive.and_utc()),
     }
 }
 
@@ -125,9 +115,10 @@ pub(super) fn is_date_time(raw: &str) -> bool {
     NaiveDateTime::parse_from_str(raw.trim_suffix('Z'), ICAL_DATE_TIME).is_ok()
 }
 
-pub(super) fn absolute_trigger(raw: &str) -> Option<String> {
-    let naive = NaiveDateTime::parse_from_str(raw.strip_suffix('Z')?, ICAL_DATE_TIME).ok()?;
-    Some(naive.format(DTO_ISO).to_string())
+pub(super) fn absolute_trigger(raw: &str) -> Option<DateTime<Utc>> {
+    NaiveDateTime::parse_from_str(raw.strip_suffix('Z')?, ICAL_DATE_TIME)
+        .ok()
+        .map(|naive| naive.and_utc())
 }
 
 /// Whole minutes in an ISO-8601 duration via `ical-rs`; non-whole-minute
@@ -148,35 +139,22 @@ pub(super) fn duration_whole_minutes(raw: &str) -> Option<i32> {
         .flatten()
 }
 
-pub(super) fn parse_datetime(value: &str) -> Option<NaiveDateTime> {
-    if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
-        return Some(datetime.with_timezone(&Utc).naive_utc());
-    }
-    NaiveDateTime::parse_from_str(value, DTO_DATE_TIME)
-        .ok()
-        .or_else(|| {
-            NaiveDate::parse_from_str(value, DTO_DATE)
-                .ok()
-                .and_then(|date| date.and_hms_opt(0, 0, 0))
-        })
-}
-
 pub(super) fn date_line(
     kind: IcalPropKind,
-    value: &str,
+    value: CalendarDateTime,
     all_day: bool,
     zone: Option<&str>,
 ) -> Option<IcalLine<'static>> {
     if all_day {
-        let date =
-            NaiveDate::parse_from_str(value.get(..DTO_DATE_LEN).unwrap_or(value), DTO_DATE).ok()?;
         return Some(encode(
             kind,
             vec![IcalParam::Value(Cow::Borrowed("DATE"))],
-            IcalValue::Date(IcalDate(Cow::Owned(date.format(ICAL_DATE).to_string()))),
+            IcalValue::Date(IcalDate(Cow::Owned(
+                value.date().format(ICAL_DATE).to_string(),
+            ))),
         ));
     }
-    let naive = write_wall_clock(value, zone)?;
+    let naive = value.to_wall_clock(zone)?;
     let params = zone.map_or_default(|tz| vec![IcalParam::TzId(Cow::Borrowed(tz))]);
     Some(encode(
         kind,
@@ -189,50 +167,19 @@ pub(super) fn date_line(
 
 pub(super) fn task_date_line(
     kind: IcalPropKind,
-    value: Option<&str>,
+    value: Option<CalendarDateTime>,
     zone: Option<&str>,
 ) -> Option<IcalLine<'static>> {
     let value = value?;
-    date_line(
-        kind,
-        value,
-        NaiveDate::parse_from_str(value, DTO_DATE).is_ok(),
-        zone,
-    )
+    date_line(kind, value, value.is_date(), zone)
 }
 
-pub(super) fn stamp_line(kind: IcalPropKind, value: &str) -> Option<IcalLine<'static>> {
-    let datetime = parse_datetime(value)?;
-    Some(encode(
+pub(super) fn stamp_line(kind: IcalPropKind, value: DateTime<Utc>) -> IcalLine<'static> {
+    encode(
         kind,
         Vec::new(),
         IcalValue::DateTime(IcalDateTime(Cow::Owned(
-            datetime.format(ICAL_UTC).to_string(),
+            value.format(ICAL_UTC).to_string(),
         ))),
-    ))
-}
-
-fn write_wall_clock(value: &str, zone: Option<&str>) -> Option<NaiveDateTime> {
-    if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
-        let utc = datetime.with_timezone(&Utc);
-        return Some(
-            zone.and_then(|name| ChronoTz::from_str(name).ok())
-                .map_or_else(
-                    || utc.naive_utc(),
-                    |timezone| utc.with_timezone(&timezone).naive_local(),
-                ),
-        );
-    }
-    NaiveDateTime::parse_from_str(value, DTO_DATE_TIME)
-        .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S"))
-        .ok()
-}
-
-fn utc_naive_to_zone(naive: NaiveDateTime, zone: Option<&str>) -> NaiveDateTime {
-    let Some(tz) = zone.and_then(|name| ChronoTz::from_str(name).ok()) else {
-        return naive;
-    };
-    Utc.from_utc_datetime(&naive)
-        .with_timezone(&tz)
-        .naive_local()
+    )
 }

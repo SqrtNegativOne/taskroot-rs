@@ -2,14 +2,12 @@
 
 use crate::features::calendar::domain::{
     AppEvent, AppTask, AppTaskStatus, EventStatus, Tag, TaskAlarmAnchor, TaskAlarmTrigger,
-    TaskPriority,
+    TaskPriority, ICAL_UTC,
 };
 use crate::features::calendar::ics::cst::{
-    ALARM_KIND, encode, is_dependency_relation, is_parent_relation, strip_cr, text_line,
+    encode, is_dependency_relation, is_parent_relation, strip_cr, text_line, ALARM_KIND,
 };
-use crate::features::calendar::ics::dates::{
-    DTO_DATE_LEN, ICAL_UTC, date_line, parse_datetime, stamp_line, task_date_line,
-};
+use crate::features::calendar::ics::dates::{date_line, stamp_line, task_date_line};
 use chrono::Utc;
 use ical::param::IcalParam;
 use ical::prop::{IcalPropKind, IcalPropName};
@@ -70,15 +68,8 @@ pub(super) fn is_owned_task_prop(line: &IcalLine<'_>) -> bool {
         || is_dependency_relation(line)
 }
 
-pub(super) fn is_all_day(event: &AppEvent) -> bool {
-    event.is_all_day.unwrap_or_else(|| {
-        let value = event.start_time.as_str();
-        value.len() == DTO_DATE_LEN && !value.contains('T') && !value.contains(' ')
-    })
-}
-
 pub(super) fn event_lines(event: &AppEvent) -> Vec<IcalLine<'static>> {
-    let all_day = is_all_day(event);
+    let all_day = event.is_all_day();
     let zone = event.timezone.as_deref();
     let mut lines = vec![text_line(IcalPropKind::Summary, &event.title)];
     lines.extend(
@@ -89,15 +80,15 @@ pub(super) fn event_lines(event: &AppEvent) -> Vec<IcalLine<'static>> {
     );
     lines.extend(date_line(
         IcalPropKind::DtStart,
-        &event.start_time,
+        event.start_time,
         all_day,
         zone,
     ));
-    lines.extend(date_line(IcalPropKind::DtEnd, &event.end_time, all_day, zone));
+    lines.extend(date_line(IcalPropKind::DtEnd, event.end_time, all_day, zone));
     lines.extend(priority_line(event.priority.as_ref()));
     lines.extend(category_line(event.tags.as_deref()));
     lines.extend(rrule_lines(event.rrule.as_deref()));
-    for exdate in event.exdates.as_deref().unwrap_or_default() {
+    for &exdate in event.exdates.as_deref().unwrap_or_default() {
         lines.extend(date_line(IcalPropKind::ExDate, exdate, all_day, zone));
     }
     if let Some(status) = event.status.as_ref() {
@@ -126,7 +117,7 @@ pub(super) fn event_lines(event: &AppEvent) -> Vec<IcalLine<'static>> {
 
 pub(super) fn task_lines(task: &AppTask) -> Vec<IcalLine<'static>> {
     let done = task.status == Some(AppTaskStatus::Done);
-    let stamp = Utc::now().format(ICAL_UTC).to_string();
+    let now = Utc::now();
     let zone = task.timezone.as_deref();
     let status = match task.status.as_ref() {
         Some(AppTaskStatus::NextUp) => "IN-PROCESS",
@@ -141,21 +132,15 @@ pub(super) fn task_lines(task: &AppTask) -> Vec<IcalLine<'static>> {
             .as_deref()
             .map(|text| text_line(IcalPropKind::Description, text)),
     );
-    lines.extend(task_date_line(
-        IcalPropKind::DtStart,
-        task.start.as_deref(),
-        zone,
-    ));
-    lines.extend(task_date_line(IcalPropKind::Due, task.due.as_deref(), zone));
+    lines.extend(task_date_line(IcalPropKind::DtStart, task.start, zone));
+    lines.extend(task_date_line(IcalPropKind::Due, task.due, zone));
     lines.extend(rrule_lines(task.rrule.as_deref()));
     lines.push(text_line(IcalPropKind::Status, status));
     if done {
-        lines.push(
-            task.completed_at
-                .as_deref()
-                .and_then(|at| stamp_line(IcalPropKind::Completed, at))
-                .unwrap_or_else(|| utc_line(IcalPropKind::Completed, &stamp)),
-        );
+        lines.push(stamp_line(
+            IcalPropKind::Completed,
+            task.completed_at.unwrap_or(now),
+        ));
         lines.push(encode(
             IcalPropKind::PercentComplete,
             Vec::new(),
@@ -197,19 +182,17 @@ pub(super) fn task_lines(task: &AppTask) -> Vec<IcalLine<'static>> {
     }));
     lines.extend(
         task.added
-            .as_deref()
-            .and_then(|added| stamp_line(IcalPropKind::Created, added)),
+            .map(|added| stamp_line(IcalPropKind::Created, added)),
     );
     lines.extend(
         task.updated_at
-            .as_deref()
-            .and_then(|updated| stamp_line(IcalPropKind::LastModified, updated)),
+            .map(|updated| stamp_line(IcalPropKind::LastModified, updated)),
     );
-    lines.push(utc_line(IcalPropKind::DtStamp, &stamp));
+    lines.push(stamp_line(IcalPropKind::DtStamp, now));
     lines
 }
 
-pub(super) fn alarm_trigger_line(alarm: &TaskAlarmTrigger) -> Option<IcalLine<'static>> {
+pub(super) fn alarm_trigger_line(alarm: &TaskAlarmTrigger) -> IcalLine<'static> {
     match alarm {
         TaskAlarmTrigger::Relative {
             minutes_before,
@@ -224,40 +207,29 @@ pub(super) fn alarm_trigger_line(alarm: &TaskAlarmTrigger) -> Option<IcalLine<'s
             } else {
                 format!("PT{}M", minutes_before.unsigned_abs())
             };
-            Some(encode(
+            encode(
                 IcalPropKind::Trigger,
                 vec![IcalParam::Related(Cow::Borrowed(related))],
                 IcalValue::Duration(IcalDuration(Cow::Owned(dur))),
-            ))
+            )
         }
-        TaskAlarmTrigger::Absolute { at } => {
-            let stamp = parse_datetime(at)?;
-            Some(encode(
-                IcalPropKind::Trigger,
-                vec![IcalParam::Value(Cow::Borrowed("DATE-TIME"))],
-                IcalValue::DateTime(IcalDateTime(Cow::Owned(stamp.format(ICAL_UTC).to_string()))),
-            ))
-        }
+        TaskAlarmTrigger::Absolute { at } => encode(
+            IcalPropKind::Trigger,
+            vec![IcalParam::Value(Cow::Borrowed("DATE-TIME"))],
+            IcalValue::DateTime(IcalDateTime(Cow::Owned(at.format(ICAL_UTC).to_string()))),
+        ),
     }
 }
 
-pub(super) fn build_alarm_component(alarm: &TaskAlarmTrigger) -> Option<IcalCst<'static>> {
+pub(super) fn build_alarm_component(alarm: &TaskAlarmTrigger) -> IcalCst<'static> {
     let mut component = IcalCst::empty(ALARM_KIND);
-    component.push_line(alarm_trigger_line(alarm)?);
+    component.push_line(alarm_trigger_line(alarm));
     component.push_line(text_line(IcalPropKind::Action, "DISPLAY"));
     component.push_line(text_line(
         IcalPropKind::Description,
         "Default Tasks.org description",
     ));
-    Some(component)
-}
-
-pub(super) fn utc_line(kind: IcalPropKind, stamp: &str) -> IcalLine<'static> {
-    encode(
-        kind,
-        Vec::new(),
-        IcalValue::DateTime(IcalDateTime(Cow::Owned(stamp.to_string()))),
-    )
+    component
 }
 
 fn priority_line(priority: Option<&TaskPriority>) -> Option<IcalLine<'static>> {

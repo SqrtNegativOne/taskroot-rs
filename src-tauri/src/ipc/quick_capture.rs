@@ -4,8 +4,8 @@ use specta::Type;
 
 use crate::error::AppError;
 use crate::features::calendar::{
-    app_calendar, parse_quick_capture as parse_draft, AppCalendar, CalendarComponent, CalendarInfo,
-    Store,
+    app_calendar, parse_quick_capture as parse_draft, AppCalendar, CalendarComponent,
+    CalendarDateTime, CalendarInfo, Store,
 };
 use crate::ipc::session::store_state;
 
@@ -13,7 +13,7 @@ use crate::ipc::session::store_state;
 #[serde(rename_all = "camelCase")]
 pub struct QuickCapturePreview {
     pub title: String,
-    pub due: Option<String>,
+    pub due: Option<CalendarDateTime>,
     pub has_time: bool,
     pub tags: Vec<String>,
     pub priority: Option<crate::features::calendar::TaskPriority>,
@@ -41,7 +41,7 @@ pub async fn parse_quick_capture(
 
 fn preview(store: &Store, text: &str, today: NaiveDate) -> QuickCapturePreview {
     let draft = parse_draft(text, today);
-    let has_time = draft.due.as_deref().is_some_and(|due| due.contains('T'));
+    let has_time = draft.due.is_some_and(CalendarDateTime::is_timed);
     let (list, list_error) = resolve_list(store, draft.list_name.as_deref());
 
     QuickCapturePreview {
@@ -222,7 +222,10 @@ mod tests {
         let result = preview(&store, "Finish PCC next wed 3pm #work p1 +work", today);
 
         assert_eq!(result.title, "Finish PCC");
-        assert_eq!(result.due.as_deref(), Some("2026-11-25T15:00:00"));
+        assert_eq!(
+            result.due.map(|value| value.to_string()).as_deref(),
+            Some("2026-11-25T15:00:00")
+        );
         assert!(result.has_time);
         assert_eq!(result.tags, vec!["work"]);
         assert_eq!(

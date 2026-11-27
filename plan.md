@@ -19,7 +19,6 @@
 ## Phase 4 — Evaluate later (only if pain grows)
 
 - [ ] **CalDAV client (`libdav`)** — consider replacing ~1,000 LOC in `caldav/{xml,discovery,transport,client}.rs` if targeting servers beyond Radicale (Fastmail, Nextcloud, iCloud, Baïkal).
-- [ ] **Typed dates/times across domain DTOs** — consolidate duplicated `ICAL_DATE`/`DTO_DATE`/`wall_clock`/`is_all_day` parsing across `ics/`, `event_timing.rs`, and `recurrence.rs`.
 - [ ] **Optional frontend ergonomics** `chrono-node` (TS) if quick-capture needs richer natural-language dates; JS `rrule` `toText()` if recurrence UX expands beyond the 6 presets.
 
 ## Library & Language Decision Notes

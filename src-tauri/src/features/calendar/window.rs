@@ -4,6 +4,7 @@
 //! Date-only boundaries are interpreted in the host's local calendar (the
 //! user's timezone); instants are used as-is.
 
+use crate::features::calendar::domain::DTO_DATE;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 
 pub struct RenderWindow {
@@ -42,14 +43,14 @@ fn parse_boundary_date(iso: &str) -> Option<NaiveDate> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
         return Some(dt.with_timezone(&chrono::Local).date_naive());
     }
-    NaiveDate::parse_from_str(iso, "%Y-%m-%d").ok()
+    NaiveDate::parse_from_str(iso, DTO_DATE).ok()
 }
 
 fn parse_boundary_instant(iso: &str, end_of_day: bool) -> Option<DateTime<Utc>> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
         return Some(dt.with_timezone(&Utc));
     }
-    let date = NaiveDate::parse_from_str(iso, "%Y-%m-%d").ok()?;
+    let date = NaiveDate::parse_from_str(iso, DTO_DATE).ok()?;
     let time = if end_of_day {
         NaiveTime::from_hms_opt(23, 59, 59)?
     } else {

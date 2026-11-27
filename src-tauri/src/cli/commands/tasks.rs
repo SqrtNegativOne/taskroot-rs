@@ -1,6 +1,6 @@
 //! Task verbs: list, show, add, set, done, remove.
 
-use chrono::{SecondsFormat, Utc};
+use chrono::{SubsecRound, Utc};
 
 use crate::error::AppError;
 use crate::features::calendar::CalendarComponent;
@@ -97,7 +97,7 @@ pub async fn done_task(ids: &[String]) -> Result<(), AppError> {
     for id in ids {
         let mut task = find_task(&session.store, id)?;
         task.status = Some(AppTaskStatus::Done);
-        task.completed_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true));
+        task.completed_at = Some(Utc::now().trunc_subsecs(0));
 
         ops::update_task(&mut session.store, &session.client, task.clone()).await?;
         updated.push(find_task(&session.store, task.id.as_str())?);
@@ -152,11 +152,11 @@ pub(crate) fn apply_task_fields(task: &mut AppTask, fields: &TaskFields) {
     if let Some(notes) = &fields.notes {
         task.notes = Some(notes.clone());
     }
-    if let Some(due) = &fields.due {
-        task.due = Some(due.clone());
+    if let Some(due) = fields.due {
+        task.due = Some(due);
     }
-    if let Some(start) = &fields.start {
-        task.start = Some(start.clone());
+    if let Some(start) = fields.start {
+        task.start = Some(start);
     }
     if let Some(priority) = fields.priority {
         task.priority = Some(priority.into());
@@ -228,8 +228,8 @@ mod tests {
 
         assert_eq!(task.title, "new title");
         assert_eq!(task.notes.as_deref(), Some("a note"));
-        assert_eq!(task.due.as_deref(), Some("2026-10-28"));
-        assert_eq!(task.start.as_deref(), Some("2026-10-27"));
+        assert_eq!(task.due, Some("2026-10-28".parse().unwrap()));
+        assert_eq!(task.start, Some("2026-10-27".parse().unwrap()));
         assert_eq!(task.priority, Some(TaskPriority::Urgent));
         assert_eq!(task.status, Some(AppTaskStatus::NextUp));
         assert_eq!(task.timezone.as_deref(), Some("Asia/Calcutta"));

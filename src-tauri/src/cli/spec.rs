@@ -2,7 +2,7 @@
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::features::calendar::{AppTaskStatus, TaskPriority};
+use crate::features::calendar::{AppTaskStatus, CalendarDateTime, TaskPriority};
 
 pub const HELP_TAIL: &str = "\
 An id may be a unique prefix. Verbs that take <id>... accept several ids and do
@@ -140,10 +140,10 @@ pub struct TaskFields {
     pub notes: Option<String>,
     /// Task due date
     #[arg(long, value_name = "DATE")]
-    pub due: Option<String>,
+    pub due: Option<CalendarDateTime>,
     /// Task start date
     #[arg(long, value_name = "DATE")]
-    pub start: Option<String>,
+    pub start: Option<CalendarDateTime>,
     /// Priority (0-4 or none/low/medium/high/urgent)
     #[arg(long, value_enum)]
     pub priority: Option<CliPriority>,
@@ -205,10 +205,10 @@ pub struct EventAddArgs {
     pub title: String,
     /// Event start
     #[arg(long, value_name = "DATE")]
-    pub start: String,
+    pub start: CalendarDateTime,
     /// Event end
     #[arg(long, value_name = "DATE")]
-    pub end: String,
+    pub end: CalendarDateTime,
     /// Description
     #[arg(long, value_name = "TEXT")]
     pub notes: Option<String>,
@@ -260,7 +260,7 @@ mod tests {
             panic!("expected task-add");
         };
         assert_eq!(args.title, "--not-a-flag");
-        assert_eq!(args.fields.due.as_deref(), Some("2026-10-28"));
+        assert_eq!(args.fields.due, Some("2026-10-28".parse().unwrap()));
         assert_eq!(args.fields.priority, Some(CliPriority::High));
 
         let show = parse(&["task-show", "--", "-dash-id", "b7c1"]).unwrap();

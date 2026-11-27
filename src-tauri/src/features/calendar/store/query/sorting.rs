@@ -68,25 +68,22 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
         AppTaskFilterColumn::Priority => {
             priority_number(a.priority.as_ref()).cmp(&priority_number(b.priority.as_ref()))
         }
-        AppTaskFilterColumn::Start => a
-            .start
-            .as_deref()
-            .unwrap_or("9999")
-            .cmp(b.start.as_deref().unwrap_or("9999")),
-        AppTaskFilterColumn::Due => a
-            .due
-            .as_deref()
-            .unwrap_or("9999")
-            .cmp(b.due.as_deref().unwrap_or("9999")),
-        AppTaskFilterColumn::Added => a
-            .added
-            .as_deref()
-            .unwrap_or("9999")
-            .cmp(b.added.as_deref().unwrap_or("9999")),
+        AppTaskFilterColumn::Start => compare_opt(a.start, b.start),
+        AppTaskFilterColumn::Due => compare_opt(a.due, b.due),
+        AppTaskFilterColumn::Added => compare_opt(a.added, b.added),
         AppTaskFilterColumn::Tags => {
             tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref()))
         }
         AppTaskFilterColumn::Remotecollectionid => collection_id(a).cmp(collection_id(b)),
+    }
+}
+
+fn compare_opt<T: Ord>(a: Option<T>, b: Option<T>) -> Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => a.cmp(&b),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
     }
 }
 

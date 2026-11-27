@@ -40,7 +40,7 @@ fn e2e_task(task_id: &str) -> AppTask {
         remote_collection_id: None,
         notes: Some("created by the migration E2E check".to_string()),
         start: None,
-        due: Some("2026-12-02".to_string()),
+        due: Some("2026-12-02".parse().expect("valid date")),
         completed_at: None,
         rrule: None,
         geo: None,
@@ -79,8 +79,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         description: Some("created by the migration E2E check".to_string()),
         priority: None,
         tags: None,
-        start_time: "2026-12-01T10:00:00".to_string(),
-        end_time: "2026-12-01T11:00:00".to_string(),
+        start_time: "2026-12-01T10:00:00".parse()?,
+        end_time: "2026-12-01T11:00:00".parse()?,
         rrule: None,
         exdates: None,
         recurring_event_id: None,
@@ -104,8 +104,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("created event {href}");
 
     event.title = "Taskroot E2E event edited".to_string();
-    event.start_time = "2026-12-01T15:30:00".to_string();
-    event.end_time = "2026-12-01T16:30:00".to_string();
+    event.start_time = "2026-12-01T15:30:00".parse()?;
+    event.end_time = "2026-12-01T16:30:00".parse()?;
     ops::update_event(&mut store, &client, event.clone()).await?;
     let raw = fetch_one(&client, &href).await?;
     ensure(
@@ -135,7 +135,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     task.title = "Taskroot E2E task edited".to_string();
     task.status = Some(AppTaskStatus::Done);
-    task.due = Some("2026-12-05".to_string());
+    task.due = Some("2026-12-05".parse()?);
     ops::update_task(&mut store, &client, task.clone()).await?;
     let raw = fetch_one(&client, &task_href).await?;
     ensure(

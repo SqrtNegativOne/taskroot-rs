@@ -58,4 +58,26 @@ describe('empty-field filter editing', () => {
         const value = screen.getByRole('textbox', { name: 'Filter value' });
         expect(value instanceof HTMLInputElement && value.value).toBe('');
     });
+
+    it('offers date comparison operators and date placeholder only for date columns', async () => {
+        const operatorValues = () => {
+            const select = screen.getByRole('combobox', { name: 'Filter operator' });
+            if (!(select instanceof HTMLSelectElement)) throw new Error('operator select missing');
+            return Array.from(select.options).map((option) => option.value);
+        };
+
+        await openFilter({ column: 'start', operator: 'is', value: [] });
+        expect(operatorValues()).toContain('before');
+        expect(operatorValues()).toContain('on or after');
+        expect(operatorValues()).toContain('is empty');
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter operator' }), { target: { value: 'before' } });
+        expect(screen.getByPlaceholderText('YYYY-MM-DD or today')).toBeTruthy();
+
+        await fireEvent.change(screen.getByRole('combobox', { name: 'Filter property' }), { target: { value: 'title' } });
+        expect(operatorValues()).toContain('is');
+        expect(operatorValues()).toContain('is not');
+        expect(operatorValues()).not.toContain('before');
+        expect(operatorValues()).not.toContain('after');
+        expect(screen.getByPlaceholderText('Value...')).toBeTruthy();
+    });
 });

@@ -4,7 +4,7 @@
 //! [`crate::features::calendar::ics`]). This module is pure and has no Tauri
 //! dependency; [`super::tauri`] delivers the notifications.
 
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveTime, Utc};
 
 use crate::features::calendar::{
     AppTask, AppTaskStatus, TaskAlarmAnchor, TaskAlarmTrigger,
@@ -61,34 +61,20 @@ pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
 /// The instant one `VALARM` trigger names.
 fn trigger_at(task: &AppTask, trigger: &TaskAlarmTrigger) -> Option<DateTime<Utc>> {
     match trigger {
-        TaskAlarmTrigger::Absolute { at } => DateTime::parse_from_rfc3339(at)
-            .ok()
-            .map(|instant| instant.with_timezone(&Utc)),
+        TaskAlarmTrigger::Absolute { at } => Some(*at),
         TaskAlarmTrigger::Relative {
             minutes_before,
             anchor,
         } => {
             let value = match anchor {
-                TaskAlarmAnchor::Start => task.start.as_deref().or(task.due.as_deref())?,
-                TaskAlarmAnchor::End => task.due.as_deref()?,
+                TaskAlarmAnchor::Start => task.start.or(task.due)?,
+                TaskAlarmAnchor::End => task.due?,
             };
-            let instant = wall_clock(value, task.timezone.as_deref())?;
-            Some(instant.checked_sub_signed(Duration::minutes(i64::from(*minutes_before)))?)
+            let morning = NaiveTime::from_hms_opt(DATE_ONLY_REMINDER_HOUR, 0, 0)?;
+            let instant = value.to_utc_with_default_time(morning, task.timezone.as_deref());
+            instant.checked_sub_signed(Duration::minutes(i64::from(*minutes_before)))
         }
     }
-}
-
-/// Date-only anchors mean "that morning"; timed anchors keep their wall clock in
-/// the task's zone.
-fn wall_clock(value: &str, timezone: Option<&str>) -> Option<DateTime<Utc>> {
-    if let Ok(naive) = NaiveDate::parse_from_str(value, "%Y-%m-%d") {
-        let morning = naive.and_hms_opt(DATE_ONLY_REMINDER_HOUR, 0, 0)?;
-        return crate::features::calendar::wall_clock_to_utc(
-            &morning.format("%Y-%m-%dT%H:%M:%S").to_string(),
-            timezone,
-        );
-    }
-    crate::features::calendar::wall_clock_to_utc(value, timezone)
 }
 
 #[cfg(test)]
@@ -110,7 +96,7 @@ mod tests {
             remote_collection_id: None,
             notes: None,
             start: None,
-            due: Some(due.to_string()),
+            due: Some(due.parse().unwrap()),
             completed_at: None,
             rrule: None,
             geo: None,
@@ -179,7 +165,7 @@ mod tests {
     #[test]
     fn a_start_anchor_prefers_the_start_and_falls_back_to_due() {
         let mut item = task("2026-10-27T10:00:00", before(10), Some("UTC"));
-        item.start = Some("2026-10-27T08:00:00".to_string());
+        item.start = Some("2026-10-27T08:00:00".parse().unwrap());
         item.alarms = Some(vec![TaskAlarmTrigger::Relative {
             minutes_before: 10,
             anchor: TaskAlarmAnchor::Start,
@@ -193,7 +179,7 @@ mod tests {
     #[test]
     fn an_absolute_trigger_uses_its_own_instant() {
         let alarm = TaskAlarmTrigger::Absolute {
-            at: "2026-10-27T09:00:00Z".to_string(),
+            at: "2026-10-27T09:00:00Z".parse().unwrap(),
         };
         let tasks = [task("2026-10-27T10:00:00", alarm, Some("UTC"))];
 

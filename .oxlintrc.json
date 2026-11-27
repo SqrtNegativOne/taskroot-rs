@@ -12,7 +12,8 @@
     "coverage/",
     "src/lib/bindings/"
   ],
-  "jsPlugins": ["oxlint-plugin-complexity"],
+  "plugins": ["typescript", "unicorn", "oxc", "vitest"],
+  "jsPlugins": ["oxlint-plugin-complexity", "eslint-plugin-sonarjs"],
   "rules": {
     "complexity/complexity": [
       "error",
@@ -29,6 +30,24 @@
     "typescript/no-unused-vars": [
       "error",
       { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
-    ]
+    ],
+    "vitest/require-mock-type-parameters": "off",
+    "sonarjs/no-identical-conditions": "error",
+    "sonarjs/no-duplicated-branches": "error",
+    "sonarjs/no-all-duplicated-branches": "error",
+    "sonarjs/no-dead-store": "error",
+    "sonarjs/no-redundant-assignments": "error",
+    "sonarjs/no-redundant-boolean": "error",
+    "sonarjs/no-redundant-jump": "error",
+    "sonarjs/no-inverted-boolean-check": "error",
+    "sonarjs/no-small-switch": "error",
+    "sonarjs/prefer-single-boolean-return": "error",
+    "sonarjs/no-nested-functions": "error",
+    "sonarjs/no-nested-template-literals": "error",
+    "sonarjs/no-collection-size-mischeck": "error",
+    "sonarjs/no-element-overwrite": "error",
+    "sonarjs/no-invariant-returns": "error",
+    "sonarjs/no-parameter-reassignment": "error",
+    "sonarjs/no-useless-increment": "error"
   }
 }

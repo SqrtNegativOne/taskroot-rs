@@ -10,6 +10,7 @@ import {
     withStartDate,
     withStartTime,
 } from './eventDates';
+import { withDate, withTime } from './format';
 
 function allDayEvent(startTime: string, endTime: string) {
     return makeEvent({ startTime, endTime, isAllDay: true });
@@ -142,5 +143,20 @@ describe('moving end', () => {
             endTime: '2026-11-06T08:00:00',
             isAllDay: false,
         });
+    });
+});
+
+describe('date/time formatting helpers', () => {
+    it('preserves timed vs date-only shape in withDate and clears on empty date', () => {
+        expect(withDate('2026-10-27T09:15:00', '2026-10-28')).toBe('2026-10-28T09:15:00');
+        expect(withDate('2026-10-27', '2026-10-28')).toBe('2026-10-28');
+        expect(withDate('2026-10-27T09:15:00', '')).toBeUndefined();
+    });
+
+    it('adds, replaces, clears, or ignores time in withTime', () => {
+        expect(withTime('2026-10-27', '09:15')).toBe('2026-10-27T09:15:00');
+        expect(withTime('2026-10-27T08:00:00', '09:15')).toBe('2026-10-27T09:15:00');
+        expect(withTime('2026-10-27T09:15:00', '')).toBe('2026-10-27');
+        expect(withTime(undefined, '09:15')).toBeUndefined();
     });
 });

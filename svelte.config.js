@@ -22,6 +22,13 @@ const config = {
     runes: true,
     warningFilter: (warning) => !IGNORED_A11Y_WARNINGS.has(warning.code),
   },
+  vitePlugin: {
+    dynamicCompileOptions({ filename }) {
+      if (filename.includes("node_modules")) {
+        return { runes: undefined };
+      }
+    },
+  },
 };
 
 export default config;

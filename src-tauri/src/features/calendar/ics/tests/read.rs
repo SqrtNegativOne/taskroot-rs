@@ -13,8 +13,8 @@ fn mozilla_event_reads_every_owned_field() {
 
     assert_eq!(event.id, EventId::from(MASTER_UID));
     assert_eq!(event.title, "CN");
-    assert_eq!(event.start_time, "2026-10-19T11:00:00");
-    assert_eq!(event.end_time, "2026-10-19T12:00:00");
+    assert_eq!(event.start_time.to_string(), "2026-10-19T11:00:00");
+    assert_eq!(event.end_time.to_string(), "2026-10-19T12:00:00");
     assert_eq!(event.timezone.as_deref(), Some("Asia/Kolkata"));
     assert_eq!(event.is_all_day, Some(false));
     assert_eq!(event.status, Some(EventStatus::Confirmed));
@@ -22,10 +22,16 @@ fn mozilla_event_reads_every_owned_field() {
         event.rrule.as_deref(),
         Some("RRULE:FREQ=WEEKLY;UNTIL=20261218T235959Z")
     );
-    assert_eq!(event.exdates, Some(vec!["2026-10-19T11:00:00".to_string()]));
+    assert_eq!(
+        event.exdates,
+        Some(vec!["2026-10-19T11:00:00".parse().unwrap()])
+    );
     assert_eq!(event.recurring_event_id, None);
     assert_eq!(event.original_start_time, None);
-    assert_eq!(event.updated_at.as_deref(), Some("2026-10-19T06:49:00Z"));
+    assert_eq!(
+        event.updated_at,
+        Some("2026-10-19T06:49:00Z".parse().unwrap())
+    );
     assert_eq!(event.color, None);
     assert_eq!(event.remote_id.as_ref().map(|id| id.0.as_str()), Some(HREF));
     assert_eq!(
@@ -43,8 +49,8 @@ fn all_day_event_stays_a_floating_date() {
         EventId::from("dsh-20261017-first-day-of-durga@dsh-import")
     );
     assert_eq!(event.title, "First Day of Durga");
-    assert_eq!(event.start_time, "2026-10-17");
-    assert_eq!(event.end_time, "2026-10-18");
+    assert_eq!(event.start_time.to_string(), "2026-10-17");
+    assert_eq!(event.end_time.to_string(), "2026-10-18");
     assert_eq!(event.is_all_day, Some(true));
     assert_eq!(event.timezone, None);
     assert_eq!(event.rrule, None);
@@ -67,7 +73,7 @@ fn tasks_org_task_maps_the_workflow_and_the_priority_bucket() {
     assert_eq!(task.title, "Brush");
     assert_eq!(task.status, Some(AppTaskStatus::Todo));
     assert_eq!(task.priority, Some(TaskPriority::Low));
-    assert_eq!(task.added.as_deref(), Some("2026-10-23T12:13:08Z"));
+    assert_eq!(task.added, Some("2026-10-23T12:13:08Z".parse().unwrap()));
     assert_eq!(task.notes, None);
     assert_eq!(task.due, None);
     assert_eq!(task.tags, None);
@@ -90,8 +96,11 @@ fn a_tasks_org_task_maps_start_due_recurrence_geo_and_reminder() {
         "the VTODO UID is the id"
     );
     assert_eq!(task.title, "Water the plants");
-    assert_eq!(task.start.as_deref(), Some("2026-11-05T09:00:00"));
-    assert_eq!(task.due.as_deref(), Some("2026-11-05T18:00:00"));
+    assert_eq!(
+        task.start,
+        Some("2026-11-05T09:00:00".parse().unwrap())
+    );
+    assert_eq!(task.due, Some("2026-11-05T18:00:00".parse().unwrap()));
     assert_eq!(task.timezone.as_deref(), Some("Asia/Kolkata"));
     assert_eq!(task.rrule.as_deref(), Some("RRULE:FREQ=DAILY;COUNT=10"));
     assert_eq!(
@@ -130,8 +139,8 @@ fn an_exception_is_identified_by_uid_at_recurrence_id() {
         EventId::from(format!("{MASTER_UID}@2026-10-26T11:00:00"))
     );
     assert_eq!(
-        events[1].original_start_time.as_deref(),
-        Some("2026-10-26T11:00:00")
+        events[1].original_start_time,
+        Some("2026-10-26T11:00:00".parse().unwrap())
     );
     assert_eq!(
         events[1]

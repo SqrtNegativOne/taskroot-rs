@@ -52,7 +52,7 @@ async fn editing_server() -> (MockServer, CalDavClient) {
 fn occurrence_starts(store: &Store, start: &str, end: &str) -> Vec<String> {
     expand_event_instances(&store.events(), start, end)
         .into_iter()
-        .map(|instance| instance.occurrence_start)
+        .map(|instance| instance.occurrence_start.to_string())
         .collect()
 }
 
@@ -222,7 +222,7 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
         &client,
         "series",
         EventScope::This,
-        Some("2026-10-26T11:00:00"),
+        Some("2026-10-26T11:00:00".parse().unwrap()),
     )
     .await
     .unwrap();
@@ -255,7 +255,7 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
         &client,
         "series",
         EventScope::Following,
-        Some("2026-10-26T11:00:00"),
+        Some("2026-10-26T11:00:00".parse().unwrap()),
     )
     .await
     .unwrap();
@@ -307,11 +307,11 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
         &client,
         ops::Reschedule {
             id: "series".to_string(),
-            start_time: "2026-10-26T08:30:00Z".to_string(),
-            end_time: "2026-10-26T09:00:00Z".to_string(),
+            start_time: "2026-10-26T08:30:00Z".parse().unwrap(),
+            end_time: "2026-10-26T09:00:00Z".parse().unwrap(),
             is_all_day: false,
             scope: EventScope::This,
-            occurrence_start: Some("2026-10-26T11:00:00".to_string()),
+            occurrence_start: Some("2026-10-26T11:00:00".parse().unwrap()),
         },
     )
     .await
@@ -350,8 +350,8 @@ async fn rescheduling_the_series_moves_the_master() {
         &client,
         ops::Reschedule {
             id: "series".to_string(),
-            start_time: "2026-10-19T09:30:00Z".to_string(),
-            end_time: "2026-10-19T10:00:00Z".to_string(),
+            start_time: "2026-10-19T09:30:00Z".parse().unwrap(),
+            end_time: "2026-10-19T10:00:00Z".parse().unwrap(),
             is_all_day: false,
             scope: EventScope::All,
             occurrence_start: None,
@@ -388,11 +388,11 @@ async fn moving_a_series_from_one_occurrence_is_refused() {
         &client,
         ops::Reschedule {
             id: "series".to_string(),
-            start_time: "2026-10-26T08:30:00Z".to_string(),
-            end_time: "2026-10-26T09:00:00Z".to_string(),
+            start_time: "2026-10-26T08:30:00Z".parse().unwrap(),
+            end_time: "2026-10-26T09:00:00Z".parse().unwrap(),
             is_all_day: false,
             scope: EventScope::Following,
-            occurrence_start: Some("2026-10-26T11:00:00".to_string()),
+            occurrence_start: Some("2026-10-26T11:00:00".parse().unwrap()),
         },
     )
     .await

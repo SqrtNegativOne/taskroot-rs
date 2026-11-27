@@ -10,9 +10,10 @@ From the repository root:
 
 ```sh
 bun run check              # svelte-check --tsgo
-bun run lint               # Oxlint then ESLint
-bun run test:unit          # Vitest (jsdom)
-bun run test               # Playwright (boots Vite dev server)
+bun run lint               # Oxlint (TS/JS/Vitest/SonarJS) then cached ESLint (.svelte templates)
+bun run test:unit          # Vitest (`unit` on Node + `browser` in headless Chromium)
+bun run test:unit -- --project unit  # fast pure-TS tests only
+bun run test               # Playwright E2E (boots Vite dev server)
 bun run coverage:frontend
 ```
 
@@ -30,15 +31,21 @@ files must still be `git add`ed). If temp-directory access fails on Windows, see
 
 ## Vitest, Svelte and Playwright
 
-Unit/component tests live beside code as `*.test.ts` using
-`@testing-library/svelte` + jsdom. Shared test utilities live in `src/test/`:
+Frontend tests live beside code and are split into two Vitest projects in
+`vite.config.js`:
+
+- `*.test.ts` (`unit` project): pure TypeScript logic tests running in `node`
+  with no SvelteKit plugin or DOM setup.
+- `*.browser.test.ts` (`browser` project): component, Svelte-rune, and DOM tests
+  running in headless Chromium via `@vitest/browser-playwright` and
+  `@testing-library/svelte` (`screenshotFailures: false`, non-visual).
+
+Shared test utilities live in `src/test/`:
 
 - `factories.ts`: `makeEvent` / `makeInstance` fixtures with partial overrides.
-- `vite.config.js`: sets `conditions: ['browser']` under Vitest so Svelte
-  resolves its browser build and components can mount.
-- `setup.ts`: enables automatic Testing Library DOM cleanup
-  (`@testing-library/svelte/vitest`) and installs no-op Tauri runtime/event
-  globals (mock events explicitly when testing event delivery).
+- `setup.ts` (`browser` project only): enables automatic Testing Library DOM
+  cleanup (`@testing-library/svelte/vitest`) and installs no-op Tauri
+  runtime/event globals (mock events explicitly when testing event delivery).
 - `tauriMock.ts`: shared per-environment IPC mock. Keep the `vi.mock` factory
   top-level so Vitest hoists it, then reset and stub commands in `beforeEach`:
 

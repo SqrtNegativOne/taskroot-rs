@@ -5,7 +5,7 @@
 //! both dates yields two markers, each keyed by `<task-id>@<start|due>`.
 
 use crate::features::calendar::domain::{
-    AppTask, TaskDateInstance, TaskDateKind, TaskDateTiming,
+    AppTask, CalendarDateTime, TaskDateInstance, TaskDateKind, TaskDateTiming,
 };
 use crate::features::calendar::window::RenderWindow;
 
@@ -26,10 +26,7 @@ pub fn expand_task_dates(
             let Some(value) = task_date_value(task, kind) else {
                 continue;
             };
-            let Some(timing) = TaskDateTiming::from_canonical(value, task.timezone.as_deref())
-            else {
-                continue;
-            };
+            let timing = TaskDateTiming::from_calendar_date(value, task.timezone.as_deref());
             if !inside(&timing, &window) {
                 continue;
             }
@@ -47,10 +44,10 @@ pub fn expand_task_dates(
     markers
 }
 
-fn task_date_value(task: &AppTask, kind: TaskDateKind) -> Option<&str> {
+const fn task_date_value(task: &AppTask, kind: TaskDateKind) -> Option<CalendarDateTime> {
     match kind {
-        TaskDateKind::Start => task.start.as_deref(),
-        TaskDateKind::Due => task.due.as_deref(),
+        TaskDateKind::Start => task.start,
+        TaskDateKind::Due => task.due,
     }
 }
 
@@ -80,8 +77,8 @@ mod tests {
             remote_id: None,
             remote_collection_id: None,
             notes: None,
-            start: start.map(str::to_string),
-            due: due.map(str::to_string),
+            start: start.map(|raw| raw.parse().unwrap()),
+            due: due.map(|raw| raw.parse().unwrap()),
             completed_at: None,
             rrule: None,
             geo: None,

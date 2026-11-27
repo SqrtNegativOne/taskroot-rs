@@ -70,7 +70,7 @@ export const commands = {
 	 * 
 	 *  Returns an error when the `CalDAV` delete or rewrite fails.
 	 */
-	deleteEvent: (id: string, scope: EventScope, occurrenceStart: string | null, options?: InvokeOptions) => __TAURI_INVOKE<null>("delete_event", { id, scope, occurrenceStart }, options),
+	deleteEvent: (id: string, scope: EventScope, occurrenceStart: CalendarDateTime | null, options?: InvokeOptions) => __TAURI_INVOKE<null>("delete_event", { id, scope, occurrenceStart }, options),
 	/**
 	 *  Move the clicked occurrence or the whole series to a new time.
 	 * 
@@ -79,7 +79,7 @@ export const commands = {
 	 *  Returns an error when the event is missing, the `CalDAV` write fails, or a
 	 *  `following` move is requested (unsupported).
 	 */
-	rescheduleEvent: (id: string, startTime: string, endTime: string, isAllDay: boolean, scope: EventScope, occurrenceStart: string | null, options?: InvokeOptions) => __TAURI_INVOKE<null>("reschedule_event", { id, startTime, endTime, isAllDay, scope, occurrenceStart }, options),
+	rescheduleEvent: (id: string, startTime: CalendarDateTime, endTime: CalendarDateTime, isAllDay: boolean, scope: EventScope, occurrenceStart: CalendarDateTime | null, options?: InvokeOptions) => __TAURI_INVOKE<null>("reschedule_event", { id, startTime, endTime, isAllDay, scope, occurrenceStart }, options),
 	/**
 	 *  The store's discovered calendars, projected for the frontend.
 	 * 
@@ -407,15 +407,15 @@ export type AppEvent = {
 	description?: string | null,
 	priority?: TaskPriority | null,
 	tags?: Tag[] | null,
-	startTime: string,
-	endTime: string,
+	startTime: CalendarDateTime,
+	endTime: CalendarDateTime,
 	rrule?: string | null,
-	exdates?: string[] | null,
+	exdates?: CalendarDateTime[] | null,
 	recurringEventId?: EventId | null,
-	originalStartTime?: string | null,
+	originalStartTime?: CalendarDateTime | null,
 	status?: EventStatus | null,
 	updatedAt?: string | null,
-	/**  The `CREATED` timestamp (falling back to `DTSTAMP`), ISO 8601. */
+	/**  The `CREATED` timestamp (falling back to `DTSTAMP`), ISO 8601 UTC. */
 	added?: string | null,
 	color?: Color | null,
 	etag?: string | null,
@@ -482,8 +482,8 @@ export type AppTask = {
 	 *  `DTSTART`: the task's start, which tasks.org also uses as "hide until".
 	 *  Canonical form matches [`Self::due`].
 	 */
-	start?: string | null,
-	due?: string | null,
+	start?: CalendarDateTime | null,
+	due?: CalendarDateTime | null,
 	/**  The `COMPLETED` timestamp, ISO 8601 UTC. */
 	completedAt?: string | null,
 	/**  The raw `RRULE` line(s), wire form (`RRULE:FREQ=…`). */
@@ -527,6 +527,8 @@ export type BackendErrorCode = "not-found" | "auth" | "remote" | "invalid-input"
 /**  The component kind stored by a calendar collection. */
 export type CalendarComponent = "VEVENT" | "VTODO";
 
+export type CalendarDateTime = string;
+
 /**  One calendar collection discovered on the server. */
 export type CalendarInfo = {
 	/**  Absolute path on the server, e.g. `/me/2f07…/`. */
@@ -561,7 +563,7 @@ export type EventInstance = {
 	 *  `YYYY-MM-DD` for all-day, wall clock in the event's zone for timed.
 	 *  Excluding it removes exactly this occurrence.
 	 */
-	occurrenceStart: string,
+	occurrenceStart: CalendarDateTime,
 	title: string,
 	description?: string | null,
 	timing: EventTiming,
@@ -590,12 +592,7 @@ export type EventScope =
 
 export type EventStatus = "confirmed" | "tentative" | "cancelled";
 
-/**
- *  The one place that decides whether a mirrored event is all-day or timed.
- * 
- *  Nothing outside this module may interpret `AppEvent::start_time` /
- *  `end_time`; those remain wire-format strings for the push path only.
- */
+/**  The one place that normalizes a mirrored event into render-ready timing. */
 export type EventTiming = { kind: "allDay"; startDate: string; endDateExclusive: string } | { kind: "timed"; start: string; end: string; timezone: string | null };
 
 export type FilterGroup<F> = {
@@ -626,7 +623,7 @@ export type ParsedSigils = {
 
 export type QuickCapturePreview = {
 	title: string,
-	due: string | null,
+	due: CalendarDateTime | null,
 	hasTime: boolean,
 	tags: string[],
 	priority: TaskPriority | null,

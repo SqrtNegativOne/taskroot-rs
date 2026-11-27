@@ -1,4 +1,4 @@
-use super::event_timing::{is_date_only, wall_clock_to_utc};
+use super::dates::{resolve_wall_clock, CalendarDateTime};
 use super::{AppTaskStatus, CollectionId, TaskId};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -36,21 +36,23 @@ pub enum TaskDateTiming {
 }
 
 impl TaskDateTiming {
-    /// Normalize a task's canonical `start`/`due` value.
+    /// Normalize a task's typed `start`/`due` value.
     ///
     /// Date-only values stay floating; timed wall clocks are resolved in the
     /// task's zone (falling back to UTC), matching the event projection.
     #[must_use]
-    pub fn from_canonical(value: &str, timezone: Option<&str>) -> Option<Self> {
-        if is_date_only(value) {
-            return NaiveDate::parse_from_str(value, "%Y-%m-%d")
-                .ok()
-                .map(|date| Self::AllDay { date });
+    pub fn from_calendar_date(value: CalendarDateTime, timezone: Option<&str>) -> Self {
+        match value {
+            CalendarDateTime::Date(date) => Self::AllDay { date },
+            CalendarDateTime::WallClock(naive) => Self::Timed {
+                start: resolve_wall_clock(naive, timezone),
+                timezone: timezone.map(ToString::to_string),
+            },
+            CalendarDateTime::Utc(start) => Self::Timed {
+                start,
+                timezone: timezone.map(ToString::to_string),
+            },
         }
-        wall_clock_to_utc(value, timezone).map(|start| Self::Timed {
-            start,
-            timezone: timezone.map(ToString::to_string),
-        })
     }
 }
 
@@ -80,26 +82,26 @@ mod tests {
     #[test]
     fn date_only_values_stay_floating() {
         assert_eq!(
-            TaskDateTiming::from_canonical("2026-11-05", None),
-            Some(TaskDateTiming::AllDay {
+            TaskDateTiming::from_calendar_date("2026-11-05".parse().unwrap(), None),
+            TaskDateTiming::AllDay {
                 date: NaiveDate::from_ymd_opt(2026, 11, 5).unwrap(),
-            })
+            }
         );
     }
 
     #[test]
     fn wall_clock_values_resolve_in_the_task_zone() {
-        match TaskDateTiming::from_canonical("2026-10-19T11:00:00", Some("Asia/Kolkata")) {
-            Some(TaskDateTiming::Timed { start, timezone }) => {
+        match TaskDateTiming::from_calendar_date(
+            "2026-10-19T11:00:00".parse().unwrap(),
+            Some("Asia/Kolkata"),
+        ) {
+            TaskDateTiming::Timed { start, timezone } => {
                 assert_eq!(start.to_rfc3339(), "2026-10-19T05:30:00+00:00");
                 assert_eq!(timezone.as_deref(), Some("Asia/Kolkata"));
             }
-            other => panic!("expected timed timing, got {other:?}"),
+            other @ TaskDateTiming::AllDay { .. } => {
+                panic!("expected timed timing, got {other:?}")
+            }
         }
-    }
-
-    #[test]
-    fn malformed_values_are_skipped() {
-        assert!(TaskDateTiming::from_canonical("not-a-date", None).is_none());
     }
 }

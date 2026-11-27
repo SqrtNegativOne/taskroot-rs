@@ -31,7 +31,7 @@ fn a_timed_occurrence_reports_its_wall_clock_exclusion_value() {
 fn excluding_a_reported_occurrence_start_removes_exactly_that_occurrence() {
     let mut master = weekly_kolkata_master();
     let reported = expand_event_instances(&[master.clone()], KOLKATA_RANGE.0, KOLKATA_RANGE.1);
-    master.exdates = Some(vec![reported[1].occurrence_start.clone()]);
+    master.exdates = Some(vec![reported[1].occurrence_start]);
 
     let remaining = expand_event_instances(&[master], KOLKATA_RANGE.0, KOLKATA_RANGE.1);
 

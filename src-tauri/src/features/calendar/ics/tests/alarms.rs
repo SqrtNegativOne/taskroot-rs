@@ -88,7 +88,7 @@ fn an_absolute_reminder_round_trips() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
     task.alarms = Some(vec![TaskAlarmTrigger::Absolute {
-        at: "2026-11-05T17:45:00Z".to_string(),
+        at: "2026-11-05T17:45:00Z".parse().unwrap(),
     }]);
 
     let written = write_task_resource(&raw, &task).unwrap();

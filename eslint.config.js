@@ -1,28 +1,21 @@
-import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintPluginSvelte from 'eslint-plugin-svelte';
 import svelteParser from 'svelte-eslint-parser';
 import oxlint from 'eslint-plugin-oxlint';
-import sonarjs from 'eslint-plugin-sonarjs';
 
-export default tseslint.config(
+// Oxlint owns JS/TS rules, type-aware rules, complexity, Vitest rules, and
+// curated SonarJS rules across all `.ts` and `.svelte` `<script>` blocks.
+// ESLint only runs Svelte template rules that Oxlint cannot parse yet.
+export default [
   {
     ignores: ['.svelte-kit/', 'dist/', 'src-tauri/', 'node_modules/', 'build/', 'coverage/', 'src/lib/bindings/'],
   },
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...eslintPluginSvelte.configs['flat/recommended'],
-  sonarjs.configs.recommended,
-  oxlint.configs['flat/recommended'],
+  ...eslintPluginSvelte.configs['flat/recommended'].map((config) => ({
+    ...config,
+    files: config.files ?? ['**/*.svelte'],
+  })),
   {
-    languageOptions: {
-      parserOptions: {
-        extraFileExtensions: ['.svelte'],
-      },
-    },
-  },
-  {
-    files: ['**/*.svelte', '**/*.svelte.ts'],
+    files: ['**/*.svelte'],
     languageOptions: {
       parser: svelteParser,
       parserOptions: {
@@ -31,36 +24,11 @@ export default tseslint.config(
       },
     },
     rules: {
-    },
-  },
-  {
-    rules: {
-      'no-undef': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      // Svelte compiler warnings are owned by `svelte-check`, which applies the
-      // a11y policy from `svelte.config.js`. ESLint only needs compile errors.
-      'svelte/valid-compile': ['error', { ignoreWarnings: true }],
+      // Svelte compiler errors and warnings (with `svelte.config.js` a11y
+      // policy) are owned by `svelte-check`.
+      'svelte/valid-compile': 'off',
       'svelte/prefer-svelte-reactivity': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-unnecessary-condition': 'off',
-      'sonarjs/void-use': 'off',
-      'sonarjs/todo-tag': 'off',
-      'sonarjs/no-nested-conditional': 'off',
-      'sonarjs/pseudo-random': 'off',
-      'sonarjs/no-identical-functions': 'off',
-      'sonarjs/no-use-of-empty-return-value': 'off',
-      'sonarjs/redundant-type-aliases': 'off',
-    }
-  },
-  {
-    files: ['**/*.generated.ts', '**/globals.d.ts'],
-    rules: {
-      '@typescript-eslint/array-type': 'off',
-      '@typescript-eslint/consistent-type-definitions': 'off',
-      'sonarjs/redundant-type-aliases': 'off',
     },
-  }
-);
+  },
+  ...oxlint.buildFromOxlintConfigFile('./.oxlintrc.json'),
+];

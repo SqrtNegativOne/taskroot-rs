@@ -40,7 +40,10 @@ fn a_matching_override_inherits_the_filtered_out_master_rule() {
     assert_eq!(instances.len(), 1);
     assert_eq!(instances[0].id, events[1].id);
     assert_eq!(instances[0].rrule, events[0].rrule);
-    assert_eq!(instances[0].occurrence_start, "2026-11-02T11:00:00");
+    assert_eq!(
+        instances[0].occurrence_start.to_string(),
+        "2026-11-02T11:00:00"
+    );
 }
 
 #[test]
@@ -79,11 +82,11 @@ fn nested_filters_and_search_do_not_discard_cancellation_tombstones() {
 fn filtered_all_day_cancellations_keep_the_original_date_suppressed() {
     let mut events = rows();
     for event in &mut events {
-        event.start_time = "2026-11-02".into();
-        event.end_time = "2026-11-03".into();
+        event.start_time = "2026-11-02".parse().unwrap();
+        event.end_time = "2026-11-03".parse().unwrap();
         event.is_all_day = Some(true);
     }
-    events[1].original_start_time = Some("2026-11-02".into());
+    events[1].original_start_time = Some("2026-11-02".parse().unwrap());
     events[1].status = Some(EventStatus::Cancelled);
     let instances = query_event_instances(
         &events,
@@ -117,5 +120,8 @@ fn filtered_projection_preserves_row_sorting_and_range_less_behavior() {
     let unexpanded = query_event_instances(&events, &FilterGroup::default(), &sort, "", None);
     assert_eq!(unexpanded.len(), 2);
     assert_eq!(unexpanded[0].id, events[1].id);
-    assert_eq!(unexpanded[1].occurrence_start, "2026-10-19T11:00:00");
+    assert_eq!(
+        unexpanded[1].occurrence_start.to_string(),
+        "2026-10-19T11:00:00"
+    );
 }

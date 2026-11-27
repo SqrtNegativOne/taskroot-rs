@@ -14,12 +14,12 @@
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime, Weekday};
 
-use crate::features::calendar::domain::{parse_sigils, TaskPriority};
+use crate::features::calendar::domain::{parse_sigils, CalendarDateTime, TaskPriority};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuickCaptureDraft {
     pub title: String,
-    pub due: Option<String>,
+    pub due: Option<CalendarDateTime>,
     pub tags: Vec<String>,
     pub priority: Option<TaskPriority>,
     pub estimate_minutes: Option<i32>,
@@ -56,18 +56,14 @@ struct Phrase {
 }
 
 impl Phrase {
-    fn resolve(self, today: NaiveDate) -> Option<String> {
+    const fn resolve(self, today: NaiveDate) -> Option<CalendarDateTime> {
         match (self.date, self.time) {
-            (Some(date), Some(time)) => Some(format_datetime(date, time)),
-            (Some(date), None) => Some(date.format("%Y-%m-%d").to_string()),
-            (None, Some(time)) => Some(format_datetime(today, time)),
+            (Some(date), Some(time)) => Some(CalendarDateTime::WallClock(date.and_time(time))),
+            (Some(date), None) => Some(CalendarDateTime::Date(date)),
+            (None, Some(time)) => Some(CalendarDateTime::WallClock(today.and_time(time))),
             (None, None) => None,
         }
     }
-}
-
-fn format_datetime(date: NaiveDate, time: NaiveTime) -> String {
-    date.and_time(time).format("%Y-%m-%dT%H:%M:%S").to_string()
 }
 
 fn detect_phrase(words: &[&str], today: NaiveDate) -> Option<Phrase> {
@@ -242,13 +238,20 @@ mod tests {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
     }
 
+    fn due_str(input: &str, today: NaiveDate) -> Option<String> {
+        parse(input, today).due.map(|value| value.to_string())
+    }
+
     #[test]
     fn parses_the_documented_example() {
         let today = date(2026, 11, 19);
         let draft = parse("Finish PCC next wed 3pm #work p1", today);
 
         assert_eq!(draft.title, "Finish PCC");
-        assert_eq!(draft.due.as_deref(), Some("2026-11-25T15:00:00"));
+        assert_eq!(
+            draft.due.map(|value| value.to_string()).as_deref(),
+            Some("2026-11-25T15:00:00")
+        );
         assert_eq!(draft.tags, vec!["work"]);
         assert_eq!(draft.priority, Some(TaskPriority::Urgent));
     }
@@ -257,15 +260,9 @@ mod tests {
     fn next_weekday_is_strict_while_bare_and_this_include_today() {
         let today = date(2026, 11, 25);
 
-        assert_eq!(
-            parse("Sync next wed", today).due.as_deref(),
-            Some("2026-12-02")
-        );
-        assert_eq!(
-            parse("Sync this wed", today).due.as_deref(),
-            Some("2026-11-25")
-        );
-        assert_eq!(parse("Sync wed", today).due.as_deref(), Some("2026-11-25"));
+        assert_eq!(due_str("Sync next wed", today).as_deref(), Some("2026-12-02"));
+        assert_eq!(due_str("Sync this wed", today).as_deref(), Some("2026-11-25"));
+        assert_eq!(due_str("Sync wed", today).as_deref(), Some("2026-11-25"));
     }
 
     #[test]
@@ -274,19 +271,19 @@ mod tests {
 
         for token in ["mon", "monday"] {
             assert_eq!(
-                parse(&format!("Plan {token}"), today).due.as_deref(),
+                due_str(&format!("Plan {token}"), today).as_deref(),
                 Some("2026-11-23")
             );
         }
         for token in ["tue", "tues", "tuesday"] {
             assert_eq!(
-                parse(&format!("Plan {token}"), today).due.as_deref(),
+                due_str(&format!("Plan {token}"), today).as_deref(),
                 Some("2026-11-24")
             );
         }
         for token in ["thu", "thur", "thurs", "thursday"] {
             assert_eq!(
-                parse(&format!("Plan {token}"), today).due.as_deref(),
+                due_str(&format!("Plan {token}"), today).as_deref(),
                 Some("2026-11-19")
             );
         }
@@ -297,15 +294,15 @@ mod tests {
         let today = date(2026, 11, 19);
 
         assert_eq!(
-            parse("Write report tomorrow", today).due.as_deref(),
+            due_str("Write report tomorrow", today).as_deref(),
             Some("2026-11-20")
         );
         assert_eq!(
-            parse("Standup tomorrow at 9:30am", today).due.as_deref(),
+            due_str("Standup tomorrow at 9:30am", today).as_deref(),
             Some("2026-11-20T09:30:00")
         );
         assert_eq!(
-            parse("Review today 15:30", today).due.as_deref(),
+            due_str("Review today 15:30", today).as_deref(),
             Some("2026-11-19T15:30:00")
         );
     }
@@ -316,11 +313,17 @@ mod tests {
 
         let draft = parse("Call mom at 3pm", today);
         assert_eq!(draft.title, "Call mom");
-        assert_eq!(draft.due.as_deref(), Some("2026-11-19T15:00:00"));
+        assert_eq!(
+            draft.due.map(|value| value.to_string()).as_deref(),
+            Some("2026-11-19T15:00:00")
+        );
 
         let draft = parse("Call mom 12:05", today);
         assert_eq!(draft.title, "Call mom");
-        assert_eq!(draft.due.as_deref(), Some("2026-11-19T12:05:00"));
+        assert_eq!(
+            draft.due.map(|value| value.to_string()).as_deref(),
+            Some("2026-11-19T12:05:00")
+        );
     }
 
     #[test]

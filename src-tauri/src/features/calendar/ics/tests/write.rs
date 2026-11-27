@@ -113,8 +113,8 @@ fn task_round_trip_only_touches_owned_lines() {
 fn moving_a_timed_event_only_rewrites_dtstart_and_dtend() {
     let raw = fixture(MOZILLA);
     let mut event = read_one(&raw);
-    event.start_time = "2026-10-20T15:30:00".to_string();
-    event.end_time = "2026-10-20T16:30:00".to_string();
+    event.start_time = "2026-10-20T15:30:00".parse().unwrap();
+    event.end_time = "2026-10-20T16:30:00".parse().unwrap();
 
     let written = write_event_resource(&raw, &event).unwrap();
 
@@ -133,7 +133,10 @@ fn moving_a_timed_event_only_rewrites_dtstart_and_dtend() {
         written.contains("TRANSP:OPAQUE"),
         "unknown props must survive"
     );
-    assert_eq!(read_one(&written).start_time, "2026-10-20T15:30:00");
+    assert_eq!(
+        read_one(&written).start_time.to_string(),
+        "2026-10-20T15:30:00"
+    );
 }
 
 #[test]
@@ -158,8 +161,8 @@ fn exdates_become_exdate_lines_in_the_event_zone() {
     let raw = fixture(MOZILLA);
     let mut event = read_one(&raw);
     event.exdates = Some(vec![
-        "2026-10-19T11:00:00".to_string(),
-        "2026-10-26T11:00:00".to_string(),
+        "2026-10-19T11:00:00".parse().unwrap(),
+        "2026-10-26T11:00:00".parse().unwrap(),
     ]);
 
     let written = write_event_resource(&raw, &event).unwrap();
@@ -170,8 +173,8 @@ fn exdates_become_exdate_lines_in_the_event_zone() {
     assert_eq!(
         read_one(&written).exdates,
         Some(vec![
-            "2026-10-19T11:00:00".to_string(),
-            "2026-10-26T11:00:00".to_string(),
+            "2026-10-19T11:00:00".parse().unwrap(),
+            "2026-10-26T11:00:00".parse().unwrap(),
         ])
     );
 }
@@ -343,27 +346,27 @@ fn next_up_writes_in_process_without_a_custom_marker() {
 fn setting_a_date_only_due_date_keeps_the_value_date_form() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
-    task.due = Some("2026-11-05".to_string());
+    task.due = Some("2026-11-05".parse().unwrap());
 
     let written = write_task_resource(&raw, &task).unwrap();
 
     assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
     assert!(written.contains("DUE;VALUE=DATE:20261105"));
-    assert_eq!(read_task(&written).due.as_deref(), Some("2026-11-05"));
+    assert_eq!(read_task(&written).due, Some("2026-11-05".parse().unwrap()));
 }
 
 #[test]
 fn a_timed_due_date_stays_a_date_time() {
     let raw = fixture(TASK);
     let mut task = read_task(&raw);
-    task.due = Some("2026-11-05T18:30:00".to_string());
+    task.due = Some("2026-11-05T18:30:00".parse().unwrap());
 
     let written = write_task_resource(&raw, &task).unwrap();
 
     assert!(written.contains("DUE:20261105T183000\r\n"));
     assert_eq!(
-        read_task(&written).due.as_deref(),
-        Some("2026-11-05T18:30:00")
+        read_task(&written).due,
+        Some("2026-11-05T18:30:00".parse().unwrap())
     );
 }
 
@@ -483,8 +486,8 @@ fn editing_a_completed_task_keeps_its_completion_time() {
     let written = write_task_resource(&completed, &edited).unwrap();
 
     assert_eq!(
-        read_task(&written).completed_at.as_deref(),
-        Some(stamp.as_str()),
+        read_task(&written).completed_at,
+        Some(stamp),
         "a retitle must not move the completion timestamp"
     );
 }
@@ -493,15 +496,15 @@ fn editing_a_completed_task_keeps_its_completion_time() {
 fn starting_a_task_writes_dtstart_in_the_task_zone() {
     let raw = fixture(TASK_ALARM);
     let mut task = read_task(&raw);
-    task.start = Some("2026-11-06T07:30:00".to_string());
+    task.start = Some("2026-11-06T07:30:00".parse().unwrap());
 
     let written = write_task_resource(&raw, &task).unwrap();
 
     assert!(written.contains("DTSTART;TZID=Asia/Kolkata:20261106T073000"));
     assert!(written.contains("DUE;TZID=Asia/Kolkata:20261105T180000"));
     assert_eq!(
-        read_task(&written).start.as_deref(),
-        Some("2026-11-06T07:30:00")
+        read_task(&written).start,
+        Some("2026-11-06T07:30:00".parse().unwrap())
     );
 }
 
@@ -509,12 +512,15 @@ fn starting_a_task_writes_dtstart_in_the_task_zone() {
 fn a_date_only_start_uses_value_date() {
     let raw = fixture(TASK_ALARM);
     let mut task = read_task(&raw);
-    task.start = Some("2026-11-04".to_string());
+    task.start = Some("2026-11-04".parse().unwrap());
 
     let written = write_task_resource(&raw, &task).unwrap();
 
     assert!(written.contains("DTSTART;VALUE=DATE:20261104"));
-    assert_eq!(read_task(&written).start.as_deref(), Some("2026-11-04"));
+    assert_eq!(
+        read_task(&written).start,
+        Some("2026-11-04".parse().unwrap())
+    );
 }
 
 #[test]
@@ -543,14 +549,14 @@ fn a_utc_due_date_keeps_its_instant() {
     let raw = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:a\r\nDUE:20261105T123000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
     let task = read_task(raw);
 
-    assert_eq!(task.due.as_deref(), Some("2026-11-05T12:30:00"));
+    assert_eq!(task.due, Some("2026-11-05T12:30:00".parse().unwrap()));
     assert_eq!(task.timezone.as_deref(), Some("UTC"));
 
     let written = write_task_resource(raw, &task).unwrap();
     assert!(written.contains("DUE;TZID=UTC:20261105T123000"));
     assert_eq!(
-        read_task(&written).due.as_deref(),
-        Some("2026-11-05T12:30:00")
+        read_task(&written).due,
+        Some("2026-11-05T12:30:00".parse().unwrap())
     );
 }
 
@@ -611,7 +617,7 @@ fn create_event_resource_uses_the_dto_id_as_uid() {
     assert!(created.ends_with("END:VCALENDAR\r\n"));
 
     let reread = read_one(&created);
-    assert_eq!(reread.start_time, "2026-10-19T11:00:00");
+    assert_eq!(reread.start_time.to_string(), "2026-10-19T11:00:00");
     assert_eq!(reread.exdates.unwrap().len(), 1);
 }
 
@@ -621,7 +627,7 @@ fn create_event_resource_emits_an_all_day_date_pair() {
 
     assert!(created.contains("DTSTART;VALUE=DATE:20261017"));
     assert!(created.contains("DTEND;VALUE=DATE:20261018"));
-    assert_eq!(read_one(&created).start_time, "2026-10-17");
+    assert_eq!(read_one(&created).start_time.to_string(), "2026-10-17");
 }
 
 #[test]
@@ -629,7 +635,7 @@ fn create_task_resource_round_trips_through_the_reader() {
     let mut task = read_task(&fixture(TASK));
     task.title = "Floss".to_string();
     task.status = Some(AppTaskStatus::Done);
-    task.due = Some("2026-11-05".to_string());
+    task.due = Some("2026-11-05".parse().unwrap());
 
     let created = create_task_resource(&task).unwrap();
 
@@ -663,9 +669,9 @@ fn writing_an_unknown_exception_inserts_a_component_after_the_master() {
     let exception = AppEvent {
         id: EventId::from(format!("{MASTER_UID}@2026-11-02T11:00:00")),
         recurring_event_id: Some(EventId::from(MASTER_UID)),
-        original_start_time: Some("2026-11-02T11:00:00".to_string()),
-        start_time: "2026-11-04T11:00:00".to_string(),
-        end_time: "2026-11-04T12:00:00".to_string(),
+        original_start_time: Some("2026-11-02T11:00:00".parse().unwrap()),
+        start_time: "2026-11-04T11:00:00".parse().unwrap(),
+        end_time: "2026-11-04T12:00:00".parse().unwrap(),
         title: "CN moved".to_string(),
         ..master
     };
@@ -684,10 +690,10 @@ fn writing_an_unknown_exception_inserts_a_component_after_the_master() {
     let events = read_event_resource(&written, HREF, COLLECTION).unwrap();
     assert_eq!(events.len(), 2);
     assert_eq!(events[1].id, exception.id);
-    assert_eq!(events[1].start_time, "2026-11-04T11:00:00");
+    assert_eq!(events[1].start_time.to_string(), "2026-11-04T11:00:00");
     assert_eq!(
-        events[1].original_start_time.as_deref(),
-        Some("2026-11-02T11:00:00")
+        events[1].original_start_time,
+        Some("2026-11-02T11:00:00".parse().unwrap())
     );
 }
 

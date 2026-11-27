@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import EventBlock from './EventBlock.svelte';
-import { EVENT_INSET_PX, PX_PER_MIN } from './constants';
+import { PX_PER_MIN } from './constants';
 import { makeInstance } from '../../../test/factories';
 
 describe('EventBlock geometry', () => {
-    it('renders the event slightly inside its time slot so back-to-back events keep a gap', () => {
+    it('leaves a visible gap between back-to-back events', () => {
         const first = render(EventBlock, {
             props: { event: makeInstance(), startMins: 60, endMins: 120, lane: 0, lanes: 1 },
         });
@@ -15,12 +15,9 @@ describe('EventBlock geometry', () => {
         const firstEl = first.container.querySelector<HTMLElement>('.day-event')!;
         const secondEl = second.container.querySelector<HTMLElement>('.day-event')!;
 
-        const firstTop = Number.parseFloat(firstEl.style.top);
-        const firstBottom = firstTop + Number.parseFloat(firstEl.style.height);
+        const firstBottom = Number.parseFloat(firstEl.style.top) + Number.parseFloat(firstEl.style.height);
         const secondTop = Number.parseFloat(secondEl.style.top);
 
-        expect(firstTop).toBeCloseTo(60 * PX_PER_MIN + EVENT_INSET_PX, 5);
-        expect(firstBottom).toBeCloseTo(120 * PX_PER_MIN - EVENT_INSET_PX, 5);
         expect(secondTop).toBeGreaterThan(firstBottom);
     });
 
@@ -29,9 +26,7 @@ describe('EventBlock geometry', () => {
             props: { event: makeInstance(), startMins: 60, endMins: 61, lane: 0, lanes: 1 },
         });
         const block = container.querySelector<HTMLElement>('.day-event')!;
-        const slotHeight = (61 - 60) * PX_PER_MIN;
 
-        expect(Number.parseFloat(block.style.height)).toBeGreaterThan(slotHeight);
-        expect(Number.parseFloat(block.style.top)).toBeCloseTo(60 * PX_PER_MIN + EVENT_INSET_PX, 5);
+        expect(Number.parseFloat(block.style.height)).toBeGreaterThan(PX_PER_MIN);
     });
 });

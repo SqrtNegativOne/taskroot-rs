@@ -1,8 +1,9 @@
 use crate::features::calendar::domain::{
-    AppEvent, AppEventFilterColumn, AppTask, AppTaskFilterColumn, EventStatus, FilterOperator,
-    TaskPriority,
+    AppEvent, AppEventFilterColumn, AppTask, AppTaskFilterColumn, CalendarDateTime, EventStatus,
+    FilterOperator, TaskPriority,
 };
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
+use std::str::FromStr;
 
 pub(super) fn task_column_is_empty(task: &AppTask, column: &AppTaskFilterColumn) -> bool {
     match column {
@@ -11,9 +12,9 @@ pub(super) fn task_column_is_empty(task: &AppTask, column: &AppTaskFilterColumn)
         AppTaskFilterColumn::Status => task.status.is_none(),
         AppTaskFilterColumn::Priority => priority_number(task.priority.as_ref()) == 0,
         AppTaskFilterColumn::Tags => task.tags.as_ref().is_none_or(Vec::is_empty),
-        AppTaskFilterColumn::Start => text_is_empty(task.start.as_deref()),
-        AppTaskFilterColumn::Due => text_is_empty(task.due.as_deref()),
-        AppTaskFilterColumn::Added => text_is_empty(task.added.as_deref()),
+        AppTaskFilterColumn::Start => task.start.is_none(),
+        AppTaskFilterColumn::Due => task.due.is_none(),
+        AppTaskFilterColumn::Added => task.added.is_none(),
         AppTaskFilterColumn::Remotecollectionid => {
             text_is_empty(task.remote_collection_id.as_ref().map(|id| id.as_str()))
         }
@@ -62,12 +63,10 @@ pub(super) fn task_column_matches(
                 .any(|tag| tag.name.to_lowercase().contains(&needle))
         }),
         AppTaskFilterColumn::Start => {
-            date_text_matches(task.start.as_deref(), value, operator, today)
+            calendar_date_matches(task.start, value, operator, today)
         }
-        AppTaskFilterColumn::Due => date_text_matches(task.due.as_deref(), value, operator, today),
-        AppTaskFilterColumn::Added => {
-            date_text_matches(task.added.as_deref(), value, operator, today)
-        }
+        AppTaskFilterColumn::Due => calendar_date_matches(task.due, value, operator, today),
+        AppTaskFilterColumn::Added => timestamp_matches(task.added, value, operator, today),
         AppTaskFilterColumn::Remotecollectionid => task
             .remote_collection_id
             .as_ref()
@@ -75,8 +74,8 @@ pub(super) fn task_column_matches(
     }
 }
 
-fn date_text_matches(
-    date: Option<&str>,
+fn calendar_date_matches(
+    date: Option<CalendarDateTime>,
     value: &serde_json::Value,
     operator: &FilterOperator,
     today: NaiveDate,
@@ -84,15 +83,42 @@ fn date_text_matches(
     let Some(date) = date else {
         return false;
     };
+    date_day_matches(date.date(), || date.to_string(), value, operator, today)
+}
+
+fn timestamp_matches(
+    stamp: Option<DateTime<Utc>>,
+    value: &serde_json::Value,
+    operator: &FilterOperator,
+    today: NaiveDate,
+) -> bool {
+    let Some(stamp) = stamp else {
+        return false;
+    };
+    date_day_matches(
+        stamp.date_naive(),
+        || stamp.to_rfc3339(),
+        value,
+        operator,
+        today,
+    )
+}
+
+fn date_day_matches(
+    day: NaiveDate,
+    as_text: impl FnOnce() -> String,
+    value: &serde_json::Value,
+    operator: &FilterOperator,
+    today: NaiveDate,
+) -> bool {
     let needle = value_as_string(value);
     if matches!(
         operator,
         FilterOperator::Contains | FilterOperator::DoesNotContain
     ) {
-        return date.to_lowercase().contains(&needle.to_lowercase());
+        return as_text().to_lowercase().contains(&needle.to_lowercase());
     }
-    let (Some(day), Some(needle_day)) = (date_prefix(date), resolve_filter_date(&needle, today))
-    else {
+    let Some(needle_day) = resolve_filter_date(&needle, today) else {
         return false;
     };
     match operator {
@@ -108,19 +134,16 @@ fn date_text_matches(
     }
 }
 
-/// The calendar day of a canonical date or date-time string.
-fn date_prefix(raw: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(raw.get(..10)?, "%Y-%m-%d").ok()
-}
-
-/// Resolve an absolute `YYYY-MM-DD` value or a relative day keyword.
+/// Resolve an absolute `YYYY-MM-DD` / date-time value or a relative day keyword.
 pub(super) fn resolve_filter_date(raw: &str, today: NaiveDate) -> Option<NaiveDate> {
     let trimmed = raw.trim();
     match trimmed.to_lowercase().as_str() {
         "today" => Some(today),
         "tomorrow" => today.succ_opt(),
         "yesterday" => today.pred_opt(),
-        _ => date_prefix(trimmed),
+        _ => CalendarDateTime::from_str(trimmed)
+            .ok()
+            .map(CalendarDateTime::date),
     }
 }
 

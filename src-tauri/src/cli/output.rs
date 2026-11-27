@@ -4,6 +4,7 @@ use chrono::{Duration, Local};
 use serde::Serialize;
 
 use crate::error::AppError;
+use crate::features::calendar::DTO_DATE;
 
 /// # Errors
 ///
@@ -17,7 +18,7 @@ pub fn print_json<T: Serialize>(value: &T) -> Result<(), AppError> {
 
 #[must_use]
 pub fn today() -> String {
-    Local::now().format("%Y-%m-%d").to_string()
+    Local::now().format(DTO_DATE).to_string()
 }
 
 #[must_use]
@@ -25,5 +26,5 @@ pub fn plus_days(days: i64) -> String {
     let later = Local::now()
         .checked_add_signed(Duration::days(days))
         .unwrap_or_else(Local::now);
-    later.format("%Y-%m-%d").to_string()
+    later.format(DTO_DATE).to_string()
 }

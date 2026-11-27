@@ -1,9 +1,11 @@
 //! Event writes: create/update/delete plus scoped recurrence resolution.
 
+use crate::error::AppError;
 use crate::features::calendar::caldav::client::CalDavClient;
 use crate::features::calendar::caldav::model::CalendarComponent;
-use crate::features::calendar::domain::{AppEvent, CollectionId, EventId, EventScope, RemoteId};
-use crate::error::AppError;
+use crate::features::calendar::domain::{
+    AppEvent, CalendarDateTime, CollectionId, EventId, EventScope, RemoteId,
+};
 use crate::features::calendar::ics;
 
 use super::super::model::{Resource, Store};
@@ -113,7 +115,7 @@ pub async fn delete_event(
     client: &CalDavClient,
     id: &str,
     scope: EventScope,
-    occurrence_start: Option<&str>,
+    occurrence_start: Option<CalendarDateTime>,
 ) -> Result<(), AppError> {
     let Some((resource, event)) = series_resource(store, id) else {
         return Ok(());
@@ -143,14 +145,14 @@ pub async fn delete_event(
     }
 
     if scope == EventScope::Following {
-        for victim in exceptions_from(&resource, &occurrence) {
+        for victim in exceptions_from(&resource, occurrence) {
             if let Some(remaining) = ics::delete_event_component(&raw, &victim)? {
                 raw = remaining;
             }
         }
     }
 
-    let updated = scoped_master(&master, scope, &occurrence)?;
+    let updated = scoped_master(&master, scope, occurrence)?;
     let raw = ics::write_event_resource(&raw, &updated)?;
     put_resource(store, client, &resource, &raw).await
 }
@@ -159,11 +161,11 @@ pub async fn delete_event(
 #[derive(Debug, Clone)]
 pub struct Reschedule {
     pub id: String,
-    pub start_time: String,
-    pub end_time: String,
+    pub start_time: CalendarDateTime,
+    pub end_time: CalendarDateTime,
     pub is_all_day: bool,
     pub scope: EventScope,
-    pub occurrence_start: Option<String>,
+    pub occurrence_start: Option<CalendarDateTime>,
 }
 
 /// Move one occurrence, or the whole series, to a new time.
@@ -206,8 +208,8 @@ pub async fn reschedule_event(
         let moved = moved(event, start_time, end_time, is_all_day);
         return update_event(store, client, moved).await;
     }
-    let occurrence = selected_occurrence(&event, occurrence_start.as_deref());
-    let exception = exception_for(&event, &occurrence, start_time, end_time, is_all_day);
+    let occurrence = selected_occurrence(&event, occurrence_start);
+    let exception = exception_for(&event, occurrence, start_time, end_time, is_all_day);
     update_event(store, client, exception).await
 }
 
@@ -230,21 +232,23 @@ fn master_event(store: &Store, event: &AppEvent) -> Option<AppEvent> {
 
 /// The canonical occurrence a mutation targets: the caller's value when it has
 /// one, otherwise the row's own start (a master starts at its first occurrence).
-fn selected_occurrence(event: &AppEvent, occurrence_start: Option<&str>) -> String {
+fn selected_occurrence(
+    event: &AppEvent,
+    occurrence_start: Option<CalendarDateTime>,
+) -> CalendarDateTime {
     occurrence_start
-        .or(event.original_start_time.as_deref())
-        .unwrap_or(&event.start_time)
-        .to_string()
+        .or(event.original_start_time)
+        .unwrap_or(event.start_time)
 }
 
 /// Exceptions whose original slot is at or after `occurrence`.
-fn exceptions_from(resource: &Resource, occurrence: &str) -> Vec<AppEvent> {
+fn exceptions_from(resource: &Resource, occurrence: CalendarDateTime) -> Vec<AppEvent> {
     resource
         .as_events()
         .unwrap_or_default()
         .iter()
         .filter(|event| event.recurring_event_id.is_some())
-        .filter(|event| event.original_start_time.as_deref().is_some_and(|start| start >= occurrence))
+        .filter(|event| event.original_start_time.is_some_and(|start| start >= occurrence))
         .cloned()
         .collect()
 }
@@ -254,7 +258,7 @@ fn exceptions_from(resource: &Resource, occurrence: &str) -> Vec<AppEvent> {
 fn scoped_master(
     master: &AppEvent,
     scope: EventScope,
-    occurrence: &str,
+    occurrence: CalendarDateTime,
 ) -> Result<AppEvent, AppError> {
     let mut updated = master.clone();
     if scope == EventScope::Following {
@@ -268,8 +272,8 @@ fn scoped_master(
         return Ok(updated);
     }
     let mut exdates = master.exdates.clone().unwrap_or_default();
-    if !exdates.iter().any(|value| value == occurrence) {
-        exdates.push(occurrence.to_string());
+    if !exdates.contains(&occurrence) {
+        exdates.push(occurrence);
     }
     updated.exdates = Some(exdates);
     Ok(updated)
@@ -316,7 +320,12 @@ async fn put_resource(
     )
 }
 
-fn moved(mut event: AppEvent, start_time: String, end_time: String, is_all_day: bool) -> AppEvent {
+const fn moved(
+    mut event: AppEvent,
+    start_time: CalendarDateTime,
+    end_time: CalendarDateTime,
+    is_all_day: bool,
+) -> AppEvent {
     event.start_time = start_time;
     event.end_time = end_time;
     event.is_all_day = Some(is_all_day);
@@ -326,9 +335,9 @@ fn moved(mut event: AppEvent, start_time: String, end_time: String, is_all_day: 
 /// A `VCALENDAR` exception row for one occurrence of `master`.
 fn exception_for(
     master: &AppEvent,
-    occurrence: &str,
-    start_time: String,
-    end_time: String,
+    occurrence: CalendarDateTime,
+    start_time: CalendarDateTime,
+    end_time: CalendarDateTime,
     is_all_day: bool,
 ) -> AppEvent {
     AppEvent {
@@ -345,7 +354,7 @@ fn exception_for(
         rrule: None,
         exdates: None,
         recurring_event_id: Some(master.id.clone()),
-        original_start_time: Some(occurrence.to_string()),
+        original_start_time: Some(occurrence),
         status: master.status.clone(),
         updated_at: None,
         added: None,

@@ -65,9 +65,9 @@ fn title_sort_is_case_insensitive_and_ties_break_by_id() {
 #[test]
 fn created_sort_uses_added_timestamp_not_id() {
     let mut older = task("z-older", "Older");
-    older.added = Some("2024-01-01T00:00:00Z".into());
+    older.added = Some("2024-01-01T00:00:00Z".parse().unwrap());
     let mut newer = task("a-newer", "Newer");
-    newer.added = Some("2025-01-01T00:00:00Z".into());
+    newer.added = Some("2025-01-01T00:00:00Z".parse().unwrap());
     let tasks = vec![newer, older];
 
     let sorted = query_tasks(
@@ -101,9 +101,9 @@ fn search_matches_title_and_tag_names() {
 #[test]
 fn start_date_filters_compare_calendar_days() {
     let mut early = task("a", "Early");
-    early.start = Some("2026-09-07".into());
+    early.start = Some("2026-09-07".parse().unwrap());
     let mut late = task("b", "Late");
-    late.start = Some("2026-09-10T09:00:00".into());
+    late.start = Some("2026-09-10T09:00:00".parse().unwrap());
     let tasks = vec![early, late, task("c", "No start")];
 
     let before = query_tasks(

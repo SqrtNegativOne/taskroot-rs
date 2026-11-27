@@ -13,8 +13,8 @@ fn event(id: &str, start: &str, end: &str) -> AppEvent {
         description: None,
         priority: None,
         tags: None,
-        start_time: start.into(),
-        end_time: end.into(),
+        start_time: start.parse().unwrap(),
+        end_time: end.parse().unwrap(),
         rrule: None,
         exdates: None,
         recurring_event_id: None,
@@ -43,10 +43,10 @@ fn all_day_start(instance: &EventInstance) -> String {
     }
 }
 
-fn occurrence_starts(instances: &[EventInstance]) -> Vec<&str> {
+fn occurrence_starts(instances: &[EventInstance]) -> Vec<String> {
     instances
         .iter()
-        .map(|instance| instance.occurrence_start.as_str())
+        .map(|instance| instance.occurrence_start.to_string())
         .collect()
 }
 

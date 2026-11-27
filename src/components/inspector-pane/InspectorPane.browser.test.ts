@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke, type InvokeArgs } from '../../test/tauriMock';
 import { makeEvent } from '../../test/factories';
+import type { AppTask } from '../../lib/domain';
 import InspectorPane from './InspectorPane.svelte';
 
 vi.mock('@tauri-apps/api/core', async () => {
@@ -60,6 +61,28 @@ describe('InspectorPane pending creation', () => {
 
         await screen.findByDisplayValue('New Event');
         expect(container.querySelector('.inspector-pane')?.classList.contains('is-open')).toBe(true);
+    });
+
+    it('sends the edited task description to update_task on blur', async () => {
+        const task: AppTask = { id: 'task-1', title: 'Write docs' };
+        tauri.stubCommandValue('query_tasks', [task]);
+        render(InspectorPane, {
+            props: {
+                inspectorState: { type: 'task', id: task.id },
+                onClose: vi.fn(),
+            },
+        });
+
+        await fireEvent.click(await screen.findByRole('button', { name: 'Description' }));
+
+        const textarea = await screen.findByRole('textbox', { name: 'Description' });
+        await fireEvent.input(textarea, { target: { value: 'Revised notes' } });
+        await fireEvent.blur(textarea);
+
+        await waitFor(() => {
+            const args = invokedArgs('update_task');
+            expect((args?.['task'] as AppTask | undefined)?.notes).toBe('Revised notes');
+        });
     });
 });
 

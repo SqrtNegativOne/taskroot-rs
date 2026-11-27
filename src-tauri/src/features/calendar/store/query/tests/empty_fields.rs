@@ -77,28 +77,25 @@ fn empty_tags_include_absent_and_empty_lists_without_needing_a_value() {
 }
 
 #[test]
-fn optional_dates_distinguish_absent_or_blank_from_date_and_datetime_values() {
-    for column in ["start", "due", "added"] {
+fn optional_dates_distinguish_absent_from_date_and_datetime_values() {
+    for column in ["start", "due"] {
         let absent = task("absent", "No date");
-        let mut blank = task("blank", "Blank date");
         let mut date = task("date", "Date only");
         let mut timed = task("timed", "Timed date");
         for (task, value) in [
-            (&mut blank, ""),
             (&mut date, "2026-11-20"),
             (&mut timed, "2026-11-20T09:00:00Z"),
         ] {
             let field = match column {
                 "start" => &mut task.start,
-                "due" => &mut task.due,
-                _ => &mut task.added,
+                _ => &mut task.due,
             };
-            *field = Some(value.into());
+            *field = Some(value.parse().unwrap());
         }
-        let tasks = [absent, blank, date, timed];
+        let tasks = [absent, date, timed];
         assert_eq!(
             task_ids(&tasks, &unary_filters(column, "is empty", None)),
-            ["absent", "blank"],
+            ["absent"],
             "{column}"
         );
         assert_eq!(
@@ -107,6 +104,19 @@ fn optional_dates_distinguish_absent_or_blank_from_date_and_datetime_values() {
             "{column}"
         );
     }
+
+    let absent = task("absent", "No timestamp");
+    let mut present = task("present", "Has timestamp");
+    present.added = Some("2026-11-20T09:00:00Z".parse().unwrap());
+    let tasks = [absent, present];
+    assert_eq!(
+        task_ids(&tasks, &unary_filters("added", "is empty", None)),
+        ["absent"]
+    );
+    assert_eq!(
+        task_ids(&tasks, &unary_filters("added", "is not empty", None)),
+        ["present"]
+    );
 }
 
 #[test]
@@ -180,7 +190,7 @@ fn event_optional_fields_use_the_same_empty_semantics_as_tasks() {
 #[test]
 fn empty_conditions_are_effective_or_branches_and_search_still_constrains_them() {
     let mut scheduled = task("scheduled", "Scheduled work");
-    scheduled.start = Some("2026-11-20".into());
+    scheduled.start = Some("2026-11-20".parse().unwrap());
     let tasks = [
         task("empty", "Unscheduled work"),
         scheduled,

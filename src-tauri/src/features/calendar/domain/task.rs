@@ -1,9 +1,10 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
 use taskroot_macros::Queryable;
 
-use super::{CollectionId, RemoteId, TaskId};
+use super::{CalendarDateTime, CollectionId, RemoteId, TaskId};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "kebab-case")]
@@ -100,7 +101,7 @@ pub enum TaskAlarmTrigger {
         anchor: TaskAlarmAnchor,
     },
     /// `TRIGGER;VALUE=DATE-TIME:…Z`, ISO 8601 UTC.
-    Absolute { at: String },
+    Absolute { at: DateTime<Utc> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Queryable)]
@@ -127,7 +128,7 @@ pub struct AppTask {
     pub est: Option<i32>,
     #[specta(optional)]
     #[query(sortable, filter_type = "date", label = "Created")]
-    pub added: Option<String>,
+    pub added: Option<DateTime<Utc>>,
     #[specta(optional)]
     pub remote_id: Option<RemoteId>,
     /// Collection href this task lives in, matching `AppEvent`.
@@ -140,13 +141,13 @@ pub struct AppTask {
     /// Canonical form matches [`Self::due`].
     #[specta(optional)]
     #[query(filter_type = "date")]
-    pub start: Option<String>,
+    pub start: Option<CalendarDateTime>,
     #[specta(optional)]
     #[query(sortable, filter_type = "date")]
-    pub due: Option<String>,
+    pub due: Option<CalendarDateTime>,
     /// The `COMPLETED` timestamp, ISO 8601 UTC.
     #[specta(optional)]
-    pub completed_at: Option<String>,
+    pub completed_at: Option<DateTime<Utc>>,
     /// The raw `RRULE` line(s), wire form (`RRULE:FREQ=…`).
     #[specta(optional)]
     pub rrule: Option<String>,
@@ -160,7 +161,7 @@ pub struct AppTask {
     #[specta(optional)]
     pub timezone: Option<String>,
     #[specta(optional)]
-    pub updated_at: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
     #[specta(optional)]
     pub etag: Option<String>,
 }

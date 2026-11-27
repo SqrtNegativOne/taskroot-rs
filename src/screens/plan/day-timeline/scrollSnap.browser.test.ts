@@ -68,8 +68,13 @@ function makeScroller(options: {
     scroller.getBoundingClientRect = () => rect(0);
     Object.defineProperty(scroller, 'scrollWidth', { value: options.scrollWidth, configurable: true });
     Object.defineProperty(scroller, 'clientWidth', { value: options.clientWidth, configurable: true });
+    let scrollLeft = options.scrollLeft ?? 0;
+    Object.defineProperty(scroller, 'scrollLeft', {
+        get: () => scrollLeft,
+        set: (value: number) => { scrollLeft = value; },
+        configurable: true,
+    });
     document.body.appendChild(scroller);
-    scroller.scrollLeft = options.scrollLeft ?? 0;
     return { scroller, columns };
 }
 
@@ -160,14 +165,28 @@ describe('attachDaySnap', () => {
     });
 
     describe('on engines without scrollend', () => {
-        const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'onscrollend');
+        const savedDescriptors: Array<{ proto: object; descriptor: PropertyDescriptor }> = [];
 
         function removeScrollEnd(): void {
-            Reflect.deleteProperty(HTMLElement.prototype, 'onscrollend');
+            savedDescriptors.length = 0;
+            for (
+                let proto: object | null = Reflect.getPrototypeOf(document.createElement('div'));
+                proto;
+                proto = Reflect.getPrototypeOf(proto)
+            ) {
+                const descriptor = Object.getOwnPropertyDescriptor(proto, 'onscrollend');
+                if (descriptor) {
+                    savedDescriptors.push({ proto, descriptor });
+                    Reflect.deleteProperty(proto, 'onscrollend');
+                }
+            }
         }
 
         function restoreScrollEnd(): void {
-            if (saved) Object.defineProperty(HTMLElement.prototype, 'onscrollend', saved);
+            for (const { proto, descriptor } of savedDescriptors) {
+                Object.defineProperty(proto, 'onscrollend', descriptor);
+            }
+            savedDescriptors.length = 0;
         }
 
         afterEach(restoreScrollEnd);

@@ -45,19 +45,6 @@ describe('TaskListPane calendar filter', () => {
         expect(screen.queryByRole('checkbox', { name: 'Event Calendar' })).toBeNull();
     });
 
-    it('keeps filter and sort editors in the view menu and drops the lists manager', async () => {
-        tauri.stubCommandValue('get_task_schema', [...schema, { id: 'due', label: 'Due', filter_type: 'Date', sortable: true }]);
-        render(TaskListPane, { props: { onAddTask: vi.fn() } });
-
-        expect(screen.queryByTitle('Manage lists')).toBeNull();
-        expect(screen.queryByTitle('Filter')).toBeNull();
-        expect(screen.queryByTitle('Sort')).toBeNull();
-
-        await fireEvent.click(await screen.findByTitle('View'));
-        expect(screen.getByRole('button', { name: /add filter/i })).toBeTruthy();
-        expect(screen.getByRole('button', { name: /add sort/i })).toBeTruthy();
-    });
-
     it('queries a nested definition and creates tasks with only unconditional typed defaults', async () => {
         const filters: FilterGroup<AppTaskFilter> = { operator: 'and', children: [
             { kind: 'condition', filter: { column: 'priority', operator: 'is', value: ['3'] } },

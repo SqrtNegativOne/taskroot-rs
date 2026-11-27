@@ -9,10 +9,11 @@ use crate::features::calendar::ics::cst::{
     text_prop,
 };
 use crate::features::calendar::ics::dates::{
-    DateValue, absolute_trigger, canonical, duration_whole_minutes, is_date_time, iso_line,
-    parse_date_line,
+    absolute_trigger, duration_whole_minutes, is_date_time, parse_date_line, stamp_from_line,
+    DateValue,
 };
 use crate::features::calendar::ics::read::{joined_rrule, priority_value, read_categories};
+use chrono::{DateTime, NaiveDate, Utc};
 use ical::tree::cst::IcalCst;
 use ical::tree::line::IcalLine;
 use ical::tree::param::related::RELATED;
@@ -21,8 +22,8 @@ use ical::tree::param::value::VALUE;
 pub(super) fn task_from_component(component: &IcalCst<'_>) -> Result<AppTask, AppError> {
     let uid = text_prop(component, "UID")
         .ok_or_else(|| AppError::InvalidInput("VTODO without UID".to_string()))?;
-    let created = prop(component, "CREATED").and_then(iso_line);
-    let stamp = prop(component, "DTSTAMP").and_then(iso_line);
+    let created = prop(component, "CREATED").and_then(stamp_from_line);
+    let stamp = prop(component, "DTSTAMP").and_then(stamp_from_line);
     let due = prop(component, "DUE").and_then(parse_date_line);
     let start = prop(component, "DTSTART").and_then(parse_date_line);
     // One zone governs both lines, as tasks.org writes them: `DUE` wins.
@@ -46,18 +47,14 @@ pub(super) fn task_from_component(component: &IcalCst<'_>) -> Result<AppTask, Ap
             .filter(|minutes| *minutes > 0),
         added: created.or(stamp),
         notes: text_prop(component, "DESCRIPTION"),
-        start: start
-            .as_ref()
-            .and_then(|value| canonical(value, timezone.as_deref())),
-        due: due
-            .as_ref()
-            .and_then(|value| canonical(value, timezone.as_deref())),
-        completed_at: prop(component, "COMPLETED").and_then(iso_line),
+        start: start.as_ref().map(|value| value.canonical(timezone.as_deref())),
+        due: due.as_ref().map(|value| value.canonical(timezone.as_deref())),
+        completed_at: prop(component, "COMPLETED").and_then(stamp_from_line),
         rrule: joined_rrule(component),
         geo: read_geo(component),
         alarms: read_alarms(component),
         timezone,
-        updated_at: prop(component, "LAST-MODIFIED").and_then(iso_line),
+        updated_at: prop(component, "LAST-MODIFIED").and_then(stamp_from_line),
         etag: None,
     })
 }
@@ -119,7 +116,7 @@ fn alarm_trigger(trigger: &IcalLine<'_>) -> Option<TaskAlarmTrigger> {
     if absolute {
         let at = absolute_trigger(raw)?;
         // tasks.org writes this instant for "the reminder was cleared".
-        if at == "1976-04-01T00:54:45Z" {
+        if is_tasks_org_cleared_alarm(at) {
             return None;
         }
         return Some(TaskAlarmTrigger::Absolute { at });
@@ -136,4 +133,11 @@ fn alarm_trigger(trigger: &IcalLine<'_>) -> Option<TaskAlarmTrigger> {
         minutes_before: duration_whole_minutes(raw)?.checked_neg()?,
         anchor,
     })
+}
+
+fn is_tasks_org_cleared_alarm(at: DateTime<Utc>) -> bool {
+    NaiveDate::from_ymd_opt(1976, 4, 1)
+        .and_then(|date| date.and_hms_opt(0, 54, 45))
+        .map(|naive| naive.and_utc())
+        == Some(at)
 }
