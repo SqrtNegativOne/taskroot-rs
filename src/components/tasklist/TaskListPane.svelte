@@ -14,6 +14,7 @@
     import { taskListQueryArgs, taskListState } from '../../lib/taskList.svelte';
     import './tasklist.css';
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '../../lib/sharedQueries.svelte';
     import { slide } from 'svelte/transition';
     import { flip } from 'svelte/animate';
 
@@ -55,7 +56,7 @@
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
     const ownCalendarsQuery = untrack(() => propCalendars === undefined)
-        ? useAutoQuery(commands.getActiveCalendars)
+        ? useActiveCalendars()
         : undefined;
     let allCalendars = $derived(propCalendars ?? ownCalendarsQuery?.data ?? []);
 

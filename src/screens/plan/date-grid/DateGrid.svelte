@@ -18,6 +18,7 @@
     import { previewColumns, type AllDayRange, type SpanEdge } from './spanResize';
     
     import { commands, useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '../../../lib/sharedQueries.svelte';
     import { eventInstances, taskDates } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import EventFilterButton from '../../../components/EventFilterButton.svelte';
@@ -98,7 +99,7 @@
         taskDates(grid.range), { debounceMs: 150 });
 
     const ownCalendarsQuery = untrack(() => propCalendars === undefined)
-        ? useAutoQuery(commands.getActiveCalendars)
+        ? useActiveCalendars()
         : undefined;
     let allCalendars = $derived(propCalendars ?? ownCalendarsQuery?.data ?? []);
 

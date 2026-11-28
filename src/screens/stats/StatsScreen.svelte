@@ -1,5 +1,6 @@
 <script lang="ts">
     import { commands, describeAppError, useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { useTags } from '../../lib/sharedQueries.svelte';
     import { allEvents, allTasks } from '../../lib/queries';
     import { useNow } from '../../lib/useNow.svelte';
     import BentoCard from './BentoCard.svelte';
@@ -15,7 +16,7 @@
     const tasksQuery = useAutoQuery(commands.queryTasks, allTasks);
     const eventsQuery = useAutoQuery(commands.queryEvents, allEvents);
     const historyQuery = useAutoQuery(commands.getStopwatchHistory);
-    const tagsQuery = useAutoQuery(commands.listTags);
+    const tagsQuery = useTags();
 
     const now = useNow(60_000);
 

@@ -18,6 +18,7 @@ export function safeInvoke<T, E = AppError>(promise: Promise<T>): ResultAsync<T,
 interface UseTauriQueryOptions<T, Args extends unknown[], E> {
     args?: Args;
     debounceMs?: number;
+    enabled?: () => boolean;
     initialData?: T;
     onError?: (error: E) => void;
 }
@@ -60,6 +61,13 @@ export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
         }, options.debounceMs);
 
     $effect(() => {
+        if (options.enabled && !options.enabled()) {
+            debouncer?.cancel();
+            guard.invalidate();
+            isLoading = false;
+            return;
+        }
+
         let isCleanedUp = false;
         let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
 
@@ -150,11 +158,10 @@ export function useAutoQuery<T, Args extends unknown[]>(
     maybeOptions?: Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
 ): AutoQueryResult<T, AppError> {
     const hasArgs = typeof getArgsOrOptions === 'function';
-    const query = useTauriQuery<T, Args>(
-        command,
-        (hasArgs ? maybeOptions : getArgsOrOptions) ?? {},
-    );
+    const resolvedOptions = (hasArgs ? maybeOptions : getArgsOrOptions) ?? {};
+    const query = useTauriQuery<T, Args>(command, resolvedOptions);
     $effect(() => {
+        if (resolvedOptions.enabled && !resolvedOptions.enabled()) return;
         if (hasArgs) {
             void query.execute(...getArgsOrOptions());
         } else {

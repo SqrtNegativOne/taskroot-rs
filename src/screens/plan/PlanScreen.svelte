@@ -4,7 +4,7 @@
     import type { AppTask, EventInstance, TaskPatch } from '../../lib/domain';
     import { buildNewEvent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
-    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '../../lib/sharedQueries.svelte';
     import type { InspectorTarget } from '../../components/inspector-pane/state.svelte';
 
     import SplitPane from '../../components/SplitPane.svelte';
@@ -41,7 +41,7 @@
 
     let inspectorState = $state<InspectorTarget | undefined>(undefined);
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const calendarsQuery = useActiveCalendars();
     let calendars = $derived(calendarsQuery.data ?? []);
 
     function scheduleTask(task: { id: string; title: string }, slot: TaskScheduleSlot) {

@@ -3,7 +3,7 @@
     import { store } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
     import { buildNewEvent } from '../../lib/domain';
-    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '../../lib/sharedQueries.svelte';
     import {
         createSidebarState,
         createSidebarWindowController,
@@ -70,7 +70,7 @@
         });
     });
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const calendarsQuery = useActiveCalendars();
 
     function onAddEvent(date: Date, startMins?: number, endMins?: number): Promise<string | undefined> {
         const newEvent = buildNewEvent(date, {

@@ -16,6 +16,7 @@ import {
 } from '../../lib/domain';
 import { allEvents, allTasks } from '../../lib/queries';
 import { commands, useAutoQuery, type AutoQueryResult } from '../../lib/safeInvoke.svelte';
+import { useActiveCalendars, useTags } from '../../lib/sharedQueries.svelte';
 import { store } from '../../lib/store.svelte';
 import { notifyError } from '../../lib/toast';
 import { eventStartDate } from './eventDates';
@@ -32,9 +33,9 @@ export class InspectorPaneState {
     private eventPendingAction = $state<AppEvent | undefined>(undefined);
     private eventPendingStart = $state<string | undefined>(undefined);
 
-    private readonly tasksQuery = useAutoQuery(commands.queryTasks, allTasks);
-    private readonly eventsQuery = useAutoQuery(commands.queryEvents, allEvents);
-    private readonly tagsQuery = useAutoQuery(commands.listTags);
+    private readonly tasksQuery: AutoQueryResult<AppTask[]>;
+    private readonly eventsQuery: AutoQueryResult<AppEvent[]>;
+    private readonly tagsQuery: AutoQueryResult<string[]>;
     private readonly calendarsQuery: AutoQueryResult<AppCalendar[]> | undefined;
 
     constructor(
@@ -43,8 +44,14 @@ export class InspectorPaneState {
         private readonly onConverted: (task: AppTask) => void = onClose,
         private readonly getCalendars?: () => AppCalendar[] | undefined,
     ) {
+        const isOpen = () => this.getTarget() !== undefined;
+        this.tasksQuery = useAutoQuery(commands.queryTasks, allTasks, { enabled: isOpen });
+        this.eventsQuery = useAutoQuery(commands.queryEvents, allEvents, {
+            enabled: () => this.getTarget()?.type === 'event',
+        });
+        this.tagsQuery = useTags(isOpen);
         this.calendarsQuery = getCalendars === undefined || untrack(() => getCalendars() === undefined)
-            ? useAutoQuery(commands.getActiveCalendars)
+            ? useActiveCalendars(isOpen)
             : undefined;
     }
 

@@ -14,6 +14,7 @@
     import HourGutter from './components/HourGutter.svelte';
     import RecurringActionModal from '../../../components/RecurringActionModal.svelte';
     import { commands, useAutoQuery } from '../../../lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '../../../lib/sharedQueries.svelte';
     import { eventInstances } from '../../../lib/queries';
     import { persistState, persistedKeys } from '../../../lib/persisted.svelte';
     import { useNow } from '../../../lib/useNow.svelte';
@@ -115,7 +116,7 @@
         eventInstances(timeline.dateRange, eventFilters, ''), { debounceMs: 150 });
 
     const ownCalendarsQuery = untrack(() => propCalendars === undefined)
-        ? useAutoQuery(commands.getActiveCalendars)
+        ? useActiveCalendars()
         : undefined;
 
     let calendars = $derived(calendarsForComponent(propCalendars ?? ownCalendarsQuery?.data ?? [], 'VEVENT'));

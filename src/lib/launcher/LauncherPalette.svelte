@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { commands, events, safeInvoke, useAutoQuery } from '$lib/safeInvoke.svelte';
+    import { useActiveCalendars } from '$lib/sharedQueries.svelte';
     import { store } from '$lib/store.svelte';
     import { Routes } from '$lib/routes';
     import { eventInstances, taskDates } from '$lib/queries';
@@ -36,7 +37,7 @@
     let selected = $state(0);
     let inputEl = $state<HTMLInputElement | null>(null);
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const calendarsQuery = useActiveCalendars();
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(todayRange, emptyFilterGroup(), ''),
     );
