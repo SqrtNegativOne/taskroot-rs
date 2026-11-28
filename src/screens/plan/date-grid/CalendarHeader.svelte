@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onDestroy } from 'svelte';
+    import { clickOutside } from '../../../lib/clickOutside';
     import { ANIMATION_DELAY_MS, DateGridView } from './constants';
 
     let {
@@ -22,7 +23,6 @@
 
     let showViewMenu = $state(false);
     let closingViewMenu = $state(false);
-    let viewMenuRef = $state<HTMLDivElement | null>(null);
     let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
     function openViewMenu() {
@@ -42,21 +42,8 @@
         }, ANIMATION_DELAY_MS);
     }
 
-    onMount(() => {
-        function handleClickOutside(e: PointerEvent) {
-            if (
-                e.target instanceof Node &&
-                viewMenuRef &&
-                !viewMenuRef.contains(e.target)
-            ) {
-                if (showViewMenu && !closingViewMenu) closeViewMenu();
-            }
-        }
-        document.addEventListener("pointerdown", handleClickOutside);
-        return () => {
-            clearTimeout(closeTimer);
-            document.removeEventListener("pointerdown", handleClickOutside);
-        };
+    onDestroy(() => {
+        clearTimeout(closeTimer);
     });
 </script>
 
@@ -92,7 +79,10 @@
             {@render filterMenu()}
         {/if}
 
-        <div style="position: relative;" bind:this={viewMenuRef}>
+        <div
+            style="position: relative;"
+            {@attach clickOutside(closeViewMenu, { enabled: showViewMenu && !closingViewMenu })}
+        >
             <button
                 onclick={() => {
                     if (showViewMenu && !closingViewMenu) closeViewMenu();

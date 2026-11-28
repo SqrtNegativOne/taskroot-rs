@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import './inspector.css';
+    import { clickOutside } from '../../lib/clickOutside';
     import type { AppCalendar } from '../../lib/domain';
     import { notifyError } from '../../lib/toast';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
@@ -40,43 +40,34 @@
     const currentItem = $derived(inspector.currentItem);
     const isReadOnly = $derived(inspector.isReadOnly);
 
-    let paneRef = $state<HTMLElement | null>(null);
+    function hasOpenPopover(): boolean {
+        return document.querySelector('[data-inspector-popover]') !== null;
+    }
 
-    onMount(() => {
-        function hasOpenPopover(): boolean {
-            return document.querySelector('[data-inspector-popover]') !== null;
-        }
-
-        function handlePointerDown(e: PointerEvent) {
-            if (inspector.recurringModalOpen || hasOpenPopover()) return;
-            if (inspectorState && paneRef && e.target instanceof Node && !paneRef.contains(e.target)) {
-                onClose();
-            }
-        }
+    $effect(() => {
+        if (!currentItem) return;
 
         function handleKeyDown(e: KeyboardEvent) {
             if (e.key !== 'Escape' || e.defaultPrevented || inspector.recurringModalOpen || hasOpenPopover()) {
                 return;
             }
-            if (!currentItem) return;
             e.preventDefault();
             onClose();
         }
 
-        document.addEventListener('pointerdown', handlePointerDown);
         document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('pointerdown', handlePointerDown);
-            document.removeEventListener('keydown', handleKeyDown);
-        };
+        return () => { document.removeEventListener('keydown', handleKeyDown); };
     });
 </script>
 
 <div
-    bind:this={paneRef}
     class="inspector-pane"
     class:is-open={currentItem !== undefined}
     aria-hidden={currentItem === undefined}
+    {@attach clickOutside(() => { onClose(); }, {
+        enabled: Boolean(inspectorState) && !inspector.recurringModalOpen,
+        shouldIgnore: hasOpenPopover,
+    })}
 >
     {#if currentItem}
         <header class="inspector-hd">

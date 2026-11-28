@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { clickOutside } from '../../lib/clickOutside';
 
     interface Option {
         label: string;
@@ -18,18 +18,6 @@
     let { values = [], onchange, options, class: className = '', style = '', placeholder = 'Select...' }: Props = $props();
 
     let open = $state(false);
-    let ref: HTMLDivElement | null = $state(null);
-
-    function handleClickOutside(e: PointerEvent) {
-        if (ref && !(e.target instanceof Node && ref.contains(e.target))) {
-            open = false;
-        }
-    }
-
-    onMount(() => {
-        document.addEventListener("pointerdown", handleClickOutside);
-        return () => document.removeEventListener("pointerdown", handleClickOutside);
-    });
 
     function toggleSelect(o: Option, e: Event) {
         e.stopPropagation();
@@ -41,7 +29,11 @@
     }
 </script>
 
-<div bind:this={ref} class={`multi-select ${className}`.trim()} {style}>
+<div
+    class={`multi-select ${className}`.trim()}
+    {style}
+    {@attach clickOutside(() => { open = false; }, { enabled: open })}
+>
     <button type="button" class="selector-input" onclick={() => open = !open}>
         {#if values.length > 0}
             <div class="values">

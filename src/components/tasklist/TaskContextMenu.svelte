@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { clickOutside } from '../../lib/clickOutside';
     import type { AppTask } from '../../lib/domain';
 
     let {
@@ -18,13 +19,6 @@
         onDo: (task: AppTask) => void;
     } = $props();
 
-    let menuEl: HTMLDivElement | undefined = $state();
-
-    function handlePointerDown(e: PointerEvent) {
-        if (e.target instanceof Node && menuEl?.contains(e.target)) return;
-        onClose();
-    }
-
     function handleKeyDown(e: KeyboardEvent) {
         if (e.key === 'Escape') onClose();
     }
@@ -34,12 +28,10 @@
     }
 
     onMount(() => {
-        window.addEventListener('pointerdown', handlePointerDown, true);
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('scroll', handleDismiss, true);
         window.addEventListener('resize', handleDismiss);
         return () => {
-            window.removeEventListener('pointerdown', handlePointerDown, true);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('scroll', handleDismiss, true);
             window.removeEventListener('resize', handleDismiss);
@@ -58,13 +50,13 @@
 </script>
 
 <div
-    bind:this={menuEl}
     class="task-context-menu"
     role="menu"
     tabindex="-1"
     aria-label={task.title}
     style="left: min({x}px, calc(100vw - 190px)); top: min({y}px, calc(100vh - 100px));"
     oncontextmenu={(e) => e.preventDefault()}
+    {@attach clickOutside(() => { onClose(); }, { target: window, capture: true })}
 >
     <button type="button" role="menuitem" class="task-context-item" onclick={doTask}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>

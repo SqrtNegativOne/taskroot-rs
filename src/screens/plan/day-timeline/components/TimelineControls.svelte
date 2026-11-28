@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onMount, type Snippet } from 'svelte';
+    import type { Snippet } from 'svelte';
+    import { clickOutside } from '../../../../lib/clickOutside';
     import { addDays } from '../../../../lib/time';
     import { NUM_DAYS_OPTIONS } from '../constants';
 
@@ -29,7 +30,6 @@
     let pinned = $state(false);
     let showViewMenu = $state(false);
     let root = $state<HTMLDivElement | null>(null);
-    let viewMenuRef = $state<HTMLDivElement | null>(null);
 
     $effect(() => {
         const stayOpen = hovering || focused || pinned || keepOpen || showViewMenu;
@@ -53,16 +53,6 @@
         showViewMenu = false;
         open = false;
     }
-
-    onMount(() => {
-        function handleClickOutside(e: PointerEvent) {
-            if (e.target instanceof Node && viewMenuRef && !viewMenuRef.contains(e.target)) {
-                showViewMenu = false;
-            }
-        }
-        document.addEventListener('pointerdown', handleClickOutside);
-        return () => { document.removeEventListener('pointerdown', handleClickOutside); };
-    });
 </script>
 
 <div
@@ -141,7 +131,10 @@
         {/if}
 
         {#if numDays !== undefined && setNumDays}
-            <div class="timeline-controls-group timeline-view" bind:this={viewMenuRef}>
+            <div
+                class="timeline-controls-group timeline-view"
+                {@attach clickOutside(() => { showViewMenu = false; }, { enabled: showViewMenu })}
+            >
                 <button
                     class="timeline-control-btn"
                     class:is-active={showViewMenu}

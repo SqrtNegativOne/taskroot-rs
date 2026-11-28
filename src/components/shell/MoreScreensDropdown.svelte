@@ -1,14 +1,13 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
+    import { clickOutside } from '$lib/clickOutside';
     import { Routes } from '$lib/routes';
     import { useNow } from '$lib/useNow.svelte';
     import { isWrapWindowOpen } from '../../screens/wrap/wrapWindow';
     import Icon from '../Icon.svelte';
 
     let dropdownOpen = $state(false);
-    let dropdownRef: HTMLDivElement | null = $state(null);
 
     const STAGE_ROUTES = {
         wrap: Routes.WRAP,
@@ -27,24 +26,17 @@
         wrapOpen ? SCREENS : SCREENS.filter((screen) => screen !== 'wrap'),
     );
 
-    function handleOutsideClick(e: PointerEvent) {
-        if (dropdownRef && e.target instanceof Node && !dropdownRef.contains(e.target)) {
-            dropdownOpen = false;
-        }
-    }
-
-    onMount(() => {
-        document.addEventListener("pointerdown", handleOutsideClick);
-        return () => document.removeEventListener("pointerdown", handleOutsideClick);
-    });
-
     function navigate(screen: Screen) {
         dropdownOpen = false;
         void goto(resolve(STAGE_ROUTES[screen]));
     }
 </script>
 
-<div class="more-screens-dropdown" bind:this={dropdownRef} style="position: relative;">
+<div
+    class="more-screens-dropdown"
+    style="position: relative;"
+    {@attach clickOutside(() => { dropdownOpen = false; }, { enabled: dropdownOpen })}
+>
     <button
         class="stage dropdown-btn {dropdownOpen ? 'is-current' : ''}"
         onclick={() => dropdownOpen = !dropdownOpen}
