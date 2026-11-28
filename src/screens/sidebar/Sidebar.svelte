@@ -1,66 +1,25 @@
 <script lang="ts">
     import { onMount, untrack } from 'svelte';
-    import { getCurrentWindow, currentMonitor, primaryMonitor } from '@tauri-apps/api/window';
-    import { PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
     import { store } from '../../lib/store.svelte';
     import DayTimeline from '../plan/day-timeline/DayTimeline.svelte';
     import { buildNewEvent } from '../../lib/domain';
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { createSidebarState, saveTabTop } from './state.svelte';
+    import {
+        createSidebarState,
+        createSidebarWindowController,
+        saveTabTop,
+        SIDEBAR_PANEL_WIDTH,
+        SIDEBAR_TAB_HEIGHT,
+        SIDEBAR_TAB_WIDTH,
+    } from './state.svelte';
     import './sidebar.css';
 
-    const TAB_WIDTH = 18;
-    const TAB_HEIGHT = 52;
-    const PANEL_WIDTH = 328;
-
-    let open = $state(false);
-    let windowIsSmall = $state(true);
     const sidebar = createSidebarState();
+    const windowCtrl = createSidebarWindowController();
 
     let isDragging = $state(false);
-    let monitorReady = $state(false);
     let dragStartScreenY = 0;
     let dragStartTabTop = 0;
-
-    let sf = 1;
-    let screenW = 0;
-    let screenH = 0;
-    let screenX = 0;
-    let screenY = 0;
-
-    async function updateWindowBounds(isOpen: boolean) {
-        if (screenW === 0 || screenH === 0) return;
-        const appWindow = getCurrentWindow();
-        if (isOpen) {
-            const widthPhysical = Math.round((TAB_WIDTH + PANEL_WIDTH) * sf);
-            const posX = screenX + screenW - widthPhysical;
-            await appWindow.setPosition(new PhysicalPosition(posX, screenY));
-            await appWindow.setSize(new PhysicalSize(widthPhysical, screenH));
-        } else {
-            const widthPhysical = Math.round(TAB_WIDTH * sf);
-            const heightPhysical = Math.round(TAB_HEIGHT * sf);
-            const posX = screenX + screenW - widthPhysical;
-            const posY = Math.round(screenY + (sidebar.tabTop * sf));
-            await appWindow.setPosition(new PhysicalPosition(posX, posY));
-            await appWindow.setSize(new PhysicalSize(widthPhysical, heightPhysical));
-        }
-    }
-
-    async function toggleSidebar() {
-        if (!open) {
-            windowIsSmall = false;
-            // Expand OS window first, then CSS animate
-            await updateWindowBounds(true);
-            open = true;
-        } else {
-            // CSS animate first, then shrink OS window
-            open = false;
-            setTimeout(() => {
-                windowIsSmall = true;
-                void updateWindowBounds(false);
-            }, 250); // wait for 250ms CSS transition
-        }
-    }
 
     function toggleNotes() {
         sidebar.showNotes = !sidebar.showNotes;
@@ -79,21 +38,8 @@
     function onPointerMove(e: PointerEvent) {
         if (!isDragging) return;
         const delta = e.screenY - dragStartScreenY;
-        let newTabTop = dragStartTabTop + delta;
-        
-        const maxTop = (screenH / sf) - TAB_HEIGHT;
-        if (newTabTop < 0) newTabTop = 0;
-        if (newTabTop > maxTop) newTabTop = maxTop;
-        
-        sidebar.tabTop = newTabTop;
-
-        if (windowIsSmall) {
-            // update OS window position live
-            const widthPhysical = Math.round(TAB_WIDTH * sf);
-            const posX = screenX + screenW - widthPhysical;
-            const posY = Math.round(screenY + (sidebar.tabTop * sf));
-            void getCurrentWindow().setPosition(new PhysicalPosition(posX, posY));
-        }
+        sidebar.tabTop = windowCtrl.clampTabTop(dragStartTabTop + delta);
+        windowCtrl.moveCollapsedTab(sidebar.tabTop);
     }
 
     function onPointerUp(e: PointerEvent) {
@@ -101,42 +47,26 @@
         const target = e.currentTarget as HTMLElement;
         target.releasePointerCapture(e.pointerId);
         isDragging = false;
-        
+
         saveTabTop(sidebar.tabTop);
-        
+
         if (Math.abs(e.screenY - dragStartScreenY) < 3) {
-            void toggleSidebar();
+            void windowCtrl.toggle(sidebar.tabTop);
         }
     }
 
-    onMount(async () => {
-        const appWindow = getCurrentWindow();
-        await appWindow.show();
-        await appWindow.unminimize();
-        await appWindow.setFocus();
-
-        try {
-            let monitor = await currentMonitor();
-            monitor ??= await primaryMonitor();
-            
-            if (monitor) {
-                sf = monitor.scaleFactor;
-                screenW = monitor.size.width;
-                screenH = monitor.size.height;
-                screenX = monitor.position.x;
-                screenY = monitor.position.y;
-                monitorReady = true;
-            }
-        } catch (err) {
-            console.error("Failed to get monitor:", err);
-        }
+    onMount(() => {
+        void windowCtrl.init();
+        return () => {
+            windowCtrl.dispose();
+        };
     });
 
     $effect(() => {
-        if (!sidebar.hydrated || !monitorReady) return;
-        sidebar.tabTop = sidebar.storedTabTop ?? (screenH / sf - TAB_HEIGHT) / 2;
+        if (!sidebar.hydrated || !windowCtrl.monitorReady) return;
+        sidebar.tabTop = sidebar.storedTabTop ?? windowCtrl.defaultTabTop();
         untrack(() => {
-            void updateWindowBounds(open);
+            void windowCtrl.syncBounds(sidebar.tabTop);
         });
     });
 
@@ -155,19 +85,19 @@
 
 <div
     class="sidebar-widget"
-    class:open
-    style="--tab-width: {TAB_WIDTH}px; --tab-height: {TAB_HEIGHT}px; --panel-width: {PANEL_WIDTH}px;"
+    class:open={windowCtrl.open}
+    style="--tab-width: {SIDEBAR_TAB_WIDTH}px; --tab-height: {SIDEBAR_TAB_HEIGHT}px; --panel-width: {SIDEBAR_PANEL_WIDTH}px;"
 >
-    <button 
+    <button
         class="tab"
-        style="margin-top: {windowIsSmall ? 0 : sidebar.tabTop}px;"
+        style="margin-top: {windowCtrl.windowIsSmall ? 0 : sidebar.tabTop}px;"
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}
         onpointercancel={onPointerUp}
         aria-label="Toggle day column"
     >
-        <span class="arrow">{open ? '›' : '‹'}</span>
+        <span class="arrow">{windowCtrl.open ? '›' : '‹'}</span>
     </button>
     <div class="panel">
         {#if !store.loaded}
