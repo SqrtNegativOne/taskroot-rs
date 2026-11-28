@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount } from 'svelte';
     import type { UnlistenFn } from '@tauri-apps/api/event';
     import { commands, events, safeInvoke } from '$lib/safeInvoke.svelte';
 
@@ -105,22 +105,24 @@
         await safeInvoke(commands.hideScreenEffect());
     }
 
-    let unlisten: UnlistenFn | undefined;
-
     onMount(() => {
         if (!canvas) return;
         ctx = canvas.getContext('2d');
+        let disposed = false;
+        let unlisten: UnlistenFn | undefined;
         void events.screenEffect.listen(() => {
+            if (disposed) return;
             animationToken += 1;
             void runEffect(animationToken);
         }).then((un) => {
-            unlisten = un;
+            if (disposed) un();
+            else unlisten = un;
         });
-    });
-
-    onDestroy(() => {
-        animationToken += 1;
-        unlisten?.();
+        return () => {
+            disposed = true;
+            animationToken += 1;
+            unlisten?.();
+        };
     });
 </script>
 
