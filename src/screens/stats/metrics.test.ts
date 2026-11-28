@@ -265,4 +265,20 @@ describe('computeStats', () => {
         expect(urgent).toMatchObject({ label: 'Urgent', total: 1, done: 1, completionPct: 100 });
         expect(none).toMatchObject({ label: 'None', total: 1, done: 1, completionPct: 100 });
     });
+
+    it('ignores stale completedAt timestamps on tasks that are not done', () => {
+        const now = new Date(2026, 10, 27, 15, 0, 0);
+        const completedAt = new Date(2026, 10, 27, 11, 0, 0).toISOString();
+        const tasks: AppTask[] = [
+            makeTask({ id: 't1', title: 'Reopened task', status: 'todo', completedAt }),
+            makeTask({ id: 't2', title: 'Cancelled task', status: 'cancelled', completedAt }),
+        ];
+
+        const stats = computeStats({ tasks, events: [], history: [], now });
+
+        expect(stats.doneTasks).toBe(0);
+        expect(stats.activeDaysTotal).toBe(0);
+        expect(stats.dailyActivity[13].completedCount).toBe(0);
+        expect(stats.hourlyActivity[11].completedCount).toBe(0);
+    });
 });

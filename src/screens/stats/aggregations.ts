@@ -134,7 +134,7 @@ function accumulateTask(
             estMinutes: positiveEstMinutes(task.est),
         });
     }
-    recordCompletedTask(task, acc);
+    if (status === 'done') recordCompletedTask(task, acc);
 }
 
 /** Aggregate task statuses, priorities, completions, and combined tracked durations. */
