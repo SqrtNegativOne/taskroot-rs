@@ -31,7 +31,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
-        "url": "/"
+        "url": "/launcher"
       },
       {
         "label": "minitracker",

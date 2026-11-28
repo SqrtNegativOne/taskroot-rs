@@ -14,7 +14,6 @@
     import TitleBar from '../components/TitleBar.svelte';
     import TaskListState from '../lib/TaskListState.svelte';
     import Theme from '$lib/themes/Theme.svelte';
-    import LauncherPalette from '$lib/launcher/LauncherPalette.svelte';
     import { Toaster } from 'svelte-sonner';
 
     import type { RouteId } from '$app/types';
@@ -25,21 +24,20 @@
     }
 
     let { children }: { children: Snippet } = $props();
-    let isLauncher = $state(false);
     let isMinitracker = $state(false);
     let isSidebar = $state(false);
     let isEffect = $state(false);
     let isBooting = $state(true);
+    let isLauncherRoute = $derived(page.url.pathname === Routes.LAUNCHER);
 
     onMount(() => {
         const appWindow = getCurrentWindow();
         const label = appWindow.label as WindowLabel;
-        isLauncher = label === 'launcher';
         isMinitracker = label === 'minitracker';
         isSidebar = label === 'sidebar';
         isEffect = label === 'effect';
 
-        const isMainWindow = !isLauncher && !isMinitracker && !isSidebar && !isEffect;
+        const isMainWindow = label === 'main' && page.url.pathname !== Routes.LAUNCHER;
 
         let disposed = false;
         let unlistenNav: (() => void) | undefined;
@@ -114,8 +112,8 @@
 
 <Theme scheme={store.settings?.colour_scheme} />
 
-{#if isLauncher}
-    <AccountBoundary><LauncherPalette /></AccountBoundary>
+{#if isLauncherRoute}
+    <AccountBoundary>{@render children()}</AccountBoundary>
 {:else if isSidebar}
     <div class="sidebar-shell">
         <AccountBoundary>{@render children()}</AccountBoundary>
