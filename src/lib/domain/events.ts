@@ -1,7 +1,6 @@
 import type { AppCalendar, AppEvent, CalendarComponent } from '../bindings/index.generated';
 import { addDays, ymd } from '../time';
 
-const MS_PER_MINUTE = 60_000;
 const DEFAULT_EVENT_MINUTES = 60;
 
 export type CalendarLike = AppCalendar | {
@@ -94,14 +93,16 @@ export function buildNewEvent(
         };
     }
 
-    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
     const end = endMinutes ?? startMinutes + DEFAULT_EVENT_MINUTES;
 
     return {
         id: crypto.randomUUID(),
         title: title ?? 'New Event',
-        startTime: new Date(dayStart.getTime() + startMinutes * MS_PER_MINUTE).toISOString(),
-        endTime: new Date(dayStart.getTime() + end * MS_PER_MINUTE).toISOString(),
+        startTime: new Date(year, month, day, 0, startMinutes).toISOString(),
+        endTime: new Date(year, month, day, 0, end).toISOString(),
         remoteCollectionId: calendar?.id,
         isAllDay: false,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,

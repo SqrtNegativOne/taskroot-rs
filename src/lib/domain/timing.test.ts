@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventInstance } from '../domain';
 import { makeInstance } from '../../test/factories';
+import { buildNewEvent } from './events';
 import { instanceOccursOnDay } from './timing';
 
 // Pin the host zone so the DST edge cases below exercise real transitions on
@@ -72,5 +73,23 @@ describe('instanceOccursOnDay', () => {
 
         expect(instanceOccursOnDay(call, new Date(2026, 2, 8))).toBe(false);
         expect(instanceOccursOnDay(call, new Date(2026, 2, 9))).toBe(true);
+    });
+});
+
+describe('buildNewEvent across DST transitions', () => {
+    it('places timed events at local wall-clock hours on spring-forward and fall-back days', () => {
+        const spring = buildNewEvent(new Date(2026, 2, 8), {
+            startMinutes: 9 * 60,
+            endMinutes: 10 * 60,
+        });
+        expect(new Date(spring.startTime).getHours()).toBe(9);
+        expect(new Date(spring.endTime).getHours()).toBe(10);
+
+        const fall = buildNewEvent(new Date(2026, 10, 1), {
+            startMinutes: 9 * 60,
+            endMinutes: 10 * 60,
+        });
+        expect(new Date(fall.startTime).getHours()).toBe(9);
+        expect(new Date(fall.endTime).getHours()).toBe(10);
     });
 });
