@@ -62,4 +62,16 @@ describe('TaskRow', () => {
         await fireEvent.click(doneCircle!);
         expect(done.updateTask).toHaveBeenCalledWith('task-2', [{ field: 'status', value: 'todo' }]);
     });
+
+    it('clears the checkmark when a task status stays or reverts to todo externally', async () => {
+        const view = renderRow(makeTask({ id: 'task-3', status: 'todo' }));
+        const circle = view.container.querySelector('.task-circle')!;
+        await fireEvent.click(circle);
+
+        await view.rerender({ task: makeTask({ id: 'task-3', status: 'done' }), updateTask: view.updateTask });
+        expect(view.container.querySelector('.task-circle-check')).not.toBeNull();
+
+        await view.rerender({ task: makeTask({ id: 'task-3', status: 'todo' }), updateTask: view.updateTask });
+        expect(view.container.querySelector('.task-circle-check')).toBeNull();
+    });
 });

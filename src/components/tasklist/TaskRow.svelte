@@ -26,8 +26,6 @@
         isActive?: boolean;
     } = $props();
 
-    let isChecking = $state(false);
-
     function handlePointerDown(e: PointerEvent | MouseEvent) {
         if (e.button !== 0) return;
         if (e.target instanceof Element && (
@@ -45,16 +43,7 @@
     function handleCircleClick(e: MouseEvent) {
         e.stopPropagation();
         const newStatus = task.status === "done" ? "todo" : "done";
-        
-        if (newStatus === "done") {
-            isChecking = true;
-            // sound effect play here
-        }
-
         updateTask(task.id, [{ field: 'status', value: newStatus }]);
-        if (newStatus === "todo") {
-            isChecking = false;
-        }
     }
     
     let dueStr = $derived(task.due ? `due ${task.due}` : "");
@@ -103,7 +92,7 @@
 >
     <TaskCircle
         priority={task.priority ?? undefined}
-        isDoneOrChecking={task.status === "done" || isChecking}
+        isDoneOrChecking={task.status === "done"}
         isActive={isActive}
         onclick={handleCircleClick}
     />
