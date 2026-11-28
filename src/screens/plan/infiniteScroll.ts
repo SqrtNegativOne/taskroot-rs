@@ -58,13 +58,48 @@ export function canScrollWithinWindow(
     return targetIndex >= 0 && targetIndex <= config.bufferCount * 2;
 }
 
+export type ScrollAxis = 'left' | 'top';
+
 export function startOfLocalDay(date: Date): Date {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+export function readScrollPos(el: HTMLElement, axis: ScrollAxis): number {
+    return axis === 'left' ? el.scrollLeft : el.scrollTop;
+}
+
+export function writeScrollPos(el: HTMLElement, axis: ScrollAxis, position: number): void {
+    if (axis === 'left') {
+        el.scrollLeft = position;
+    } else {
+        el.scrollTop = position;
+    }
+}
+
+export function readViewportSize(el: HTMLElement, axis: ScrollAxis): number {
+    return axis === 'left' ? el.clientWidth : el.clientHeight;
+}
+
+export function readEdge(el: HTMLElement, axis: ScrollAxis): number {
+    const rect = el.getBoundingClientRect();
+    return axis === 'left' ? rect.left : rect.top;
+}
+
+export function measureItemOffset(
+    scroller: HTMLElement,
+    axis: ScrollAxis,
+    firstSelector: string,
+    target: HTMLElement | null,
+    fallback: number,
+): number {
+    const first = scroller.querySelector<HTMLElement>(firstSelector);
+    if (!first || !target) return fallback;
+    return Math.max(0, readEdge(target, axis) - readEdge(first, axis));
+}
+
 export function scrollElementTo(
     element: HTMLElement,
-    axis: 'left' | 'top',
+    axis: ScrollAxis,
     position: number,
     smooth: boolean,
 ): void {
@@ -73,11 +108,7 @@ export function scrollElementTo(
         element.scrollTo({ [axis]: position, behavior: smooth ? 'smooth' : 'instant' });
         return;
     }
-    if (axis === 'left') {
-        element.scrollLeft = position;
-    } else {
-        element.scrollTop = position;
-    }
+    writeScrollPos(element, axis, position);
 }
 
 export interface ScrollObserverHandlers {
