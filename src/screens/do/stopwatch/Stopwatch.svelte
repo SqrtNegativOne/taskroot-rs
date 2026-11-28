@@ -8,8 +8,6 @@
     import { commands, useTauriQuery } from '../../../lib/safeInvoke.svelte';
     import { allTasks as allTasksQueryArgs } from '../../../lib/queries';
 
-    let { onBreakStatusChange }: { onBreakStatusChange?: (status: boolean) => void; } = $props();
-
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
     let allTasksQuery = useTauriQuery(commands.queryTasks);
@@ -25,11 +23,6 @@
             ? allTasks.find((task) => task.id === stopwatchState.taskId)
             : undefined,
     );
-
-    // Notify break status changes
-    $effect(() => {
-        onBreakStatusChange?.(stopwatchState.isBreak);
-    });
 
     // P toggles the timed pause; arrow keys resize an active pause by a minute.
     function handlePauseKey(e: KeyboardEvent): boolean {

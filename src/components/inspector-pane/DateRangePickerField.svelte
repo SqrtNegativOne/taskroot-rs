@@ -48,17 +48,11 @@
     }
 
     let open = $state(false);
-    let draft = $state<EventDateFields>(untrack(() => snapshotFields(event)));
-    let rangeValue = $state<DateRange>(untrack(() => rangeForFields(event)));
+    let draft = $derived(snapshotFields(event));
+    let rangeValue = $derived(rangeForFields(draft));
     let calendarPlaceholder = $state<DateValue>(
         untrack(() => parseYmdToCalendarDate(eventStartDate(event)) ?? todayCalendarDate()),
     );
-
-    $effect(() => {
-        const next = snapshotFields(event);
-        draft = next;
-        rangeValue = rangeForFields(next);
-    });
 
     const allDay = $derived(eventIsAllDay(draft));
     const displayText = $derived(formatEventSchedule(draft));
@@ -70,14 +64,11 @@
             calendarPlaceholder = parseYmdToCalendarDate(eventStartDate(draft)) ?? todayCalendarDate();
             return;
         }
-        const reset = snapshotFields(event);
-        draft = reset;
-        rangeValue = rangeForFields(reset);
+        draft = snapshotFields(event);
     }
 
     function commit(fields: EventDateFields): void {
         draft = fields;
-        rangeValue = rangeForFields(fields);
         onchange(fields);
     }
 

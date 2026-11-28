@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, type Snippet } from 'svelte';
-    import { SvelteDate } from 'svelte/reactivity';
+    import { addDays } from '../../../../lib/time';
     import { NUM_DAYS_OPTIONS } from '../constants';
 
     let {
@@ -41,16 +41,6 @@
         const timer = setTimeout(() => { open = false; }, CLOSE_DELAY_MS);
         return () => { clearTimeout(timer); };
     });
-
-    $effect(() => {
-        if (!open) showViewMenu = false;
-    });
-
-    function addDays(d: Date, days: number) {
-        const nd = new SvelteDate(d);
-        nd.setDate(nd.getDate() + days);
-        return nd;
-    }
 
     function onFocusOut(e: FocusEvent) {
         if (e.relatedTarget instanceof Node && root?.contains(e.relatedTarget)) return;

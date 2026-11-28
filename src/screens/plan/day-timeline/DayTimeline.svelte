@@ -85,7 +85,6 @@
     }
 
     let eventFilters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
-    let eventQuery = $state('');
     let numDays = $state(1);
     let filterOpen = $state(false);
     const now = useNow(60_000);
@@ -113,7 +112,7 @@
     const timeline = createInfiniteTimeline(() => numDays);
 
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
-        eventInstances(timeline.dateRange, eventFilters, eventQuery), { debounceMs: 150 });
+        eventInstances(timeline.dateRange, eventFilters, ''), { debounceMs: 150 });
 
     const ownCalendarsQuery = untrack(() => propCalendars === undefined)
         ? useAutoQuery(commands.getActiveCalendars)

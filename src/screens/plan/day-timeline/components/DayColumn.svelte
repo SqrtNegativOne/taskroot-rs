@@ -49,21 +49,17 @@
         new Set(laid.filter((l) => isEventReadOnly(l.event, calendars)).map((l) => l.event.id)),
     );
     
-    // Event handlers
-    function handleResize(event: EventInstance, newStartMins: number, newEndMins: number) {
-        if (readOnlyEventIds.has(event.id)) return;
+    function emitTimeRange(
+        event: EventInstance,
+        newStartMins: number,
+        newEndMins: number,
+        handler?: (event: EventInstance, startTime: string, endTime: string) => void,
+    ) {
+        if (!handler || readOnlyEventIds.has(event.id)) return;
         const cellStart = parseLocalYmd(cellDateStr).getTime();
         const newStartDt = new Date(cellStart + newStartMins * MS_PER_MINUTE);
         const newEndDt = new Date(cellStart + newEndMins * MS_PER_MINUTE);
-        if (onResizeEvent) onResizeEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
-    }
-
-    function handleMove(event: EventInstance, newStartMins: number, newEndMins: number) {
-        if (readOnlyEventIds.has(event.id)) return;
-        const cellStart = parseLocalYmd(cellDateStr).getTime();
-        const newStartDt = new Date(cellStart + newStartMins * MS_PER_MINUTE);
-        const newEndDt = new Date(cellStart + newEndMins * MS_PER_MINUTE);
-        if (onMoveEvent) onMoveEvent(event, newStartDt.toISOString(), newEndDt.toISOString());
+        handler(event, newStartDt.toISOString(), newEndDt.toISOString());
     }
 
     // Grid creation logic
@@ -181,8 +177,8 @@
             selected={event.id === selectedEventId}
             readOnly={readOnlyEventIds.has(event.id)}
             {calendars}
-            onResize={handleResize}
-            onMove={handleMove}
+            onResize={(ev, s, e) => emitTimeRange(ev, s, e, onResizeEvent)}
+            onMove={(ev, s, e) => emitTimeRange(ev, s, e, onMoveEvent)}
             {onEventClick}
             {onToggleTask}
         />

@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
     import { store } from '../../lib/store.svelte';
-    import { commands, safeInvoke, useAutoQuery, useTauriQuery } from '../../lib/safeInvoke.svelte';
+    import { commands, safeInvoke, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { persistState, persistedKeys } from '../../lib/persisted.svelte';
     import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
@@ -70,7 +70,9 @@
     let leftShiftDown = false;
     let rightShiftDown = false;
     let shiftBreakFired = false;
-    let baseAlpha = $state(0.85);
+    let baseAlpha = $derived(
+        store.settings?.tracker_opacity !== undefined ? store.settings.tracker_opacity / 100 : 0.85,
+    );
     let menuBarHeight = $state(DEFAULT_BAR_HEIGHT);
     let barElement: HTMLDivElement | undefined = $state();
     let savedPosition = $state<StoredPosition>({ x: 0, y: 0 });
@@ -93,10 +95,6 @@
 
     const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
 
-    $effect(() => {
-        if (store.settings?.tracker_opacity !== undefined) baseAlpha = store.settings.tracker_opacity / 100;
-    });
-
     const effectiveOpacity = $derived.by(() => {
         if (isDimmed) return 0.2;
         if (controller.isClickDimmed) return Math.max(0.2, baseAlpha - 0.15);
@@ -118,12 +116,8 @@
         adjustOpacity(event.deltaY < 0 ? 0.05 : -0.05);
     }
 
-    let allTasksQuery = useTauriQuery(commands.queryTasks);
+    let allTasksQuery = useAutoQuery(commands.queryTasks, allTasksQueryArgs);
     let allTasks = $derived(allTasksQuery.data ?? []);
-
-    $effect(() => {
-        void allTasksQuery.execute(...allTasksQueryArgs());
-    });
 
     let listQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(listQuery.data ?? []);

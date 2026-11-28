@@ -42,10 +42,6 @@
         }
     }
 
-    function handleTextareaChange(e: Event & { currentTarget: EventTarget & HTMLTextAreaElement }) {
-        localValue = e.currentTarget.value;
-    }
-
     function handleBlur() {
         if (!editing) return;
         editing = false;
@@ -88,8 +84,7 @@
     {:else}
         <textarea
             use:focusAction
-            value={localValue}
-            oninput={handleTextareaChange}
+            bind:value={localValue}
             onblur={handleBlur}
             rows="5"
             class={`description-editor ${className}`.trim()}

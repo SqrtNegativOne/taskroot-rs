@@ -1,25 +1,21 @@
 <script lang="ts">
     import Collapsible from '../../components/Collapsible.svelte';
     import Stopwatch from './stopwatch/Stopwatch.svelte';
+    import { stopwatchState } from './stopwatch/engine.svelte';
 
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
     import { taskListQueryArgs } from '../../lib/taskList.svelte';
 
-    let isBreak = $state(false);
-    let showRestOverride = $state(false);
+    let isBreak = $derived(stopwatchState.isBreak);
+    let showRestOverride = $derived(isBreak);
 
     let tasksQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(tasksQuery.data ?? []);
-
-    function handleBreakStatusChange(status: boolean) {
-        isBreak = status;
-        showRestOverride = status;
-    }
 </script>
 
 <main class="do-main">
-    <Stopwatch onBreakStatusChange={handleBreakStatusChange} />
+    <Stopwatch />
 
     {#if showRestOverride}
         <div class="do-rest-container">

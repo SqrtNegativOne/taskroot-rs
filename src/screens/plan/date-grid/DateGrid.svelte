@@ -50,7 +50,6 @@
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
     let filters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
     let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false, hideDoneTasks: false });
-    let query = $state('');
     let cellsRef = $state<HTMLDivElement | null>(null);
     const now = useNow(60_000);
     let today = $derived(new Date(now.ms));
@@ -93,7 +92,7 @@
     });
 
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
-        eventInstances(grid.range, filters, query), { debounceMs: 150 });
+        eventInstances(grid.range, filters, ''), { debounceMs: 150 });
 
     const taskDatesQuery = useAutoQuery(commands.queryTaskDates, () =>
         taskDates(grid.range), { debounceMs: 150 });

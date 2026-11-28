@@ -32,16 +32,11 @@
     }: Props = $props();
 
     let open = $state(false);
-    let selectedDate = $state(untrack(() => getFormattedDate(value)));
-    let selectedTime = $state(untrack(() => getFormattedTime(value)));
+    let selectedDate = $derived(getFormattedDate(value));
+    let selectedTime = $derived(getFormattedTime(value));
     let calendarPlaceholder = $state<DateValue>(
         untrack(() => parseYmdToCalendarDate(getFormattedDate(value)) ?? todayCalendarDate()),
     );
-
-    $effect(() => {
-        selectedDate = getFormattedDate(value);
-        selectedTime = getFormattedTime(value);
-    });
 
     const calendarValue = $derived(parseYmdToCalendarDate(selectedDate));
     const displayText = $derived(
