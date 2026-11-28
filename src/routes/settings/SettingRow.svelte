@@ -167,10 +167,10 @@
         justify-content: flex-end;
     }
 
-    :global(input[type='text']),
-    :global(input[type='number']),
-    :global(input[type='time']),
-    select {
+    .setting-control :global(input[type='text']),
+    .setting-control :global(input[type='number']),
+    .setting-control :global(input[type='time']),
+    .setting-control select {
         padding: 6px 10px;
         border: 1px solid var(--border);
         border-radius: 4px;
@@ -179,10 +179,5 @@
         font-size: 14px;
         width: 100%;
         max-width: 200px;
-    }
-
-    :global(input[type='checkbox']) {
-        width: 18px;
-        height: 18px;
     }
 </style>
