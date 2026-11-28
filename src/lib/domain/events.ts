@@ -22,23 +22,6 @@ export interface NewEventOptions {
     readonly taskId?: string;
 }
 
-function resolveEventCalendar(
-    ev: { readonly remoteCollectionId?: string | null },
-    calendars: readonly CalendarLike[] = [],
-): CalendarLike | undefined {
-    if (calendars.length === 0) {
-        return undefined;
-    }
-
-    const fallback = calendars[0];
-    const collectionId = ev.remoteCollectionId;
-    if (!collectionId) {
-        return fallback;
-    }
-
-    return calendars.find((c) => c.id === collectionId) ?? fallback;
-}
-
 export function isRecurring(event: {
     readonly rrule?: string | null;
     readonly recurringEventId?: string | null;
@@ -123,7 +106,7 @@ export function isEventReadOnly(
     if (!collectionId) {
         return false;
     }
-    return isCalendarReadOnly(resolveEventCalendar({ remoteCollectionId: collectionId }, calendars));
+    return isCalendarReadOnly(calendars.find((calendar) => calendar.id === collectionId));
 }
 
 

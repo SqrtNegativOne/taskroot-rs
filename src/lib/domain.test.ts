@@ -65,6 +65,15 @@ describe('isEventReadOnly', () => {
         expect(isEventReadOnly({}, calendars)).toBe(false);
         expect(isEventReadOnly({ remoteCollectionId: undefined }, [])).toBe(false);
     });
+
+    it('does not inherit read-only status from calendars[0] when the event calendar is unknown', () => {
+        const readOnlyFirst: AppCalendar[] = [
+            { id: 'cal-holidays', summary: 'Holidays', writable: false, component: 'VEVENT' },
+            { id: 'cal-work', summary: 'Work', writable: true, component: 'VEVENT' },
+        ];
+        expect(isEventReadOnly({ remoteCollectionId: 'cal-missing' }, readOnlyFirst)).toBe(false);
+        expect(isEventReadOnly({ calendarId: 'cal-missing' }, readOnlyFirst)).toBe(false);
+    });
 });
 
 describe('buildNewEvent', () => {
