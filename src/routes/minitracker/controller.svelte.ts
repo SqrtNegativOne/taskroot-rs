@@ -17,7 +17,7 @@ export type {
     StoredPosition,
     WindowGeometryAdapter,
 } from './windowGeometry';
-export { createTauriWindowGeometryAdapter } from './windowGeometry';
+export { createTauriWindowGeometryAdapter, isStoredPosition } from './windowGeometry';
 
 export interface ControllerOptions {
     readonly savePosition: (position: StoredPosition) => void;

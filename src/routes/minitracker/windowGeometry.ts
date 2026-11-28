@@ -11,6 +11,12 @@ export interface StoredPosition {
     readonly y: number;
 }
 
+export function isStoredPosition(value: unknown): value is StoredPosition {
+    if (typeof value !== 'object' || value === null) return false;
+    const candidate = value as { x?: unknown; y?: unknown };
+    return typeof candidate.x === 'number' && typeof candidate.y === 'number';
+}
+
 export interface BarSize {
     readonly width: number;
     readonly height: number;

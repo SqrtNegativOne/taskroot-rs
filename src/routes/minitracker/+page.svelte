@@ -7,18 +7,20 @@
     import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
-    import {
-        DEFAULT_TASK_PRIORITY,
-        type AppTask,
-        type AppTaskStatus,
-    } from '../../lib/domain';
     import TaskMenu from './TaskMenu.svelte';
     import {
         createMinitrackerController,
         isInteractiveTarget,
+        isStoredPosition,
         isTaskMenuTarget,
         type StoredPosition,
     } from './controller.svelte';
+    import { createMinitrackerActions } from './actions';
+    import {
+        isTypingTarget,
+        resolveMinitrackerKeyCommand,
+        ShiftChordTracker,
+    } from './shortcuts';
     import { DEFAULT_BAR_HEIGHT } from './menuLayout';
     import './minitracker.css';
 
@@ -29,45 +31,9 @@
         stopped: 'var(--fg-muted)',
     } as const;
 
-    type ShortcutAction = 'toggleDimmed' | 'restoreMainWindow';
-
-    interface KeyboardShortcut {
-        readonly key: string;
-        readonly ctrl?: boolean;
-        readonly alt?: boolean;
-        readonly action: ShortcutAction;
-    }
-
-    const KEYBOARD_SHORTCUTS: readonly KeyboardShortcut[] = [
-        { key: 'h', action: 'toggleDimmed' },
-        { key: 'r', ctrl: true, alt: true, action: 'restoreMainWindow' },
-    ];
-
-    function matchesShortcut(e: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
-        return (
-            e.key === shortcut.key &&
-            e.ctrlKey === !!shortcut.ctrl &&
-            e.altKey === !!shortcut.alt &&
-            !e.metaKey &&
-            !e.shiftKey
-        );
-    }
-
-    function isTypingTarget(target: EventTarget | null): boolean {
-        return target instanceof HTMLElement && target.matches('input, textarea, [contenteditable]');
-    }
-
-    function isStoredPosition(value: unknown): value is StoredPosition {
-        if (typeof value !== 'object' || value === null) return false;
-        const candidate = value as { x?: unknown; y?: unknown };
-        return typeof candidate.x === 'number' && typeof candidate.y === 'number';
-    }
-
     const breakDivisor = $derived(store.settings?.flowtime_break_divisor ?? 5);
+    const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
     let isDimmed = $state(false);
-    let leftShiftDown = false;
-    let rightShiftDown = false;
-    let shiftBreakFired = false;
     let baseAlpha = $derived(
         store.settings?.tracker_opacity !== undefined ? store.settings.tracker_opacity / 100 : 0.85,
     );
@@ -91,7 +57,14 @@
         },
     });
 
-    const pauseMinutes = $derived(store.settings?.pause_minutes ?? 10);
+    const actions = createMinitrackerActions({
+        closeMenu: () => controller.closeMenu(),
+        getPauseMinutes: () => pauseMinutes,
+        getBreakDivisor: () => breakDivisor,
+        toggleDimmed: () => {
+            isDimmed = !isDimmed;
+        },
+    });
 
     const effectiveOpacity = $derived.by(() => {
         if (isDimmed) return 0.2;
@@ -121,12 +94,8 @@
     let tasks = $derived(listQuery.data ?? []);
 
     let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
-
-    let currentMs = $derived(stopwatchState.currentMs);
-
-    let timeParts = $derived(splitTime(currentMs));
+    let timeParts = $derived(splitTime(stopwatchState.currentMs));
     let timeText = $derived(stopwatchState.isBreak ? timeParts.sec : timeParts.m);
-
     let textColor = $derived(PHASE_COLORS[stopwatchState.phase]);
     let customLabel = $derived(
         stopwatchState.labelSource === 'custom' ? stopwatchState.label : undefined,
@@ -152,195 +121,43 @@
             await controller.closeMenu();
             return;
         }
-
         const rect = barElement?.getBoundingClientRect();
         if (rect === undefined) return;
-
         menuBarHeight = rect.height;
         await reloadTaskListState();
-        controller.toggleMenu(
+        void controller.toggleMenu(
             tasks.length + (activeTask ? 1 : 0),
             { width: rect.width, height: rect.height },
         );
     }
 
-    async function setTaskStatus(task: AppTask, status: AppTaskStatus): Promise<void> {
-        if (task.status === status) return;
-        await store.mutate('Failed to update task status', () =>
-            store.updateTask(task.id, [{ field: 'status', value: status }]));
-    }
-
-    async function stopClock(): Promise<void> {
-        if (stopwatchState.isPaused) await stopwatchState.togglePause(pauseMinutes);
-        if (stopwatchState.running && !stopwatchState.isBreak) await stopwatchState.toggle();
-    }
-
-    async function selectTask(taskId: string): Promise<void> {
-        const selected = tasks.find((task) => task.id === taskId);
-        if (selected === undefined || selected.status === 'done') return;
-
-        await controller.closeMenu();
-        await stopwatchState.startTask(selected);
-    }
-
-    async function addAndTrackTask(title: string): Promise<void> {
-        const trimmed = title.trim();
-        if (trimmed === '') return;
-
-        const newTask: AppTask = {
-            id: crypto.randomUUID(),
-            title: trimmed,
-            status: 'todo',
-            priority: DEFAULT_TASK_PRIORITY,
-        };
-
-        const result = await store.mutate('Failed to create task', () => store.addTask(newTask));
-        if (result.isOk()) {
-            await controller.closeMenu();
-            await stopwatchState.startTask(newTask);
-        }
-    }
-
-    async function setCustomLabel(text: string): Promise<void> {
-        const trimmed = text.trim();
-        await controller.closeMenu();
-
-        if (trimmed === '') {
-            await stopwatchState.setLabel(null, 'unset');
-            return;
-        }
-
-        await stopwatchState.setLabel(trimmed, 'custom');
-        if (stopwatchState.phase === 'paused' || stopwatchState.phase === 'stopped') {
-            await stopwatchState.toggle();
-        }
-    }
-
-    async function stopWorking(): Promise<void> {
-        if (activeTask === undefined) return;
-
-        await controller.closeMenu();
-        await stopClock();
-        await stopwatchState.clearTask();
-    }
-
-    async function toggleDone(task: AppTask): Promise<void> {
-        const next: AppTaskStatus = task.status === 'done' ? 'todo' : 'done';
-        await setTaskStatus(task, next);
-        if (next === 'done' && stopwatchState.taskId === task.id) {
-            await stopClock();
-            await stopwatchState.clearTask();
-        }
-    }
-
-    async function runShortcut(action: ShortcutAction) {
-        if (action === 'toggleDimmed') {
-            isDimmed = !isDimmed;
-            return;
-        }
-        await safeInvoke(commands.windowRestoreMain());
-    }
-
-    function handleEscape(e: KeyboardEvent): boolean {
-        if (e.key !== 'Escape' || !controller.menuOpen) return false;
-        e.preventDefault();
-        void controller.closeMenu();
-        return true;
-    }
-
-    function handlePauseShortcut(e: KeyboardEvent): boolean {
-        if (e.key === 'p' || e.key === 'P') {
-            e.preventDefault();
-            void stopwatchState.togglePause(pauseMinutes);
-            return true;
-        }
-        if (!stopwatchState.isPaused) return false;
-
-        if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-            e.preventDefault();
-            void stopwatchState.adjustPause(1);
-            return true;
-        }
-        if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            void stopwatchState.adjustPause(-1);
-            return true;
-        }
-        return false;
-    }
-
-    function handleTransportShortcut(e: KeyboardEvent): boolean {
-        if (e.code !== 'Space') return false;
-        e.preventDefault();
-        void stopwatchState.toggle();
-        return true;
-    }
-
-    function handleShiftKeyDown(e: KeyboardEvent): boolean {
-        if (e.code === 'ShiftLeft') {
-            leftShiftDown = true;
-        } else if (e.code === 'ShiftRight') {
-            rightShiftDown = true;
-        } else {
-            return false;
-        }
-
-        if (leftShiftDown && rightShiftDown && !shiftBreakFired) {
-            shiftBreakFired = true;
-            e.preventDefault();
-            void stopwatchState.toggleBreak(breakDivisor);
-        }
-        return true;
-    }
-
-    function handleShiftKeyUp(e: KeyboardEvent): void {
-        if (e.code === 'ShiftLeft') {
-            leftShiftDown = false;
-        } else if (e.code === 'ShiftRight') {
-            rightShiftDown = false;
-        } else {
-            return;
-        }
-        shiftBreakFired = false;
-    }
-
-    function resetShiftState(): void {
-        leftShiftDown = false;
-        rightShiftDown = false;
-        shiftBreakFired = false;
-    }
-
     onMount(() => {
         void getCurrentWindow().setAlwaysOnTop(true);
+        const shiftChord = new ShiftChordTracker();
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (handleShiftKeyDown(e)) return;
-
-            if (isTypingTarget(e.target)) {
-                handleEscape(e);
-                return;
-            }
-
-            const shortcut = KEYBOARD_SHORTCUTS.find((s) => matchesShortcut(e, s));
-            if (shortcut) {
-                e.preventDefault();
-                void runShortcut(shortcut.action);
-                return;
-            }
-            if (handleEscape(e) || handlePauseShortcut(e) || handleTransportShortcut(e)) return;
+            const cmd = resolveMinitrackerKeyCommand(
+                e,
+                {
+                    isTyping: isTypingTarget(e.target),
+                    menuOpen: controller.menuOpen,
+                    isPaused: stopwatchState.isPaused,
+                },
+                shiftChord,
+            );
+            if (cmd === null) return;
+            e.preventDefault();
+            actions.executeKeyCommand(cmd);
         };
-        const handleKeyUp = (e: KeyboardEvent) => {
-            handleShiftKeyUp(e);
-        };
+        const handleKeyUp = (e: KeyboardEvent) => shiftChord.onKeyUp(e.code);
         const handleBlur = () => {
-            resetShiftState();
+            shiftChord.reset();
             void controller.closeMenu();
         };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('blur', handleBlur);
-
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
@@ -398,11 +215,11 @@
             {tasks}
             {activeTask}
             customLabel={hasCustomLabel ? customLabel : undefined}
-            onSelect={(taskId) => void selectTask(taskId)}
-            onStop={() => void stopWorking()}
-            onSetCustom={(label) => void setCustomLabel(label)}
-            onToggleDone={(task) => void toggleDone(task)}
-            onAddTask={(title) => void addAndTrackTask(title)}
+            onSelect={(taskId) => void actions.selectTask(tasks, taskId)}
+            onStop={() => void actions.stopWorking(activeTask)}
+            onSetCustom={(label) => void actions.setCustomLabel(label)}
+            onToggleDone={(task) => void actions.toggleDone(task)}
+            onAddTask={(title) => void actions.addAndTrackTask(title)}
         />
     {/if}
 </div>
