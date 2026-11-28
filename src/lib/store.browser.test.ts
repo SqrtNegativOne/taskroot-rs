@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushSync } from 'svelte';
 import { waitFor } from '@testing-library/svelte';
 import type { EventCallback } from '@tauri-apps/api/event';
 import { mockTauriInvoke } from '../test/tauriMock';
+import { mountEffectRoot } from './effectRootHarness.svelte';
+import { useTauriQuery } from './safeInvoke.svelte';
 
 const eventMock = vi.hoisted(() => ({
     listeners: new Map<string, Set<EventCallback<unknown>>>(),
@@ -80,5 +83,41 @@ describe('AppStore IPC & event contract', () => {
             expect(tauri.invoke).toHaveBeenCalledWith('get_settings', undefined, undefined);
             expect(store.settings).toEqual({ colour_scheme: 'ember' });
         });
+    });
+});
+
+describe('useTauriQuery debounced stale guard', () => {
+    it('drops an in-flight response that resolves while a newer debounced request is queued', async () => {
+        const first = Promise.withResolvers<string>();
+        const second = Promise.withResolvers<string>();
+        const command = vi.fn((term: string) => (term === 'a' ? first.promise : second.promise));
+
+        let query!: ReturnType<typeof useTauriQuery<string, [string]>>;
+        const dispose = mountEffectRoot(() => {
+            query = useTauriQuery(command, { debounceMs: 60 });
+        });
+        flushSync();
+
+        void query.execute('a');
+        await waitFor(() => { expect(command).toHaveBeenCalledWith('a'); });
+
+        // Queue a newer debounced request while 'a' is still in flight.
+        const secondDone = query.execute('ab');
+        expect(query.isLoading).toBe(true);
+
+        // Stale 'a' resolves well before 'ab' finishes debouncing.
+        first.resolve('stale-a');
+        await new Promise((resolve) => setTimeout(resolve, 15));
+
+        expect(query.data).toBeUndefined();
+        expect(query.isLoading).toBe(true);
+
+        await waitFor(() => { expect(command).toHaveBeenCalledWith('ab'); });
+        second.resolve('fresh-ab');
+        await secondDone;
+
+        expect(query.data).toBe('fresh-ab');
+        expect(query.isLoading).toBe(false);
+        dispose();
     });
 });

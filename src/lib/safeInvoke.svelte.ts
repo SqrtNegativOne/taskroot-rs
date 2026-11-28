@@ -111,6 +111,7 @@ export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
         lastArgs = effective;
         if (debouncer === undefined) return dispatch(effective);
 
+        guard.invalidate();
         isLoading = true;
         resolveScheduled?.();
         resolveScheduled = undefined;
