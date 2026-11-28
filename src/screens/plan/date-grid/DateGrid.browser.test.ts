@@ -499,3 +499,34 @@ describe('DateGrid vertical infinite scroll', () => {
         }
     });
 });
+
+describe('DateGrid view menu', () => {
+    beforeEach(() => {
+        tauri.reset();
+        tauri.stubCommandValue('get_active_calendars', calendars);
+        tauri.stubCommandValue('get_ui_state', undefined);
+        tauri.stubCommandValue('query_event_instances', []);
+        tauri.stubCommandValue('query_task_dates', []);
+    });
+
+    it('cancels a pending close animation timer when the view menu is reopened', async () => {
+        vi.useFakeTimers();
+        try {
+            render(DateGrid);
+            const trigger = screen.getByTitle('View options');
+
+            await fireEvent.click(trigger);
+            expect(screen.getByRole('button', { name: 'month' })).toBeTruthy();
+
+            await fireEvent.click(trigger);
+            await vi.advanceTimersByTimeAsync(50);
+
+            await fireEvent.click(trigger);
+            await vi.advanceTimersByTimeAsync(200);
+
+            expect(screen.getByRole('button', { name: 'month' })).toBeTruthy();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});

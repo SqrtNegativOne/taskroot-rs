@@ -23,10 +23,20 @@
     let showViewMenu = $state(false);
     let closingViewMenu = $state(false);
     let viewMenuRef = $state<HTMLDivElement | null>(null);
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function openViewMenu() {
+        clearTimeout(closeTimer);
+        closeTimer = undefined;
+        closingViewMenu = false;
+        showViewMenu = true;
+    }
 
     function closeViewMenu() {
+        clearTimeout(closeTimer);
         closingViewMenu = true;
-        setTimeout(() => {
+        closeTimer = setTimeout(() => {
+            closeTimer = undefined;
             showViewMenu = false;
             closingViewMenu = false;
         }, ANIMATION_DELAY_MS);
@@ -43,7 +53,10 @@
             }
         }
         document.addEventListener("pointerdown", handleClickOutside);
-        return () => { document.removeEventListener("pointerdown", handleClickOutside); };
+        return () => {
+            clearTimeout(closeTimer);
+            document.removeEventListener("pointerdown", handleClickOutside);
+        };
     });
 </script>
 
@@ -82,8 +95,8 @@
         <div style="position: relative;" bind:this={viewMenuRef}>
             <button
                 onclick={() => {
-                    if (showViewMenu) closeViewMenu();
-                    else showViewMenu = true;
+                    if (showViewMenu && !closingViewMenu) closeViewMenu();
+                    else openViewMenu();
                 }}
                 title="View options"
                 style="
