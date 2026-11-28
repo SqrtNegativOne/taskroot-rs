@@ -82,6 +82,14 @@ describe('all-day and timed conversion', () => {
         const timed = toTimed(makeEvent({ startTime: '2026-11-05', endTime: '2026-11-05' }));
         expect(timed.endTime > timed.startTime).toBe(true);
     });
+
+    it('rolls repaired timed ends past midnight instead of producing an inverted range', () => {
+        expect(toTimed(timedEvent('2026-11-05T23:30:00', '2026-11-05T23:00:00'))).toEqual({
+            startTime: '2026-11-05T23:30:00',
+            endTime: '2026-11-06T00:30:00',
+            isAllDay: false,
+        });
+    });
 });
 
 describe('moving start', () => {
@@ -111,6 +119,22 @@ describe('moving start', () => {
             isAllDay: false,
         });
     });
+
+    it('rolls the end to the next day when a late-night start crosses midnight', () => {
+        const event = timedEvent('2026-11-05T09:00:00', '2026-11-05T10:00:00');
+        expect(withStartTime(event, '23:30')).toEqual({
+            startTime: '2026-11-05T23:30:00',
+            endTime: '2026-11-06T00:30:00',
+            isAllDay: false,
+        });
+
+        const inverted = timedEvent('2026-11-05T23:30:00', '2026-11-05T23:00:00');
+        expect(withStartDate(inverted, '2026-11-07')).toEqual({
+            startTime: '2026-11-07T23:30:00',
+            endTime: '2026-11-08T00:30:00',
+            isAllDay: false,
+        });
+    });
 });
 
 describe('moving end', () => {
@@ -133,6 +157,22 @@ describe('moving end', () => {
         expect(withEndDate(event, '2026-11-05')).toEqual({
             startTime: '2026-11-05T09:00:00',
             endTime: '2026-11-05T10:00:00',
+            isAllDay: false,
+        });
+    });
+
+    it('clamps a timed end date before start to the earliest valid date', () => {
+        const sameDay = timedEvent('2026-11-05T09:00:00', '2026-11-05T10:00:00');
+        expect(withEndDate(sameDay, '2026-11-01')).toEqual({
+            startTime: '2026-11-05T09:00:00',
+            endTime: '2026-11-05T10:00:00',
+            isAllDay: false,
+        });
+
+        const overnight = timedEvent('2026-11-05T17:00:00', '2026-11-06T09:00:00');
+        expect(withEndDate(overnight, '2026-11-05')).toEqual({
+            startTime: '2026-11-05T17:00:00',
+            endTime: '2026-11-06T09:00:00',
             isAllDay: false,
         });
     });

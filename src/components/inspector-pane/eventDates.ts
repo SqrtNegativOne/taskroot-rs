@@ -22,12 +22,14 @@ function shiftDay(date: string, days: number): string {
     return ymd(addDays(parseLocalYmd(date), days));
 }
 
-function addMinutes(time: string, minutes: number): string {
+function addMinutes(time: string, minutes: number): { time: string; dayOffset: number } {
     const [hours = 0, mins = 0] = time.split(':').map(Number);
-    const total = (hours * 60 + mins + minutes + 1440) % 1440;
-    const hh = Math.floor(total / 60).toString().padStart(2, '0');
-    const mm = (total % 60).toString().padStart(2, '0');
-    return `${hh}:${mm}`;
+    const total = hours * 60 + mins + minutes;
+    const dayOffset = Math.floor(total / 1440);
+    const rem = ((total % 1440) + 1440) % 1440;
+    const hh = Math.floor(rem / 60).toString().padStart(2, '0');
+    const mm = (rem % 60).toString().padStart(2, '0');
+    return { time: `${hh}:${mm}`, dayOffset };
 }
 
 function isBefore(
@@ -37,6 +39,28 @@ function isBefore(
     timeB: string,
 ): boolean {
     return `${dateA}T${timeA}` < `${dateB}T${timeB}`;
+}
+
+function timedRange(
+    startDate: string,
+    startTime: string,
+    endDate: string,
+    endTime: string | undefined,
+): EventDateFields {
+    if (endTime !== undefined && isBefore(startDate, startTime, endDate, endTime)) {
+        return {
+            startTime: `${startDate}T${startTime}:00`,
+            endTime: `${endDate}T${endTime}:00`,
+            isAllDay: false,
+        };
+    }
+    const { time, dayOffset } = addMinutes(startTime, DEFAULT_DURATION_MINUTES);
+    const resolvedEndDate = dayOffset === 0 ? startDate : shiftDay(startDate, dayOffset);
+    return {
+        startTime: `${startDate}T${startTime}:00`,
+        endTime: `${resolvedEndDate}T${time}:00`,
+        isAllDay: false,
+    };
 }
 
 export function eventIsAllDay(event: Pick<AppEvent, 'startTime' | 'isAllDay'>): boolean {
@@ -85,21 +109,12 @@ export function toTimed(event: EventDateFields): EventDateFields {
     const endDate = eventIsAllDay(event)
         ? eventEndDateInclusive(event) ?? startDate
         : datePart(event.endTime) ?? startDate;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
-
-    if (!isBefore(startDate, startTime, endDate, endTime)) {
-        return {
-            startTime: `${startDate}T${startTime}:00`,
-            endTime: `${startDate}T${addMinutes(startTime, DEFAULT_DURATION_MINUTES)}:00`,
-            isAllDay: false,
-        };
-    }
-
-    return {
-        startTime: `${startDate}T${startTime}:00`,
-        endTime: `${endDate}T${endTime}:00`,
-        isAllDay: false,
-    };
+    const parsedEnd = timePart(event.endTime);
+    const fallback = addMinutes(startTime, DEFAULT_DURATION_MINUTES);
+    const candidateEndDate = parsedEnd !== undefined || fallback.dayOffset === 0
+        ? endDate
+        : shiftDay(endDate, fallback.dayOffset);
+    return timedRange(startDate, startTime, candidateEndDate, parsedEnd ?? fallback.time);
 }
 
 export function withStartDate(event: EventDateFields, date: string): EventDateFields {
@@ -117,38 +132,14 @@ export function withStartDate(event: EventDateFields, date: string): EventDateFi
     }
 
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
     const movedEndDate = end ? shiftDay(end, delta) : date;
-    const endDate = isBefore(date, startTime, movedEndDate, endTime) ? movedEndDate : date;
-    const resolvedEndTime = isBefore(date, startTime, endDate, endTime)
-        ? endTime
-        : addMinutes(startTime, DEFAULT_DURATION_MINUTES);
-
-    return {
-        startTime: `${date}T${startTime}:00`,
-        endTime: `${endDate}T${resolvedEndTime}:00`,
-        isAllDay: false,
-    };
+    return timedRange(date, startTime, movedEndDate, timePart(event.endTime));
 }
 
 export function withStartTime(event: EventDateFields, time: string): EventDateFields {
     const date = datePart(event.startTime) ?? ymd(new Date());
     const endDate = datePart(event.endTime) ?? date;
-    const endTime = timePart(event.endTime) ?? addMinutes(time, DEFAULT_DURATION_MINUTES);
-
-    if (!isBefore(date, time, endDate, endTime)) {
-        return {
-            startTime: `${date}T${time}:00`,
-            endTime: `${date}T${addMinutes(time, DEFAULT_DURATION_MINUTES)}:00`,
-            isAllDay: false,
-        };
-    }
-
-    return {
-        startTime: `${date}T${time}:00`,
-        endTime: `${endDate}T${endTime}:00`,
-        isAllDay: false,
-    };
+    return timedRange(date, time, endDate, timePart(event.endTime));
 }
 
 export function withEndDate(event: EventDateFields, date: string): EventDateFields {
@@ -160,10 +151,9 @@ export function withEndDate(event: EventDateFields, date: string): EventDateFiel
     }
 
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
-    const clamped = !isBefore(start, startTime, date, endTime)
-        ? shiftDay(start, 1)
-        : date;
+    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
+    const minEndDate = endTime > startTime ? start : shiftDay(start, 1);
+    const clamped = date < minEndDate ? minEndDate : date;
     return {
         startTime: `${start}T${startTime}:00`,
         endTime: `${clamped}T${endTime}:00`,
@@ -197,15 +187,15 @@ export function withDateRange(
     }
 
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
+    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
     if (isBefore(start, startTime, end, endTime)) {
         return { startTime: `${start}T${startTime}:00`, endTime: `${end}T${endTime}:00`, isAllDay: false };
     }
 
     const plusHour = addMinutes(startTime, DEFAULT_DURATION_MINUTES);
-    const resolvedEnd = plusHour > startTime
-        ? `${end}T${plusHour}:00`
-        : startTime < '23:59' ? `${end}T23:59:00` : `${shiftDay(end, 1)}T${plusHour}:00`;
+    const resolvedEnd = plusHour.dayOffset === 0
+        ? `${end}T${plusHour.time}:00`
+        : startTime < '23:59' ? `${end}T23:59:00` : `${shiftDay(end, 1)}T${plusHour.time}:00`;
     return { startTime: `${start}T${startTime}:00`, endTime: resolvedEnd, isAllDay: false };
 }
 
