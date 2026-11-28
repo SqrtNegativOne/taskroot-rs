@@ -91,7 +91,7 @@
     -webkit-app-region: drag;
     z-index: 0;
   }
-  .topbar-left, .topbar-right { 
+  .topbar-left { 
     display: flex; 
     align-items: center; 
     gap: 12px; 

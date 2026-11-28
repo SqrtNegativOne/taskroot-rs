@@ -79,17 +79,6 @@
     font-weight: 500; 
   }
 
-  @keyframes eventEnter {
-    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  @keyframes eventExit {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to { opacity: 0; transform: translateY(4px) scale(0.98); }
-  }
-  .day-cell-event.is-entering { animation: eventEnter 150ms ease-out forwards; }
-  .day-cell-event.is-removing { animation: eventExit 150ms ease-in forwards; pointer-events: none; }
-
   .day-cell.can-accept { cursor: copy; }
   .day-cell.is-drag-over {
     background: var(--accent-soft);
@@ -219,12 +208,6 @@
     filter: brightness(1.15);
   }
   .day-cell-event.ev-plan { border-left-color: var(--ev-color, var(--accent)); background: var(--ev-bg, var(--accent-soft)); color: var(--ev-text, var(--on-event)); }
-  .day-cell-event.ev-meeting { border-left-color: var(--ev-color, var(--fg-dim)); background: var(--ev-bg, var(--bg-surface)); }
-  .day-cell-event.pri-bar-0 { border-left-color: var(--priority-0); }
-  .day-cell-event.pri-bar-1 { border-left-color: var(--priority-1); }
-  .day-cell-event.pri-bar-2 { border-left-color: var(--priority-2); }
-  .day-cell-event.pri-bar-3 { border-left-color: var(--priority-3); }
-  .day-cell-event.pri-bar-4 { border-left-color: var(--priority-4); }
   .day-cell-event.is-done { opacity: 0.45; text-decoration: line-through; }
   .day-cell-event.is-done .day-cell-event-title-text { text-decoration: line-through; }
   .day-cell-event-time { color: var(--ev-secondary, var(--on-event)); flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }

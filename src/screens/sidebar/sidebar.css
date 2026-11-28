@@ -65,7 +65,6 @@
 }
 .sidebar-widget .calendar-wrap.half { flex: none; height: 50%; }
 .sidebar-widget .calendar-wrap .day-pane { flex: 1; height: 100%; border-radius: 0; background: transparent !important; }
-.sidebar-widget .calendar-wrap .timeline-header { border-radius: 0 !important; background: transparent !important; }
 .sidebar-widget .notes-wrap {
     height: 50%;
     border-top: 1px solid var(--border);

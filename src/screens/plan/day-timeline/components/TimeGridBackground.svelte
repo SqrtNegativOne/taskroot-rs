@@ -15,7 +15,6 @@
             height: {MINUTES_IN_HOUR * PX_PER_MIN}px;
         "
     >
-        <div class="day-hour-line"></div>
         <div class="day-hour-half"></div>
     </div>
 {/each}

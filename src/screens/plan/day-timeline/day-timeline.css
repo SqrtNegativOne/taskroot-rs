@@ -3,7 +3,6 @@
 
 /* Day columns and hour gutter geometry. */
 .day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 0 16px; font-size: calc(14px * var(--font-scale, 1)); }
-.day-pane-stats { font-size: 0.85em; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
 .day-scroll { flex: 1; min-height: 0; overflow: auto; overflow-anchor: none; padding: 4px 0 48px 0; scrollbar-width: none; }
 .day-scroll::-webkit-scrollbar { display: none; }
 .day-cols { display: flex; flex-direction: column; min-width: min-content; }
@@ -50,7 +49,6 @@
 .day-grid { position: relative; width: 100%; }
 .day-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border-soft); }
 .day-hour:first-child { border-top-color: var(--border); }
-.day-hour-line { display: none; }
 .day-hour-half {
     position: absolute; left: 0; right: 0;
     top: 50%;

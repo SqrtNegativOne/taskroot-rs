@@ -24,11 +24,6 @@
     background: var(--ev-bg, var(--bg-surface));
     border-left-color: var(--ev-color, var(--fg-muted));
 }
-.day-event.pri-bar-0 { border-left-color: var(--priority-0); }
-.day-event.pri-bar-1 { border-left-color: var(--priority-1); }
-.day-event.pri-bar-2 { border-left-color: var(--priority-2); }
-.day-event.pri-bar-3 { border-left-color: var(--priority-3); }
-.day-event.pri-bar-4 { border-left-color: var(--priority-4); }
 .day-event.is-done { opacity: 0.75; background: var(--bg-surface-hover); border-left-color: var(--border); }
 .day-event.is-done .day-event-title { color: var(--ev-text, var(--on-event)); text-decoration: line-through; }
 .day-event.is-done .day-event-title-text { text-decoration: line-through; }
@@ -59,8 +54,6 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .day-event-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.day-event-tags { display: flex; gap: 6px; font-size: 0.74em; color: var(--ev-text, var(--on-event)); margin-top: 2px; }
-.day-event-tag { color: var(--ev-text, var(--on-event)); }
 .day-event.is-compact .day-event-time { display: none; }
 .day-event.is-compact { padding: 1px 8px; }
 .day-event.is-compact .day-event-title { font-size: 0.78em; }
@@ -68,7 +61,6 @@
 .day-event.is-short .day-event-inner { flex-direction: row; align-items: center; gap: 6px; }
 .day-event.is-short .day-event-title { flex: 0 1 auto; min-width: 0; }
 .day-event.is-short .day-event-time { flex: 0 0 auto; }
-.day-event.is-short .day-event-tags { display: none; }
 
 .day-event-handle {
     position: absolute; left: 0; right: 0;
@@ -91,24 +83,3 @@
     padding: 4px 8px;
 }
 .day-drop-preview-label { font-size: 0.78em; color: var(--accent); letter-spacing: 0.03em; }
-
-.drag-ghost {
-    position: fixed;
-    z-index: 9999;
-    pointer-events: none;
-    background: var(--bg-surface);
-    border: 1px solid var(--accent-line);
-    box-shadow: 0 8px 32px var(--shadow-dark), 0 0 0 1px var(--bg) inset;
-    padding: 8px 12px;
-    max-width: 320px;
-}
-.drag-ghost.is-bracket { background: var(--bg-surface); border: 1px dashed var(--accent); }
-.drag-ghost.is-bracket::before {
-    content: '▌';
-    color: var(--accent);
-    position: absolute; left: -1px; top: 0; bottom: 0;
-    display: flex; align-items: center;
-}
-.drag-ghost-inner { display: flex; align-items: center; gap: 6px; font-size: 0.92em; }
-.drag-ghost-title { color: var(--fg); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.drag-ghost-meta { font-size: 0.74em; color: var(--fg-dim); margin-top: 3px; }

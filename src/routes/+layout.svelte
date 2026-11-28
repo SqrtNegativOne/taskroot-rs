@@ -142,13 +142,7 @@
 {/if}
 
 <style>
-    .sidebar-shell {
-        height: 100vh;
-        width: 100vw;
-        background: transparent;
-        overflow: hidden;
-    }
-
+    .sidebar-shell,
     .effect-shell {
         height: 100vh;
         width: 100vw;
