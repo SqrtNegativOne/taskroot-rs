@@ -50,6 +50,9 @@ The CalDAV-backed task and event domain. Base feature: imports no other feature,
   bumps the revision. Startup retries transient `Remote` failures up to 20 times
   (2 s delay); Refresh does not retry.
 - `store/ops/` owns conditional writes, writability preflight and scoped
-  recurring mutations. See [CalDAV](../../../../docs/caldav.md),
+  recurring mutations. Every CalDAV write runs without holding the `StoreState`
+  mutex (snapshot and validate under the lock → run network I/O unlocked →
+  re-acquire and apply under `Store::revision()` / `ETag` guards). See
+  [CalDAV](../../../../docs/caldav.md),
   [known limitations](../../../../docs/known-limitations.md) and
   [settings](../../../../docs/settings.md).

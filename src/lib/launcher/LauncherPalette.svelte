@@ -1,26 +1,25 @@
 <script lang="ts">
-    import { onDestroy, onMount } from 'svelte';
+    import { onMount } from 'svelte';
     import { commands, events, safeInvoke, useAutoQuery } from '$lib/safeInvoke.svelte';
-    import { describeError, store } from '$lib/store.svelte';
-    import { notifyError } from '$lib/toast';
+    import { store } from '$lib/store.svelte';
     import { Routes } from '$lib/routes';
     import { eventInstances } from '$lib/queries';
-    import { createDebouncer, createStaleGuard } from '$lib/asyncState.svelte';
     import { useNow } from '$lib/useNow.svelte';
-    import { addDays, formatHhMm, minutesSinceMidnight, parseLocalYmd, sameDay, ymd } from '$lib/time';
-    import type { AppTask, AppTaskFilter, AppTaskSort, EventInstance, FilterGroup, QuickCapturePreview } from '$lib/domain';
+    import { formatHhMm, minutesSinceMidnight, parseLocalYmd, ymd } from '$lib/time';
+    import type { AppTask, AppTaskFilter, AppTaskSort, EventInstance, FilterGroup } from '$lib/domain';
     import { emptyFilterGroup, filterGroup } from '$lib/domain';
+    import { formatQuickCaptureDue, parseQuickCapture, type QuickCapturePreview } from './quickCapture';
 
-    const PARSE_DEBOUNCE_MS = 160;
     const DAY_CHECK_INTERVAL_MS = 60_000;
 
     const now = useNow(DAY_CHECK_INTERVAL_MS);
-    let todayIso = $derived(ymd(now.value));
+    let currentNow = $derived(new Date(now.ms));
+    let todayIso = $derived(ymd(currentNow));
     let today = $derived(parseLocalYmd(todayIso));
     let todayRange = $derived({ startDate: todayIso, endDate: todayIso });
 
     function refreshToday(): void {
-        todayIso = ymd(new Date());
+        currentNow = new Date();
     }
 
     const OPEN_TASK_FILTERS: FilterGroup<AppTaskFilter> = filterGroup([
@@ -36,13 +35,10 @@
     };
 
     let text = $state('');
-    let preview = $state<QuickCapturePreview | null>(null);
-    let previewText = $state('');
     let selected = $state(0);
     let inputEl = $state<HTMLInputElement | null>(null);
 
-    const guard = createStaleGuard();
-
+    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(todayRange, emptyFilterGroup(), ''),
     );
@@ -52,6 +48,7 @@
         '',
     ]);
 
+    let calendars = $derived(calendarsQuery.data ?? []);
     let todayEvents = $derived(eventsQuery.data ?? []);
     let todayTasks = $derived(
         (tasksQuery.data ?? []).filter(
@@ -88,31 +85,17 @@
     });
 
     let activeIndex = $derived(rows.length === 0 ? 0 : Math.min(selected, rows.length - 1));
-    let previewPending = $derived(text.trim() !== '' && previewText !== text);
-    let activePreview = $derived(preview !== null && previewText === text ? preview : null);
+    let activePreview = $derived(
+        text.trim() === ''
+            ? null
+            : parseQuickCapture(text, currentNow, calendars, store.settings?.default_task_list),
+    );
     let createTitle = $derived(activePreview?.title.trim() || text.trim());
     let createParts = $derived(activePreview ? previewParts(activePreview) : []);
     let createBlocked = $derived(
         activePreview !== null &&
             (activePreview.listError !== null || activePreview.title.trim() === ''),
     );
-
-    const debouncer = createDebouncer<string>((value) => {
-        void runParse(value);
-    }, PARSE_DEBOUNCE_MS);
-
-    $effect(() => {
-        const value = text;
-        if (value.trim() === '') {
-            debouncer.cancel();
-            guard.invalidate();
-            preview = null;
-            previewText = '';
-            return;
-        }
-        guard.invalidate();
-        debouncer.schedule(value);
-    });
 
     $effect(() => {
         void text;
@@ -133,33 +116,8 @@
         };
     });
 
-    onDestroy(() => {
-        debouncer.cancel();
-        guard.invalidate();
-    });
-
-    async function runParse(value: string): Promise<QuickCapturePreview | null> {
-        const isCurrent = guard.begin();
-        const result = await safeInvoke(commands.parseQuickCapture(value));
-        if (!isCurrent()) return null;
-
-        if (result.isErr()) {
-            preview = null;
-            previewText = value;
-            notifyError(`Could not parse quick capture: ${describeError(result.error)}`);
-            return null;
-        }
-
-        preview = result.value;
-        previewText = value;
-        return result.value;
-    }
-
     async function createFromPreview(): Promise<void> {
-        const value = text.trim();
-        if (value === '') return;
-
-        const current = preview !== null && previewText === text ? preview : await runParse(value);
+        const current = activePreview;
         if (current === null) return;
         if (current.listError !== null || current.title.trim() === '') return;
 
@@ -180,11 +138,7 @@
     }
 
     async function hide(): Promise<void> {
-        debouncer.cancel();
-        guard.invalidate();
         text = '';
-        preview = null;
-        previewText = '';
         await safeInvoke(commands.hideLauncher());
     }
 
@@ -248,21 +202,7 @@
 
     function dueLabel(value: QuickCapturePreview): string | null {
         if (value.due === null) return null;
-
-        const [datePart, timePart] = value.due.split('T');
-        const day = relativeDay(datePart);
-        if (!value.hasTime || timePart === undefined) return day;
-
-        const hours = Number(timePart.slice(0, 2));
-        const minutes = Number(timePart.slice(3, 5));
-        return `${day} ${formatHhMm(hours * 60 + minutes)}`;
-    }
-
-    function relativeDay(datePart: string): string {
-        const date = parseLocalYmd(datePart);
-        if (sameDay(date, today)) return 'Today';
-        if (sameDay(date, addDays(today, 1))) return 'Tomorrow';
-        return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+        return formatQuickCaptureDue(value.due, value.hasTime, today);
     }
 
     function eventDetail(event: EventInstance): string {
@@ -308,9 +248,7 @@
                         <span class="row-kind">New task</span>
                         <span class="row-body">
                             <span class="row-title">{createTitle}</span>
-                            {#if previewPending}
-                                <span class="row-detail">Parsing...</span>
-                            {:else if createParts.length > 0}
+                            {#if createParts.length > 0}
                                 <span class="row-detail">{createParts.join(' · ')}</span>
                             {/if}
                             {#if activePreview?.listError}

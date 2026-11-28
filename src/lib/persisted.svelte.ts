@@ -26,6 +26,7 @@ export const persistedKeys = {
     doTipsOpen: 'ui.do.tips_open',
     doNotesOpen: 'ui.do.notes_open',
     minitrackerPosition: 'ui.minitracker.position',
+    wrapReflections: 'ui.wrap.reflections',
 } as const;
 
 const DEFAULT_DEBOUNCE_MS = 400;

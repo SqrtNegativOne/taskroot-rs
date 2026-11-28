@@ -29,8 +29,8 @@ pub(super) fn task_from_component(component: &IcalCst<'_>) -> Result<AppTask, Ap
     // One zone governs both lines, as tasks.org writes them: `DUE` wins.
     let timezone = due
         .as_ref()
-        .and_then(DateValue::task_timezone)
-        .or_else(|| start.as_ref().and_then(DateValue::task_timezone));
+        .and_then(DateValue::timezone)
+        .or_else(|| start.as_ref().and_then(DateValue::timezone));
 
     Ok(AppTask {
         id: TaskId::from(uid),
@@ -45,6 +45,9 @@ pub(super) fn task_from_component(component: &IcalCst<'_>) -> Result<AppTask, Ap
         est: prop(component, "ESTIMATED-DURATION")
             .and_then(|line| duration_whole_minutes(&line.raw_value_str()))
             .filter(|minutes| *minutes > 0),
+        time_spent: prop(component, "X-TASKROOT-TIME-SPENT")
+            .and_then(|line| line.raw_value_str().trim().parse::<i32>().ok())
+            .filter(|seconds| *seconds > 0),
         added: created.or(stamp),
         notes: text_prop(component, "DESCRIPTION"),
         start: start.as_ref().map(|value| value.canonical(timezone.as_deref())),

@@ -6,7 +6,7 @@ import type {
 } from '../../../lib/domain';
 import { store } from '../../../lib/store.svelte';
 import { useNow } from '../../../lib/useNow.svelte';
-import { notifyBreakTransition, playErrorSound } from './feedback';
+import { notifyBreakTransition, playErrorSound, playTaskStartSound } from './feedback';
 
 let now: { get ms(): number };
 $effect.root(() => {
@@ -23,6 +23,7 @@ export class StopwatchState {
     taskId = $state<string | undefined>(undefined);
     label = $state<string | undefined>(undefined);
     labelSource = $state<StopwatchLabelSource>('unset');
+    hydrated = $state(false);
 
     private unlisten: (() => void) | undefined;
     private connection: Promise<void> | undefined;
@@ -33,11 +34,13 @@ export class StopwatchState {
     }
 
     async init(): Promise<void> {
+        this.hydrated = false;
         const result = await safeInvoke(commands.getStopwatchState());
         if (this.disposed) return;
         if (result.isOk() && (result.value as StopwatchSnapshot | undefined) !== undefined) {
             this.updateFromPayload(result.value);
         }
+        this.hydrated = true;
 
         await this.connect();
     }
@@ -236,6 +239,8 @@ export function stopwatchDisplay(source: StopwatchDisplaySource): {
 }
 
 let lastInBreak: boolean | undefined;
+let lastTaskId: string | undefined;
+let taskIdInitialized = false;
 let completingBreak = false;
 
 if (typeof window !== 'undefined') {
@@ -246,6 +251,22 @@ if (typeof window !== 'undefined') {
                 notifyBreakTransition(stopwatchState.phase);
             }
             lastInBreak = inBreak;
+        });
+    });
+
+    $effect.root(() => {
+        $effect(() => {
+            if (!stopwatchState.hydrated) {
+                taskIdInitialized = false;
+                lastTaskId = undefined;
+                return;
+            }
+            const nextTaskId = stopwatchState.taskId;
+            if (taskIdInitialized && nextTaskId !== undefined && nextTaskId !== lastTaskId) {
+                playTaskStartSound();
+            }
+            lastTaskId = nextTaskId;
+            taskIdInitialized = true;
         });
     });
 

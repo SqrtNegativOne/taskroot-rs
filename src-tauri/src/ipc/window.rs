@@ -48,7 +48,8 @@ pub async fn hide_screen_effect(app: tauri::AppHandle) {
 
 #[tauri::command]
 #[specta::specta]
-pub fn quit_app(app: tauri::AppHandle) {
+pub async fn quit_app(app: tauri::AppHandle) {
+    super::stopwatch::flush_and_credit_on_exit(&app).await;
     platform::quit_app(&app);
 }
 

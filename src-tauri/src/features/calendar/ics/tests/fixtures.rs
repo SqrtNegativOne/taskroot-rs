@@ -40,6 +40,7 @@ pub(super) const TASK_PROPERTIES: &[&str] = &[
     "GEO",
     "RELATED-TO",
     "ESTIMATED-DURATION",
+    "X-TASKROOT-TIME-SPENT",
     "CREATED",
     "LAST-MODIFIED",
     "DTSTAMP",

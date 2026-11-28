@@ -136,7 +136,7 @@ def main():
             check(base)
             if args.check_backend:
                 subprocess.run(["cargo", "nextest", "run", "--run-ignored", "ignored-only", "-E",
-                                "test(disposable_dummy_accounts_switch_real_resources_without_keychain_access)"],
+                                "test(dummy_accounts::)"],
                                cwd=ROOT / "src-tauri", check=True)
             if not (args.check or args.check_backend):
                 print(f"Dummy CalDAV: {base}. Credentials are in AGENTS.md. Ctrl+C stops this fixture.")

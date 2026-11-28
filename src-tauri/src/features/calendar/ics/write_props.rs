@@ -49,6 +49,7 @@ const TASK_OWNED: &[&str] = &[
     "CATEGORIES",
     "GEO",
     "ESTIMATED-DURATION",
+    "X-TASKROOT-TIME-SPENT",
     "CREATED",
     "LAST-MODIFIED",
     "DTSTAMP",
@@ -178,6 +179,13 @@ pub(super) fn task_lines(task: &AppTask) -> Vec<IcalLine<'static>> {
             IcalPropName::Unknown(Cow::Borrowed("ESTIMATED-DURATION")),
             Vec::new(),
             IcalValue::Duration(IcalDuration(Cow::Owned(format!("PT{minutes}M")))),
+        )
+    }));
+    lines.extend(task.time_spent.filter(|seconds| *seconds > 0).map(|seconds| {
+        encode(
+            IcalPropName::Unknown(Cow::Borrowed("X-TASKROOT-TIME-SPENT")),
+            Vec::new(),
+            IcalValue::Integer(IcalInteger(Cow::Owned(seconds.to_string()))),
         )
     }));
     lines.extend(

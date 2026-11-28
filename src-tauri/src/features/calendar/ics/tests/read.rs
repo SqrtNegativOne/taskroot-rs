@@ -150,3 +150,74 @@ fn an_exception_is_identified_by_uid_at_recurrence_id() {
         Some(MASTER_UID)
     );
 }
+
+#[test]
+fn utc_event_preserves_utc_timezone_and_canonical_times() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:utc-1\r\n",
+        "DTSTART:20260410T140000Z\r\n",
+        "DTEND:20260410T150000Z\r\n",
+        "RRULE:FREQ=WEEKLY\r\n",
+        "EXDATE:20260417T140000Z\r\n",
+        "SUMMARY:UTC sync\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:utc-1\r\n",
+        "RECURRENCE-ID:20260424T140000Z\r\n",
+        "DTSTART:20260424T160000Z\r\n",
+        "DTEND:20260424T170000Z\r\n",
+        "SUMMARY:UTC sync moved\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+
+    let events = read_event_resource(raw, HREF, COLLECTION).unwrap();
+
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].id, EventId::from("utc-1"));
+    assert_eq!(events[0].timezone.as_deref(), Some("UTC"));
+    assert_eq!(events[0].is_all_day, Some(false));
+    assert_eq!(events[0].start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(events[0].end_time.to_string(), "2026-04-10T15:00:00");
+    assert_eq!(
+        events[0].exdates,
+        Some(vec!["2026-04-17T14:00:00".parse().unwrap()])
+    );
+
+    assert_eq!(events[1].id, EventId::from("utc-1@2026-04-24T14:00:00"));
+    assert_eq!(events[1].timezone.as_deref(), Some("UTC"));
+    assert_eq!(
+        events[1].original_start_time,
+        Some("2026-04-24T14:00:00".parse().unwrap())
+    );
+    assert_eq!(events[1].start_time.to_string(), "2026-04-24T16:00:00");
+    assert_eq!(events[1].end_time.to_string(), "2026-04-24T17:00:00");
+}
+
+#[test]
+fn floating_timed_event_reads_with_no_timezone() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:float-1\r\n",
+        "DTSTART:20260410T140000\r\n",
+        "DTEND:20260410T150000\r\n",
+        "SUMMARY:Floating\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+
+    let event = read_one(raw);
+
+    assert_eq!(event.timezone, None);
+    assert_eq!(event.is_all_day, Some(false));
+    assert_eq!(event.start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(event.end_time.to_string(), "2026-04-10T15:00:00");
+}

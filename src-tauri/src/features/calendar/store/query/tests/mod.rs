@@ -20,6 +20,7 @@ pub(super) fn task(id: &str, title: &str) -> AppTask {
         parent_task: None,
         dependencies: None,
         est: None,
+        time_spent: None,
         added: None,
         remote_id: None,
         remote_collection_id: None,

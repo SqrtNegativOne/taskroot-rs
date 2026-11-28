@@ -2,9 +2,9 @@
 @import './timeline-events.css';
 
 /* Day columns and hour gutter geometry. */
-.day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; font-size: calc(14px * var(--font-scale, 1)); }
+.day-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 0 16px; font-size: calc(14px * var(--font-scale, 1)); }
 .day-pane-stats { font-size: 0.85em; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
-.day-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 48px 16px; scrollbar-width: none; }
+.day-scroll { flex: 1; min-height: 0; overflow: auto; overflow-anchor: none; padding: 4px 0 48px 0; scrollbar-width: none; }
 .day-scroll::-webkit-scrollbar { display: none; }
 .day-cols { display: flex; flex-direction: column; min-width: min-content; }
 
@@ -12,7 +12,7 @@
 .day-head,
 .day-row {
     display: grid;
-    grid-template-columns: var(--day-gutter-w, 44px) repeat(var(--day-count, 1), minmax(200px, 1fr));
+    grid-template-columns: var(--day-gutter-w, 44px) repeat(var(--day-count, 1), var(--day-col-w, minmax(200px, 1fr)));
 }
 .day-head {
     position: sticky;
@@ -22,7 +22,14 @@
     background: var(--bg);
     border-bottom: 1px solid var(--border-soft);
 }
-.day-gutter { position: relative; border-right: 1px solid var(--border-soft); }
+.day-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 6;
+    background: var(--bg);
+    border-right: 1px solid var(--border-soft);
+}
+.day-head .day-gutter { z-index: 9; }
 .day-head-cell {
     border-right: 1px solid var(--border-soft);
     padding: 5px 8px;

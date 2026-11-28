@@ -9,12 +9,15 @@ recurring edits, see [CalDAV](caldav.md).
 Events own `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`,
 `CATEGORIES`, `RRULE`, `EXDATE`, `STATUS`, `COLOR` and `X-TASKROOT-TASK-ID`.
 
+- `DTSTART`, `DTEND` and `EXDATE` store all-day dates as `VALUE=DATE`
+  (`YYYY-MM-DD`) and timed wall clocks paired with `timezone`: UTC `…Z` values
+  read as `Some("UTC")` and write back in RFC 5545 `…Z` form (without
+  `TZID=UTC`), IANA zones write `TZID=<zone>`, and floating values use `None`.
 - `PRIORITY` and `CATEGORIES` follow the VTODO conventions below; missing
   priority or empty tags emit no line.
-- `X-TASKROOT-TASK-ID: <task UID>` is the sole remaining `X-TASKROOT-*`
-  property. It lives on the `VEVENT` because one task can be scheduled as
-  multiple blocks; `AppEvent.task_id` reads it back and writes it only when set
-  or cleared. Other CalDAV clients ignore it.
+- `X-TASKROOT-TASK-ID: <task UID>` lives on `VEVENT` because one task can be
+  scheduled as multiple blocks; `AppEvent.task_id` reads it back and writes it
+  only when set or cleared. Other CalDAV clients ignore it.
 
 ## VTODO mapping
 
@@ -26,7 +29,7 @@ Events own `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`,
 | `notes` | `DESCRIPTION` | Plain text; a `VALARM`'s own `DESCRIPTION` is separate. |
 | `start` | `DTSTART` | tasks.org "hide until"; date-only stays `YYYY-MM-DD`. |
 | `due` | `DUE` | Preserves raw value; date-only stays `YYYY-MM-DD`. |
-| `timezone` | `TZID` of `DUE`, else `DTSTART` | `DUE` wins when zones differ; `…Z` reads as `UTC` so its instant survives writes. |
+| `timezone` | `TZID` of `DUE`, else `DTSTART` | `DUE` wins when zones differ; `…Z` reads as `Some("UTC")` and writes back as `…Z` (without `TZID=UTC`), while `None` writes floating local time. |
 | `status` | `STATUS` + `COMPLETED` + `PERCENT-COMPLETE` | `Todo`/missing → `NEEDS-ACTION`, `NextUp` → `IN-PROCESS`, `Done` → `COMPLETED` (with `PERCENT-COMPLETE:100`), `Cancelled` → `CANCELLED`. Live stopwatch focus is app-local, never written as status. |
 | `completed_at` | `COMPLETED` | Preserved across edits so retitling a done task keeps its completion time. |
 | `priority` | `PRIORITY` | `None` omitted, `Low→7`, `Medium→5`, `High→3`, `Urgent→1`; reverse `1–2→Urgent`, `3–4→High`, `5→Medium`, `6–9→Low`, `0→None`. |
@@ -39,6 +42,7 @@ Events own `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `PRIORITY`,
 | `added` | `CREATED`, fallback `DTSTAMP` | tasks.org often omits `CREATED`. |
 | `updated_at` | `LAST-MODIFIED` | |
 | `est` | `ESTIMATED-DURATION` | RFC 9074 duration; whole minutes write as `PT{n}M`. |
+| `time_spent` | `X-TASKROOT-TIME-SPENT` | Positive whole seconds accumulated from stopwatch focus; omitted when `None` or `<= 0`. |
 
 ### Preservation and guards
 

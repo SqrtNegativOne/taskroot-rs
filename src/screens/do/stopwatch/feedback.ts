@@ -30,6 +30,10 @@ export function playErrorSound(): void {
     playSound('windows-xp-error.mp3');
 }
 
+export function playTaskStartSound(): void {
+    playSound('task_start.wav');
+}
+
 /** Called only when entering or leaving a break; stopped means the break ended. */
 export function notifyBreakTransition(phase: StopwatchPhase): void {
     if (phase === 'stopped') {

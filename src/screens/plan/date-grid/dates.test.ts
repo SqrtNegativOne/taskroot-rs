@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ymd } from '../../../lib/time';
 import { DateGridView } from './constants';
-import { buildDateGrid, shiftDateGridAnchor } from './dates';
+import {
+    buildDateGrid,
+    buildInfiniteWeeks,
+    dominantMonthInViewport,
+    shiftDateGridAnchor,
+} from './dates';
 
 describe('date-grid dates', () => {
     it.each([
@@ -39,5 +44,42 @@ describe('date-grid dates', () => {
         { view: DateGridView.ThreeWeeks, expected: '2026-09-30' },
     ])('moves $view by its displayed length', ({ view, expected }) => {
         expect(ymd(shiftDateGridAnchor(new Date(2026, 8, 9), view, 1))).toBe(expected);
+    });
+});
+
+describe('dominantMonthInViewport', () => {
+    // 14 consecutive weeks starting Mon 2026-10-26 (covers Nov, Dec 2026, Jan 2027).
+    const weeks = buildInfiniteWeeks(new Date(2026, 9, 26), 14);
+    const weekHeight = 100;
+    const viewportHeight = 600; // 6 visible week rows
+
+    it('identifies the primary month when framed at its first week', () => {
+        expect(
+            dominantMonthInViewport(weeks, 0, viewportHeight, weekHeight, { year: 2026, month: 9 }),
+        ).toEqual({ year: 2026, month: 10 });
+    });
+
+    it('switches to the next month once it occupies more visible rows while scrolling down', () => {
+        // At scrollTop = 200 (weeks 2..7), Nov has 22 days vs Dec 20 days -> Nov still wins.
+        expect(
+            dominantMonthInViewport(weeks, 200, viewportHeight, weekHeight, { year: 2026, month: 10 }),
+        ).toEqual({ year: 2026, month: 10 });
+
+        // Scrolling 25px further down flips the visible area in favor of December.
+        expect(
+            dominantMonthInViewport(weeks, 225, viewportHeight, weekHeight, { year: 2026, month: 10 }),
+        ).toEqual({ year: 2026, month: 11 });
+    });
+
+    it('tracks year transitions cleanly across December into January', () => {
+        // Week 9 starts Mon 2026-12-28; 6 visible rows from week 9 are mostly January 2027.
+        expect(
+            dominantMonthInViewport(weeks, 900, viewportHeight, weekHeight, { year: 2026, month: 11 }),
+        ).toEqual({ year: 2027, month: 0 });
+    });
+
+    it('returns the fallback when the viewport has not been measured yet', () => {
+        const fallback = { year: 2026, month: 10 };
+        expect(dominantMonthInViewport(weeks, 0, 0, 0, fallback)).toEqual(fallback);
     });
 });

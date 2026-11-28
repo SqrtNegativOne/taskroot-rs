@@ -43,6 +43,9 @@ re-exported via `src/lib/domain.ts` and `src/lib/safeInvoke.svelte.ts`.
 | Recursive filters & defaults | `src/components/filters/`, `src/components/FilterButton.svelte`, `src/lib/domain/filterTree.ts`, `src/lib/domain/filters.ts` |
 | Plan screen, date grid, timeline, drag/drop | `src/screens/plan/`, [planning UI](planning-ui.md) |
 | Do screen & stopwatch feedback | `src/screens/do/stopwatch/` |
+| Tags screen & inline tag renaming | `src/screens/tags/` |
+| Wrap screen (10 PM–3 AM daily review) | `src/screens/wrap/`, `src/routes/wrap/` |
+| Stats screen (all-time bento grid) | `src/screens/stats/`, `src/routes/stats/` |
 | Quick-capture launcher | `src/lib/launcher/LauncherPalette.svelte` |
 | Mini tracker & sidebar | `src/routes/minitracker/`, `src/screens/sidebar/state.svelte.ts` |
 

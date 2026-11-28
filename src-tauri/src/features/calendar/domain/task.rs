@@ -126,6 +126,9 @@ pub struct AppTask {
     pub dependencies: Option<Vec<TaskId>>,
     #[specta(optional)]
     pub est: Option<i32>,
+    /// Accumulated stopwatch work time tracked on this task, in whole seconds.
+    #[specta(optional)]
+    pub time_spent: Option<i32>,
     #[specta(optional)]
     #[query(sortable, filter_type = "date", label = "Created")]
     pub added: Option<DateTime<Utc>>,
@@ -185,6 +188,7 @@ mod tests {
             parent_task: None,
             dependencies: None,
             est: None,
+            time_spent: None,
             added: None,
             remote_id: None,
             remote_collection_id: None,

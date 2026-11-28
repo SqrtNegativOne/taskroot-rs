@@ -116,6 +116,7 @@ impl StopwatchState {
         self.work_elapsed = self.work_elapsed.saturating_add(duration);
         (duration > 0).then(|| StopwatchHistoryEntry {
             kind: StopwatchHistoryKind::Work,
+            task_id: self.task_id.clone(),
             label: self.label.clone().unwrap_or_default(),
             label_source: self.label_source,
             started_at: started,
@@ -129,6 +130,7 @@ impl StopwatchState {
         let duration = now.saturating_sub(started).min(self.break_duration);
         (duration > 0).then(|| StopwatchHistoryEntry {
             kind: StopwatchHistoryKind::Break,
+            task_id: self.task_id.clone(),
             label: self.label.clone().unwrap_or_default(),
             label_source: self.label_source,
             started_at: started,
@@ -308,34 +310,98 @@ impl StopwatchState {
         entry.into_iter().collect()
     }
 
-    pub fn set_label(&mut self, label: Option<String>, source: StopwatchLabelSource) {
-        self.task_id = None;
-        self.label = label;
-        self.label_source = source;
-        self.normalize_focus();
+    /// Flush any active work segment and pause the clock (used on exit or focus clear).
+    pub fn flush_running_work(&mut self, now: u64) -> Vec<StopwatchHistoryEntry> {
+        if self.phase != StopwatchPhase::Running {
+            return Vec::new();
+        }
+        self.expire_pause(now);
+        self.paused_until = None;
+        let entry = self.take_work_segment(now);
+        self.phase = StopwatchPhase::Paused;
+        entry.into_iter().collect()
     }
 
-    /// Point the stopwatch at a task, or clear the local focus pointer.
-    pub fn set_task(&mut self, task_id: Option<String>, label: Option<String>) {
-        self.task_id = task_id;
-        self.label = label;
-        self.label_source = StopwatchLabelSource::Task;
-        self.normalize_focus();
+    /// Set or clear the custom focus label. When switching focus mid-run, any
+    /// live work segment is closed under the previous focus and resumed from `now`.
+    pub fn set_label(
+        &mut self,
+        label: Option<String>,
+        source: StopwatchLabelSource,
+        now: u64,
+    ) -> Vec<StopwatchHistoryEntry> {
+        self.apply_focus(None, label, source, now)
+    }
+
+    /// Point the stopwatch at a task, or clear the local focus pointer. When
+    /// switching focus mid-run, any live work segment is closed under the
+    /// previous focus and resumed from `now`.
+    pub fn set_task(
+        &mut self,
+        task_id: Option<String>,
+        label: Option<String>,
+        now: u64,
+    ) -> Vec<StopwatchHistoryEntry> {
+        self.apply_focus(task_id, label, StopwatchLabelSource::Task, now)
+    }
+
+    fn apply_focus(
+        &mut self,
+        task_id: Option<String>,
+        label: Option<String>,
+        source: StopwatchLabelSource,
+        now: u64,
+    ) -> Vec<StopwatchHistoryEntry> {
+        let (next_task_id, next_label, next_source) = normalize_focus_parts(task_id, label, source);
+        let focus_changing = self.task_id != next_task_id
+            || self.label != next_label
+            || self.label_source != next_source;
+
+        let mut entries = Vec::new();
+        if self.phase == StopwatchPhase::Running {
+            self.expire_pause(now);
+            if focus_changing && self.work_running_since.is_some() {
+                if let Some(entry) = self.take_work_segment(now) {
+                    entries.push(entry);
+                }
+                self.work_running_since = Some(now);
+            }
+        }
+
+        self.task_id = next_task_id;
+        self.label = next_label;
+        self.label_source = next_source;
+        entries
     }
 
     fn normalize_focus(&mut self) {
-        self.task_id = trim_to_some(self.task_id.take());
-        self.label = trim_to_some(self.label.take());
-        if self.task_id.is_some() {
-            self.label_source = StopwatchLabelSource::Task;
-        } else if self.label.is_some() {
-            if self.label_source != StopwatchLabelSource::Custom {
-                self.label_source = StopwatchLabelSource::Custom;
-            }
-        } else {
-            self.label_source = StopwatchLabelSource::Unset;
-        }
+        let (task_id, label, source) = normalize_focus_parts(
+            self.task_id.take(),
+            self.label.take(),
+            self.label_source,
+        );
+        self.task_id = task_id;
+        self.label = label;
+        self.label_source = source;
     }
+}
+
+fn normalize_focus_parts(
+    task_id: Option<String>,
+    label: Option<String>,
+    source: StopwatchLabelSource,
+) -> (Option<String>, Option<String>, StopwatchLabelSource) {
+    let task_id = trim_to_some(task_id);
+    let label = trim_to_some(label);
+    let source = if task_id.is_some() {
+        StopwatchLabelSource::Task
+    } else if label.is_some() {
+        let _ = source;
+        StopwatchLabelSource::Custom
+    } else {
+        StopwatchLabelSource::Unset
+    };
+    (task_id, label, source)
 }
 
 fn trim_to_some(value: Option<String>) -> Option<String> {
@@ -345,14 +411,12 @@ fn trim_to_some(value: Option<String>) -> Option<String> {
     })
 }
 
-fn stop_running_work(state: &mut StopwatchState, now: u64) -> Vec<StopwatchHistoryEntry> {
-    if state.phase != StopwatchPhase::Running {
-        return Vec::new();
-    }
-    if state.paused_until.is_some_and(|until| until > now) {
-        state.paused_until = None;
-    }
-    state.toggle_work(now).unwrap_or_default()
+/// Result of a state-machine transition: the updated snapshot plus any
+/// history segments closed during that step.
+#[derive(Debug, Clone)]
+pub struct StopwatchTransition {
+    pub state: StopwatchState,
+    pub entries: Vec<StopwatchHistoryEntry>,
 }
 
 pub struct StopwatchManager {
@@ -379,10 +443,10 @@ impl StopwatchManager {
         }
     }
 
-    fn alter(
+    fn alter_transition(
         &self,
         change: impl FnOnce(&mut StopwatchState) -> Result<Vec<StopwatchHistoryEntry>, AppError>,
-    ) -> Result<StopwatchState, AppError> {
+    ) -> Result<StopwatchTransition, AppError> {
         let mut state = self
             .state
             .lock()
@@ -401,7 +465,10 @@ impl StopwatchManager {
         if let Err(error) = history::append(&self.history_path, &entries) {
             eprintln!("Failed to record stopwatch history: {error}");
         }
-        Ok(snapshot)
+        Ok(StopwatchTransition {
+            state: snapshot,
+            entries,
+        })
     }
 
     /// Read the current state, clearing an expired timed pause.
@@ -411,10 +478,20 @@ impl StopwatchManager {
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
     pub fn snapshot(&self) -> Result<StopwatchState, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| {
+        self.alter_transition(|state| {
             state.expire_pause(now);
             Ok(Vec::new())
         })
+        .map(|transition| transition.state)
+    }
+
+    /// Read every persisted stopwatch history entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::Store`] when the history file cannot be read.
+    pub fn history(&self) -> Result<Vec<StopwatchHistoryEntry>, AppError> {
+        history::read(&self.history_path)
     }
 
     /// Start, pause or resume work.
@@ -423,9 +500,9 @@ impl StopwatchManager {
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails,
     /// or [`AppError::InvalidInput`] while a break is active.
-    pub fn toggle_work(&self) -> Result<StopwatchState, AppError> {
+    pub fn toggle_work(&self) -> Result<StopwatchTransition, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| state.toggle_work(now))
+        self.alter_transition(|state| state.toggle_work(now))
     }
 
     /// Start a break, or cancel an active break.
@@ -434,9 +511,9 @@ impl StopwatchManager {
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails,
     /// or [`AppError::InvalidInput`] when the break is not allowed.
-    pub fn toggle_break(&self, short_divisor: u32) -> Result<StopwatchState, AppError> {
+    pub fn toggle_break(&self, short_divisor: u32) -> Result<StopwatchTransition, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| state.toggle_break(now, short_divisor))
+        self.alter_transition(|state| state.toggle_break(now, short_divisor))
     }
 
     /// Finish the current break countdown.
@@ -444,9 +521,9 @@ impl StopwatchManager {
     /// # Errors
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
-    pub fn complete_break(&self) -> Result<StopwatchState, AppError> {
+    pub fn complete_break(&self) -> Result<StopwatchTransition, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| Ok(state.complete_break(now)))
+        self.alter_transition(|state| Ok(state.complete_break(now)))
     }
 
     /// Pause or resume the timed pause.
@@ -454,9 +531,9 @@ impl StopwatchManager {
     /// # Errors
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
-    pub fn toggle_pause(&self, minutes: u64) -> Result<StopwatchState, AppError> {
+    pub fn toggle_pause(&self, minutes: u64) -> Result<StopwatchTransition, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| Ok(state.toggle_pause(now, minutes)))
+        self.alter_transition(|state| Ok(state.toggle_pause(now, minutes)))
     }
 
     /// Extend or shorten an active timed pause.
@@ -466,10 +543,11 @@ impl StopwatchManager {
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
     pub fn adjust_pause(&self, delta_minutes: i64) -> Result<StopwatchState, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| {
+        self.alter_transition(|state| {
             state.adjust_pause(now, delta_minutes);
             Ok(Vec::new())
         })
+        .map(|transition| transition.state)
     }
 
     /// Clear the clock and record the live segment.
@@ -477,63 +555,69 @@ impl StopwatchManager {
     /// # Errors
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
-    pub fn reset(&self) -> Result<StopwatchState, AppError> {
+    pub fn reset(&self) -> Result<StopwatchTransition, AppError> {
         let now = current_epoch_millis()?;
-        self.alter(|state| Ok(state.reset(now)))
+        self.alter_transition(|state| Ok(state.reset(now)))
     }
 
     /// Set or clear the mini tracker label.
     ///
     /// # Errors
     ///
-    /// Returns [`AppError::Internal`] when the state lock fails.
+    /// Returns [`AppError::Internal`] when the state lock or system clock fails.
     pub fn set_label(
         &self,
         label: Option<String>,
         source: StopwatchLabelSource,
-    ) -> Result<StopwatchState, AppError> {
-        self.alter(|state| {
-            state.set_label(label, source);
-            Ok(Vec::new())
-        })
+    ) -> Result<StopwatchTransition, AppError> {
+        let now = current_epoch_millis()?;
+        self.alter_transition(|state| Ok(state.set_label(label, source, now)))
     }
 
     /// Point the stopwatch at a task, or clear the focus pointer.
     ///
     /// # Errors
     ///
-    /// Returns [`AppError::Internal`] when the state lock fails.
+    /// Returns [`AppError::Internal`] when the state lock or system clock fails.
     pub fn set_task(
         &self,
         task_id: Option<String>,
         label: Option<String>,
-    ) -> Result<StopwatchState, AppError> {
-        self.alter(|state| {
-            state.set_task(task_id, label);
-            Ok(Vec::new())
-        })
+    ) -> Result<StopwatchTransition, AppError> {
+        let now = current_epoch_millis()?;
+        self.alter_transition(|state| Ok(state.set_task(task_id, label, now)))
     }
 
-    /// Clear the focus when it points at `task_id`, stopping a running clock.
-    ///
-    /// Returns the updated snapshot when the focus matched, `None` otherwise.
+    /// Flush any running work segment on application exit and pause the clock.
     ///
     /// # Errors
     ///
     /// Returns [`AppError::Internal`] when the state lock or system clock fails.
-    pub fn clear_task_if(&self, task_id: &str) -> Result<Option<StopwatchState>, AppError> {
+    pub fn flush_for_exit(&self) -> Result<StopwatchTransition, AppError> {
+        let now = current_epoch_millis()?;
+        self.alter_transition(|state| Ok(state.flush_running_work(now)))
+    }
+
+    /// Clear the focus when it points at `task_id`, stopping a running clock.
+    ///
+    /// Returns the transition when the focus matched, `None` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError::Internal`] when the state lock or system clock fails.
+    pub fn clear_task_if(&self, task_id: &str) -> Result<Option<StopwatchTransition>, AppError> {
         let now = current_epoch_millis()?;
         let mut cleared = false;
-        let snapshot = self.alter(|state| {
+        let transition = self.alter_transition(|state| {
             if state.task_id.as_deref() != Some(task_id) {
                 return Ok(Vec::new());
             }
-            let entries = stop_running_work(state, now);
-            state.set_task(None, None);
+            let mut entries = state.flush_running_work(now);
+            entries.extend(state.set_task(None, None, now));
             cleared = true;
             Ok(entries)
         })?;
-        Ok(cleared.then_some(snapshot))
+        Ok(cleared.then_some(transition))
     }
 }
 

@@ -1,6 +1,6 @@
 import type { AppEvent } from '../../lib/domain';
 import { addDays, dayDiff, parseLocalYmd, ymd } from '../../lib/time';
-import { getFormattedTime } from './format';
+import { formatFriendlyDate, getFormattedTime } from './format';
 
 export type EventDateFields = Pick<AppEvent, 'startTime' | 'endTime' | 'isAllDay'>;
 
@@ -25,7 +25,9 @@ function shiftDay(date: string, days: number): string {
 function addMinutes(time: string, minutes: number): string {
     const [hours = 0, mins = 0] = time.split(':').map(Number);
     const total = (hours * 60 + mins + minutes + 1440) % 1440;
-    return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+    const hh = Math.floor(total / 60).toString().padStart(2, '0');
+    const mm = (total % 60).toString().padStart(2, '0');
+    return `${hh}:${mm}`;
 }
 
 function isBefore(
@@ -60,7 +62,7 @@ export function eventEndDate(event: Pick<AppEvent, 'startTime' | 'endTime'>): st
     return datePart(event.endTime) ?? datePart(event.startTime);
 }
 
-export function toAllDay(event: AppEvent): EventDateFields {
+export function toAllDay(event: EventDateFields): EventDateFields {
     const start = datePart(event.startTime) ?? ymd(new Date());
     const end = datePart(event.endTime);
 
@@ -77,7 +79,7 @@ export function toAllDay(event: AppEvent): EventDateFields {
     return { startTime: start, endTime: shiftDay(lastDay, 1), isAllDay: true };
 }
 
-export function toTimed(event: AppEvent): EventDateFields {
+export function toTimed(event: EventDateFields): EventDateFields {
     const startDate = datePart(event.startTime) ?? ymd(new Date());
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
     const endDate = eventIsAllDay(event)
@@ -100,7 +102,7 @@ export function toTimed(event: AppEvent): EventDateFields {
     };
 }
 
-export function withStartDate(event: AppEvent, date: string): EventDateFields {
+export function withStartDate(event: EventDateFields, date: string): EventDateFields {
     const oldStart = datePart(event.startTime) ?? date;
     const delta = dayDiff(parseLocalYmd(date), parseLocalYmd(oldStart));
     const end = datePart(event.endTime);
@@ -129,7 +131,7 @@ export function withStartDate(event: AppEvent, date: string): EventDateFields {
     };
 }
 
-export function withStartTime(event: AppEvent, time: string): EventDateFields {
+export function withStartTime(event: EventDateFields, time: string): EventDateFields {
     const date = datePart(event.startTime) ?? ymd(new Date());
     const endDate = datePart(event.endTime) ?? date;
     const endTime = timePart(event.endTime) ?? addMinutes(time, DEFAULT_DURATION_MINUTES);
@@ -149,7 +151,7 @@ export function withStartTime(event: AppEvent, time: string): EventDateFields {
     };
 }
 
-export function withEndDate(event: AppEvent, date: string): EventDateFields {
+export function withEndDate(event: EventDateFields, date: string): EventDateFields {
     const start = datePart(event.startTime) ?? date;
 
     if (eventIsAllDay(event)) {
@@ -169,7 +171,7 @@ export function withEndDate(event: AppEvent, date: string): EventDateFields {
     };
 }
 
-export function withEndTime(event: AppEvent, time: string): EventDateFields {
+export function withEndTime(event: EventDateFields, time: string): EventDateFields {
     const start = datePart(event.startTime) ?? ymd(new Date());
     const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
     const endDate = datePart(event.endTime) ?? start;
@@ -181,4 +183,48 @@ export function withEndTime(event: AppEvent, time: string): EventDateFields {
         endTime: `${clampedDate}T${time}:00`,
         isAllDay: false,
     };
+}
+
+/** Update both start and inclusive end dates, preserving all-day vs timed times cleanly. */
+export function withDateRange(
+    event: EventDateFields,
+    startYmd: string,
+    endYmd: string,
+): EventDateFields {
+    const [start, end] = startYmd <= endYmd ? [startYmd, endYmd] : [endYmd, startYmd];
+    if (eventIsAllDay(event)) {
+        return { startTime: start, endTime: shiftDay(end, 1), isAllDay: true };
+    }
+
+    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
+    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES);
+    if (isBefore(start, startTime, end, endTime)) {
+        return { startTime: `${start}T${startTime}:00`, endTime: `${end}T${endTime}:00`, isAllDay: false };
+    }
+
+    const plusHour = addMinutes(startTime, DEFAULT_DURATION_MINUTES);
+    const resolvedEnd = plusHour > startTime
+        ? `${end}T${plusHour}:00`
+        : startTime < '23:59' ? `${end}T23:59:00` : `${shiftDay(end, 1)}T${plusHour}:00`;
+    return { startTime: `${start}T${startTime}:00`, endTime: resolvedEnd, isAllDay: false };
+}
+
+/** Unified readable schedule summary for an event. */
+export function formatEventSchedule(event: EventDateFields): string {
+    const startYmd = eventStartDate(event);
+    if (!startYmd) return 'No date';
+    const startLabel = formatFriendlyDate(startYmd);
+
+    if (eventIsAllDay(event)) {
+        const endYmd = eventEndDateInclusive(event) ?? startYmd;
+        return endYmd === startYmd
+            ? `${startLabel} · All day`
+            : `${startLabel} – ${formatFriendlyDate(endYmd)} · All day`;
+    }
+
+    const endYmd = eventEndDate(event) ?? startYmd;
+    const startHm = getFormattedTime(event.startTime) || '00:00';
+    const endHm = getFormattedTime(event.endTime) || startHm;
+    if (endYmd === startYmd) return `${startLabel} · ${startHm} – ${endHm}`;
+    return `${startLabel}, ${startHm} – ${formatFriendlyDate(endYmd)}, ${endHm}`;
 }

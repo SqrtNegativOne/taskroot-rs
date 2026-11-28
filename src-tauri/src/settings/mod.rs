@@ -78,6 +78,14 @@ pub struct AppSettings {
     )]
     pub day_timeline_start_view: i32,
     #[setting(
+        label = "Earliest Wake Up Time",
+        description = "Hide hours before this time on the day timeline.",
+        keywords = ["wake", "morning", "timeline", "day", "start", "hours", "sleep"],
+        kind = "time",
+        section = "plan_calendar"
+    )]
+    pub earliest_wake_up_time: i32,
+    #[setting(
         label = "Default Duration",
         keywords = ["task", "duration", "estimate", "time"],
         kind = "select",
@@ -188,6 +196,7 @@ impl Default for AppSettings {
             default_task_list: String::new(),
             default_event_list: String::new(),
             day_timeline_start_view: 300,
+            earliest_wake_up_time: 0,
             default_task_duration: 0,
             clock_style: "flowtime".to_string(),
             flowtime_break_divisor: 5,

@@ -11,7 +11,10 @@ use super::windows::{WindowLabel, restore_main};
 /// # Errors
 ///
 /// Propagates Tauri's menu, icon or tray construction failure.
-pub fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn Error>> {
+pub fn build_tray(
+    app: &mut tauri::App,
+    on_exit: impl Fn(&tauri::AppHandle) + Send + Sync + 'static,
+) -> Result<(), Box<dyn Error>> {
     let open_i = tauri::menu::MenuItem::with_id(app, "open", "Open Taskroot", true, None::<&str>)?;
     let exit_i = tauri::menu::MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
     let menu = tauri::menu::Menu::with_items(app, &[&open_i, &exit_i])?;
@@ -23,9 +26,9 @@ pub fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn Error>> {
         .tooltip("Taskroot")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id.as_ref() {
+        .on_menu_event(move |app, event| match event.id.as_ref() {
             "open" => restore_main(app),
-            "exit" => app.exit(0),
+            "exit" => on_exit(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

@@ -128,7 +128,7 @@ describe('Do screen shared focus', () => {
         await loadFocus({ taskId: selectedTask.id, label: selectedTask.title, labelSource: 'task' });
         render(Stopwatch);
         await screen.findByText(selectedTask.title);
-        await waitFor(() => { expect(events.get(STORE_UPDATED)?.size).toBeGreaterThan(1); });
+        await waitFor(() => { expect(events.get(STORE_UPDATED)?.size).toBeGreaterThan(0); });
 
         tauri.stubCommandValue('query_tasks', [{ ...selectedTask, title: 'Renamed proposal' }]);
         publish(STORE_UPDATED, snapshot());

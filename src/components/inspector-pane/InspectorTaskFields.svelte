@@ -1,18 +1,18 @@
 <script lang="ts">
     import type {
+        AppCalendar,
         AppTask,
         AppTaskStatus,
         TaskAlarmTrigger,
+        TaskPatch,
         TaskPriority,
     } from '../../lib/domain';
     import { calendarsForComponent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
-    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { formatTimestamp, getFormattedDate, getFormattedTime, withDate, withTime } from './format';
+    import { formatTimestamp, formatTrackedDuration } from './format';
     import NumberInput from '../inputs/NumberInput.svelte';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TagsInput from '../inputs/TagsInput.svelte';
-    import TimeInput from '../inputs/TimeInput.svelte';
-    import DateField from './DateField.svelte';
+    import DatePickerField from './DatePickerField.svelte';
     import InspectorField from './InspectorField.svelte';
     import MetaFooter from './MetaFooter.svelte';
     import RecurrenceEditor from './RecurrenceEditor.svelte';
@@ -20,38 +20,42 @@
     interface Props {
         task: AppTask;
         tasks: AppTask[];
-        updateTask: (id: string, update: (task: AppTask) => AppTask) => void;
+        calendars?: AppCalendar[];
+        availableTags?: string[];
+        updateTask: (id: string, patches: TaskPatch[]) => void;
         readOnly?: boolean;
         onDelete?: () => void;
     }
 
-    let { task, tasks, updateTask, readOnly = false, onDelete }: Props = $props();
+    let {
+        task,
+        tasks,
+        calendars = [],
+        availableTags = [],
+        updateTask,
+        readOnly = false,
+        onDelete,
+    }: Props = $props();
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const STATUSES = ['todo', 'next-up', 'done', 'cancelled'] as const;
 
     let listOptions = $derived.by(() => {
-        const todos = calendarsForComponent(calendarsQuery.data ?? [], 'VTODO');
+        const todos = calendarsForComponent(calendars, 'VTODO');
         const current = todos.find(c => c.id === task.remoteCollectionId);
-        const selectable = current && !current.writable
-            ? [...todos.filter(c => c.writable), current]
-            : todos.filter(c => c.writable);
-        if (!task.remoteCollectionId) {
-            return [
-                { label: 'Default list', value: '' },
-                ...selectable.map(c => ({ label: c.summary || c.id, value: c.id })),
-            ];
-        }
-        if (current && !selectable.some(c => c.id === current.id)) {
-            return [
-                { label: current.summary || current.id, value: current.id },
-                ...selectable.map(c => ({ label: c.summary || c.id, value: c.id })),
-            ];
-        }
-        return selectable.map(c => ({
+        const writable = todos.filter(c => c.writable);
+        const selectable = current && !current.writable ? [...writable, current] : writable;
+        const mapped = selectable.map(c => ({
             label: c.summary || c.id,
             value: c.id,
             ...(c.color ? { color: c.color } : {}),
         }));
+        if (!task.remoteCollectionId) {
+            return [{ label: 'Default list', value: '' }, ...mapped];
+        }
+        if (current && !selectable.some(c => c.id === current.id)) {
+            return [{ label: current.summary || current.id, value: current.id }, ...mapped];
+        }
+        return mapped;
     });
 
     let parentOptions = $derived([
@@ -60,56 +64,36 @@
     ]);
 
     let dependencyNames = $derived(
-        (task.dependencies ?? []).map((id) => tasks.find((candidate) => candidate.id === id)?.title ?? id),
+        (task.dependencies ?? []).map(id => tasks.find(c => c.id === id)?.title ?? id),
     );
 
-    const STATUSES = ['todo', 'next-up', 'done', 'cancelled'] as const;
-
     function isAppTaskStatus(value: string): value is AppTaskStatus {
-        return STATUSES.some((status) => status === value);
+        return STATUSES.some(status => status === value);
     }
 
     function isTaskPriority(value: number): value is TaskPriority {
         return Number.isInteger(value) && value >= 0 && value <= 4;
     }
 
-    function handleListChange(value: string): void {
-        updateTask(task.id, (current) => ({ ...current, remoteCollectionId: value || undefined }));
-    }
-
     function handleStatusChange(value: string): void {
         if (!isAppTaskStatus(value)) return;
-        updateTask(task.id, (current) => ({ ...current, status: value }));
+        updateTask(task.id, [{ field: 'status', value }]);
     }
 
     function handlePriorityChange(value: number): void {
         const clamped = Math.max(0, Math.min(4, value));
-        if (!isTaskPriority(clamped)) return;
-        updateTask(task.id, (current) => ({ ...current, priority: clamped }));
+        if (isTaskPriority(clamped)) updateTask(task.id, [{ field: 'priority', value: clamped }]);
     }
 
-    function handleDateChange(field: 'start' | 'due', value: string): void {
-        updateTask(task.id, (current) => ({ ...current, [field]: withDate(current[field], value) }));
+    function handleDateTimeChange(field: 'start' | 'due', value: string | null): void {
+        updateTask(task.id, [field === 'start' ? { field: 'start', value } : { field: 'due', value }]);
     }
 
-    function clearDate(field: 'start' | 'due'): void {
-        updateTask(task.id, (current) => ({ ...current, [field]: undefined }));
-    }
-
-    function handleTimeChange(field: 'start' | 'due', value: string): void {
-        updateTask(task.id, (current) => ({ ...current, [field]: withTime(current[field], value) }));
-    }
-
-    function handleDurationChange(value: number): void {
-        updateTask(task.id, (current) => ({ ...current, est: value || undefined }));
-    }
-
-    function handleParentChange(value: string): void {
-        updateTask(task.id, (current) => ({ ...current, parentTask: value || undefined }));
-    }
-
-    function handleRecurrenceChange(value: string | undefined): void {
-        updateTask(task.id, (current) => ({ ...current, rrule: value }));
+    function handleTagsChange(newTags: string[]): void {
+        updateTask(task.id, [{
+            field: 'tags',
+            value: newTags.map(name => ({ id: crypto.randomUUID(), name })),
+        }]);
     }
 
     function formatMinutes(minutes: number): string {
@@ -156,7 +140,7 @@
 <InspectorField icon="list" label="List" disabled={readOnly}>
     <SelectInput
         value={task.remoteCollectionId ?? ''}
-        onchange={handleListChange}
+        onchange={(value) => updateTask(task.id, [{ field: 'remoteCollectionId', value: value || null }])}
         options={listOptions}
         variant="bare"
         disabled={readOnly}
@@ -165,43 +149,25 @@
 </InspectorField>
 
 <InspectorField icon="calendar_month" label="Start" disabled={readOnly}>
-    <div class="inspector-inline">
-        <DateField
-            value={getFormattedDate(task.start)}
-            placeholder="No start date"
-            ariaLabel="Start date"
-            disabled={readOnly}
-            onchange={(value) => handleDateChange('start', value)}
-            onclear={() => clearDate('start')}
-        />
-        <TimeInput
-            value={getFormattedTime(task.start)}
-            onchange={(value) => handleTimeChange('start', value)}
-            variant="bare"
-            disabled={readOnly || !task.start}
-            ariaLabel="Start time"
-        />
-    </div>
+    <DatePickerField
+        value={task.start}
+        placeholder="No start date"
+        ariaLabel="Start date"
+        timeAriaLabel="Start time"
+        disabled={readOnly}
+        onchange={(value) => handleDateTimeChange('start', value)}
+    />
 </InspectorField>
 
 <InspectorField icon="hourglass" label="Deadline" disabled={readOnly}>
-    <div class="inspector-inline">
-        <DateField
-            value={getFormattedDate(task.due)}
-            placeholder="No due date"
-            ariaLabel="Due date"
-            disabled={readOnly}
-            onchange={(value) => handleDateChange('due', value)}
-            onclear={() => clearDate('due')}
-        />
-        <TimeInput
-            value={getFormattedTime(task.due)}
-            onchange={(value) => handleTimeChange('due', value)}
-            variant="bare"
-            disabled={readOnly || !task.due}
-            ariaLabel="Due time"
-        />
-    </div>
+    <DatePickerField
+        value={task.due}
+        placeholder="No due date"
+        ariaLabel="Due date"
+        timeAriaLabel="Due time"
+        disabled={readOnly}
+        onchange={(value) => handleDateTimeChange('due', value)}
+    />
 </InspectorField>
 
 <InspectorField icon="timer" label="Estimate" disabled={readOnly}>
@@ -209,7 +175,7 @@
         <NumberInput
             min={0}
             value={task.est ?? ''}
-            onchange={handleDurationChange}
+            onchange={(value) => updateTask(task.id, [{ field: 'est', value: value || null }])}
             variant="bare"
             disabled={readOnly}
             ariaLabel="Estimate in minutes"
@@ -223,12 +189,9 @@
     <TagsInput
         id={`tags-${task.id}`}
         tags={task.tags ? task.tags.map(t => t.name) : []}
-        onchange={(newTags: string[]) => {
-            updateTask(task.id, (current) => ({
-                ...current,
-                tags: newTags.map((name: string) => ({ id: crypto.randomUUID(), name })),
-            }));
-        }}
+        suggestions={availableTags}
+        onchange={handleTagsChange}
+        disabled={readOnly}
         variant="bare"
         ariaLabel="Tags"
     />
@@ -237,7 +200,7 @@
 <InspectorField icon="account_tree" label="Parent task" disabled={readOnly}>
     <SelectInput
         value={task.parentTask ?? ''}
-        onchange={handleParentChange}
+        onchange={(value) => updateTask(task.id, [{ field: 'parentTask', value: value || null }])}
         options={parentOptions}
         variant="bare"
         disabled={readOnly}
@@ -248,7 +211,7 @@
 <InspectorField icon="repeat" label="Repeat" disabled={readOnly}>
     <RecurrenceEditor
         value={task.rrule}
-        onchange={handleRecurrenceChange}
+        onchange={(value) => updateTask(task.id, [{ field: 'rrule', value: value ?? null }])}
         disabled={readOnly}
     />
 </InspectorField>
@@ -267,10 +230,22 @@
     </InspectorField>
 {/if}
 
+{#if task.timeSpent && task.timeSpent > 0}
+    <InspectorField icon="schedule" label="Time spent">
+        <span class="inspector-readonly-value">{formatTrackedDuration(task.timeSpent)}</span>
+    </InspectorField>
+{/if}
+
 {#if task.completedAt}
     <InspectorField icon="task_alt" label="Completed">
         <span class="inspector-readonly-value">{formatTimestamp(task.completedAt)}</span>
     </InspectorField>
 {/if}
 
-<MetaFooter created={task.added} modified={task.updatedAt} onDelete={onDelete} deleteLabel="Delete task" deleteDisabled={readOnly} />
+<MetaFooter
+    created={task.added}
+    modified={task.updatedAt}
+    onDelete={onDelete}
+    deleteLabel="Delete task"
+    deleteDisabled={readOnly}
+/>

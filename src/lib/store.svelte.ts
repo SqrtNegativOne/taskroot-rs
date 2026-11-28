@@ -2,7 +2,14 @@ import { commands, events, safeInvoke, type AppError } from './safeInvoke.svelte
 import { err, ok, ResultAsync, type Result } from 'neverthrow';
 import { describeAppError, normalizeAppError, unknownAppError } from './errors';
 import { notifyError } from './toast';
-import type { AppEvent, AppSettings, AppTask, EventScope } from './domain';
+import type {
+    AppEvent,
+    AppSettings,
+    AppTask,
+    EventPatch,
+    EventScope,
+    TaskPatch,
+} from './domain';
 
 export function describeError(error: unknown): string {
     return describeAppError(error);
@@ -74,8 +81,8 @@ export class AppStore {
         return this.commit(safeInvoke(commands.createTask(task)));
     }
 
-    updateTask(task: AppTask): Promise<Result<void, AppError>> {
-        return this.commit(safeInvoke(commands.updateTask(task)));
+    updateTask(id: string, patches: TaskPatch[]): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke(commands.updateTask(id, patches)));
     }
 
     toggleTask(id: string): Promise<Result<void, AppError>> {
@@ -90,8 +97,8 @@ export class AppStore {
         return this.commit(safeInvoke(commands.createEvent(event)));
     }
 
-    updateEvent(event: AppEvent): Promise<Result<void, AppError>> {
-        return this.commit(safeInvoke(commands.updateEvent(event)));
+    updateEvent(id: string, patches: EventPatch[]): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke(commands.updateEvent(id, patches)));
     }
 
     /** Reschedule one occurrence or the whole series (`scope`). */
@@ -136,6 +143,10 @@ export class AppStore {
         return this.commit(safeInvoke(commands.renameCalendar(href, displayName)));
     }
 
+    renameTag(from: string, to: string): Promise<Result<void, AppError>> {
+        return this.commit(safeInvoke(commands.renameTag(from, to)));
+    }
+
     setCalendarColor(href: string, color: string | null): Promise<Result<void, AppError>> {
         return this.commit(safeInvoke(commands.setCalendarColor(href, color)));
     }
@@ -147,7 +158,6 @@ export class AppStore {
     private async commit(command: ResultAsync<unknown, AppError>): Promise<Result<void, AppError>> {
         const result = await command;
         if (result.isErr()) return err(result.error);
-        void events.storeUpdated.emit();
         return ok(undefined);
     }
 }
@@ -155,7 +165,7 @@ export class AppStore {
 export const store = new AppStore();
 
 if (typeof window !== 'undefined') {
-    void events.storeUpdated.listen(() => {
+    void events.settingsUpdated.listen(() => {
         void store.refresh();
     });
 }

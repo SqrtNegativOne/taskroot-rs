@@ -1,9 +1,5 @@
 <script lang="ts">
-    import ComingSoon from '../../components/ComingSoon.svelte';
-    import { Routes } from '$lib/routes';
-
-    const routeName = Routes.WRAP.substring(1);
-    const title = `${routeName.charAt(0).toUpperCase()}${routeName.substring(1)}`;
+    import WrapScreen from '../../screens/wrap/WrapScreen.svelte';
 </script>
 
-<ComingSoon {title} />
+<WrapScreen />

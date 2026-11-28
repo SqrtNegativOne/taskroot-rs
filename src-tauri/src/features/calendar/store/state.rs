@@ -6,10 +6,10 @@ use super::model::Store;
 
 /// The managed store lock.
 ///
-/// A `tokio::sync::Mutex` is used deliberately: an edit holds the store while
-/// its `PUT` is in flight, so a concurrent load can never overwrite the merge
-/// with a stale resource. The single-user data set makes the short lock
-/// contention acceptable.
+/// The lock is held only for short in-memory reads, validation snapshots, and
+/// revision/ETag-guarded commits — never across `CalDAV` network I/O. That
+/// keeps settings reads, reminder polls, and queries responsive while `PUT`,
+/// `DELETE`, or `REPORT` requests are in flight.
 pub struct StoreState(pub Mutex<Store>);
 
 impl StoreState {

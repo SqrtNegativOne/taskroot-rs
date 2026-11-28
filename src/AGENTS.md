@@ -27,8 +27,10 @@ affected area.
 - Wrap user-triggered calendar mutations in `store.mutate(operation, action)`.
   Recoverable errors go to `notifyError` toasts; `store.error` is for fatal
   bootstrap/load failures only.
-- Await backend writes and let `STORE_UPDATED` trigger re-queries. Never
-  optimistically patch local calendar arrays or cache them in `localStorage`.
+- Await backend writes and let Rust-emitted `STORE_UPDATED` trigger re-queries
+  (`SETTINGS_UPDATED` refreshes `AppSettings` without re-fetching
+  `settings.json` on calendar edits). Never optimistically patch local calendar
+  arrays or cache them in `localStorage`.
 - Use `update_setting` for typed settings, `persistState` for component UI
   state, `lib/asyncState.svelte.ts` for stale guards/debouncers/hydration, and
   `lib/useNow.svelte.ts` for reactive clocks.
@@ -40,8 +42,11 @@ affected area.
 - Never derive calendar days with `Date.toISOString()`; use `lib/time.ts`
   (`ymd`, `addMonths`, `parseLocalYmd`) and `lib/domain/timing.ts`.
 - Key rendered events by `occurrenceKey`; pass `occurrenceStart` on scoped
-  mutations; never compose `RRULE`/`EXDATE`/ICS text or run quick-capture
-  parsing on the frontend.
+  mutations; send typed field patches (`TaskPatch[]` / `EventPatch[]`) for
+  task/event updates. Never hand-roll raw ICS/`EXDATE` text on the frontend
+  (recurrence descriptions and custom `RRULE` building use `rrule` in
+  `components/inspector-pane/recurrence.ts`, and quick-capture sigil/date
+  parsing uses `chrono-node` in `lib/launcher/quickCapture.ts`).
 - Keep recursive filter validation in `lib/domain/filterTree.ts` and new-task
   default inference in `lib/domain/filters.ts`.
 - Use semantic CSS variables from `lib/themes/`; keep today indicators on

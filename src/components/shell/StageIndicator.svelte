@@ -3,24 +3,39 @@
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { Routes } from '$lib/routes';
+    import { useNow } from '$lib/useNow.svelte';
+    import { isWrapWindowOpen } from '../../screens/wrap/wrapWindow';
 
-    let current = $derived(page.url.pathname === Routes.HOME ? 'plan' : page.url.pathname.substring(1));
+    type StageRoute = typeof Routes.HOME | typeof Routes.DO | typeof Routes.TAGS | typeof Routes.WRAP;
 
-    const defaultStages = [
+    interface StageItem {
+        key: string;
+        label: string;
+        href: StageRoute;
+    }
+
+    const baseStages: readonly StageItem[] = [
         { key: 'plan', label: 'plan', href: Routes.HOME },
         { key: 'do', label: 'do', href: Routes.DO },
         { key: 'tags', label: 'tags', href: Routes.TAGS }
-    ] as const;
+    ];
 
-    const isDefault = $derived(defaultStages.some(s => s.key === current) || current === 'settings');
+    const wrapStage: StageItem = { key: 'wrap', label: 'wrap', href: Routes.WRAP };
 
-    function navigate(href: typeof defaultStages[number]['href']): void {
+    const now = useNow(60_000);
+    let wrapOpen = $derived(isWrapWindowOpen(new Date(now.ms)));
+    let stages = $derived(wrapOpen ? [...baseStages, wrapStage] : baseStages);
+
+    let current = $derived(page.url.pathname === Routes.HOME ? 'plan' : page.url.pathname.substring(1));
+    let isDefault = $derived(stages.some(s => s.key === current) || current === 'settings');
+
+    function navigate(href: StageRoute): void {
         void goto(resolve(href));
     }
 </script>
 
 <nav class="stages" aria-label="Stages">
-    {#each defaultStages as s, i (s.key)}
+    {#each stages as s, i (s.key)}
         <button
             class="stage {current === s.key ? 'is-current' : ''}"
             onclick={() => navigate(s.href)}
@@ -28,7 +43,7 @@
         >
             <span class="stage-name">{s.label}</span>
         </button>
-        {#if i < defaultStages.length - 1 || !isDefault}
+        {#if i < stages.length - 1 || !isDefault}
             <span class="stage-sep">|</span>
         {/if}
     {/each}

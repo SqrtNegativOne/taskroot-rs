@@ -134,3 +134,33 @@ async fn ui_state_round_trips_and_is_absent_until_written() {
         Some(&stored)
     );
 }
+
+#[tokio::test]
+async fn earliest_wake_up_time_defaults_to_zero_and_round_trips_through_settings_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+
+    assert_eq!(
+        storage::read_settings(&state).await.unwrap().earliest_wake_up_time,
+        0
+    );
+
+    storage::write_setting(&state, "earliest_wake_up_time", &json!(360))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        storage::read_settings(&state).await.unwrap().earliest_wake_up_time,
+        360
+    );
+    assert_eq!(persist::read_settings(dir.path()).earliest_wake_up_time, 360);
+
+    let reopened = StoreState::new(Store::load(dir.path().to_path_buf()));
+    assert_eq!(
+        storage::read_settings(&reopened)
+            .await
+            .unwrap()
+            .earliest_wake_up_time,
+        360
+    );
+}

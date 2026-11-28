@@ -1,4 +1,12 @@
-import type { AppCalendar, AppEvent, AppTask, EventScope } from '../../lib/domain';
+import { untrack } from 'svelte';
+import type {
+    AppCalendar,
+    AppEvent,
+    AppTask,
+    EventPatch,
+    EventScope,
+    TaskPatch,
+} from '../../lib/domain';
 import {
     DEFAULT_TASK_PRIORITY,
     calendarsForComponent,
@@ -7,10 +15,11 @@ import {
     isRecurring,
 } from '../../lib/domain';
 import { allEvents, allTasks } from '../../lib/queries';
-import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
+import { commands, useAutoQuery, type AutoQueryResult } from '../../lib/safeInvoke.svelte';
 import { store } from '../../lib/store.svelte';
 import { notifyError } from '../../lib/toast';
 import { eventStartDate } from './eventDates';
+import { buildTaskQuickEditPatches, type TaskTitleQuickEdit } from './quickEdit';
 
 export type InspectorTarget =
     | { type: 'task'; id: string; draft?: AppTask }
@@ -38,13 +47,19 @@ export class InspectorPaneState {
 
     private readonly tasksQuery = useAutoQuery(commands.queryTasks, allTasks);
     private readonly eventsQuery = useAutoQuery(commands.queryEvents, allEvents);
-    private readonly calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    private readonly tagsQuery = useAutoQuery(commands.listTags);
+    private readonly calendarsQuery: AutoQueryResult<AppCalendar[]> | undefined;
 
     constructor(
         private readonly getTarget: () => InspectorTarget | undefined,
         private readonly onClose: () => void,
         private readonly onConverted: (task: AppTask) => void = onClose,
-    ) {}
+        private readonly getCalendars?: () => AppCalendar[] | undefined,
+    ) {
+        this.calendarsQuery = getCalendars === undefined || untrack(() => getCalendars() === undefined)
+            ? useAutoQuery(commands.getActiveCalendars)
+            : undefined;
+    }
 
     get tasks(): AppTask[] {
         return this.tasksQuery.data ?? [];
@@ -52,6 +67,14 @@ export class InspectorPaneState {
 
     get events(): AppEvent[] {
         return this.eventsQuery.data ?? [];
+    }
+
+    get availableTags(): string[] {
+        return this.tagsQuery.data ?? [];
+    }
+
+    get calendars(): AppCalendar[] {
+        return this.getCalendars?.() ?? this.calendarsQuery?.data ?? [];
     }
 
     get currentTask(): AppTask | undefined {
@@ -75,7 +98,7 @@ export class InspectorPaneState {
     }
 
     get isReadOnly(): boolean {
-        const calendars = this.calendarsQuery.data ?? [];
+        const calendars = this.calendars;
         const event = this.currentEvent;
         if (event !== undefined) return isEventReadOnly(event, calendars);
 
@@ -101,36 +124,40 @@ export class InspectorPaneState {
         return target?.type === 'event' && target.id === id ? target.draft : undefined;
     }
 
-    updateTask = (id: string, update: (task: AppTask) => AppTask): void => {
-        const current = this.taskFor(id);
-        if (!current) return;
-        void store.mutate('Failed to update task', () => store.updateTask(update(current)));
+    updateTask = (id: string, patches: TaskPatch[]): void => {
+        void store.mutate('Failed to update task', () => store.updateTask(id, patches));
     };
 
-    updateEvent = (id: string, update: (event: AppEvent) => AppEvent): void => {
-        const current = this.eventFor(id);
-        if (!current) return;
-        void store.mutate('Failed to update event', () => store.updateEvent(update(current)));
+    updateEvent = (id: string, patches: EventPatch[]): void => {
+        void store.mutate('Failed to update event', () => store.updateEvent(id, patches));
     };
 
     handleTitleChange = (value: string): void => {
         const task = this.currentTask;
         if (task) {
-            this.updateTask(task.id, (current) => ({ ...current, title: value }));
+            this.updateTask(task.id, [{ field: 'title', value }]);
             return;
         }
         const event = this.currentEvent;
-        if (event) this.updateEvent(event.id, (current) => ({ ...current, title: value }));
+        if (event) this.updateEvent(event.id, [{ field: 'title', value }]);
+    };
+
+    handleTaskQuickEdit = (edit: TaskTitleQuickEdit): void => {
+        const task = this.currentTask;
+        if (!task) return;
+        const patches = buildTaskQuickEditPatches(task, edit);
+        if (patches.length === 0) return;
+        this.updateTask(task.id, patches);
     };
 
     handleDescriptionChange = (value: string): void => {
         const task = this.currentTask;
         if (task) {
-            this.updateTask(task.id, (current) => ({ ...current, notes: value }));
+            this.updateTask(task.id, [{ field: 'notes', value: value || null }]);
             return;
         }
         const event = this.currentEvent;
-        if (event) this.updateEvent(event.id, (current) => ({ ...current, description: value }));
+        if (event) this.updateEvent(event.id, [{ field: 'description', value: value || null }]);
     };
 
     handleDelete = (): void => {
@@ -179,7 +206,7 @@ export class InspectorPaneState {
         occurrenceStart: string | undefined,
     ): Promise<void> {
         const taskList = writableTaskListId(
-            this.calendarsQuery.data ?? [],
+            this.calendars,
             store.settings?.default_task_list,
         );
         if (taskList === undefined) {
@@ -253,6 +280,7 @@ export function createInspectorState(
     getTarget: () => InspectorTarget | undefined,
     onClose: () => void,
     onConverted?: (task: AppTask) => void,
+    getCalendars?: () => AppCalendar[] | undefined,
 ): InspectorPaneState {
-    return new InspectorPaneState(getTarget, onClose, onConverted);
+    return new InspectorPaneState(getTarget, onClose, onConverted, getCalendars);
 }

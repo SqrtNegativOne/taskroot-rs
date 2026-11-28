@@ -23,6 +23,7 @@
         endMins,
         lane,
         lanes,
+        startMinute = 0,
         selected,
         onResize,
         onMove,
@@ -36,6 +37,7 @@
         endMins: number;
         lane: number;
         lanes: number;
+        startMinute?: number;
         selected?: boolean;
         onResize?: (event: EventInstance, start: number, end: number) => void;
         onMove?: (event: EventInstance, start: number, end: number) => void;
@@ -71,7 +73,8 @@
                         const newEnd = clamp(startEnd + dm, startStart + SNAP_MIN, MINUTES_PER_DAY);
                         onResize?.(event, startStart, newEnd);
                     } else {
-                        const newStart = clamp(startStart + dm, 0, startEnd - SNAP_MIN);
+                        const minStart = Math.min(startStart, startMinute);
+                        const newStart = clamp(startStart + dm, minStart, startEnd - SNAP_MIN);
                         onResize?.(event, newStart, startEnd);
                     }
                 },
@@ -104,7 +107,7 @@
 
                 finalDm = clamp(
                     snapPixels(dy),
-                    -startStart,
+                    Math.min(0, startMinute - startStart),
                     MINUTES_PER_DAY - startEnd,
                 );
                 dragOffset = finalDm;
@@ -132,11 +135,13 @@
 </script>
 
 {#snippet renderBlock(start: number, end: number, isGhost: boolean, isFloating: boolean)}
-    {@const slotHeight = (end - start) * PX_PER_MIN}
-    {@const top = start * PX_PER_MIN + EVENT_INSET_PX}
+    {@const visibleStart = Math.max(start, startMinute)}
+    {@const visibleDuration = Math.max(0, end - visibleStart)}
+    {@const slotHeight = visibleDuration * PX_PER_MIN}
+    {@const top = (visibleStart - startMinute) * PX_PER_MIN + EVENT_INSET_PX}
     {@const height = Math.max(slotHeight - 2 * EVENT_INSET_PX, MIN_EVENT_HEIGHT_PX)}
     {@const compact = slotHeight < COMPACT_EVENT_HEIGHT_PX}
-    {@const isShort = (end - start) <= SHORT_EVENT_DURATION_MINS}
+    {@const isShort = visibleDuration <= SHORT_EVENT_DURATION_MINS}
     
     <div
         class="day-event"

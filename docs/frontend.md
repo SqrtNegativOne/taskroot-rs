@@ -7,16 +7,19 @@ geometry), see [planning UI](planning-ui.md); for palettes and tokens, see
 
 ## Backend-backed state
 
-- `src/lib/store.svelte.ts` wraps calendar mutations. Successful commands finish
-  the server write before `STORE_UPDATED` triggers live re-queries; components
-  never optimistically patch calendar arrays. `store.mutate(operation, action)`
-  reports recoverable failures through `notifyError` (`src/lib/toast.ts`,
-  mounted in every window except `effect`); `store.error` is reserved for fatal
+- `src/lib/store.svelte.ts` wraps calendar mutations (with task/event updates
+  sending typed field patches `TaskPatch[]` / `EventPatch[]`). Successful
+  commands finish the server write before Rust emits `STORE_UPDATED` to trigger
+  live re-queries; components never optimistically patch calendar arrays.
+  `SETTINGS_UPDATED` refreshes `AppSettings` independently so calendar edits do
+  not re-fetch `settings.json`. `store.mutate(operation, action)` reports
+  recoverable failures through `notifyError` (`src/lib/toast.ts`, mounted in
+  every window except `effect`); `store.error` is reserved for fatal
   bootstrap/load failures.
 - `src/lib/safeInvoke.svelte.ts` provides `ResultAsync`, `useTauriQuery` and
-  `useAutoQuery`. Queries re-fetch on `STORE_UPDATED` (including after account
-  commands). `AccountBoundary` re-keys non-Settings routes on `account-changed`
-  to discard cross-account drafts.
+  `useAutoQuery`. Queries re-fetch on Rust-emitted `STORE_UPDATED` (including
+  after account commands). `AccountBoundary` re-keys non-Settings routes on
+  `account-changed` to discard cross-account drafts.
 - `src/lib/asyncState.svelte.ts` supplies stale-response guards, flushable
   debouncers and effect-based hydration (`hydrateOnce` reruns if its loader
   reads reactive dependencies). `persistState` (`src/lib/persisted.svelte.ts`)
@@ -48,8 +51,12 @@ geometry), see [planning UI](planning-ui.md); for palettes and tokens, see
   literal default). Backend filter evaluation is documented in
   [calendar feature](../src-tauri/src/features/calendar/README.md).
 - `src/components/inspector-pane/state.svelte.ts` owns selection, queries,
-  mutations and recurring scope prompts; `eventDates.ts` handles inclusive
-  all-day ends and timed/all-day conversion; `recurrence.ts` owns presets.
+  patch-based mutations (`TaskPatch[]` / `EventPatch[]`), `list_tags`
+  autocomplete suggestions and recurring scope prompts; `DatePickerField` and
+  `DateRangePickerField` wrap `bits-ui` `DatePicker`/`DateRangePicker` into
+  single readable clickable fields; `eventDates.ts` handles inclusive all-day
+  ends and timed/all-day conversion; `recurrence.ts` owns presets,
+  human-readable descriptions and custom `RRULE` building via `rrule`.
   Event-to-task conversion copies title, description, tags, priority and start
   into the default writable task list, then deletes the event under the chosen
   scope.
@@ -58,7 +65,12 @@ geometry), see [planning UI](planning-ui.md); for palettes and tokens, see
 
 `src/lib/launcher/LauncherPalette.svelte` queries today's agenda when empty
 (refreshing the local day reactively on focus, visibility change and a 60 s
-clock tick) and debounces `parse_quick_capture` for typed previews. Sigil/date
-parsing and writable-list resolution stay in Rust. Pressing Enter on the create
-row calls `create_task`; agenda rows navigate to Plan; route words emit
-`LAUNCHER_NAVIGATE` to the main window.
+clock tick) and parses typed previews synchronously client-side in
+`src/lib/launcher/quickCapture.ts` (sigils, natural-language dates via
+`chrono-node`, and target writable-list resolution against active calendars).
+Pressing Enter on the create row calls `create_task`; agenda rows navigate to
+Plan; route words emit `LAUNCHER_NAVIGATE` to the main window. Editing a task's
+title in `src/components/inspector-pane/InspectorTitle.svelte` reuses the same
+parser via `src/components/inspector-pane/quickEdit.ts` to preview and apply
+property patches (merging `#tags`, setting due/priority/estimate/list, with a
+"Keep text" opt-out) when committing the title.

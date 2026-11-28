@@ -1,15 +1,17 @@
 <script lang="ts">
+    import { onMount, untrack } from 'svelte';
     import './date-grid.css';
     import { DateGridView, DAYS_IN_WEEK } from './constants';
     import CalendarHeader from './CalendarHeader.svelte';
     import DayCell from './DayCell.svelte';
-    import type { EventInstance, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
+    import type { AppCalendar, EventInstance, AppEventFilter, FilterGroup, TaskDateInstance } from '../../../lib/domain';
     import { calendarsForComponent, emptyFilterGroup, isEventFilterGroup, instanceOccursOnDay, isEventReadOnly, taskDateOccursOnDay } from '../../../lib/domain';
     import { resolveEventColor } from '../../../lib/eventColor';
     import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
     import { isMultiDayAllDay, layoutWeekSpans, type WeekSpan } from './spanLayout';
     import { addDays, getWeekNumber, isoWeeksInYear, isoWeekYear, parseLocalYmd, ymd } from '../../../lib/time';
-    import { buildDateGrid, shiftDateGridAnchor, type GridCell } from './dates';
+    import { createInfiniteDateGrid } from './infiniteGrid.svelte';
+    import { attachWeekSnap } from './weekSnap';
     import { isEventVisible, isEventVisibility, type EventVisibility } from '../../../lib/eventVisibility';
     import { useNow } from '../../../lib/useNow.svelte';
     import { createSpanResizeController, type SpanResizePreview } from '../hooks/spanResize.svelte';
@@ -22,18 +24,22 @@
     import { store } from '../../../lib/store.svelte';
 
     let {
+        calendars: propCalendars,
         dragState,
         selectedEventId,
         onEventDragStart,
+        onTaskDragStart,
         onAddEvent,
         onEventClick,
         onTaskClick,
         onToggleTask,
         onEventResize,
     }: {
+        calendars?: AppCalendar[];
         dragState?: import('../day-timeline/types').DragState;
         selectedEventId?: string;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
+        onTaskDragStart?: (e: PointerEvent, marker: TaskDateInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
         onTaskClick?: (marker: TaskDateInstance) => void;
@@ -42,10 +48,10 @@
     } = $props();
 
     let view = $state<DateGridView>(DateGridView.ThreeWeeks);
-    let anchor = $state(new Date());
     let filters = $state<FilterGroup<AppEventFilter>>(emptyFilterGroup());
     let visibility = $state<EventVisibility>({ hideFrequentRecurring: false, hideTimed: false, hideDoneTasks: false });
     let query = $state('');
+    let cellsRef = $state<HTMLDivElement | null>(null);
     const now = useNow(60_000);
     let today = $derived(new Date(now.ms));
 
@@ -69,8 +75,22 @@
         { isValid: (stored): stored is DateGridView => Object.values(DateGridView).includes(stored as DateGridView) },
     );
 
-    let grid = $derived(buildDateGrid(anchor, view));
-    let cells = $derived(grid.cells);
+    const grid = createInfiniteDateGrid(() => view);
+
+    onMount(() => {
+        if (!cellsRef) return;
+        // Attach the infinite-scroll controller first so scrollend recenters
+        // before week-row snapping starts its smooth alignment animation.
+        const detachGrid = grid.attach(cellsRef);
+        const detachSnap = attachWeekSnap(cellsRef, {
+            onBeforeSnap: grid.settle,
+            onSnapStart: grid.beginSnap,
+        });
+        return () => {
+            detachSnap();
+            detachGrid();
+        };
+    });
 
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(grid.range, filters, query), { debounceMs: 150 });
@@ -78,11 +98,14 @@
     const taskDatesQuery = useAutoQuery(commands.queryTaskDates, () =>
         taskDates(grid.range), { debounceMs: 150 });
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const ownCalendarsQuery = untrack(() => propCalendars === undefined)
+        ? useAutoQuery(commands.getActiveCalendars)
+        : undefined;
+    let allCalendars = $derived(propCalendars ?? ownCalendarsQuery?.data ?? []);
 
     let events = $derived((eventsQuery.data ?? []).filter(event => isEventVisible(event, visibility)));
-    let calendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VEVENT'));
-    let taskCalendars = $derived(calendarsForComponent(calendarsQuery.data ?? [], 'VTODO'));
+    let calendars = $derived(calendarsForComponent(allCalendars, 'VEVENT'));
+    let taskCalendars = $derived(calendarsForComponent(allCalendars, 'VTODO'));
     let taskMarkers = $derived(visibility.hideDoneTasks
         ? (taskDatesQuery.data ?? []).filter(marker => marker.status !== 'done')
         : (taskDatesQuery.data ?? []));
@@ -94,20 +117,14 @@
     const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const DOW_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-    function weekLabel(a: Date) {
-        const week = getWeekNumber(a);
-        const totalWeeks = isoWeeksInYear(isoWeekYear(a));
-        return `Week #${week.toString()}/${totalWeeks.toString()} ${MONTHS_LONG[anchor.getMonth()]}`;
+    function weekLabel(weekStart: Date, monthIndex: number) {
+        const week = getWeekNumber(weekStart);
+        const totalWeeks = isoWeeksInYear(isoWeekYear(weekStart));
+        return `Week #${week.toString()}/${totalWeeks.toString()} ${MONTHS_LONG[monthIndex]}`;
     }
 
-    let weeks = $derived.by(() => {
-        const rows: GridCell[][] = [];
-        for (let i = 0; i < cells.length; i += DAYS_IN_WEEK) rows.push(cells.slice(i, i + DAYS_IN_WEEK));
-        return rows;
-    });
-
     let weekLayouts = $derived(
-        weeks.map((week) => ({
+        grid.weeks.map((week) => ({
             key: ymd(week[0].date),
             week,
             layout: layoutWeekSpans(events, week.map((c) => c.date)),
@@ -150,11 +167,11 @@
     }
 
     let titleLabel = $derived(isStrip
-        ? weekLabel(cells[0].date)
-        : `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear().toString()}`);
+        ? weekLabel(grid.topWeekStart, grid.dominantMonth.month)
+        : `${MONTHS_LONG[grid.dominantMonth.month]} ${grid.dominantMonth.year.toString()}`);
 
     function shift(n: number) {
-        anchor = shiftDateGridAnchor(anchor, view, n);
+        grid.shift(n);
     }
 
     function handleToggleTask(taskId: string) {
@@ -176,7 +193,7 @@
         {today}
         {view}
         setView={(v: DateGridView) => { view = v; }}
-        setAnchor={(d: Date) => { anchor = d; }}
+        setAnchor={(d: Date) => { grid.goToDate(d); }}
         {shift}
         {filterMenu}
     />
@@ -187,7 +204,17 @@
                 <div class="cal-dow-cell">{d.toLowerCase()}</div>
             {/each}
         </div>
-        <div class="cal-cells" class:is-grid={!isStrip} class:is-strip-3={isStrip && is3Weeks} class:is-strip-1={isStrip && !is3Weeks} class:dragging={!!dragState}>
+        <div class="cal-cells-wrap">
+        <div
+            class="cal-cells"
+            class:is-grid={!isStrip}
+            class:is-strip-3={isStrip && is3Weeks}
+            class:is-strip-1={isStrip && !is3Weeks}
+            class:has-week-height={grid.weekHeight > 0}
+            class:dragging={!!dragState}
+            style={grid.weekHeight > 0 ? `--week-height: ${grid.weekHeight}px;` : undefined}
+            bind:this={cellsRef}
+        >
             {#each weekLayouts as { key, week, layout } (key)}
                 <div class="cal-week" data-week-start={key} style="--span-lanes: {layout.laneCount}">
                     {#each week as c (ymd(c.date))}
@@ -201,6 +228,7 @@
                             {dragState}
                             {selectedEventId}
                             {onEventDragStart}
+                            {onTaskDragStart}
                             {onAddEvent}
                             {onEventClick}
                             {onTaskClick}
@@ -260,6 +288,7 @@
                     {/each}
                 </div>
             {/each}
+        </div>
         </div>
     </div>
 </section>

@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import './inspector.css';
+    import type { AppCalendar } from '../../lib/domain';
+    import { notifyError } from '../../lib/toast';
     import DescriptionInput from '../inputs/DescriptionInput.svelte';
     import InspectorEventFields from './InspectorEventFields.svelte';
     import InspectorTaskFields from './InspectorTaskFields.svelte';
@@ -10,10 +12,12 @@
 
     let {
         inspectorState,
+        calendars,
         onClose,
         onConverted,
     }: {
         inspectorState?: InspectorTarget;
+        calendars?: AppCalendar[];
         onClose: () => void;
         onConverted?: (target: InspectorTarget) => void;
     } = $props();
@@ -28,6 +32,7 @@
             }
             onClose();
         },
+        () => calendars,
     );
 
     const currentTask = $derived(inspector.currentTask);
@@ -38,15 +43,21 @@
     let paneRef = $state<HTMLElement | null>(null);
 
     onMount(() => {
+        function hasOpenPopover(): boolean {
+            return document.querySelector('[data-inspector-popover]') !== null;
+        }
+
         function handlePointerDown(e: PointerEvent) {
-            if (inspector.recurringModalOpen) return;
+            if (inspector.recurringModalOpen || hasOpenPopover()) return;
             if (inspectorState && paneRef && e.target instanceof Node && !paneRef.contains(e.target)) {
                 onClose();
             }
         }
 
         function handleKeyDown(e: KeyboardEvent) {
-            if (e.key !== 'Escape' || inspector.recurringModalOpen) return;
+            if (e.key !== 'Escape' || e.defaultPrevented || inspector.recurringModalOpen || hasOpenPopover()) {
+                return;
+            }
             if (!currentItem) return;
             e.preventDefault();
             onClose();
@@ -69,11 +80,18 @@
 >
     {#if currentItem}
         <header class="inspector-hd">
-            <InspectorTitle
-                value={currentItem.title}
-                onchange={inspector.handleTitleChange}
-                disabled={isReadOnly}
-            />
+            {#key currentItem.id}
+                <InspectorTitle
+                    value={currentItem.title}
+                    onchange={inspector.handleTitleChange}
+                    disabled={isReadOnly}
+                    quickEdit={currentTask && !isReadOnly ? {
+                        calendars: inspector.calendars,
+                        onCommit: inspector.handleTaskQuickEdit,
+                        onError: notifyError,
+                    } : undefined}
+                />
+            {/key}
             <div class="inspector-description">
                 <DescriptionInput
                     value={currentTask ? currentTask.notes : currentEvent?.description}
@@ -88,6 +106,8 @@
                 <InspectorTaskFields
                     task={currentTask}
                     tasks={inspector.tasks}
+                    calendars={inspector.calendars}
+                    availableTags={inspector.availableTags}
                     updateTask={inspector.updateTask}
                     readOnly={isReadOnly}
                     onDelete={inspector.handleDelete}
@@ -96,6 +116,8 @@
                 <InspectorEventFields
                     event={currentEvent}
                     tasks={inspector.tasks}
+                    calendars={inspector.calendars}
+                    availableTags={inspector.availableTags}
                     updateEvent={inspector.updateEvent}
                     readOnly={isReadOnly}
                     onDelete={inspector.handleDelete}

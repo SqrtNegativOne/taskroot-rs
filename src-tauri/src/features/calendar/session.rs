@@ -13,11 +13,11 @@ use super::caldav::discovery;
 use super::caldav::model::CalendarInfo;
 use super::caldav::transport::HttpClient;
 use super::domain::{AppCalendar, CollectionId};
-use super::store::{Store, ops};
+use super::store::{ops, Store, StoreState};
 
 pub struct Session {
     pub dir: PathBuf,
-    pub store: Store,
+    pub store: StoreState,
     pub client: CalDavClient,
 }
 
@@ -33,7 +33,11 @@ pub async fn open(dir: PathBuf) -> Result<Session, AppError> {
     let calendars = discovery::refresh_collections(&dir, &client, &mut account).await?;
     store.set_calendars(calendars);
     ops::full_load(&mut store, &client).await?;
-    Ok(Session { dir, store, client })
+    Ok(Session {
+        dir,
+        store: StoreState::new(store),
+        client,
+    })
 }
 
 /// Project a discovered collection onto the view DTO the frontend consumes.
@@ -42,10 +46,9 @@ pub fn app_calendar(info: &CalendarInfo) -> AppCalendar {
     AppCalendar {
         id: CollectionId::from(info.href.clone()),
         summary: info.display_name.clone(),
-        color: info
-            .color
-            .as_deref()
-            .and_then(|color| crate::features::calendar::domain::Color::try_from(color.to_string()).ok()),
+        color: info.color.as_deref().and_then(|color| {
+            crate::features::calendar::domain::Color::try_from(color.to_string()).ok()
+        }),
         writable: info.writable,
         component: info.component,
     }

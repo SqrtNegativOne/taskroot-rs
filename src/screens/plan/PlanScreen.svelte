@@ -1,7 +1,7 @@
 <script lang="ts">
     import { store } from '../../lib/store.svelte';
     import { persistedKeys } from '../../lib/persisted.svelte';
-    import type { AppTask, EventInstance } from '../../lib/domain';
+    import type { AppTask, EventInstance, TaskPatch } from '../../lib/domain';
     import { buildNewEvent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
     import { parseLocalYmd } from '../../lib/time';
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -15,7 +15,11 @@
     import DayTimeline from './day-timeline/DayTimeline.svelte';
     import { stopwatchState } from '../do/stopwatch/engine.svelte';
     import { createEventDragController } from './hooks/eventDrag.svelte';
-    import { createTaskDragController } from './hooks/taskDrag.svelte';
+    import {
+        createTaskDragController,
+        createTaskMarkerDragController,
+        type TaskScheduleSlot,
+    } from './hooks/taskDrag.svelte';
     import { createReschedulePrompt } from './hooks/reschedule.svelte';
     import type { DragState } from './day-timeline/types';
     let dragState = $state<DragState | undefined>(undefined);
@@ -38,33 +42,49 @@
     let inspectorState = $state<InspectorTarget | undefined>(undefined);
 
     const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    let calendars = $derived(calendarsQuery.data ?? []);
 
     let defaultTaskCollection = $derived(
-        calendarsQuery.data?.find((c) => c.component === 'VTODO' && c.writable)?.id
+        calendars.find((c) => c.component === 'VTODO' && c.writable)?.id
     );
+
+    function scheduleTask(task: { id: string; title: string }, slot: TaskScheduleSlot) {
+        const event = buildNewEvent(parseLocalYmd(slot.date), {
+            startMinutes: slot.minute,
+            endMinutes: slot.minute + slot.duration,
+            calendars,
+            title: task.title,
+            taskId: task.id,
+        });
+        inspectorState = { type: 'event', id: event.id, draft: event };
+        void store
+            .mutate('Failed to schedule task', () => store.addEvent(event))
+            .then((result) => {
+                if (result.isErr() && inspectorState?.id === event.id) inspectorState = undefined;
+            });
+    }
 
     const startTaskDrag = createTaskDragController({
         setDragState: (ds) => { dragState = ds; },
         defaultDuration: () => store.settings?.default_task_duration || 30,
         onSetStart: (task, date) => {
             void store.mutate('Failed to set task start', () =>
-                store.updateTask({ ...task, start: date }));
+                store.updateTask(task.id, [{ field: 'start', value: date }]));
         },
-        onSchedule: (task, slot) => {
-            const event = buildNewEvent(parseLocalYmd(slot.date), {
-                startMinutes: slot.minute,
-                endMinutes: slot.minute + slot.duration,
-                calendars: calendarsQuery.data ?? [],
-                title: task.title,
-                taskId: task.id,
-            });
-            inspectorState = { type: 'event', id: event.id, draft: event };
-            void store
-                .mutate('Failed to schedule task', () => store.addEvent(event))
-                .then((result) => {
-                    if (result.isErr() && inspectorState?.id === event.id) inspectorState = undefined;
-                });
+        onSchedule: (task, slot) => scheduleTask(task, slot),
+    });
+
+    const startTaskMarkerDrag = createTaskMarkerDragController({
+        setDragState: (ds) => { dragState = ds; },
+        defaultDuration: () => store.settings?.default_task_duration || 30,
+        onMoveDate: (marker, field, value) => {
+            const label = field === 'due'
+                ? 'Failed to move task due date'
+                : 'Failed to move task start date';
+            void store.mutate(label, () =>
+                store.updateTask(marker.taskId, [{ field, value }]));
         },
+        onSchedule: (marker, slot) => scheduleTask({ id: marker.taskId, title: marker.title }, slot),
     });
 
     async function onAddTask(defaults?: Partial<AppTask>) {
@@ -94,7 +114,7 @@
         const newEvent = buildNewEvent(date, {
             startMinutes: startMins,
             endMinutes: endMins,
-            calendars: calendarsQuery.data ?? [],
+            calendars,
         });
         inspectorState = { type: 'event', id: newEvent.id, draft: newEvent };
         const result = await store.mutate('Failed to create event', () => store.addEvent(newEvent));
@@ -127,6 +147,7 @@
             {#snippet pane1()}
                 <div style="height: 100%; display: flex; flex-direction: column;">
                     <TaskListPane
+                        {calendars}
                         onDragStart={startTaskDrag}
                         {onAddTask}
                         {onDeleteTask}
@@ -135,8 +156,8 @@
                         onStartTask={(task: AppTask) => {
                             void stopwatchState.startTask(task);
                         }}
-                        onUpdateTask={(task: AppTask) => {
-                            void store.mutate('Failed to update task', () => store.updateTask(task));
+                        onUpdateTask={(id: string, patches: TaskPatch[]) => {
+                            void store.mutate('Failed to update task', () => store.updateTask(id, patches));
                         }}
                         onTaskClick={(task: AppTask) => {
                             inspectorState = { type: 'task', id: task.id };
@@ -156,9 +177,11 @@
                     >
                         {#snippet pane1()}
                             <DateGrid
+                                {calendars}
                                 {dragState}
                                 selectedEventId={inspectorState?.type === 'event' ? inspectorState.id : undefined}
                                 onEventDragStart={startEventDrag}
+                                onTaskDragStart={startTaskMarkerDrag}
                                 {onAddEvent}
                                 {onEventClick}
                                 onEventResize={(instance, range) => {
@@ -178,6 +201,7 @@
 
                         {#snippet pane2()}
                             <DayTimeline
+                                {calendars}
                                 {dragState}
                                 selectedEventId={inspectorState?.type === 'event' ? inspectorState.id : undefined}
                                 {onEventClick}
@@ -190,6 +214,7 @@
         </SplitPane>
         <InspectorPane
             {inspectorState}
+            {calendars}
             onClose={() => { inspectorState = undefined; }}
             onConverted={(target) => { inspectorState = target; }}
         />

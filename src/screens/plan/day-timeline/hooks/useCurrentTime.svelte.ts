@@ -1,13 +1,11 @@
 import { onMount } from 'svelte';
-import { SvelteDate } from 'svelte/reactivity';
-import { MINUTES_IN_HOUR } from '../constants';
+import { minutesSinceMidnight } from '../../../../lib/time';
 
 export function useCurrentTime() {
-    let nowMin = $state(0);
+    let nowMin = $state(minutesSinceMidnight(new Date()));
 
     function update() {
-        const now = new SvelteDate();
-        nowMin = now.getHours() * MINUTES_IN_HOUR + now.getMinutes();
+        nowMin = minutesSinceMidnight(new Date());
     }
 
     onMount(() => {

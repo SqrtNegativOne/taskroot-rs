@@ -163,3 +163,56 @@ describe('SettingRow calendar select', () => {
         expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('/me/gone/');
     });
 });
+
+describe('SettingRow time input', () => {
+    afterEach(cleanup);
+
+    const wakeUpSetting: SettingsSchemaItem = {
+        id: 'earliest_wake_up_time',
+        label: 'Earliest Wake Up Time',
+        type: 'time',
+        defaultValue: 0,
+    };
+
+    it('displays HH:MM for stored minutes and emits integer minutes on change', async () => {
+        let emitted: SettingValue | undefined;
+        render(SettingRow, {
+            props: {
+                item: wakeUpSetting,
+                value: 360,
+                onchange: (next: SettingValue) => {
+                    emitted = next;
+                },
+            },
+        });
+
+        const input = screen.getByLabelText('Earliest Wake Up Time') as HTMLInputElement;
+        expect(input.type).toBe('time');
+        expect(input.value).toBe('06:00');
+
+        await fireEvent.change(input, { target: { value: '06:30' } });
+        expect(emitted).toBe(390);
+
+        await fireEvent.input(input, { target: { value: '00:00' } });
+        expect(emitted).toBe(0);
+    });
+
+    it('falls back to 00:00 when unset and ignores empty partial values', async () => {
+        const emissions: SettingValue[] = [];
+        render(SettingRow, {
+            props: {
+                item: wakeUpSetting,
+                value: undefined,
+                onchange: (next: SettingValue) => {
+                    emissions.push(next);
+                },
+            },
+        });
+
+        const input = screen.getByLabelText('Earliest Wake Up Time') as HTMLInputElement;
+        expect(input.value).toBe('00:00');
+
+        await fireEvent.input(input, { target: { value: '' } });
+        expect(emissions).toEqual([]);
+    });
+});

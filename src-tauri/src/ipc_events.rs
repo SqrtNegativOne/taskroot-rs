@@ -15,6 +15,9 @@ pub struct AccountChanged;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, Event)]
 pub struct StoreUpdated;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, Event)]
+pub struct SettingsUpdated;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct DeepLink(pub String);
 

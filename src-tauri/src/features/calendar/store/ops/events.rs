@@ -1,160 +1,181 @@
-//! Event writes: create/update/delete plus scoped recurrence resolution.
+//! Event writes: create, patch-based update, and scoped reschedule.
 
 use crate::error::AppError;
 use crate::features::calendar::caldav::client::CalDavClient;
 use crate::features::calendar::caldav::model::CalendarComponent;
 use crate::features::calendar::domain::{
-    AppEvent, CalendarDateTime, CollectionId, EventId, EventScope, RemoteId,
+    apply_event_patches, AppEvent, CalendarDateTime, CollectionId, EventId, EventPatch, EventScope,
+    RemoteId,
 };
 use crate::features::calendar::ics;
 
-use super::super::model::{Resource, Store};
+use super::super::model::Resource;
+use super::super::state::StoreState;
 use super::{
-    collection_for, ensure_source_writable, refetch_resource, require_uid, resource_href,
-    writable_calendar,
+    apply_resource_create, apply_resource_move, apply_resource_update, collection_for,
+    ensure_source_writable, refetch_resource, require_uid, resource_href, writable_calendar,
+    UpdateGuard,
 };
 
-/// Create one event resource.
+/// Create one event resource without holding the store lock during network I/O.
 ///
 /// # Errors
 ///
 /// Returns an error for an empty id, a read-only/unknown target calendar, or a
 /// failed `PUT`.
 pub async fn create_event(
-    store: &mut Store,
+    state: &StoreState,
     client: &CalDavClient,
     mut event: AppEvent,
 ) -> Result<AppEvent, AppError> {
-    let collection = collection_for(
-        store,
-        CalendarComponent::VEvent,
-        event.remote_collection_id.as_ref().map(|id| id.as_str()),
-    )?;
-    let uid = event.id.as_str().to_string();
-    require_uid(&uid)?;
-    let href = resource_href(&collection.href, &uid);
-    let raw = ics::create_event_resource(&event)?;
+    let (collection, href, raw, base_revision) = state
+        .read(|store| {
+            let collection = collection_for(
+                store,
+                CalendarComponent::VEvent,
+                event.remote_collection_id.as_ref().map(|id| id.as_str()),
+            )?;
+            let uid = event.id.as_str();
+            require_uid(uid)?;
+            let href = resource_href(&collection.href, uid);
+            let raw = ics::create_event_resource(&event)?;
+            Ok::<_, AppError>((collection, href, raw, store.revision()))
+        })
+        .await?;
+
     let etag = client.put_resource(&href, &raw, None, true).await?;
 
     event.remote_id = Some(RemoteId(href.clone()));
     event.remote_collection_id = Some(CollectionId(collection.href.clone()));
-    store.set_resource(&href, &collection.href, etag.as_deref(), &raw)?;
+    state
+        .write(|store| {
+            apply_resource_create(
+                store,
+                &href,
+                &collection.href,
+                base_revision,
+                etag.as_deref(),
+                &raw,
+            )
+        })
+        .await?;
     Ok(event)
 }
 
-/// Update one event resource, moving it when its calendar changed.
+/// Apply field `patches` to one event, moving it when its calendar changed.
+///
+/// On `412 Conflict`, refetches the fresh server resource, applies only
+/// `patches` onto the freshly parsed event, and retries the `PUT` once (a second
+/// `412` is returned, never swallowed).
 ///
 /// # Errors
 ///
 /// Returns [`AppError::NotFound`] when the event is not in the store,
 /// [`AppError::InvalidInput`] for a read-only target, and propagates transport
-/// errors (a second `412` is returned, never swallowed).
+/// errors.
 pub async fn update_event(
-    store: &mut Store,
+    state: &StoreState,
     client: &CalDavClient,
-    event: AppEvent,
+    id: &str,
+    patches: &[EventPatch],
 ) -> Result<(), AppError> {
-    let resource = resource_for_event(store, &event)?;
-    let target = match event.remote_collection_id.as_deref() {
-        Some(href) => writable_calendar(store, href, CalendarComponent::VEvent)?,
-        None => collection_for(store, CalendarComponent::VEvent, None)?,
-    };
-
-    let merged = ics::write_event_resource(&resource.raw, &event)?;
+    let (resource, target, merged, base_revision) = state
+        .read(|store| {
+            let resource = store
+                .resource_for_event(id)
+                .cloned()
+                .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
+            let mut event = find_event_in(&resource, id)?.clone();
+            apply_event_patches(&mut event, patches);
+            let target = match event.remote_collection_id.as_deref() {
+                Some(href) => writable_calendar(store, href, CalendarComponent::VEvent)?,
+                None => collection_for(store, CalendarComponent::VEvent, None)?,
+            };
+            if target.href != resource.collection {
+                ensure_source_writable(store, &resource.collection)?;
+            }
+            let merged = ics::write_event_resource(&resource.raw, &event)?;
+            Ok::<_, AppError>((resource, target, merged, store.revision()))
+        })
+        .await?;
 
     if target.href != resource.collection {
-        ensure_source_writable(store, &resource.collection)?;
-        let href = resource_href(&target.href, event.id.as_str());
-        let etag = client.put_resource(&href, &merged, None, true).await?;
+        let new_href = resource_href(&target.href, id);
+        let new_etag = client.put_resource(&new_href, &merged, None, true).await?;
         client
             .delete_resource(&resource.href, resource.etag.as_deref())
             .await?;
-        store.remove_resource(&resource.href);
-        store.set_resource(&href, &target.href, etag.as_deref(), &merged)?;
-        return Ok(());
+        return state
+            .write(|store| {
+                apply_resource_move(
+                    store,
+                    &resource.href,
+                    &new_href,
+                    &target.href,
+                    base_revision,
+                    resource.etag.as_deref(),
+                    new_etag.as_deref(),
+                    &merged,
+                )
+            })
+            .await;
     }
 
-    let (merged, etag) = match client
+    let (final_raw, final_etag, committed_from) =
+        put_event_with_retry(client, &resource, id, patches, merged).await?;
+
+    state
+        .write(|store| {
+            apply_resource_update(
+                store,
+                &resource.href,
+                &resource.collection,
+                UpdateGuard {
+                    base_revision,
+                    initial_etag: resource.etag.as_deref(),
+                    committed_from_etag: committed_from.as_deref(),
+                },
+                final_etag.as_deref(),
+                &final_raw,
+            )
+        })
+        .await
+}
+
+async fn put_event_with_retry(
+    client: &CalDavClient,
+    resource: &Resource,
+    id: &str,
+    patches: &[EventPatch],
+    merged: String,
+) -> Result<(String, Option<String>, Option<String>), AppError> {
+    match client
         .put_resource(&resource.href, &merged, resource.etag.as_deref(), false)
         .await
     {
-        Ok(etag) => (merged, etag.or_else(|| resource.etag.clone())),
+        Ok(etag) => Ok((
+            merged,
+            etag.or_else(|| resource.etag.clone()),
+            resource.etag.clone(),
+        )),
         Err(AppError::Conflict(_)) => {
-            let fresh = refetch_resource(client, store, &resource)
+            let fresh = refetch_resource(client, &resource.collection, &resource.href)
                 .await?
-                .ok_or_else(|| AppError::NotFound(format!("event {}", event.id)))?;
-            let merged = ics::write_event_resource(&fresh.raw, &event)?;
+                .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
+            let mut fresh_event = find_event_in(&fresh, id)?.clone();
+            apply_event_patches(&mut fresh_event, patches);
+            let retried = ics::write_event_resource(&fresh.raw, &fresh_event)?;
             let etag = client
-                .put_resource(&resource.href, &merged, fresh.etag.as_deref(), false)
+                .put_resource(&resource.href, &retried, fresh.etag.as_deref(), false)
                 .await?;
-            (merged, etag.or_else(|| fresh.etag.clone()))
+            Ok((
+                retried,
+                etag.or_else(|| fresh.etag.clone()),
+                fresh.etag.clone(),
+            ))
         }
-        Err(error) => return Err(error),
-    };
-
-    store.set_resource(
-        &resource.href,
-        &resource.collection,
-        etag.as_deref(),
-        &merged,
-    )?;
-    Ok(())
-}
-
-/// Delete a recurring event's occurrences according to `scope`.
-///
-/// [`EventScope::All`] removes the whole series, [`EventScope::This`] excludes
-/// only `occurrence_start` (and drops the exception row when that is what was
-/// selected), and [`EventScope::Following`] ends the rule just before it.
-///
-/// # Errors
-///
-/// Propagates transport errors from the delete or the rewrite.
-pub async fn delete_event(
-    store: &mut Store,
-    client: &CalDavClient,
-    id: &str,
-    scope: EventScope,
-    occurrence_start: Option<CalendarDateTime>,
-) -> Result<(), AppError> {
-    let Some((resource, event)) = series_resource(store, id) else {
-        return Ok(());
-    };
-    ensure_source_writable(store, &resource.collection)?;
-    let master = master_event(store, &event);
-    let is_series = master.as_ref().is_some_and(AppEvent::is_recurring);
-
-    if scope == EventScope::All || !is_series {
-        return match master {
-            Some(master) => delete_series(store, client, &resource, &master).await,
-            None => delete_resource(store, client, &resource).await,
-        };
+        Err(error) => Err(error),
     }
-
-    let occurrence = selected_occurrence(&event, occurrence_start);
-    let Some(master) = master else {
-        return Err(AppError::NotFound(format!("series of event {id}")));
-    };
-    let mut raw = resource.raw.clone();
-
-    if scope == EventScope::This && event.recurring_event_id.is_some() {
-        let Some(remaining) = ics::delete_event_component(&raw, &event)? else {
-            return delete_resource(store, client, &resource).await;
-        };
-        raw = remaining;
-    }
-
-    if scope == EventScope::Following {
-        for victim in exceptions_from(&resource, occurrence) {
-            if let Some(remaining) = ics::delete_event_component(&raw, &victim)? {
-                raw = remaining;
-            }
-        }
-    }
-
-    let updated = scoped_master(&master, scope, occurrence)?;
-    let raw = ics::write_event_resource(&raw, &updated)?;
-    put_resource(store, client, &resource, &raw).await
 }
 
 /// A requested move of one occurrence or of a whole series.
@@ -180,7 +201,7 @@ pub struct Reschedule {
 /// [`AppError::InvalidInput`] for a `following` move, and propagates transport
 /// errors.
 pub async fn reschedule_event(
-    store: &mut Store,
+    state: &StoreState,
     client: &CalDavClient,
     request: Reschedule,
 ) -> Result<(), AppError> {
@@ -192,47 +213,107 @@ pub async fn reschedule_event(
         scope,
         occurrence_start,
     } = request;
-    let Some(event) = store.event(&id).cloned() else {
-        return Err(AppError::NotFound(format!("event {id}")));
-    };
-    if !event.is_recurring() || scope == EventScope::All {
-        let moved = moved(event, start_time, end_time, is_all_day);
-        return update_event(store, client, moved).await;
+    let event = state
+        .read(|store| store.event(&id).cloned())
+        .await
+        .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
+    if !event.is_recurring() || scope == EventScope::All || event.recurring_event_id.is_some() {
+        let patches = [
+            EventPatch::StartTime(start_time),
+            EventPatch::EndTime(end_time),
+            EventPatch::IsAllDay(Some(is_all_day)),
+        ];
+        return update_event(state, client, &id, &patches).await;
     }
     if scope == EventScope::Following {
         return Err(AppError::InvalidInput(
             "moving a series from one occurrence is not supported".to_string(),
         ));
     }
-    if event.recurring_event_id.is_some() {
-        let moved = moved(event, start_time, end_time, is_all_day);
-        return update_event(store, client, moved).await;
-    }
     let occurrence = selected_occurrence(&event, occurrence_start);
-    let exception = exception_for(&event, occurrence, start_time, end_time, is_all_day);
-    update_event(store, client, exception).await
+    write_exception(
+        state,
+        client,
+        &id,
+        occurrence,
+        start_time,
+        end_time,
+        is_all_day,
+    )
+    .await
 }
 
-fn series_resource(store: &Store, id: &str) -> Option<(Resource, AppEvent)> {
-    let resource = store.resource_for_event(id)?.clone();
-    let event = resource
-        .as_events()?
-        .iter()
-        .find(|event| event.id.as_str() == id)?
-        .clone();
-    Some((resource, event))
+async fn write_exception(
+    state: &StoreState,
+    client: &CalDavClient,
+    master_id: &str,
+    occurrence: CalendarDateTime,
+    start_time: CalendarDateTime,
+    end_time: CalendarDateTime,
+    is_all_day: bool,
+) -> Result<(), AppError> {
+    let (resource, merged, base_revision) = state
+        .read(|store| {
+            let resource = store
+                .resource_for_event(master_id)
+                .cloned()
+                .ok_or_else(|| AppError::NotFound(format!("event {master_id}")))?;
+            writable_calendar(store, &resource.collection, CalendarComponent::VEvent)?;
+            let master = find_event_in(&resource, master_id)?;
+            let exception = exception_for(master, occurrence, start_time, end_time, is_all_day);
+            let merged = ics::write_event_resource(&resource.raw, &exception)?;
+            Ok::<_, AppError>((resource, merged, store.revision()))
+        })
+        .await?;
+
+    let (final_raw, final_etag, committed_from) = match client
+        .put_resource(&resource.href, &merged, resource.etag.as_deref(), false)
+        .await
+    {
+        Ok(etag) => (
+            merged,
+            etag.or_else(|| resource.etag.clone()),
+            resource.etag.clone(),
+        ),
+        Err(AppError::Conflict(_)) => {
+            let fresh = refetch_resource(client, &resource.collection, &resource.href)
+                .await?
+                .ok_or_else(|| AppError::NotFound(format!("event {master_id}")))?;
+            let fresh_master = find_event_in(&fresh, master_id)?;
+            let exception =
+                exception_for(fresh_master, occurrence, start_time, end_time, is_all_day);
+            let retried = ics::write_event_resource(&fresh.raw, &exception)?;
+            let etag = client
+                .put_resource(&resource.href, &retried, fresh.etag.as_deref(), false)
+                .await?;
+            (
+                retried,
+                etag.or_else(|| fresh.etag.clone()),
+                fresh.etag.clone(),
+            )
+        }
+        Err(error) => return Err(error),
+    };
+
+    state
+        .write(|store| {
+            apply_resource_update(
+                store,
+                &resource.href,
+                &resource.collection,
+                UpdateGuard {
+                    base_revision,
+                    initial_etag: resource.etag.as_deref(),
+                    committed_from_etag: committed_from.as_deref(),
+                },
+                final_etag.as_deref(),
+                &final_raw,
+            )
+        })
+        .await
 }
 
-fn master_event(store: &Store, event: &AppEvent) -> Option<AppEvent> {
-    event
-        .recurring_event_id
-        .as_deref()
-        .map_or_else(|| Some(event.clone()), |master_id| store.event(master_id).cloned())
-}
-
-/// The canonical occurrence a mutation targets: the caller's value when it has
-/// one, otherwise the row's own start (a master starts at its first occurrence).
-fn selected_occurrence(
+pub(super) fn selected_occurrence(
     event: &AppEvent,
     occurrence_start: Option<CalendarDateTime>,
 ) -> CalendarDateTime {
@@ -241,98 +322,13 @@ fn selected_occurrence(
         .unwrap_or(event.start_time)
 }
 
-/// Exceptions whose original slot is at or after `occurrence`.
-fn exceptions_from(resource: &Resource, occurrence: CalendarDateTime) -> Vec<AppEvent> {
+fn find_event_in<'a>(resource: &'a Resource, id: &str) -> Result<&'a AppEvent, AppError> {
     resource
         .as_events()
-        .unwrap_or_default()
-        .iter()
-        .filter(|event| event.recurring_event_id.is_some())
-        .filter(|event| event.original_start_time.is_some_and(|start| start >= occurrence))
-        .cloned()
-        .collect()
+        .and_then(|events| events.iter().find(|event| event.id.as_str() == id))
+        .ok_or_else(|| AppError::NotFound(format!("event {id}")))
 }
 
-/// The master row as it must be written after a single-occurrence or
-/// from-here-on edit: an added `EXDATE`, or a rule that ends before `occurrence`.
-fn scoped_master(
-    master: &AppEvent,
-    scope: EventScope,
-    occurrence: CalendarDateTime,
-) -> Result<AppEvent, AppError> {
-    let mut updated = master.clone();
-    if scope == EventScope::Following {
-        if let Some(rrule) = master.rrule.as_deref() {
-            updated.rrule = Some(crate::features::calendar::domain::timing::truncate_before(
-                rrule,
-                occurrence,
-                master.timezone.as_deref(),
-            )?);
-        }
-        return Ok(updated);
-    }
-    let mut exdates = master.exdates.clone().unwrap_or_default();
-    if !exdates.contains(&occurrence) {
-        exdates.push(occurrence);
-    }
-    updated.exdates = Some(exdates);
-    Ok(updated)
-}
-
-async fn delete_series(
-    store: &mut Store,
-    client: &CalDavClient,
-    resource: &Resource,
-    master: &AppEvent,
-) -> Result<(), AppError> {
-    match ics::delete_event_component(&resource.raw, master)? {
-        Some(raw) => put_resource(store, client, resource, &raw).await,
-        None => delete_resource(store, client, resource).await,
-    }
-}
-
-async fn delete_resource(
-    store: &mut Store,
-    client: &CalDavClient,
-    resource: &Resource,
-) -> Result<(), AppError> {
-    client
-        .delete_resource(&resource.href, resource.etag.as_deref())
-        .await?;
-    store.remove_resource(&resource.href);
-    Ok(())
-}
-
-async fn put_resource(
-    store: &mut Store,
-    client: &CalDavClient,
-    resource: &Resource,
-    raw: &str,
-) -> Result<(), AppError> {
-    let etag = client
-        .put_resource(&resource.href, raw, resource.etag.as_deref(), false)
-        .await?;
-    store.set_resource(
-        &resource.href,
-        &resource.collection,
-        etag.as_deref().or(resource.etag.as_deref()),
-        raw,
-    )
-}
-
-const fn moved(
-    mut event: AppEvent,
-    start_time: CalendarDateTime,
-    end_time: CalendarDateTime,
-    is_all_day: bool,
-) -> AppEvent {
-    event.start_time = start_time;
-    event.end_time = end_time;
-    event.is_all_day = Some(is_all_day);
-    event
-}
-
-/// A `VCALENDAR` exception row for one occurrence of `master`.
 fn exception_for(
     master: &AppEvent,
     occurrence: CalendarDateTime,
@@ -363,14 +359,4 @@ fn exception_for(
         is_all_day: Some(is_all_day),
         timezone: master.timezone.clone(),
     }
-}
-
-fn resource_for_event(store: &Store, event: &AppEvent) -> Result<Resource, AppError> {
-    event
-        .remote_id
-        .as_deref()
-        .and_then(|href| store.resources.get(href))
-        .or_else(|| store.resource_for_event(event.id.as_str()))
-        .cloned()
-        .ok_or_else(|| AppError::NotFound(format!("event {}", event.id)))
 }

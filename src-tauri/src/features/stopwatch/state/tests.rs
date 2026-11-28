@@ -154,7 +154,7 @@ fn toggling_work_clears_an_active_timed_pause() {
 #[test]
 fn reset_records_the_live_segment_and_keeps_the_label() {
     let mut state = state_running_since(1_000);
-    state.set_label(Some("  maths  ".to_string()), StopwatchLabelSource::Custom);
+    state.set_label(Some("  maths  ".to_string()), StopwatchLabelSource::Custom, 1_000);
 
     let entries = state.reset(1_000_u64.saturating_add(minutes(2)));
 
@@ -169,8 +169,8 @@ fn reset_records_the_live_segment_and_keeps_the_label() {
 #[test]
 fn setting_an_empty_label_clears_its_source() {
     let mut state = StopwatchState::default();
-    state.set_label(Some("deep work".to_string()), StopwatchLabelSource::Task);
-    state.set_label(Some("   ".to_string()), StopwatchLabelSource::Custom);
+    state.set_label(Some("deep work".to_string()), StopwatchLabelSource::Task, 0);
+    state.set_label(Some("   ".to_string()), StopwatchLabelSource::Custom, 0);
 
     assert_eq!(state.label, None);
     assert_eq!(state.label_source, StopwatchLabelSource::Unset);
@@ -180,7 +180,7 @@ fn setting_an_empty_label_clears_its_source() {
 fn setting_a_task_sets_the_focus_and_its_title() {
     let mut state = StopwatchState::default();
 
-    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()), 0);
 
     assert_eq!(state.task_id.as_deref(), Some("task-1"));
     assert_eq!(state.label.as_deref(), Some("Learn Python"));
@@ -190,9 +190,9 @@ fn setting_a_task_sets_the_focus_and_its_title() {
 #[test]
 fn setting_a_label_clears_the_focus_task() {
     let mut state = StopwatchState::default();
-    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()), 0);
 
-    state.set_label(Some("writing".to_string()), StopwatchLabelSource::Custom);
+    state.set_label(Some("writing".to_string()), StopwatchLabelSource::Custom, 0);
 
     assert_eq!(state.task_id, None);
     assert_eq!(state.label.as_deref(), Some("writing"));
@@ -202,9 +202,9 @@ fn setting_a_label_clears_the_focus_task() {
 #[test]
 fn clearing_a_task_clears_the_label() {
     let mut state = StopwatchState::default();
-    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()));
+    state.set_task(Some("task-1".to_string()), Some("Learn Python".to_string()), 0);
 
-    state.set_task(None, None);
+    state.set_task(None, None, 0);
 
     assert_eq!(state.task_id, None);
     assert_eq!(state.label, None);
@@ -220,7 +220,7 @@ fn clearing_the_focused_task_stops_work_and_records_it() {
         .unwrap();
     manager.toggle_work().unwrap();
 
-    let cleared = manager.clear_task_if("task-1").unwrap().unwrap();
+    let cleared = manager.clear_task_if("task-1").unwrap().unwrap().state;
 
     assert_eq!(cleared.task_id, None);
     assert_eq!(cleared.label, None);
@@ -265,4 +265,111 @@ fn the_focus_survives_a_manager_reload() {
     assert_eq!(reloaded.label.as_deref(), Some("Learn Python"));
     assert_eq!(reloaded.label_source, StopwatchLabelSource::Task);
     assert_eq!(reloaded.phase, StopwatchPhase::Paused);
+}
+
+#[test]
+fn switching_tasks_while_running_records_previous_task_work_and_continues() {
+    let mut state = StopwatchState::default();
+    state.set_task(Some("task-1".to_string()), Some("First".to_string()), 1_000);
+    state.toggle_work(1_000).unwrap();
+
+    let switched = state.set_task(Some("task-2".to_string()), Some("Second".to_string()), 6_000);
+
+    assert_eq!(switched.len(), 1);
+    assert_eq!(switched[0].kind, StopwatchHistoryKind::Work);
+    assert_eq!(switched[0].task_id.as_deref(), Some("task-1"));
+    assert_eq!(switched[0].label, "First");
+    assert_eq!(switched[0].started_at, 1_000);
+    assert_eq!(switched[0].ended_at, 6_000);
+    assert_eq!(switched[0].duration_ms, 5_000);
+    assert_eq!(state.phase, StopwatchPhase::Running);
+    assert_eq!(state.work_running_since, Some(6_000));
+    assert_eq!(state.task_id.as_deref(), Some("task-2"));
+
+    let stopped = state.toggle_work(10_000).unwrap();
+    assert_eq!(stopped.len(), 1);
+    assert_eq!(stopped[0].task_id.as_deref(), Some("task-2"));
+    assert_eq!(stopped[0].duration_ms, 4_000);
+    assert_eq!(state.work_ms(10_000), 9_000);
+}
+
+#[test]
+fn switching_to_custom_label_while_running_records_previous_task_work() {
+    let mut state = StopwatchState::default();
+    state.set_task(Some("task-1".to_string()), Some("First".to_string()), 1_000);
+    state.toggle_work(1_000).unwrap();
+
+    let switched = state.set_label(
+        Some("Ad-hoc writing".to_string()),
+        StopwatchLabelSource::Custom,
+        5_000,
+    );
+
+    assert_eq!(switched.len(), 1);
+    assert_eq!(switched[0].kind, StopwatchHistoryKind::Work);
+    assert_eq!(switched[0].task_id.as_deref(), Some("task-1"));
+    assert_eq!(switched[0].duration_ms, 4_000);
+    assert_eq!(state.phase, StopwatchPhase::Running);
+    assert_eq!(state.work_running_since, Some(5_000));
+    assert_eq!(state.task_id, None);
+    assert_eq!(state.label.as_deref(), Some("Ad-hoc writing"));
+    assert_eq!(state.label_source, StopwatchLabelSource::Custom);
+}
+
+#[test]
+fn reselecting_unchanged_focus_while_running_does_not_split_segment() {
+    let mut state = StopwatchState::default();
+    state.set_task(Some("task-1".to_string()), Some("First".to_string()), 1_000);
+    state.toggle_work(1_000).unwrap();
+
+    let entries = state.set_task(
+        Some(" task-1 ".to_string()),
+        Some(" First ".to_string()),
+        5_000,
+    );
+
+    assert!(entries.is_empty());
+    assert_eq!(state.work_running_since, Some(1_000));
+    assert_eq!(state.work_elapsed, 0);
+}
+
+#[test]
+fn flush_running_work_records_task_id_and_pauses() {
+    let mut state = StopwatchState::default();
+    state.set_task(Some("task-1".to_string()), Some("First".to_string()), 1_000);
+    state.toggle_work(1_000).unwrap();
+
+    let flushed = state.flush_running_work(7_000);
+
+    assert_eq!(flushed.len(), 1);
+    assert_eq!(flushed[0].kind, StopwatchHistoryKind::Work);
+    assert_eq!(flushed[0].task_id.as_deref(), Some("task-1"));
+    assert_eq!(flushed[0].duration_ms, 6_000);
+    assert_eq!(state.phase, StopwatchPhase::Paused);
+    assert_eq!(state.work_running_since, None);
+    assert_eq!(state.work_ms(9_000), 6_000);
+}
+
+#[test]
+fn manager_flush_for_exit_and_history_persist_entries_with_task_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = StopwatchManager::load(dir.path());
+    manager
+        .set_task(Some("task-1".to_string()), Some("Learn Python".to_string()))
+        .unwrap();
+    manager.toggle_work().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(15));
+
+    let flushed = manager.flush_for_exit().unwrap();
+
+    assert_eq!(flushed.state.phase, StopwatchPhase::Paused);
+    assert_eq!(flushed.entries.len(), 1);
+    assert_eq!(flushed.entries[0].kind, StopwatchHistoryKind::Work);
+    assert_eq!(flushed.entries[0].task_id.as_deref(), Some("task-1"));
+    assert!(flushed.entries[0].duration_ms >= 10);
+
+    let history = manager.history().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].task_id.as_deref(), Some("task-1"));
+    assert_eq!(history[0].label, "Learn Python");
 }

@@ -27,7 +27,7 @@ export const commands = {
 	 * 
 	 *  Returns an error when the task is missing or the `CalDAV` write fails.
 	 */
-	updateTask: (task: AppTask, options?: InvokeOptions) => __TAURI_INVOKE<null>("update_task", { task }, options),
+	updateTask: (id: string, patches: TaskPatch[], options?: InvokeOptions) => __TAURI_INVOKE<null>("update_task", { id, patches }, options),
 	/**
 	 *  # Errors
 	 * 
@@ -58,7 +58,7 @@ export const commands = {
 	 * 
 	 *  Returns an error when the event is missing or the `CalDAV` write fails.
 	 */
-	updateEvent: (event: AppEvent, options?: InvokeOptions) => __TAURI_INVOKE<null>("update_event", { event }, options),
+	updateEvent: (id: string, patches: EventPatch[], options?: InvokeOptions) => __TAURI_INVOKE<null>("update_event", { id, patches }, options),
 	/**
 	 *  Delete one occurrence, the rest of the series, or the whole event.
 	 * 
@@ -135,6 +135,15 @@ export const commands = {
 	 */
 	listTags: (options?: InvokeOptions) => __TAURI_INVOKE<string[]>("list_tags", undefined, options),
 	/**
+	 *  Rename one tag across every task and event in the store.
+	 * 
+	 *  # Errors
+	 * 
+	 *  Returns an error if the new name is invalid, any affected calendar is
+	 *  read-only, the account/store is unavailable, or a `CalDAV` write fails.
+	 */
+	renameTag: (from: string, to: string, options?: InvokeOptions) => __TAURI_INVOKE<null>("rename_tag", { from, to }, options),
+	/**
 	 *  Fetch one raw event by id (used to reschedule instances back onto the master).
 	 * 
 	 *  # Errors
@@ -175,6 +184,15 @@ export const commands = {
 	 */
 	getStopwatchState: (options?: InvokeOptions) => __TAURI_INVOKE<StopwatchState>("get_stopwatch_state", undefined, options),
 	/**
+	 *  Return all persisted stopwatch work and break history entries.
+	 * 
+	 *  # Errors
+	 * 
+	 *  Returns [`AppError::Internal`] when the stopwatch state is not managed yet or
+	 *  [`AppError::Store`] when history cannot be read.
+	 */
+	getStopwatchHistory: (options?: InvokeOptions) => __TAURI_INVOKE<StopwatchHistoryEntry[]>("get_stopwatch_history", undefined, options),
+	/**
 	 *  Start, pause or resume work.
 	 * 
 	 *  # Errors
@@ -209,7 +227,7 @@ export const commands = {
 	 */
 	togglePause: (pauseMinutes: number, options?: InvokeOptions) => __TAURI_INVOKE<StopwatchState>("toggle_pause", { pauseMinutes }, options),
 	/**
-	 *  Extend (`delta_minutes > 0`) or shrink an active pause by whole minutes. A
+	 *  Extend (`delta_minutes > 0`) or shrink an active timed pause by whole minutes. A
 	 *  pause reduced to zero or below unpauses.
 	 * 
 	 *  # Errors
@@ -349,6 +367,7 @@ export const events = {
 	deepLink: makeEvent<DeepLink, DeepLink>("deep-link"),
 	launcherNavigate: makeEvent<LauncherNavigate, LauncherNavigate>("launcher-navigate"),
 	screenEffect: makeEvent<ScreenEffect, ScreenEffect>("screen-effect"),
+	settingsUpdated: makeEvent<SettingsUpdated, SettingsUpdated>("settings-updated"),
 	stopwatchUpdated: makeEvent<StopwatchUpdated, StopwatchUpdated>("stopwatch-updated"),
 	storeUpdated: makeEvent<StoreUpdated, StoreUpdated>("store-updated"),
 };
@@ -420,7 +439,10 @@ export type AppEvent = {
 	color?: Color | null,
 	etag?: string | null,
 	isAllDay?: boolean | null,
-	/**  IANA timezone of a timed event's wall clock (`None` = UTC). */
+	/**
+	 *  IANA timezone of a timed event's wall clock: `None` writes floating local
+	 *  time, `Some("UTC")` writes UTC (`…Z`), otherwise an IANA `TZID`.
+	 */
 	timezone?: string | null,
 };
 
@@ -450,6 +472,7 @@ export type AppSettings = {
 	default_task_list?: string,
 	default_event_list?: string,
 	day_timeline_start_view?: number,
+	earliest_wake_up_time?: number,
 	default_task_duration?: number,
 	clock_style?: string,
 	flowtime_break_divisor?: number,
@@ -473,6 +496,8 @@ export type AppTask = {
 	parentTask?: TaskId | null,
 	dependencies?: TaskId[] | null,
 	est?: number | null,
+	/**  Accumulated stopwatch work time tracked on this task, in whole seconds. */
+	timeSpent?: number | null,
 	added?: string | null,
 	remoteId?: RemoteId | null,
 	/**  Collection href this task lives in, matching `AppEvent`. */
@@ -581,6 +606,8 @@ export type EventInstance = {
 	taskStatus?: AppTaskStatus | null,
 };
 
+export type EventPatch = { field: "title"; value: string } | { field: "description"; value?: string | null } | { field: "priority"; value?: TaskPriority | null } | { field: "tags"; value?: Tag[] | null } | { field: "startTime"; value: CalendarDateTime } | { field: "endTime"; value: CalendarDateTime } | { field: "rrule"; value?: string | null } | { field: "exdates"; value?: CalendarDateTime[] | null } | { field: "status"; value?: EventStatus | null } | { field: "color"; value?: Color | null } | { field: "isAllDay"; value?: boolean | null } | { field: "timezone"; value?: string | null } | { field: "taskId"; value?: TaskId | null } | { field: "remoteCollectionId"; value?: CollectionId | null };
+
 /**  Which occurrences of a recurring event a write applies to. */
 export type EventScope = 
 /**  Only the selected occurrence; every other occurrence is untouched. */
@@ -637,6 +664,8 @@ export type RemoteId = string;
 
 export type ScreenEffect = null;
 
+export type SettingsUpdated = null;
+
 export type SigilProperties = {
 	priority?: TaskPriority | null,
 	tags: string[],
@@ -649,6 +678,7 @@ export type SortDirection = "asc" | "desc";
 
 export type StopwatchHistoryEntry = {
 	kind: StopwatchHistoryKind,
+	taskId?: string | null,
 	label: string,
 	labelSource: StopwatchLabelSource,
 	startedAt: number,
@@ -738,6 +768,8 @@ export type TaskDateKind = "start" | "due";
 export type TaskDateTiming = { kind: "allDay"; date: string } | { kind: "timed"; start: string; timezone: string | null };
 
 export type TaskId = string;
+
+export type TaskPatch = { field: "title"; value: string } | { field: "status"; value?: AppTaskStatus | null } | { field: "priority"; value?: TaskPriority | null } | { field: "tags"; value?: Tag[] | null } | { field: "parentTask"; value?: TaskId | null } | { field: "dependencies"; value?: TaskId[] | null } | { field: "est"; value?: number | null } | { field: "timeSpent"; value?: number | null } | { field: "remoteCollectionId"; value?: CollectionId | null } | { field: "notes"; value?: string | null } | { field: "start"; value?: CalendarDateTime | null } | { field: "due"; value?: CalendarDateTime | null } | { field: "completedAt"; value?: string | null } | { field: "rrule"; value?: string | null } | { field: "geo"; value?: GeoPoint | null } | { field: "alarms"; value?: TaskAlarmTrigger[] | null } | { field: "timezone"; value?: string | null };
 
 export type TaskPriority = 0 | 1 | 2 | 3 | 4;
 

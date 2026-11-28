@@ -4,8 +4,9 @@ use chrono::{SubsecRound, Utc};
 
 use crate::error::AppError;
 use crate::features::calendar::CalendarComponent;
-use crate::features::calendar::{ops, query, Store};
-use crate::features::calendar::{AppTask, AppTaskStatus, CollectionId, FilterGroup, TaskId};
+use crate::features::calendar::{
+    ops, query, AppTask, AppTaskStatus, CollectionId, FilterGroup, Store, TaskId, TaskPatch,
+};
 
 use super::super::output::print_json;
 use super::super::session::open;
@@ -18,8 +19,8 @@ use super::{find_task, require_component, resolve_list};
 pub async fn list_tasks(args: &ListTasksArgs) -> Result<(), AppError> {
     let session = open().await?;
     let search = args.search.as_deref().unwrap_or_default();
-    let mut tasks =
-        query::query_tasks(&session.store.tasks(), &FilterGroup::default(), &[], search);
+    let stored = session.store.read(Store::tasks).await;
+    let mut tasks = query::query_tasks(&stored, &FilterGroup::default(), &[], search);
 
     if let Some(status) = args.status {
         let wanted = AppTaskStatus::from(status);
@@ -37,7 +38,7 @@ pub async fn list_tasks(args: &ListTasksArgs) -> Result<(), AppError> {
 /// Propagates session, id-resolution and output failures.
 pub async fn show_task(ids: &[String]) -> Result<(), AppError> {
     let session = open().await?;
-    let tasks = resolve_tasks(&session.store, ids)?;
+    let tasks = session.store.read(|store| resolve_tasks(store, ids)).await?;
     print_json(&tasks)
 }
 
@@ -49,17 +50,17 @@ fn resolve_tasks(store: &Store, ids: &[String]) -> Result<Vec<AppTask>, AppError
 ///
 /// Propagates session, option, list-resolution and write failures.
 pub async fn add_task(args: &TaskAddArgs) -> Result<(), AppError> {
-    let mut session = open().await?;
+    let session = open().await?;
     let mut task = empty_task(uuid::Uuid::new_v4().to_string(), args.title.clone());
     apply_task_fields(&mut task, &args.fields);
 
     if let Some(list) = args.fields.list.as_deref() {
-        let (href, component) = resolve_list(&session.store, list)?;
+        let (href, component) = session.store.read(|store| resolve_list(store, list)).await?;
         require_component(component, CalendarComponent::VTodo, list)?;
         task.remote_collection_id = Some(CollectionId(href));
     }
 
-    let created = ops::create_task(&mut session.store, &session.client, task).await?;
+    let created = ops::create_task(&session.store, &session.client, task).await?;
     print_json(&created)
 }
 
@@ -67,21 +68,26 @@ pub async fn add_task(args: &TaskAddArgs) -> Result<(), AppError> {
 ///
 /// Propagates session, option, id/list-resolution, write and output failures.
 pub async fn set_task(args: &TaskSetArgs) -> Result<(), AppError> {
-    let mut session = open().await?;
+    let session = open().await?;
+    let list_href = if let Some(list) = args.fields.list.as_deref() {
+        let (href, component) = session.store.read(|store| resolve_list(store, list)).await?;
+        require_component(component, CalendarComponent::VTodo, list)?;
+        Some(CollectionId(href))
+    } else {
+        None
+    };
+    let patches = task_set_patches(args, list_href);
     let mut updated = Vec::new();
 
     for id in &args.ids {
-        let mut task = find_task(&session.store, id)?;
-        apply_task_set(&mut task, args);
-
-        if let Some(list) = args.fields.list.as_deref() {
-            let (href, component) = resolve_list(&session.store, list)?;
-            require_component(component, CalendarComponent::VTodo, list)?;
-            task.remote_collection_id = Some(CollectionId(href));
-        }
-
-        ops::update_task(&mut session.store, &session.client, task.clone()).await?;
-        updated.push(find_task(&session.store, task.id.as_str())?);
+        let task_id = session.store.read(|store| find_task(store, id)).await?.id;
+        ops::update_task(&session.store, &session.client, task_id.as_str(), &patches).await?;
+        updated.push(
+            session
+                .store
+                .read(|store| find_task(store, task_id.as_str()))
+                .await?,
+        );
     }
 
     print_json(&updated)
@@ -91,16 +97,22 @@ pub async fn set_task(args: &TaskSetArgs) -> Result<(), AppError> {
 ///
 /// Propagates session, id-resolution, write and output failures.
 pub async fn done_task(ids: &[String]) -> Result<(), AppError> {
-    let mut session = open().await?;
+    let session = open().await?;
+    let patches = [
+        TaskPatch::Status(Some(AppTaskStatus::Done)),
+        TaskPatch::CompletedAt(Some(Utc::now().trunc_subsecs(0))),
+    ];
     let mut updated = Vec::new();
 
     for id in ids {
-        let mut task = find_task(&session.store, id)?;
-        task.status = Some(AppTaskStatus::Done);
-        task.completed_at = Some(Utc::now().trunc_subsecs(0));
-
-        ops::update_task(&mut session.store, &session.client, task.clone()).await?;
-        updated.push(find_task(&session.store, task.id.as_str())?);
+        let task_id = session.store.read(|store| find_task(store, id)).await?.id;
+        ops::update_task(&session.store, &session.client, task_id.as_str(), &patches).await?;
+        updated.push(
+            session
+                .store
+                .read(|store| find_task(store, task_id.as_str()))
+                .await?,
+        );
     }
 
     print_json(&updated)
@@ -110,13 +122,13 @@ pub async fn done_task(ids: &[String]) -> Result<(), AppError> {
 ///
 /// Propagates session, id-resolution, delete and output failures.
 pub async fn remove_task(ids: &[String]) -> Result<(), AppError> {
-    let mut session = open().await?;
+    let session = open().await?;
     let mut deleted = Vec::new();
 
     for id in ids {
-        let task = find_task(&session.store, id)?;
-        ops::delete_task(&mut session.store, &session.client, task.id.as_str()).await?;
-        deleted.push(serde_json::json!({ "deleted": task.id.as_str() }));
+        let task_id = session.store.read(|store| find_task(store, id)).await?.id;
+        ops::delete_task(&session.store, &session.client, task_id.as_str()).await?;
+        deleted.push(serde_json::json!({ "deleted": task_id.as_str() }));
     }
 
     print_json(&deleted)
@@ -132,6 +144,7 @@ pub(crate) const fn empty_task(id: String, title: String) -> AppTask {
         parent_task: None,
         dependencies: None,
         est: None,
+        time_spent: None,
         added: None,
         remote_id: None,
         remote_collection_id: None,
@@ -169,17 +182,40 @@ pub(crate) fn apply_task_fields(task: &mut AppTask, fields: &TaskFields) {
     }
 }
 
-pub(crate) fn apply_task_set(task: &mut AppTask, args: &TaskSetArgs) {
+pub(crate) fn task_set_patches(
+    args: &TaskSetArgs,
+    list_href: Option<CollectionId>,
+) -> Vec<TaskPatch> {
+    let mut patches = Vec::new();
     if let Some(title) = &args.title {
-        task.title.clone_from(title);
+        patches.push(TaskPatch::Title(title.clone()));
     }
-    apply_task_fields(task, &args.fields);
+    if let Some(notes) = &args.fields.notes {
+        patches.push(TaskPatch::Notes(Some(notes.clone())));
+    }
     if args.clear_due {
-        task.due = None;
+        patches.push(TaskPatch::Due(None));
+    } else if let Some(due) = args.fields.due {
+        patches.push(TaskPatch::Due(Some(due)));
     }
     if args.clear_start {
-        task.start = None;
+        patches.push(TaskPatch::Start(None));
+    } else if let Some(start) = args.fields.start {
+        patches.push(TaskPatch::Start(Some(start)));
     }
+    if let Some(priority) = args.fields.priority {
+        patches.push(TaskPatch::Priority(Some(priority.into())));
+    }
+    if let Some(status) = args.fields.status {
+        patches.push(TaskPatch::Status(Some(status.into())));
+    }
+    if let Some(tz) = &args.fields.tz {
+        patches.push(TaskPatch::Timezone(Some(tz.clone())));
+    }
+    if let Some(href) = list_href {
+        patches.push(TaskPatch::RemoteCollectionId(Some(href)));
+    }
+    patches
 }
 
 #[cfg(test)]
@@ -191,7 +227,9 @@ mod tests {
 
     use super::*;
     use crate::cli::spec::{Cli, Command};
-    use crate::features::calendar::{Resource, ResourceItems, TaskPriority};
+    use crate::features::calendar::{
+        apply_task_patches, Resource, ResourceItems, TaskPriority,
+    };
     use crate::settings::AppSettings;
 
     fn parse_set(tokens: &[&str]) -> TaskSetArgs {
@@ -224,7 +262,8 @@ mod tests {
             "Asia/Calcutta",
         ]);
 
-        apply_task_set(&mut task, &args);
+        let patches = task_set_patches(&args, None);
+        apply_task_patches(&mut task, &patches);
 
         assert_eq!(task.title, "new title");
         assert_eq!(task.notes.as_deref(), Some("a note"));
@@ -240,7 +279,8 @@ mod tests {
         let mut task = empty_task("id".into(), "task".into());
         let args = parse_set(&["--due", "2026-10-28", "--clear-due"]);
 
-        apply_task_set(&mut task, &args);
+        let patches = task_set_patches(&args, None);
+        apply_task_patches(&mut task, &patches);
 
         assert_eq!(task.due, None);
     }

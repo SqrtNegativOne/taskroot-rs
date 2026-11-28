@@ -146,6 +146,111 @@ fn resolve_href_handles_paths_urls_and_relative_hrefs() {
         "/me/cal/a.ics"
     );
     assert_eq!(resolve_href("/me/cal", "a.ics"), "/me/cal/a.ics");
+    assert_eq!(resolve_href("/me/cal/", "./a.ics"), "/me/cal/a.ics");
+    assert_eq!(resolve_href("/me/cal/", "../other/a.ics"), "/me/other/a.ics");
+    assert_eq!(
+        resolve_href("/me/cal/", "/me/cal/my%20event%401.ics"),
+        "/me/cal/my%20event%401.ics"
+    );
+}
+
+#[test]
+fn calendar_data_restores_crlf_and_handles_cdata_utf8_and_missing_resources() {
+    // Stolen from libdav xmlutils & dav/mod tests:
+    // 1. Bare LF from XML 1.0 §2.11 normalization is restored to CRLF.
+    // 2. CDATA with multibyte UTF-8 (roxmltree #108) survives verbatim.
+    // 3. A 404 sibling response in the same multistatus is skipped.
+    let xml = concat!(
+        r#"<?xml version="1.0" encoding="utf-8"?>"#,
+        r#"<ns0:multistatus xmlns:ns0="DAV:" xmlns:ns1="urn:ietf:params:xml:ns:caldav">"#,
+        r#"<ns0:response>"#,
+        r#"<ns0:href>/me/cal/lf.ics</ns0:href>"#,
+        r#"<ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop>"#,
+        r#"<ns0:getetag>"e1"</ns0:getetag>"#,
+        "<ns1:calendar-data>BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:lf\nSUMMARY:A &amp; B\nEND:VEVENT\nEND:VCALENDAR\n</ns1:calendar-data>",
+        r#"</ns0:prop></ns0:propstat></ns0:response>"#,
+        r#"<ns0:response>"#,
+        r#"<ns0:href>/me/cal/cdata.ics</ns0:href>"#,
+        r#"<ns0:propstat><ns0:status>HTTP/1.1 200 OK</ns0:status><ns0:prop>"#,
+        r#"<ns0:getetag>"e2"</ns0:getetag>"#,
+        "<ns1:calendar-data><![CDATA[BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:utf8\r\nSUMMARY:Comidas: ñoquis, 西红柿 (baño)\r\nEND:VTODO\r\nEND:VCALENDAR\r\n]]></ns1:calendar-data>",
+        r#"</ns0:prop></ns0:propstat></ns0:response>"#,
+        r#"<ns0:response>"#,
+        r#"<ns0:href>/me/cal/missing.ics</ns0:href>"#,
+        r#"<ns0:status>HTTP/1.1 404 Not Found</ns0:status>"#,
+        r#"</ns0:response>"#,
+        r#"</ns0:multistatus>"#,
+    );
+
+    let resources = parse_calendar_resources(xml, "/me/cal/").unwrap();
+
+    assert_eq!(resources.len(), 2);
+    assert_eq!(resources[0].href, "/me/cal/lf.ics");
+    assert_eq!(
+        resources[0].calendar_data.as_deref(),
+        Some("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:lf\r\nSUMMARY:A & B\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    );
+    assert_eq!(resources[1].href, "/me/cal/cdata.ics");
+    assert_eq!(
+        resources[1].calendar_data.as_deref(),
+        Some("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:utf8\r\nSUMMARY:Comidas: ñoquis, 西红柿 (baño)\r\nEND:VTODO\r\nEND:VCALENDAR\r\n")
+    );
+}
+
+#[test]
+fn calendar_data_concatenates_split_text_and_cdata_nodes() {
+    let xml = concat!(
+        r#"<?xml version="1.0" encoding="utf-8"?>"#,
+        r#"<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><response>"#,
+        r#"<href>/me/cal/split.ics</href>"#,
+        r#"<propstat><prop><getetag>"e1"</getetag>"#,
+        "<C:calendar-data>BEGIN:VCALENDAR\n<![CDATA[SUMMARY:Hello & <World>\n]]>END:VCALENDAR\n</C:calendar-data>",
+        r#"</prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"#,
+    );
+
+    let resources = parse_calendar_resources(xml, "/me/cal/").unwrap();
+
+    assert_eq!(resources.len(), 1);
+    assert_eq!(
+        resources[0].calendar_data.as_deref(),
+        Some("BEGIN:VCALENDAR\r\nSUMMARY:Hello & <World>\r\nEND:VCALENDAR\r\n")
+    );
+}
+
+#[test]
+fn collection_without_supported_component_set_defaults_to_vevent_per_rfc_4791() {
+    let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:X="http://wrong.namespace/">
+  <response>
+    <href>/me/default/</href>
+    <propstat>
+      <prop>
+        <displayname>Default Cal</displayname>
+        <resourcetype><C:calendar/><collection/></resourcetype>
+        <X:calendar-color>#123456</X:calendar-color>
+      </prop>
+      <status>HTTP/1.1 200 OK</status>
+    </propstat>
+  </response>
+  <response>
+    <href>/me/journal-only/</href>
+    <propstat>
+      <prop>
+        <displayname>Journal</displayname>
+        <resourcetype><C:calendar/><collection/></resourcetype>
+        <C:supported-calendar-component-set><C:comp name="VJOURNAL"/></C:supported-calendar-component-set>
+      </prop>
+      <status>HTTP/1.1 200 OK</status>
+    </propstat>
+  </response>
+</multistatus>"#;
+
+    let calendars = parse_collections(xml, "/me/").unwrap();
+
+    assert_eq!(calendars.len(), 1);
+    assert_eq!(calendars[0].href, "/me/default/");
+    assert_eq!(calendars[0].component, CalendarComponent::VEvent);
+    assert_eq!(calendars[0].color.as_deref(), Some("#123456"));
 }
 
 #[test]

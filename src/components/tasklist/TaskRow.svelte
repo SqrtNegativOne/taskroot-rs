@@ -1,7 +1,7 @@
 <script lang="ts">
     import TaskCircle from '../TaskCircle.svelte';
     import Icon from '../Icon.svelte';
-    import { isRecurring, type AppTask } from '../../lib/domain';
+    import { isRecurring, type AppTask, type TaskPatch } from '../../lib/domain';
     import { ymd } from '../../lib/time';
 
     let {
@@ -18,7 +18,7 @@
         task: AppTask;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
         dragging?: boolean;
-        updateTask: (id: string, transform: (task: AppTask) => AppTask) => void;
+        updateTask: (id: string, patches: TaskPatch[]) => void;
         isPastDue?: boolean;
         selected?: boolean;
         onTaskClick?: (task: AppTask) => void;
@@ -51,7 +51,7 @@
             // sound effect play here
         }
 
-        updateTask(task.id, t => ({ ...t, status: newStatus }));
+        updateTask(task.id, [{ field: 'status', value: newStatus }]);
         if (newStatus === "todo") {
             isChecking = false;
         }

@@ -10,8 +10,8 @@ use super::model::CalendarComponent;
 pub use super::transport::CalDavClient;
 use super::transport::{check_status, CalDavRequest, HttpClient};
 use super::xml::{
-    calendar_color_body, mkcalendar_body, multiget_body, parse_calendar_resources,
-    rename_calendar_body, MultiGetResource, CALENDAR_QUERY_BODY,
+    calendar_color_body, check_proppatch_response, mkcalendar_body, multiget_body,
+    parse_calendar_resources, rename_calendar_body, MultiGetResource, CALENDAR_QUERY_BODY,
 };
 
 /// `calendar-multiget` batch size; Radicale is happy with far more, but 50 keeps
@@ -143,26 +143,26 @@ impl CalDavClient {
     ///
     /// # Errors
     ///
-    /// Propagates transport errors.
+    /// Propagates transport errors and inner `207 Multi-Status` failures.
     pub async fn set_display_name(&self, href: &str, display_name: &str) -> Result<(), AppError> {
         let body = rename_calendar_body(display_name);
-        self.send(&CalDavRequest::proppatch(href, &body)).await?;
-        Ok(())
+        let response = self.send(&CalDavRequest::proppatch(href, &body)).await?;
+        check_proppatch_response(&response.body, "displayname")
     }
 
     /// Set or clear a collection's `calendar-color`.
     ///
     /// # Errors
     ///
-    /// Propagates transport errors.
+    /// Propagates transport errors and inner `207 Multi-Status` failures.
     pub async fn set_calendar_color(
         &self,
         href: &str,
         color: Option<&str>,
     ) -> Result<(), AppError> {
         let body = calendar_color_body(color);
-        self.send(&CalDavRequest::proppatch(href, &body)).await?;
-        Ok(())
+        let response = self.send(&CalDavRequest::proppatch(href, &body)).await?;
+        check_proppatch_response(&response.body, "calendar-color")
     }
 
     /// Delete a whole collection and everything in it. A `404`/`410` counts as

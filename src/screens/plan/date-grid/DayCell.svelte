@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import type { EventInstance, AppCalendar, TaskDateInstance } from '../../../lib/domain';
-    import { isEventReadOnly } from '../../../lib/domain';
+    import { isCalendarReadOnly, isEventReadOnly } from '../../../lib/domain';
     import { resolveEventColor } from '../../../lib/eventColor';
     import { eventColorVars } from '../../../lib/themes/eventTheme.svelte';
     import { formatHhMm, minutesSinceMidnight, sameDay, ymd } from '../../../lib/time';
@@ -11,6 +11,7 @@
     const OPACITY_FADED = 0.4;
     const OPACITY_READ_ONLY = 0.6;
     const CHIP_GAP_PX = 2;
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     type DayItem =
         | { kind: 'event'; key: string; event: EventInstance }
@@ -26,6 +27,7 @@
         dragState,
         selectedEventId,
         onEventDragStart,
+        onTaskDragStart,
         onAddEvent,
         onEventClick,
         onTaskClick,
@@ -42,6 +44,7 @@
         dragState?: import('../day-timeline/types').DragState;
         selectedEventId?: string;
         onEventDragStart?: (e: PointerEvent, ev: EventInstance) => void;
+        onTaskDragStart?: (e: PointerEvent, marker: TaskDateInstance) => void;
         onAddEvent?: (date: Date) => void;
         onEventClick?: (ev: EventInstance) => void;
         onTaskClick?: (marker: TaskDateInstance) => void;
@@ -66,9 +69,16 @@
 
     let isToday = $derived(sameDay(cell.date, today));
     let isPast = $derived(cell.date < today && !isToday);
+    let isFirstOfMonth = $derived(cell.date.getDate() === 1);
     let cellDateStr = $derived(ymd(cell.date));
     let isDragOver = $derived(dragState?.target?.kind === "grid-day" && dragState.target.date === cellDateStr);
     let canAccept = $derived(!!dragState);
+    let dropHintText = $derived.by(() => {
+        if (!dragState?.task) return 'drop to plan';
+        if (dragState.task.markerKind === 'due') return 'drop to move due';
+        if (dragState.task.markerKind === 'start') return 'drop to move start';
+        return 'drop to set start';
+    });
     let eventsEl = $state<HTMLDivElement | undefined>(undefined);
     let probeEl = $state<HTMLElement | undefined>(undefined);
     let availableHeight = $state(0);
@@ -127,6 +137,9 @@
         <span class="day-cell-num">
             {cell.date.getDate().toString().padStart(2, '0')}
         </span>
+        {#if isFirstOfMonth}
+            <span class="day-cell-month">{MONTHS_SHORT[cell.date.getMonth()]}</span>
+        {/if}
     </div>
     <div class="day-cell-events">
         <div class="day-cell-events-scroll" bind:this={eventsEl}>
@@ -187,12 +200,24 @@
                     {@const marker = item.marker}
                     {@const isDone = marker.status === 'done'}
                     {@const taskTime = formatTaskTime(marker)}
+                    {@const readOnly = isCalendarReadOnly(marker.calendarId ? taskCalendars.find((c) => c.id === marker.calendarId) : undefined)}
+                    {@const isDragging = dragState?.task?.occurrenceKey === marker.occurrenceKey}
                     <div
                         class="day-cell-task"
                         class:is-done={isDone}
                         class:is-due={marker.kind === 'due'}
-                        style={eventColorVars(taskColor(marker))}
+                        class:is-readonly={readOnly}
+                        class:is-dragging={isDragging}
+                        style="
+                            cursor: {readOnly ? 'default' : 'grab'};
+                            {isDragging ? `opacity: ${OPACITY_FADED};` : readOnly ? `opacity: ${OPACITY_READ_ONLY};` : ''}
+                            {eventColorVars(taskColor(marker))}
+                        "
                         title="{marker.kind === 'due' ? 'Due: ' : 'Start: '}{marker.title}"
+                        onpointerdown={readOnly ? undefined : (e) => {
+                            if (e.target instanceof Element && e.target.closest('.task-circle')) return;
+                            onTaskDragStart?.(e, marker);
+                        }}
                         onclick={(e) => {
                             e.stopPropagation();
                             onTaskClick?.(marker);
@@ -223,7 +248,7 @@
     
     {#if isDragOver}
         <div class="day-cell-drop-hint">
-            <span class="bracket">▸</span> {dragState?.task ? 'drop to set start' : 'drop to plan'}
+            <span class="bracket">▸</span> {dropHintText}
         </div>
     {/if}
 </div>

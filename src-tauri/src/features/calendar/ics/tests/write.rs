@@ -439,6 +439,36 @@ fn tags_dependencies_and_estimate_round_trip() {
     assert_eq!(reread.est, Some(25));
 }
 
+#[test]
+fn time_spent_round_trips_preserving_unknown_props_and_omits_non_positive() {
+    let raw = fixture(TASK_ALARM);
+    let mut task = read_task(&raw);
+    assert_eq!(task.time_spent, None);
+
+    task.time_spent = Some(3_725);
+    let written = write_task_resource(&raw, &task).unwrap();
+
+    assert_only_owned_changed(&raw, &written, TASK_PROPERTIES);
+    assert_nested_preserved(&raw, &written);
+    assert!(written.contains("X-TASKROOT-TIME-SPENT:3725"));
+    assert!(written.contains("X-APPLE-SORT-ORDER:813839139"));
+    assert_eq!(read_task(&written).time_spent, Some(3_725));
+
+    let created = create_task_resource(&task).unwrap();
+    assert!(created.contains("X-TASKROOT-TIME-SPENT:3725"));
+    assert_eq!(read_task(&created).time_spent, Some(3_725));
+
+    task.time_spent = Some(0);
+    let zero_written = write_task_resource(&written, &task).unwrap();
+    assert!(!zero_written.contains("X-TASKROOT-TIME-SPENT"));
+    assert_eq!(read_task(&zero_written).time_spent, None);
+
+    task.time_spent = None;
+    let cleared = write_task_resource(&written, &task).unwrap();
+    assert!(!cleared.contains("X-TASKROOT-TIME-SPENT"));
+    assert_eq!(read_task(&cleared).time_spent, None);
+}
+
 // ---------------------------------------------------- tasks.org VTODO -------
 
 #[test]
@@ -553,11 +583,17 @@ fn a_utc_due_date_keeps_its_instant() {
     assert_eq!(task.timezone.as_deref(), Some("UTC"));
 
     let written = write_task_resource(raw, &task).unwrap();
-    assert!(written.contains("DUE;TZID=UTC:20261105T123000"));
-    assert_eq!(
-        read_task(&written).due,
-        Some("2026-11-05T12:30:00".parse().unwrap())
+    assert!(
+        written.contains("DUE:20261105T123000Z\r\n"),
+        "UTC DUE must use trailing Z: {written}"
     );
+    assert!(
+        !written.contains("TZID=UTC"),
+        "RFC 5545 forbids TZID on UTC date-times: {written}"
+    );
+    let reread = read_task(&written);
+    assert_eq!(reread.due, Some("2026-11-05T12:30:00".parse().unwrap()));
+    assert_eq!(reread.timezone.as_deref(), Some("UTC"));
 }
 
 #[test]
@@ -708,4 +744,210 @@ fn inserting_a_component_for_a_foreign_uid_is_rejected() {
 
     let error = write_event_resource(&raw, &foreign).unwrap_err();
     assert_eq!(error.code(), "invalid-input");
+}
+
+// -------------------------------------------------- UTC & timezone round-trip
+
+#[test]
+fn editing_a_utc_event_preserves_utc_z_timestamps() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:utc-edit-1\r\n",
+        "DTSTART:20260410T140000Z\r\n",
+        "DTEND:20260410T150000Z\r\n",
+        "SUMMARY:Original UTC\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+    let mut event = read_one(raw);
+    event.title = "Edited UTC".to_string();
+
+    let written = write_event_resource(raw, &event).unwrap();
+
+    assert_only_owned_changed(raw, &written, EVENT_PROPERTIES);
+    assert!(
+        written.contains("DTSTART:20260410T140000Z\r\n"),
+        "UTC DTSTART must keep trailing Z: {written}"
+    );
+    assert!(
+        written.contains("DTEND:20260410T150000Z\r\n"),
+        "UTC DTEND must keep trailing Z: {written}"
+    );
+    assert!(
+        !written.contains("TZID=UTC"),
+        "RFC 5545 forbids TZID=UTC: {written}"
+    );
+    let reread = read_one(&written);
+    assert_eq!(reread.title, "Edited UTC");
+    assert_eq!(reread.timezone.as_deref(), Some("UTC"));
+    assert_eq!(reread.start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(reread.end_time.to_string(), "2026-04-10T15:00:00");
+}
+
+#[test]
+fn creating_a_utc_event_writes_z_timestamps() {
+    let template = read_one(&fixture(MOZILLA));
+    let event = AppEvent {
+        id: EventId::from("new-utc-1"),
+        title: "New UTC event".to_string(),
+        start_time: "2026-04-10T14:00:00".parse().unwrap(),
+        end_time: "2026-04-10T15:00:00".parse().unwrap(),
+        rrule: None,
+        exdates: None,
+        timezone: Some("UTC".to_string()),
+        is_all_day: Some(false),
+        ..template
+    };
+
+    let created = create_event_resource(&event).unwrap();
+
+    assert!(
+        created.contains("DTSTART:20260410T140000Z\r\n"),
+        "created UTC event must write Z suffix: {created}"
+    );
+    assert!(
+        created.contains("DTEND:20260410T150000Z\r\n"),
+        "created UTC event must write Z suffix: {created}"
+    );
+    assert!(
+        !created.contains("TZID=UTC"),
+        "RFC 5545 forbids TZID=UTC: {created}"
+    );
+    let reread = read_one(&created);
+    assert_eq!(reread.timezone.as_deref(), Some("UTC"));
+    assert_eq!(reread.start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(reread.end_time.to_string(), "2026-04-10T15:00:00");
+}
+
+#[test]
+fn floating_timed_event_round_trips_without_zone_or_z() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:float-1\r\n",
+        "DTSTART:20260410T140000\r\n",
+        "DTEND:20260410T150000\r\n",
+        "SUMMARY:Floating\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+    let mut event = read_one(raw);
+    assert_eq!(event.timezone, None);
+    event.title = "Still floating".to_string();
+
+    let written = write_event_resource(raw, &event).unwrap();
+
+    assert!(written.contains("DTSTART:20260410T140000\r\n"));
+    assert!(written.contains("DTEND:20260410T150000\r\n"));
+    assert!(!written.contains("TZID="));
+    let reread = read_one(&written);
+    assert_eq!(reread.timezone, None);
+    assert_eq!(reread.start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(reread.end_time.to_string(), "2026-04-10T15:00:00");
+}
+
+#[test]
+fn zoned_america_new_york_event_round_trips_with_tzid() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:ny-1\r\n",
+        "DTSTART;TZID=America/New_York:20260410T100000\r\n",
+        "DTEND;TZID=America/New_York:20260410T110000\r\n",
+        "SUMMARY:NYC meeting\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+    let mut event = read_one(raw);
+    assert_eq!(event.timezone.as_deref(), Some("America/New_York"));
+    event.title = "NYC meeting updated".to_string();
+
+    let written = write_event_resource(raw, &event).unwrap();
+
+    assert!(written.contains("DTSTART;TZID=America/New_York:20260410T100000\r\n"));
+    assert!(written.contains("DTEND;TZID=America/New_York:20260410T110000\r\n"));
+    let reread = read_one(&written);
+    assert_eq!(reread.timezone.as_deref(), Some("America/New_York"));
+    assert_eq!(reread.start_time.to_string(), "2026-04-10T10:00:00");
+    assert_eq!(reread.end_time.to_string(), "2026-04-10T11:00:00");
+}
+
+#[test]
+fn utc_exdate_and_recurrence_id_round_trip() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:utc-series\r\n",
+        "DTSTART:20260410T140000Z\r\n",
+        "DTEND:20260410T150000Z\r\n",
+        "RRULE:FREQ=WEEKLY\r\n",
+        "EXDATE:20260417T140000Z\r\n",
+        "SUMMARY:Weekly UTC\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+    let mut master = read_one(raw);
+    master.exdates = Some(vec![
+        "2026-04-17T14:00:00".parse().unwrap(),
+        "2026-04-24T14:00:00".parse().unwrap(),
+    ]);
+    let with_exdates = write_event_resource(raw, &master).unwrap();
+
+    assert!(with_exdates.contains("EXDATE:20260417T140000Z\r\n"));
+    assert!(with_exdates.contains("EXDATE:20260424T140000Z\r\n"));
+    assert!(!with_exdates.contains("TZID=UTC"));
+
+    let exception = AppEvent {
+        id: EventId::from("utc-series@2026-05-01T14:00:00"),
+        recurring_event_id: Some(EventId::from("utc-series")),
+        original_start_time: Some("2026-05-01T14:00:00".parse().unwrap()),
+        start_time: "2026-05-02T16:00:00".parse().unwrap(),
+        end_time: "2026-05-02T17:00:00".parse().unwrap(),
+        rrule: None,
+        exdates: None,
+        title: "Weekly UTC moved".to_string(),
+        ..master
+    };
+    let with_exception = write_event_resource(&with_exdates, &exception).unwrap();
+
+    assert!(
+        with_exception.contains("RECURRENCE-ID:20260501T140000Z\r\n"),
+        "UTC RECURRENCE-ID must use trailing Z: {with_exception}"
+    );
+    assert!(with_exception.contains("DTSTART:20260502T160000Z\r\n"));
+    assert!(with_exception.contains("DTEND:20260502T170000Z\r\n"));
+    assert!(!with_exception.contains("TZID=UTC"));
+
+    let mut events = read_event_resource(&with_exception, HREF, COLLECTION).unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].timezone.as_deref(), Some("UTC"));
+    assert_eq!(
+        events[0].exdates,
+        Some(vec![
+            "2026-04-17T14:00:00".parse().unwrap(),
+            "2026-04-24T14:00:00".parse().unwrap(),
+        ])
+    );
+    assert_eq!(events[1].id, EventId::from("utc-series@2026-05-01T14:00:00"));
+    assert_eq!(events[1].timezone.as_deref(), Some("UTC"));
+    assert_eq!(
+        events[1].original_start_time,
+        Some("2026-05-01T14:00:00".parse().unwrap())
+    );
+
+    events[1].title = "Weekly UTC moved again".to_string();
+    let edited_exception = write_event_resource(&with_exception, &events[1]).unwrap();
+    assert!(edited_exception.contains("RECURRENCE-ID:20260501T140000Z\r\n"));
+    assert!(edited_exception.contains("DTSTART:20260502T160000Z\r\n"));
+    assert!(edited_exception.contains("DTEND:20260502T170000Z\r\n"));
+    assert!(!edited_exception.contains("TZID=UTC"));
 }

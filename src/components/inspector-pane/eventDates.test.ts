@@ -3,14 +3,16 @@ import { makeEvent } from '../../test/factories';
 import {
     eventEndDateInclusive,
     eventIsAllDay,
+    formatEventSchedule,
     toAllDay,
     toTimed,
+    withDateRange,
     withEndDate,
     withEndTime,
     withStartDate,
     withStartTime,
 } from './eventDates';
-import { withDate, withTime } from './format';
+import { formatTaskDateTime, withDate, withTime } from './format';
 
 function allDayEvent(startTime: string, endTime: string) {
     return makeEvent({ startTime, endTime, isAllDay: true });
@@ -158,5 +160,74 @@ describe('date/time formatting helpers', () => {
         expect(withTime('2026-10-27T08:00:00', '09:15')).toBe('2026-10-27T09:15:00');
         expect(withTime('2026-10-27T09:15:00', '')).toBe('2026-10-27');
         expect(withTime(undefined, '09:15')).toBeUndefined();
+    });
+
+    it('formats unified task date/time summaries', () => {
+        expect(formatTaskDateTime(undefined, 'No start date')).toBe('No start date');
+        expect(formatTaskDateTime('2026-11-05', 'No start date')).not.toContain('·');
+        expect(formatTaskDateTime('2026-11-05T14:30:00', 'No start date')).toContain('· 14:30');
+    });
+});
+
+describe('date range updates and formatting', () => {
+    it('updates an all-day event range with an exclusive end date', () => {
+        const single = withDateRange(allDayEvent('2026-11-05', '2026-11-08'), '2026-11-10', '2026-11-10');
+        expect(single).toEqual({
+            startTime: '2026-11-10',
+            endTime: '2026-11-11',
+            isAllDay: true,
+        });
+
+        const multi = withDateRange(allDayEvent('2026-11-05', '2026-11-06'), '2026-11-12', '2026-11-09');
+        expect(multi).toEqual({
+            startTime: '2026-11-09',
+            endTime: '2026-11-13',
+            isAllDay: true,
+        });
+    });
+
+    it('updates a timed event range and repairs inverted same-day times', () => {
+        const multi = withDateRange(
+            timedEvent('2026-11-05T17:00:00', '2026-11-06T09:00:00'),
+            '2026-11-10',
+            '2026-11-12',
+        );
+        expect(multi).toEqual({
+            startTime: '2026-11-10T17:00:00',
+            endTime: '2026-11-12T09:00:00',
+            isAllDay: false,
+        });
+
+        const collapsed = withDateRange(
+            timedEvent('2026-11-05T17:00:00', '2026-11-06T09:00:00'),
+            '2026-11-10',
+            '2026-11-10',
+        );
+        expect(collapsed).toEqual({
+            startTime: '2026-11-10T17:00:00',
+            endTime: '2026-11-10T18:00:00',
+            isAllDay: false,
+        });
+    });
+
+    it('formats readable single-day and multi-day event schedules', () => {
+        const singleAllDay = formatEventSchedule(allDayEvent('2026-11-05', '2026-11-06'));
+        expect(singleAllDay).toContain('· All day');
+        expect(singleAllDay).not.toContain('–');
+
+        const multiAllDay = formatEventSchedule(allDayEvent('2026-11-05', '2026-11-08'));
+        expect(multiAllDay).toContain('–');
+        expect(multiAllDay).toContain('· All day');
+
+        const sameDayTimed = formatEventSchedule(
+            timedEvent('2026-11-05T09:00:00', '2026-11-05T10:30:00'),
+        );
+        expect(sameDayTimed).toContain('· 09:00 – 10:30');
+
+        const multiDayTimed = formatEventSchedule(
+            timedEvent('2026-11-05T09:00:00', '2026-11-06T17:00:00'),
+        );
+        expect(multiDayTimed).toContain(', 09:00 – ');
+        expect(multiDayTimed).toContain(', 17:00');
     });
 });

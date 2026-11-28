@@ -2,7 +2,7 @@
 //!
 //! Canonical value formats consumed symmetrically by the writer:
 //! - All-day dates: `YYYY-MM-DD`; timed wall clocks: `YYYY-MM-DDTHH:MM:SS` paired
-//!   with `timezone` (`TZID`, or `"UTC"` on VTODO `…Z` values).
+//!   with `timezone` (`TZID`, or `"UTC"` on `…Z` values).
 //! - Exceptions: `id = <UID>@<original_start_time>`.
 //! - Timestamps (`added`, `updated_at`, `completed_at`): ISO 8601 UTC.
 //! - `rrule`: wire form (`RRULE:FREQ=…`), one line per rule.
@@ -72,7 +72,7 @@ pub(super) fn event_from_component(component: &IcalCst<'_>) -> Result<AppEvent, 
     let start = prop(component, "DTSTART")
         .and_then(parse_date_line)
         .ok_or_else(|| AppError::InvalidInput(format!("VEVENT {uid} has no parseable DTSTART")))?;
-    let timezone = start.tzid().map(ToString::to_string);
+    let timezone = start.timezone();
     let is_all_day = start.is_date();
     let start_time = start.canonical(timezone.as_deref());
     let end_time = prop(component, "DTEND")

@@ -22,7 +22,8 @@ use tauri_specta::{collect_commands, collect_events, Builder};
 use crate::error::{AppError, BackendErrorCode};
 use crate::features::stopwatch::history::{StopwatchHistoryEntry, StopwatchHistoryKind};
 use crate::ipc_events::{
-    AccountChanged, DeepLink, LauncherNavigate, ScreenEffect, StopwatchUpdated, StoreUpdated,
+    AccountChanged, DeepLink, LauncherNavigate, ScreenEffect, SettingsUpdated, StopwatchUpdated,
+    StoreUpdated,
 };
 use crate::platform::WindowLabel;
 
@@ -50,6 +51,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             plan::query_event_instances,
             plan::query_task_dates,
             plan::list_tags,
+            plan::rename_tag,
             plan::get_event,
             schema::get_task_schema,
             schema::get_event_schema,
@@ -62,6 +64,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             window::toggle_launcher,
             window::resize_launcher,
             stopwatch::get_stopwatch_state,
+            stopwatch::get_stopwatch_history,
             stopwatch::toggle_stopwatch,
             stopwatch::toggle_break,
             stopwatch::complete_break,
@@ -92,6 +95,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             StopwatchUpdated,
             AccountChanged,
             StoreUpdated,
+            SettingsUpdated,
             DeepLink,
             ScreenEffect,
             LauncherNavigate

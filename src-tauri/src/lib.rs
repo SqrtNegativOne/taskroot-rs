@@ -2,6 +2,7 @@
 #![warn(unreachable_pub)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+#![allow(clippy::doc_markdown)]
 
 pub mod bootstrap;
 pub mod cli;

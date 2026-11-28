@@ -14,3 +14,5 @@ pub use state::StoreState;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_patches;

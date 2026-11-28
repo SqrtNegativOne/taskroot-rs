@@ -237,4 +237,265 @@ describe('DateGrid task dates', () => {
         expect(onTaskClick).toHaveBeenCalledTimes(1);
         expect(onTaskClick.mock.calls[0][0]).toMatchObject({ taskId: 'rent', kind: 'start' });
     });
+
+    it('starts dragging on writable marker body, ignores circle pointerdown, and blocks read-only markers', async () => {
+        const start = startOfWeek(new Date());
+        const startDate = ymd(start);
+        const onTaskDragStart = vi.fn();
+        const onTaskClick = vi.fn();
+        const onToggleTask = vi.fn();
+
+        tauri.stubCommandValue('get_active_calendars', [
+            ...calendars,
+            { id: 'ro-tasks', summary: 'Shared Tasks', writable: false, component: 'VTODO' },
+        ]);
+        tauri.stubCommandValue('query_task_dates', [
+            makeTaskDateInstance({
+                taskId: 'writable-task',
+                kind: 'start',
+                title: 'Editable task',
+                calendarId: 'tasks',
+                timing: { kind: 'allDay', date: startDate },
+            }),
+            makeTaskDateInstance({
+                taskId: 'readonly-task',
+                kind: 'start',
+                title: 'Readonly task',
+                calendarId: 'ro-tasks',
+                timing: { kind: 'allDay', date: startDate },
+            }),
+        ]);
+
+        render(DateGrid, { onTaskDragStart, onTaskClick, onToggleTask });
+
+        const editable = (await screen.findByText('Editable task')).closest('.day-cell-task') as HTMLElement;
+        const readonly = screen.getByText('Readonly task').closest('.day-cell-task') as HTMLElement;
+
+        expect(editable.style.cursor).toBe('grab');
+        expect(readonly.classList.contains('is-readonly')).toBe(true);
+        expect(readonly.style.cursor).toBe('default');
+
+        const circle = editable.querySelector('.task-circle') as HTMLElement;
+        await fireEvent.pointerDown(circle, { button: 0 });
+        await fireEvent.click(circle);
+        expect(onTaskDragStart).not.toHaveBeenCalled();
+        expect(onTaskClick).not.toHaveBeenCalled();
+        expect(onToggleTask).toHaveBeenCalledWith('writable-task');
+
+        await fireEvent.pointerDown(readonly, { button: 0 });
+        expect(onTaskDragStart).not.toHaveBeenCalled();
+
+        await fireEvent.pointerDown(editable, { button: 0 });
+        expect(onTaskDragStart).toHaveBeenCalledTimes(1);
+        expect(onTaskDragStart.mock.calls[0][1]).toMatchObject({ taskId: 'writable-task', kind: 'start' });
+    });
+
+    it('fades only the dragged marker occurrence and shows kind-specific drop hint text', async () => {
+        const start = startOfWeek(new Date());
+        const targetDate = ymd(addDays(start, 2));
+
+        const { container, rerender } = render(DateGrid, {
+            dragState: {
+                task: { id: 'rent', markerKind: 'due', occurrenceKey: 'rent@due' },
+                target: { kind: 'grid-day', date: targetDate },
+            },
+        });
+
+        await screen.findAllByText('Pay rent');
+        const capsules = Array.from(container.querySelectorAll<HTMLElement>('.day-cell-task'));
+        const startCapsule = capsules.find((el) => el.getAttribute('title')?.startsWith('Start: Pay rent'));
+        const dueCapsule = capsules.find((el) => el.getAttribute('title')?.startsWith('Due: Pay rent'));
+
+        expect(startCapsule?.classList.contains('is-dragging')).toBe(false);
+        expect(dueCapsule?.classList.contains('is-dragging')).toBe(true);
+        expect(dueCapsule?.style.opacity).toBe('0.4');
+        expect(screen.getByText('drop to move due')).toBeTruthy();
+
+        await rerender({
+            dragState: {
+                task: { id: 'rent', markerKind: 'start', occurrenceKey: 'rent@start' },
+                target: { kind: 'grid-day', date: targetDate },
+            },
+        });
+        expect(screen.getByText('drop to move start')).toBeTruthy();
+    });
+});
+
+describe('DateGrid vertical infinite scroll', () => {
+    beforeEach(() => {
+        tauri.reset();
+        tauri.stubCommandValue('get_active_calendars', calendars);
+        tauri.stubCommandValue('query_event_instances', []);
+        tauri.stubCommandValue('query_task_dates', []);
+    });
+
+    it('highlights the most-shown month as active while scrolling down in month view', async () => {
+        tauri.stubCommand('get_ui_state', (args) =>
+            args?.key === persistedKeys.dateGridView ? 'month' : undefined,
+        );
+        const host = document.createElement('div');
+        host.style.width = '700px';
+        host.style.height = '660px';
+        document.body.appendChild(host);
+
+        try {
+            const { container } = render(DateGrid, { target: host });
+            const scroller = container.querySelector('.cal-cells') as HTMLDivElement;
+
+            await waitFor(() => {
+                expect(scroller.classList.contains('has-week-height')).toBe(true);
+                expect(scroller.scrollTop).toBeGreaterThan(0);
+            });
+
+            const initialTitle = container.querySelector('.cal-hd-title')?.textContent?.trim();
+            const weekHeight = scroller.clientHeight / 6;
+
+            // Scroll down 5 weeks (~1 full month forward) so the next month dominates the viewport.
+            scroller.scrollTop += weekHeight * 5;
+            scroller.dispatchEvent(new Event('scroll'));
+
+            await waitFor(() => {
+                const nextTitle = container.querySelector('.cal-hd-title')?.textContent?.trim();
+                expect(nextTitle).not.toBe(initialTitle);
+            });
+
+            // The dominant month's cells are active (not .is-out), while surrounding months are .is-out.
+            const activeCells = container.querySelectorAll('.day-cell:not(.is-out)');
+            const outCells = container.querySelectorAll('.day-cell.is-out');
+            expect(activeCells.length).toBeGreaterThanOrEqual(28);
+            expect(activeCells.length).toBeLessThanOrEqual(31);
+            expect(outCells.length).toBeGreaterThan(0);
+        } finally {
+            host.remove();
+        }
+    });
+
+    it('extends rendered weeks when scrolling continuously in week view', async () => {
+        tauri.stubCommand('get_ui_state', (args) =>
+            args?.key === persistedKeys.dateGridView ? '1 week' : undefined,
+        );
+        const host = document.createElement('div');
+        host.style.width = '700px';
+        host.style.height = '320px';
+        document.body.appendChild(host);
+
+        try {
+            const { container } = render(DateGrid, { target: host });
+            const scroller = container.querySelector('.cal-cells') as HTMLDivElement;
+
+            await waitFor(() => {
+                expect(scroller.classList.contains('has-week-height')).toBe(true);
+                expect(scroller.scrollTop).toBeGreaterThan(0);
+            });
+
+            const farFutureWeek = ymd(addDays(startOfWeek(new Date()), 7 * 12));
+            expect(container.querySelector(`[data-week-start="${farFutureWeek}"]`)).toBeNull();
+
+            scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+            scroller.dispatchEvent(new Event('scroll'));
+
+            await waitFor(() => {
+                expect(container.querySelector(`[data-week-start="${farFutureWeek}"]`)).not.toBeNull();
+            });
+        } finally {
+            host.remove();
+        }
+    });
+
+    it('keeps inner day cells non-scrollable (overflow: clip) and aligns arrow navigation flush to the top row', async () => {
+        tauri.stubCommand('get_ui_state', (args) =>
+            args?.key === persistedKeys.dateGridView ? 'month' : undefined,
+        );
+        const host = document.createElement('div');
+        host.style.width = '700px';
+        host.style.height = '653px'; // intentionally non-divisible by 6 to test fractional row alignment
+        document.body.appendChild(host);
+
+        try {
+            const { container } = render(DateGrid, { target: host });
+            const scroller = container.querySelector('.cal-cells') as HTMLDivElement;
+
+            await waitFor(() => {
+                expect(scroller.classList.contains('has-week-height')).toBe(true);
+                expect(scroller.scrollTop).toBeGreaterThan(0);
+            });
+
+            // Inner day cells must use clip (not hidden) so overscroll-behavior: none cannot swallow wheel events.
+            const firstCell = container.querySelector('.day-cell') as HTMLElement;
+            const firstEvents = container.querySelector('.day-cell-events-scroll') as HTMLElement;
+            expect(getComputedStyle(firstCell).overflowY).toBe('clip');
+            expect(getComputedStyle(firstEvents).overflowY).toBe('clip');
+
+            // Clicking Next month and waiting for scrollend leaves the top visible week flush with the viewport top.
+            const nextBtn = screen.getByRole('button', { name: 'next' });
+            await fireEvent.click(nextBtn);
+
+            await waitFor(() => {
+                const scrollerTop = scroller.getBoundingClientRect().top + 1; // +1px border-top
+                const weeks = Array.from(container.querySelectorAll<HTMLElement>('.cal-week'));
+                const topVisible = weeks.find(
+                    (w) => Math.abs(w.getBoundingClientRect().top - scrollerTop) <= 1.5,
+                );
+                expect(topVisible).toBeDefined();
+            });
+        } finally {
+            host.remove();
+        }
+    });
+
+    it('keeps all 7 day cells equal width even with long event titles and snaps vertically onto week rows', async () => {
+        const start = startOfWeek(new Date());
+        tauri.stubCommand('get_ui_state', (args) =>
+            args?.key === persistedKeys.dateGridView ? 'month' : undefined,
+        );
+        tauri.stubCommandValue('query_event_instances', [
+            makeInstance({
+                id: 'long-title',
+                title: 'An extraordinarily long single-day event title that must never widen its grid column',
+                timing: { kind: 'allDay', startDate: ymd(start), endDateExclusive: ymd(addDays(start, 1)) },
+            }),
+        ]);
+
+        const host = document.createElement('div');
+        host.style.width = '732px';
+        host.style.height = '660px';
+        document.body.appendChild(host);
+
+        try {
+            const { container } = render(DateGrid, { target: host });
+            const scroller = container.querySelector('.cal-cells') as HTMLDivElement;
+
+            await screen.findByText(/extraordinarily long/);
+            await waitFor(() => {
+                expect(scroller.classList.contains('has-week-height')).toBe(true);
+                expect(scroller.scrollTop).toBeGreaterThan(0);
+            });
+
+            // Every cell in the week containing the long title must share the exact same width.
+            const targetWeek = container.querySelector(`[data-week-start="${ymd(start)}"]`) as HTMLElement;
+            const widths = Array.from(targetWeek.querySelectorAll<HTMLElement>('.day-cell'), (c) =>
+                c.getBoundingClientRect().width,
+            );
+            expect(widths).toHaveLength(7);
+            for (const width of widths) {
+                expect(width).toBeCloseTo(widths[0], 0);
+            }
+
+            // Stopping partway down a week smoothly snaps onto the nearest week row boundary.
+            const initialTop = scroller.scrollTop;
+            const weekHeight = scroller.clientHeight / 6;
+            const scrollCalls: ScrollToOptions[] = [];
+            scroller.scrollTo = ((arg?: ScrollToOptions | number) => {
+                if (typeof arg === 'object' && arg !== null) scrollCalls.push(arg);
+            }) as typeof scroller.scrollTo;
+            scroller.scrollTop = initialTop + weekHeight * 0.7;
+            scroller.dispatchEvent(new Event('scrollend'));
+
+            expect(scrollCalls).toHaveLength(1);
+            expect(scrollCalls[0]?.behavior).toBe('smooth');
+            expect(Math.abs((scrollCalls[0]?.top ?? 0) - (initialTop + weekHeight))).toBeLessThanOrEqual(1);
+        } finally {
+            host.remove();
+        }
+    });
 });

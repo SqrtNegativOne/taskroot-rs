@@ -94,7 +94,8 @@ pub struct AppEvent {
     pub etag: Option<String>,
     #[specta(optional)]
     pub is_all_day: Option<bool>,
-    /// IANA timezone of a timed event's wall clock (`None` = UTC).
+    /// IANA timezone of a timed event's wall clock: `None` writes floating local
+    /// time, `Some("UTC")` writes UTC (`…Z`), otherwise an IANA `TZID`.
     #[specta(optional)]
     pub timezone: Option<String>,
 }

@@ -30,14 +30,7 @@ impl DateValue {
         matches!(self, Self::Date(_))
     }
 
-    pub(super) fn tzid(&self) -> Option<&str> {
-        match self {
-            Self::Date(_) => None,
-            Self::Timed { tzid, .. } => tzid.as_deref(),
-        }
-    }
-
-    pub(super) fn task_timezone(&self) -> Option<String> {
+    pub(super) fn timezone(&self) -> Option<String> {
         match self {
             Self::Date(_) => None,
             Self::Timed { tzid, utc, .. } => {
@@ -155,6 +148,9 @@ pub(super) fn date_line(
         ));
     }
     let naive = value.to_wall_clock(zone)?;
+    if zone.is_some_and(|tz| tz.eq_ignore_ascii_case("UTC")) {
+        return Some(stamp_line(kind, naive.and_utc()));
+    }
     let params = zone.map_or_default(|tz| vec![IcalParam::TzId(Cow::Borrowed(tz))]);
     Some(encode(
         kind,

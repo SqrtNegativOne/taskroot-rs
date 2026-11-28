@@ -1,0 +1,270 @@
+/* ── Inspector date & range picker popover ────────────────────────── */
+
+.inspector-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.inspector-picker-trigger {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.inspector-picker-trigger:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+}
+
+.inspector-picker-trigger.is-empty {
+  color: var(--fg-dim);
+}
+
+.inspector-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.inspector-picker-label {
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.inspector-date-popover {
+  z-index: 1200;
+  width: 268px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-highlight);
+  color: var(--fg);
+  box-shadow: 0 12px 32px var(--shadow-heavy);
+  font-family: var(--sans);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inspector-date-popover :focus-visible {
+  outline: 1px solid var(--accent-line);
+  outline-offset: 2px;
+}
+
+.inspector-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.inspector-cal-heading {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.inspector-cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.inspector-cal-nav:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+.inspector-cal-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.inspector-cal-nav .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.inspector-cal-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.inspector-cal-head-cell {
+  padding: 4px 0 6px;
+  text-align: center;
+  font-size: 0.78em;
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+
+.inspector-cal-cell {
+  padding: 1px 0;
+  text-align: center;
+}
+
+.inspector-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.inspector-cal-day:hover:not([data-disabled]):not([data-selected]) {
+  background: var(--bg-surface-hover);
+}
+
+.inspector-cal-day[data-outside-month] {
+  color: var(--fg-dimmest);
+}
+
+.inspector-cal-day[data-disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.inspector-cal-day[data-today]:not([data-selected]) {
+  color: var(--today);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--today) 45%, transparent);
+}
+
+.inspector-cal-day[data-selected] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.inspector-cal-day[data-range-middle] {
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-weight: 500;
+  border-radius: 0;
+}
+
+.inspector-cal-day[data-highlighted]:not([data-selected]) {
+  background: var(--accent-hover);
+  color: var(--fg);
+}
+
+.inspector-cal-day[data-selection-start] {
+  border-radius: 6px 0 0 6px;
+}
+
+.inspector-cal-day[data-selection-end] {
+  border-radius: 0 6px 6px 0;
+}
+
+.inspector-cal-day[data-selection-start][data-selection-end] {
+  border-radius: 6px;
+}
+
+.inspector-popover-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.inspector-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inspector-popover-label {
+  color: var(--fg-muted);
+  font-size: 0.9em;
+}
+
+.inspector-popover-time-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inspector-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.inspector-popover-hint {
+  color: var(--fg-dim);
+  font-size: 0.82em;
+}
+
+.inspector-popover-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.inspector-popover-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+}
+
+.inspector-popover-btn.is-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  padding: 4px 6px;
+}
+
+.inspector-popover-btn.is-ghost:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--fg);
+}
+
+.inspector-popover-btn.is-primary {
+  margin-left: auto;
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.inspector-popover-btn.is-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}

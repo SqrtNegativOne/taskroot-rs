@@ -1,8 +1,8 @@
 //! Calendar collection lifecycle: create, rename, recolour and delete lists.
 //!
-//! Every operation writes the server first, then mirrors the resulting
-//! collection list into the in-memory store and `account.json`, so a Refresh
-//! does not have to re-discover the list.
+//! Every operation writes the server first without holding the store lock, then
+//! mirrors the resulting collection list into the in-memory store and
+//! `account.json`, so a Refresh does not have to re-discover the list.
 
 use std::path::Path;
 
@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::features::calendar::domain::Color;
-use crate::features::calendar::store::Store;
+use crate::features::calendar::store::{Store, StoreState};
 
 use super::account;
 use super::client::CalDavClient;
@@ -26,7 +26,7 @@ use super::model::{CalendarComponent, CalendarInfo};
 pub async fn create(
     dir: &Path,
     client: &CalDavClient,
-    store: &mut Store,
+    state: &StoreState,
     display_name: &str,
     component: CalendarComponent,
 ) -> Result<(), AppError> {
@@ -41,7 +41,9 @@ pub async fn create(
 
     client.mkcalendar(&href, name, component).await?;
     let calendars = discovery::fetch_calendars(client, &account.home_href).await?;
-    replace_calendars(dir, client, store, calendars)
+    state
+        .write(|store| replace_calendars(dir, client, store, calendars))
+        .await
 }
 
 /// Rename a collection.
@@ -54,19 +56,24 @@ pub async fn create(
 pub async fn rename(
     dir: &Path,
     client: &CalDavClient,
-    store: &mut Store,
+    state: &StoreState,
     href: &str,
     display_name: &str,
 ) -> Result<(), AppError> {
     let name = require_name(display_name)?;
-    ensure_writable(store, href)?;
+    state.read(|store| ensure_writable(store, href)).await?;
 
     client.set_display_name(href, name).await?;
-    let mut calendars = store.calendars.clone();
-    if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
-        calendar.display_name = name.to_string();
-    }
-    replace_calendars(dir, client, store, calendars)
+    let name = name.to_string();
+    state
+        .write(|store| {
+            let mut calendars = store.calendars.clone();
+            if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
+                calendar.display_name = name;
+            }
+            replace_calendars(dir, client, store, calendars)
+        })
+        .await
 }
 
 /// Set (or clear, with `None`) a collection's colour.
@@ -79,21 +86,25 @@ pub async fn rename(
 pub async fn set_color(
     dir: &Path,
     client: &CalDavClient,
-    store: &mut Store,
+    state: &StoreState,
     href: &str,
     color: Option<String>,
 ) -> Result<(), AppError> {
-    ensure_writable(store, href)?;
+    state.read(|store| ensure_writable(store, href)).await?;
     if let Some(color) = color.as_deref() {
         Color::try_from(color.to_string()).map_err(AppError::InvalidInput)?;
     }
 
     client.set_calendar_color(href, color.as_deref()).await?;
-    let mut calendars = store.calendars.clone();
-    if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
-        calendar.color = color;
-    }
-    replace_calendars(dir, client, store, calendars)
+    state
+        .write(|store| {
+            let mut calendars = store.calendars.clone();
+            if let Some(calendar) = calendars.iter_mut().find(|calendar| calendar.href == href) {
+                calendar.color = color;
+            }
+            replace_calendars(dir, client, store, calendars)
+        })
+        .await
 }
 
 /// Delete a collection and every resource in it.
@@ -106,21 +117,24 @@ pub async fn set_color(
 pub async fn delete(
     dir: &Path,
     client: &CalDavClient,
-    store: &mut Store,
+    state: &StoreState,
     href: &str,
 ) -> Result<(), AppError> {
-    ensure_writable(store, href)?;
+    state.read(|store| ensure_writable(store, href)).await?;
 
     client.delete_collection(href).await?;
-    store.remove_collection_resources(href);
-    let calendars = store
-        .calendars
-        .iter()
-        .filter(|calendar| calendar.href != href)
-        .cloned()
-        .collect();
-    replace_calendars(dir, client, store, calendars)?;
-    Ok(())
+    state
+        .write(|store| {
+            store.remove_collection_resources(href);
+            let calendars = store
+                .calendars
+                .iter()
+                .filter(|calendar| calendar.href != href)
+                .cloned()
+                .collect();
+            replace_calendars(dir, client, store, calendars)
+        })
+        .await
 }
 
 fn require_name(display_name: &str) -> Result<&str, AppError> {

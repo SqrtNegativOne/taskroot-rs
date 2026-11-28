@@ -1,9 +1,16 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import TaskRow from './TaskRow.svelte';
     import TaskContextMenu from './TaskContextMenu.svelte';
     import ViewMenuButton from '../ViewMenuButton.svelte';
     import SearchBar from '../SearchBar.svelte';
-    import { calendarsForComponent, computeFilterDefaults, type AppTask } from '../../lib/domain';
+    import {
+        calendarsForComponent,
+        computeFilterDefaults,
+        type AppCalendar,
+        type AppTask,
+        type TaskPatch,
+    } from '../../lib/domain';
     import { taskListQueryArgs, taskListState } from '../../lib/taskList.svelte';
     import './tasklist.css';
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
@@ -11,6 +18,7 @@
     import { flip } from 'svelte/animate';
 
     let {
+        calendars: propCalendars,
         onUpdateTask,
         onDragStart,
         activeDragId,
@@ -22,7 +30,8 @@
         onStartTask,
         footer,
     }: {
-        onUpdateTask?: (task: AppTask) => void;
+        calendars?: AppCalendar[];
+        onUpdateTask?: (id: string, patches: TaskPatch[]) => void;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
         activeDragId?: string;
         onAddTask: (defaults?: Partial<AppTask>) => void;
@@ -36,9 +45,8 @@
 
     let query = $state('');
 
-    function updateTask(id: string, transform: (t: AppTask) => AppTask) {
-        const task = filtered.find((t) => t.id === id);
-        if (task) onUpdateTask?.(transform(task));
+    function updateTask(id: string, patches: TaskPatch[]) {
+        onUpdateTask?.(id, patches);
     }
 
     let contextMenu = $state<{ task: AppTask; x: number; y: number } | null>(null);
@@ -50,7 +58,10 @@
     let pastDueQuery = useAutoQuery(commands.getPastDueTaskIds);
     let pastDueTaskIds = $derived(new Set(pastDueQuery.data ?? []));
 
-    const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    const ownCalendarsQuery = untrack(() => propCalendars === undefined)
+        ? useAutoQuery(commands.getActiveCalendars)
+        : undefined;
+    let allCalendars = $derived(propCalendars ?? ownCalendarsQuery?.data ?? []);
 
     const TASK_QUERY_DEBOUNCE_MS = 150;
 
@@ -64,7 +75,7 @@
 
     function getFilterValues(colId: string): {label: string, value: string}[] {
         if (colId === 'remotecollectionid') {
-            return calendarsForComponent(calendarsQuery.data ?? [], 'VTODO')
+            return calendarsForComponent(allCalendars, 'VTODO')
                 .map(c => ({ label: c.summary || c.id, value: c.id }));
         }
         const col = schema.find(c => c.id === colId);

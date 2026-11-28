@@ -1,5 +1,3 @@
-# Taskroot agent guide
-
 Taskroot is a desktop task manager: Svelte 5 + SvelteKit SPA (TypeScript, Vite,
 Bun) wrapped by Tauri v2 (Rust). One active CalDAV profile is the source of
 truth; calendar data lives in an in-memory Rust store with immediate server
@@ -7,13 +5,13 @@ writes and no local calendar database, offline queue or background sync.
 
 ## Working rules
 
-- **Never screenshot the desktop/app or launch it for visual inspection.** Ask
+- **Don't screenshot the desktop/app or launch it for visual inspection.** Ask
   the user for screenshots or descriptions; rely on code, logs and non-visual
   checks.
 - **Keep docs current and non-redundant.** Put each detail in its single owning
   doc below and update links when architecture or structure changes.
 - **No migrations or legacy compatibility.** Single-user app with backups: change
-  the current schema/defaults directly; never add data migrations, legacy
+  the current schema/defaults directly; don't add data migrations, legacy
   fallbacks or localStorage seeding.
 - **Never hand-edit `src/lib/bindings/` or `docs/cli.md`.** Both are regenerated
   by `cargo nextest run` in `src-tauri/`; commit updated outputs with your change.

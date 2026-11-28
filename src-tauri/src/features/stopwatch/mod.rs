@@ -17,7 +17,7 @@ mod tauri;
 
 pub use feed::start as start_focus_feed;
 pub use state::{
-    StopwatchLabelSource, StopwatchManager, StopwatchPhase, StopwatchState,
+    StopwatchLabelSource, StopwatchManager, StopwatchPhase, StopwatchState, StopwatchTransition,
     LONG_BREAK_THRESHOLD_MS, MIN_WORK_FOR_BREAK_MS,
 };
 pub(crate) use tauri::with_manager;

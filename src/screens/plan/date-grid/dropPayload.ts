@@ -1,5 +1,13 @@
-import type { EventInstance } from '../../../lib/domain';
-import { addDays, dayDiff, MS_PER_MINUTE, parseLocalYmd, ymd } from '../../../lib/time';
+import type { EventInstance, TaskDateTiming } from '../../../lib/domain';
+import {
+    addDays,
+    dayDiff,
+    formatHhMm,
+    minutesSinceMidnight,
+    MS_PER_MINUTE,
+    parseLocalYmd,
+    ymd,
+} from '../../../lib/time';
 import { MINUTES_PER_DAY, clampDuration, snapPixels } from '../snapping';
 
 export const DEFAULT_DROP_DURATION_MINUTES = 60;
@@ -73,4 +81,23 @@ export function timelineDropPayload(
         endTime: new Date(start.getTime() + duration * MS_PER_MINUTE).toISOString(),
         isAllDay: false,
     };
+}
+
+/**
+ * Compute the updated `start` or `due` patch value when dropping a task date
+ * marker onto `targetDate`. Returns `undefined` when the marker already sits
+ * on that local day so the drop is a no-op.
+ */
+export function movedTaskDateValue(
+    timing: TaskDateTiming,
+    targetDate: string,
+): string | undefined {
+    if (!targetDate) return undefined;
+    if (timing.kind === 'allDay') {
+        return timing.date === targetDate ? undefined : targetDate;
+    }
+    const start = new Date(timing.start);
+    if (Number.isNaN(start.getTime())) return undefined;
+    if (ymd(start) === targetDate) return undefined;
+    return `${targetDate}T${formatHhMm(minutesSinceMidnight(start))}:00`;
 }

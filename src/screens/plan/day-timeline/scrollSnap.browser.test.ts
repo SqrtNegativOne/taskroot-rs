@@ -74,6 +74,11 @@ function makeScroller(options: {
         set: (value: number) => { scrollLeft = value; },
         configurable: true,
     });
+    scroller.scrollTo = ((arg?: ScrollToOptions | number) => {
+        if (typeof arg === 'object' && arg?.left !== undefined) {
+            scrollLeft = arg.left;
+        }
+    }) as typeof scroller.scrollTo;
     document.body.appendChild(scroller);
     return { scroller, columns };
 }
@@ -86,18 +91,21 @@ describe('snapDayScroll', () => {
         document.body.innerHTML = '';
     });
 
-    it('moves a sideways scroll that stopped between days onto the nearest boundary', () => {
+    it('smoothly moves a sideways scroll that stopped between days onto the nearest boundary', () => {
         const { scroller } = overflowing();
+        const scrollToSpy = vi.spyOn(scroller, 'scrollTo');
         scroller.scrollLeft = 130;
 
         snapDayScroll(scroller);
 
+        expect(scrollToSpy).toHaveBeenCalledWith({ left: 200, behavior: 'smooth' });
         expect(scroller.scrollLeft).toBe(200);
     });
 
     it('does not move a scroll that is already aligned', () => {
         const { scroller } = overflowing();
         scroller.scrollLeft = 200;
+        const scrollToSpy = vi.spyOn(scroller, 'scrollTo');
         const setter = vi.fn();
         Object.defineProperty(scroller, 'scrollLeft', {
             get: () => 200,
@@ -107,6 +115,7 @@ describe('snapDayScroll', () => {
 
         snapDayScroll(scroller);
 
+        expect(scrollToSpy).not.toHaveBeenCalled();
         expect(setter).not.toHaveBeenCalled();
     });
 
@@ -162,6 +171,58 @@ describe('attachDaySnap', () => {
         scroller.dispatchEvent(new Event('scrollend'));
 
         expect(scroller.scrollLeft).toBe(130);
+    });
+
+    it('suppresses re-snapping on its own completion scrollend until new user input arrives', () => {
+        const { scroller } = overflowing();
+        const scrollToSpy = vi.fn();
+        scroller.scrollTo = scrollToSpy;
+
+        const detach = attachDaySnap(scroller);
+        scroller.scrollLeft = 130;
+        scroller.dispatchEvent(new Event('scrollend'));
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+        // Even if the element lands slightly off-boundary, the snap's own scrollend does not loop.
+        scroller.scrollLeft = 198;
+        scroller.dispatchEvent(new Event('scrollend'));
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+        // A new user input gesture re-enables snapping.
+        scroller.dispatchEvent(new PointerEvent('pointerdown'));
+        scroller.scrollLeft = 130;
+        scroller.dispatchEvent(new Event('scrollend'));
+        expect(scrollToSpy).toHaveBeenCalledTimes(2);
+        detach();
+    });
+
+    it('defers snapping while wheel momentum events are still arriving so high-momentum scrolls do not bounce', () => {
+        vi.useFakeTimers();
+        const { scroller } = overflowing();
+        const scrollToSpy = vi.fn();
+        scroller.scrollTo = scrollToSpy;
+
+        const detach = attachDaySnap(scroller);
+        scroller.dispatchEvent(new WheelEvent('wheel'));
+        scroller.scrollLeft = 130;
+        scroller.dispatchEvent(new Event('scrollend'));
+
+        // Premature scrollend right after a wheel event does not immediately snap back.
+        expect(scrollToSpy).not.toHaveBeenCalled();
+
+        // Another momentum wheel event resets the settle window.
+        vi.advanceTimersByTime(100);
+        scroller.dispatchEvent(new WheelEvent('wheel'));
+        scroller.scrollLeft = 150;
+        scroller.dispatchEvent(new Event('scrollend'));
+        vi.advanceTimersByTime(100);
+        expect(scrollToSpy).not.toHaveBeenCalled();
+
+        // Once wheel momentum stays quiet for the full settle window, it snaps smoothly once.
+        vi.advanceTimersByTime(50);
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+        expect(scrollToSpy).toHaveBeenCalledWith({ left: 200, behavior: 'smooth' });
+        detach();
     });
 
     describe('on engines without scrollend', () => {

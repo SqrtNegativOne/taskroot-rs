@@ -47,6 +47,7 @@
     }
 
     function handleBlur() {
+        if (!editing) return;
         editing = false;
         if (localValue !== (value ?? '')) onchange(localValue);
     }

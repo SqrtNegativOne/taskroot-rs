@@ -1,7 +1,9 @@
 //! Plan-screen queries: tasks, raw events and render-ready event instances.
 
+use tauri_specta::Event;
+
 use crate::error::AppError;
-use crate::features::calendar::query;
+use crate::features::calendar::{ops, query};
 use crate::features::calendar::{
     expand_task_dates, query_event_instances as project_event_instances,
 };
@@ -9,7 +11,8 @@ use crate::features::calendar::{
     AppEvent, AppEventFilter, AppEventSort, AppTask, AppTaskFilter, AppTaskSort, FilterGroup,
     TaskDateInstance,
 };
-use crate::ipc::session::store_state;
+use crate::ipc::session::{client_for, store_state};
+use crate::ipc_events::StoreUpdated;
 
 /// # Errors
 ///
@@ -94,6 +97,26 @@ pub async fn list_tags(app: tauri::AppHandle) -> Result<Vec<String>, AppError> {
     Ok(state
         .read(crate::features::calendar::Store::tag_names)
         .await)
+}
+
+/// Rename one tag across every task and event in the store.
+///
+/// # Errors
+///
+/// Returns an error if the new name is invalid, any affected calendar is
+/// read-only, the account/store is unavailable, or a `CalDAV` write fails.
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_tag(
+    app: tauri::AppHandle,
+    from: String,
+    to: String,
+) -> Result<(), AppError> {
+    let client = client_for(&app).await?;
+    let state = store_state(&app)?;
+    ops::rename_tag(&state, &client, &from, &to).await?;
+    let _ = StoreUpdated.emit(&app);
+    Ok(())
 }
 
 /// Return task start/due markers inside a local date window.

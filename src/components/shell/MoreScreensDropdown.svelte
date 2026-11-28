@@ -3,6 +3,8 @@
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { Routes } from '$lib/routes';
+    import { useNow } from '$lib/useNow.svelte';
+    import { isWrapWindowOpen } from '../../screens/wrap/wrapWindow';
     import Icon from '../Icon.svelte';
 
     let dropdownOpen = $state(false);
@@ -18,6 +20,12 @@
 
     type Screen = keyof typeof STAGE_ROUTES;
     const SCREENS = Object.keys(STAGE_ROUTES) as Screen[];
+
+    const now = useNow(60_000);
+    let wrapOpen = $derived(isWrapWindowOpen(new Date(now.ms)));
+    let visibleScreens = $derived(
+        wrapOpen ? SCREENS : SCREENS.filter((screen) => screen !== 'wrap'),
+    );
 
     function handleOutsideClick(e: PointerEvent) {
         if (dropdownRef && e.target instanceof Node && !dropdownRef.contains(e.target)) {
@@ -48,7 +56,7 @@
     
     {#if dropdownOpen}
         <div class="dropdown-menu" style="position: absolute; top: 100%; left: 0; z-index: 1000; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 0; min-width: 120px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
-            {#each SCREENS as screen (screen)}
+            {#each visibleScreens as screen (screen)}
                 <button
                     class="dd-item"
                     onclick={() => navigate(screen)}

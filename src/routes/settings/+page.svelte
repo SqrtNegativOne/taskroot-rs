@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
 
-    import { commands, events, safeInvoke } from '$lib/safeInvoke.svelte';
+    import { commands, safeInvoke } from '$lib/safeInvoke.svelte';
 
     import SettingRow from './SettingRow.svelte';
     import AccountPanel from './AccountPanel.svelte';
@@ -67,7 +67,6 @@
                 saveError = 'Could not update the mini tracker window.';
             }
         }
-        void events.storeUpdated.emit();
         await loadSettings();
     }
 </script>

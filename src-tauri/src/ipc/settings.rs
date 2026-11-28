@@ -4,9 +4,11 @@
 //! store.
 
 use serde_json::Value;
+use tauri_specta::Event;
 
-use crate::ipc::session::store_state;
 use crate::error::AppError;
+use crate::ipc::session::store_state;
+use crate::ipc_events::SettingsUpdated;
 use crate::settings::{metadata, storage, AppSettings};
 
 /// The settings screen's tab/section/setting metadata, derived from the
@@ -42,7 +44,9 @@ pub async fn update_setting(
     value: Value,
 ) -> Result<(), AppError> {
     let state = store_state(&app)?;
-    storage::write_setting(&state, &key, &value).await
+    storage::write_setting(&state, &key, &value).await?;
+    let _ = SettingsUpdated.emit(&app);
+    Ok(())
 }
 
 /// Read per-component UI state (filters, sorts, view modes, pane sizes).

@@ -11,6 +11,7 @@
         onStop,
         onSetCustom,
         onToggleDone,
+        onAddTask,
     }: {
         tasks: AppTask[];
         activeTask?: AppTask;
@@ -19,15 +20,19 @@
         onStop: () => void;
         onSetCustom: (label: string) => void;
         onToggleDone: (task: AppTask) => void;
+        onAddTask: (title: string) => void;
     } = $props();
 
     let query = $state(untrack(() => customLabel ?? ''));
+    let trimmedQuery = $derived(query.trim());
 
     let visibleTasks = $derived.by(() => {
-        const needle = query.trim().toLowerCase();
+        const needle = trimmedQuery.toLowerCase();
         if (needle === '') return tasks;
         return tasks.filter((task) => task.title.toLowerCase().includes(needle));
     });
+
+    let showAddTask = $derived(trimmedQuery.length > 0 && visibleTasks.length <= 2);
 </script>
 
 <div
@@ -91,7 +96,7 @@
 
     <div class="menu-list">
         {#if visibleTasks.length === 0}
-            <p class="empty">{query.trim() === '' ? 'No tasks' : 'No matching tasks'}</p>
+            <p class="empty" class:compact={showAddTask}>{trimmedQuery === '' ? 'No tasks' : 'No matching tasks'}</p>
         {:else}
             <ul>
                 {#each visibleTasks as task (task.id)}
@@ -124,6 +129,20 @@
                     </li>
                 {/each}
             </ul>
+        {/if}
+        {#if showAddTask}
+            <div class="add-task-wrap">
+                <button
+                    type="button"
+                    class="add-task-button"
+                    onclick={() => onAddTask(trimmedQuery)}
+                    title={`Add task "${trimmedQuery}"`}
+                >
+                    <span class="add-task-icon material-symbols-outlined" aria-hidden="true">add</span>
+                    <span class="add-task-label">Add task</span>
+                    <span class="add-task-preview">“{trimmedQuery}”</span>
+                </button>
+            </div>
         {/if}
     </div>
 </div>

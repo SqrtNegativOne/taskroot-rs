@@ -237,7 +237,7 @@ pub fn parse_collections(xml: &str, home_href: &str) -> Result<Vec<CalendarInfo>
 ///
 /// # Errors
 ///
-/// Returns [`AppError::Sync`] for malformed XML.
+/// Returns [`AppError::Remote`] for malformed XML.
 pub fn parse_calendar_resources(
     xml: &str,
     collection_href: &str,
@@ -251,7 +251,7 @@ pub fn parse_calendar_resources(
         };
         let href = resolve_href(collection_href, &text(href));
         let props = successful_props(response);
-        let Some(calendar_data) = prop(&props, "calendar-data").map(text) else {
+        let Some(calendar_data) = prop(&props, "calendar-data").and_then(calendar_data_text) else {
             continue;
         };
         let etag = prop(&props, "getetag")
@@ -267,25 +267,72 @@ pub fn parse_calendar_resources(
     Ok(resources)
 }
 
+/// Inspect a `PROPPATCH` response body (`207 Multi-Status` or empty `200`/`204`)
+/// and surface inner `<propstat>` failures for `property`.
+///
+/// Servers such as Rustical may emit empty `404`/`409` `<propstat>` blocks
+/// alongside a `200 OK` block for the updated property; once `property` is found
+/// with a `2xx` status, spurious empty blocks are ignored.
+///
+/// # Errors
+///
+/// Returns [`AppError::Auth`], [`AppError::Conflict`], [`AppError::Gone`], or
+/// [`AppError::Remote`] when the XML is malformed or reports a non-`2xx` status.
+pub fn check_proppatch_response(xml: &str, property: &str) -> Result<(), AppError> {
+    if xml.trim().is_empty() {
+        return Ok(());
+    }
+    let document = parse_document(xml)?;
+    let mut fallback_failure: Option<u16> = None;
+
+    for response in response_nodes(&document) {
+        for propstat in propstat_nodes(response) {
+            let status = propstat_status_code(propstat);
+            let has_target = element(propstat, "prop")
+                .is_some_and(|prop_node| element(prop_node, property).is_some());
+            if has_target {
+                return check_propstat_status(status, property);
+            }
+            if let Some(code) = status.filter(|code| !(200..300).contains(code)) {
+                fallback_failure.get_or_insert(code);
+            }
+        }
+    }
+
+    if let Some(code) = fallback_failure {
+        return Err(map_propstat_error(code, property));
+    }
+    Ok(())
+}
+
 /// Resolve an href reported by the server to an absolute path on the server.
 ///
 /// Absolute URLs are reduced to their path, server-rooted paths pass through,
-/// and a bare relative href is joined onto `base_href` (the requested
-/// collection, which is treated as a directory when it ends with `/`).
+/// and a relative href (including `.` and `..` segments) is resolved against
+/// `base_href` (treated as a directory even without a trailing `/`).
 #[must_use]
 pub fn resolve_href(base_href: &str, href: &str) -> String {
     let href = href.trim();
     if let Some(path) = absolute_url_path(href) {
         return path;
     }
-    if href.starts_with('/') {
-        return href.to_string();
-    }
     let base_path = absolute_url_path(base_href).unwrap_or_else(|| base_href.trim().to_string());
-    if base_path.ends_with('/') {
-        return format!("{base_path}{href}");
+    let base_dir = if base_path.ends_with('/') {
+        base_path
+    } else {
+        format!("{base_path}/")
+    };
+    if let Ok(resolved) = Url::parse("http://caldav.invalid")
+        .and_then(|root| root.join(&base_dir))
+        .and_then(|base| base.join(href))
+    {
+        return resolved.path().to_string();
     }
-    format!("{base_path}/{href}")
+    if href.starts_with('/') {
+        href.to_string()
+    } else {
+        format!("{base_dir}{href}")
+    }
 }
 
 fn parse_document(xml: &str) -> Result<Document<'_>, AppError> {
@@ -301,20 +348,51 @@ fn response_nodes<'a, 'input>(
         .filter(|node| node.is_element() && node.tag_name().name() == "response")
 }
 
-fn successful_props<'a, 'input>(response: Node<'a, 'input>) -> Vec<Node<'a, 'input>> {
+fn propstat_nodes<'a, 'input>(
+    response: Node<'a, 'input>,
+) -> impl Iterator<Item = Node<'a, 'input>> + 'a {
     response
         .children()
         .filter(|child| child.is_element() && child.tag_name().name() == "propstat")
+}
+
+fn successful_props<'a, 'input>(response: Node<'a, 'input>) -> Vec<Node<'a, 'input>> {
+    propstat_nodes(response)
         .filter(|propstat| propstat_is_success(*propstat))
         .filter_map(|propstat| element(propstat, "prop"))
         .flat_map(|prop| prop.children().filter(Node::is_element))
         .collect()
 }
 
+fn propstat_status_code(propstat: Node<'_, '_>) -> Option<u16> {
+    element(propstat, "status").and_then(|node| status_code(&text(node)))
+}
+
 fn propstat_is_success(propstat: Node<'_, '_>) -> bool {
-    element(propstat, "status")
-        .map(text)
-        .is_some_and(|status| status_code(&status).is_some_and(|code| (200..300).contains(&code)))
+    propstat_status_code(propstat).is_some_and(|code| (200..300).contains(&code))
+}
+
+fn check_propstat_status(status: Option<u16>, property: &str) -> Result<(), AppError> {
+    match status {
+        Some(code) if (200..300).contains(&code) => Ok(()),
+        Some(code) => Err(map_propstat_error(code, property)),
+        None => Err(AppError::Remote(format!(
+            "CalDAV PROPPATCH response for `{property}` was missing a status"
+        ))),
+    }
+}
+
+fn map_propstat_error(status: u16, property: &str) -> AppError {
+    match status {
+        401 => AppError::Auth("The CalDAV server rejected the credentials (401)".to_string()),
+        412 => AppError::Conflict(format!(
+            "CalDAV PROPPATCH for `{property}` failed precondition (412)"
+        )),
+        410 => AppError::Gone(format!("CalDAV resource is gone (410) for `{property}`")),
+        other => AppError::Remote(format!(
+            "CalDAV PROPPATCH failed for `{property}` with status {other}"
+        )),
+    }
 }
 
 fn status_code(status: &str) -> Option<u16> {
@@ -334,8 +412,33 @@ fn prop<'a, 'input>(props: &[Node<'a, 'input>], name: &str) -> Option<Node<'a, '
         .find(|node| node.tag_name().name() == name)
 }
 
+fn raw_text(node: Node<'_, '_>) -> String {
+    let mut out = String::new();
+    for child in node.children().filter(Node::is_text) {
+        if let Some(chunk) = child.text() {
+            out.push_str(chunk);
+        }
+    }
+    out
+}
+
 fn text(node: Node<'_, '_>) -> String {
-    node.text().unwrap_or_default().trim().to_string()
+    raw_text(node).trim().to_string()
+}
+
+/// Extract `<calendar-data>` text, concatenating split text/CDATA nodes and
+/// restoring RFC 5545 CRLF line endings that XML 1.0 §2.11 normalizes to LF.
+fn calendar_data_text(node: Node<'_, '_>) -> Option<String> {
+    let raw = raw_text(node);
+    if raw.trim().is_empty() {
+        return None;
+    }
+    let normalized = raw
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join("\r\n");
+    Some(normalized)
 }
 
 fn href_child(node: Node<'_, '_>) -> Option<String> {
@@ -350,7 +453,9 @@ fn is_calendar(props: &[Node<'_, '_>]) -> bool {
 
 fn supported_components(props: &[Node<'_, '_>]) -> (bool, bool) {
     let Some(component_set) = prop(props, "supported-calendar-component-set") else {
-        return (false, false);
+        // RFC 4791 §5.2.3: omitting supported-calendar-component-set means the
+        // collection accepts all component types.
+        return (true, true);
     };
     let mut has_event = false;
     let mut has_task = false;

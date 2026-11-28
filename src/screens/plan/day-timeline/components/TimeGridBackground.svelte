@@ -1,12 +1,17 @@
 <script lang="ts">
-    import { MINUTES_IN_HOUR, PX_PER_MIN } from '../constants';
+    import { HOURS_PER_DAY, MINUTES_IN_HOUR, PX_PER_MIN } from '../constants';
+
+    let { startHour = 0 }: { startHour?: number } = $props();
+    let hours = $derived(
+        Array.from({ length: HOURS_PER_DAY - startHour }, (_, i) => startHour + i),
+    );
 </script>
 
-{#each Array.from({ length: 24 }) as _, h (h)}
+{#each hours as h (h)}
     <div
         class="day-hour"
         style="
-            top: {h * MINUTES_IN_HOUR * PX_PER_MIN}px;
+            top: {(h - startHour) * MINUTES_IN_HOUR * PX_PER_MIN}px;
             height: {MINUTES_IN_HOUR * PX_PER_MIN}px;
         "
     >

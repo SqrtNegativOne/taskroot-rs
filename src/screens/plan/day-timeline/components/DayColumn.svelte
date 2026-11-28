@@ -17,6 +17,7 @@
         date,
         today,
         laid,
+        startHour = 0,
         dragState,
         selectedEventId,
         onResizeEvent,
@@ -29,6 +30,7 @@
         date: Date;
         today: Date;
         laid: LaidEvent[];
+        startHour?: number;
         dragState?: DragState;
         selectedEventId?: string;
         onResizeEvent?: (event: EventInstance, startTime: string, endTime: string) => void;
@@ -39,6 +41,8 @@
         calendars?: AppCalendar[];
     } = $props();
 
+    let startMinute = $derived(startHour * MINUTES_IN_HOUR);
+    let visibleLaid = $derived(laid.filter((item) => item.endMins > startMinute));
     let isToday = $derived(sameDay(date, today));
     let cellDateStr = $derived(ymd(date));
     let readOnlyEventIds = $derived(
@@ -91,6 +95,13 @@
         createPreview = undefined;
     }
 
+    function pointerMinute(clientY: number, gridTop: number): number {
+        return Math.min(
+            MINUTES_PER_DAY,
+            Math.max(startMinute, startMinute + snapPixels(clientY - gridTop)),
+        );
+    }
+
     function onGridPointerDown(e: PointerEvent) {
         if (!(e.target instanceof Element)) return;
         if (e.target.closest('.day-event') || e.target.closest('.day-now')) return;
@@ -99,7 +110,7 @@
 
         if (!containerRef) return;
         const rect = containerRef.getBoundingClientRect();
-        const startMin = snapPixels(e.clientY - rect.top);
+        const startMin = pointerMinute(e.clientY, rect.top);
         let active = false;
 
         createBaseline = undefined;
@@ -108,13 +119,13 @@
         trackPointerGesture({
             onMove: (ev) => {
                 active = true;
-                const moveMin = snapPixels(ev.clientY - rect.top);
+                const moveMin = pointerMinute(ev.clientY, rect.top);
                 createPreview = previewRange(startMin, moveMin);
             },
             onEnd: (ev) => {
                 const baseline = laid;
                 const range = active
-                    ? previewRange(startMin, snapPixels(ev.clientY - rect.top))
+                    ? previewRange(startMin, pointerMinute(ev.clientY, rect.top))
                     : defaultCreateRange(startMin);
                 createPreview = range;
                 void finishCreate(range, baseline);
@@ -145,26 +156,28 @@
     bind:this={containerRef}
     style="
         position: relative;
-        height: {MINUTES_PER_DAY * PX_PER_MIN}px;
+        height: {(MINUTES_PER_DAY - startMinute) * PX_PER_MIN}px;
         border-right: 1px solid var(--border-soft);
     "
     data-drop-kind="day-time"
     data-drop-date={cellDateStr}
+    data-start-minute={startMinute}
     onpointerdown={onGridPointerDown}
 >
-    <TimeGridBackground />
+    <TimeGridBackground {startHour} />
     
     {#if isToday}
-        <CurrentTimeLine />
+        <CurrentTimeLine {startMinute} />
     {/if}
 
-    {#each laid as { event, startMins, endMins, lane, lanes } (event.occurrenceKey)}
+    {#each visibleLaid as { event, startMins, endMins, lane, lanes } (event.occurrenceKey)}
         <EventBlock
             {event}
             {startMins}
             {endMins}
             {lane}
             {lanes}
+            {startMinute}
             selected={event.id === selectedEventId}
             readOnly={readOnlyEventIds.has(event.id)}
             {calendars}
@@ -176,10 +189,10 @@
     {/each}
 
     {#if createPreview}
-        <CreationPreview preview={createPreview} />
+        <CreationPreview preview={createPreview} {startMinute} />
     {/if}
 
     {#if dropPreview?.minute !== undefined}
-        <DropPreview target={dropPreview} />
+        <DropPreview target={dropPreview} {startMinute} />
     {/if}
 </div>

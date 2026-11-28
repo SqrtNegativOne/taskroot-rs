@@ -1,8 +1,11 @@
 <script lang="ts">
     import type { SettingsSchemaItem, SettingValue } from './schema';
     import type { AppCalendar } from '../../lib/domain';
+    import { formatHhMm } from '../../lib/time';
     import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
     import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
+
+    const MAX_TIME_MINUTES = 23 * 60 + 59;
 
     interface Props {
         item: SettingsSchemaItem;
@@ -15,6 +18,26 @@
 
     function selectValue(): SettingValue | undefined {
         return value ?? item.defaultValue;
+    }
+
+    function minutesToTimeString(raw: SettingValue | undefined): string {
+        const mins = typeof raw === 'number' && Number.isFinite(raw) ? Math.round(raw) : 0;
+        const clamped = Math.min(MAX_TIME_MINUTES, Math.max(0, mins));
+        return formatHhMm(clamped);
+    }
+
+    function parseTimeMinutes(raw: string): number | undefined {
+        const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(raw);
+        if (!match) return undefined;
+        const hours = Number(match[1]);
+        const mins = Number(match[2]);
+        if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return undefined;
+        return hours * 60 + mins;
+    }
+
+    function handleTimeChange(raw: string): void {
+        const mins = parseTimeMinutes(raw);
+        if (mins !== undefined) onchange(mins);
     }
 
     function calendarComponent(id: string): AppCalendar['component'] | undefined {
@@ -98,10 +121,11 @@
             />
         {:else if item.type === 'time'}
             <input
-                type="number"
+                type="time"
                 id={item.id}
-                value={selectValue()}
-                oninput={(e) => onchange(Number(e.currentTarget.value))}
+                value={minutesToTimeString(selectValue())}
+                oninput={(e) => handleTimeChange(e.currentTarget.value)}
+                onchange={(e) => handleTimeChange(e.currentTarget.value)}
             />
         {:else if item.type === 'keybinding'}
             <KeybindingInput
@@ -145,6 +169,7 @@
 
     :global(input[type='text']),
     :global(input[type='number']),
+    :global(input[type='time']),
     select {
         padding: 6px 10px;
         border: 1px solid var(--border);

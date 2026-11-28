@@ -2,19 +2,19 @@
 :root,
 :root[data-theme='slate'] {
     color-scheme: dark;
-    --bg: #181e28;
-    --bg-highlight: #1d2531;
-    --bg-surface: #222b38;
-    --bg-surface-hover: #2b3646;
-    --bg-active: #344258;
-    --border: #3b4b61;
-    --border-soft: #2e3b4d;
-    --border-strong: #536880;
+    --bg: #11161f;
+    --bg-highlight: #151b26;
+    --bg-surface: #1a212e;
+    --bg-surface-hover: #222b3b;
+    --bg-active: #2a364a;
+    --border: #2e3b4f;
+    --border-soft: #222c3c;
+    --border-strong: #435570;
     --fg: #e3eaf4;
     --fg-muted: #a9b8cc;
     --fg-dim: #8195b1;
-    --fg-dimmer: #5d708c;
-    --fg-dimmest: #435672;
+    --fg-dimmer: #596d89;
+    --fg-dimmest: #3d4f6a;
     --accent: #8ab4f8;
     --tag-red: #ee8795;
     --tag-yellow: #d8bf85;

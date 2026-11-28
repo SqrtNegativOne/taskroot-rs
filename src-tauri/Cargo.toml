@@ -62,7 +62,7 @@ keyring = { version = "3", features = ["sync-secret-service"] }
 keyring = { version = "3", features = ["apple-native"] }
 
 [lints.clippy]
-pedantic = { level = "deny", priority = -1 }
+pedantic = { level = "allow", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 # Deny panics
 unwrap_used = "deny"

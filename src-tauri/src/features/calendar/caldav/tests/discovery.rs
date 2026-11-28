@@ -208,6 +208,108 @@ async fn bad_credentials_surface_as_auth() {
     assert_eq!(error.code(), "auth");
 }
 
+#[tokio::test]
+async fn discovery_falls_back_to_configured_subpath_when_well_known_fails() {
+    let (server, http) = start_http_server().await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/.well-known/caldav"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/radicale"))
+        .and(header("depth", "0"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(ROOT_PROPFIND))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/me/"))
+        .and(header("depth", "0"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(PRINCIPAL_PROPFIND))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/me/"))
+        .and(header("depth", "1"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(HOME_PROPFIND))
+        .mount(&server)
+        .await;
+
+    let subpath_url = format!("{}/radicale", server.uri());
+    let discovery = discover(&http, &subpath_url, "me", "secret").await.unwrap();
+
+    assert_eq!(discovery.server_url, subpath_url);
+    assert_eq!(discovery.principal_href, "/me/");
+    assert_eq!(discovery.calendars.len(), 2);
+}
+
+#[tokio::test]
+async fn discovery_resolves_chained_relative_redirects_against_previous_hop() {
+    let (server, http) = start_http_server().await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/.well-known/caldav"))
+        .respond_with(ResponseTemplate::new(301).insert_header("Location", "/dav/"))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/dav/"))
+        .respond_with(ResponseTemplate::new(302).insert_header("Location", "principals/"))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/dav/principals/"))
+        .and(header("depth", "0"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(ROOT_PROPFIND))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/me/"))
+        .and(header("depth", "0"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(PRINCIPAL_PROPFIND))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/me/"))
+        .and(header("depth", "1"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(HOME_PROPFIND))
+        .mount(&server)
+        .await;
+
+    let discovery = discover(&http, &server.uri(), "me", "secret")
+        .await
+        .unwrap();
+
+    assert_eq!(discovery.principal_href, "/me/");
+    assert_eq!(discovery.calendars.len(), 2);
+}
+
+#[tokio::test]
+async fn discovery_refuses_cross_origin_redirect_from_well_known() {
+    let (server, http) = start_http_server().await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/.well-known/caldav"))
+        .respond_with(
+            ResponseTemplate::new(301).insert_header("Location", "https://evil.example/dav/"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPFIND"))
+        .and(path("/"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let error = discover(&http, &server.uri(), "me", "secret")
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.code(), "remote");
+    assert!(
+        error.to_string().contains("different origin"),
+        "expected cross-origin rejection, got: {error}"
+    );
+}
+
 /// Requires the local Radicale at `http://127.0.0.1:5232` with the `me` user.
 /// Run with `cargo nextest run --run-ignored ignored-only` when applicable.
 #[tokio::test]

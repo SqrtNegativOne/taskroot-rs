@@ -15,9 +15,10 @@ use taskroot_lib::features::calendar::CalDavClient;
 use taskroot_lib::features::calendar::discovery;
 use taskroot_lib::features::calendar::HttpClient;
 use taskroot_lib::features::calendar::{
-    AppEvent, AppTask, AppTaskStatus, Color, EventId, EventScope, EventStatus, TaskId, TaskPriority,
+    AppEvent, AppTask, AppTaskStatus, Color, EventId, EventPatch, EventScope, EventStatus, TaskId,
+    TaskPatch, TaskPriority,
 };
-use taskroot_lib::features::calendar::{ops, Store};
+use taskroot_lib::features::calendar::{ops, Store, StoreState};
 
 struct Args {
     server: String,
@@ -35,6 +36,7 @@ fn e2e_task(task_id: &str) -> AppTask {
         parent_task: None,
         dependencies: None,
         est: Some(30),
+        time_spent: None,
         added: None,
         remote_id: None,
         remote_collection_id: None,
@@ -68,7 +70,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     store.calendars = discovered.calendars.clone();
     ops::full_load(&mut store, &client).await?;
     println!("loaded {} resources from Radicale", store.resources.len());
+    let state = StoreState::new(store);
 
+    exercise_event(&state, &client).await?;
+    exercise_task(&state, &client).await?;
+    preserve_apple_sort_order(&state, &client).await?;
+    restart_and_compare(&client, &dir, &discovered.calendars).await?;
+    println!("E2E OK");
+    Ok(())
+}
+
+async fn exercise_event(state: &StoreState, client: &CalDavClient) -> Result<(), Box<dyn Error>> {
     let event_id = format!("e2e-{}", uuid::Uuid::new_v4());
     let event = AppEvent {
         id: EventId::from(event_id.as_str()),
@@ -94,20 +106,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
         timezone: Some("Asia/Kolkata".to_string()),
     };
 
-    let mut event = ops::create_event(&mut store, &client, event).await?;
+    let event = ops::create_event(state, client, event).await?;
     let href = event
         .remote_id
         .as_deref()
         .ok_or("created event has no href")?
         .clone();
-    assert_exists(&client, &href).await?;
+    assert_exists(client, &href).await?;
     println!("created event {href}");
 
-    event.title = "Taskroot E2E event edited".to_string();
-    event.start_time = "2026-12-01T15:30:00".parse()?;
-    event.end_time = "2026-12-01T16:30:00".parse()?;
-    ops::update_event(&mut store, &client, event.clone()).await?;
-    let raw = fetch_one(&client, &href).await?;
+    ops::update_event(
+        state,
+        client,
+        event.id.as_str(),
+        &[
+            EventPatch::Title("Taskroot E2E event edited".to_string()),
+            EventPatch::StartTime("2026-12-01T15:30:00".parse()?),
+            EventPatch::EndTime("2026-12-01T16:30:00".parse()?),
+        ],
+    )
+    .await?;
+    let raw = fetch_one(client, &href).await?;
     ensure(
         raw.contains("SUMMARY:Taskroot E2E event edited"),
         "the edited summary did not reach the server",
@@ -118,26 +137,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )?;
     println!("edited and moved event");
 
-    ops::delete_event(&mut store, &client, event_id.as_str(), EventScope::All, None).await?;
-    assert_absent(&client, &href).await?;
+    ops::delete_event(state, client, event_id.as_str(), EventScope::All, None).await?;
+    assert_absent(client, &href).await?;
     println!("deleted event");
+    Ok(())
+}
 
+async fn exercise_task(state: &StoreState, client: &CalDavClient) -> Result<(), Box<dyn Error>> {
     let task_id = format!("e2e-{}", uuid::Uuid::new_v4());
-    let task = e2e_task(&task_id);
-    let mut task = ops::create_task(&mut store, &client, task).await?;
+    let task = ops::create_task(state, client, e2e_task(&task_id)).await?;
     let task_href = task
         .remote_id
         .as_deref()
         .ok_or("created task has no href")?
         .clone();
-    assert_exists(&client, &task_href).await?;
+    assert_exists(client, &task_href).await?;
     println!("created task {task_href}");
 
-    task.title = "Taskroot E2E task edited".to_string();
-    task.status = Some(AppTaskStatus::Done);
-    task.due = Some("2026-12-05".parse()?);
-    ops::update_task(&mut store, &client, task.clone()).await?;
-    let raw = fetch_one(&client, &task_href).await?;
+    ops::update_task(
+        state,
+        client,
+        task.id.as_str(),
+        &[
+            TaskPatch::Title("Taskroot E2E task edited".to_string()),
+            TaskPatch::Status(Some(AppTaskStatus::Done)),
+            TaskPatch::Due(Some("2026-12-05".parse()?)),
+        ],
+    )
+    .await?;
+    let raw = fetch_one(client, &task_href).await?;
     ensure(
         raw.contains("SUMMARY:Taskroot E2E task edited"),
         "the edited task summary did not reach the server",
@@ -152,22 +180,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )?;
     println!("edited and rescheduled task");
 
-    ops::delete_task(&mut store, &client, task_id.as_str()).await?;
-    assert_absent(&client, &task_href).await?;
+    ops::delete_task(state, client, task_id.as_str()).await?;
+    assert_absent(client, &task_href).await?;
     println!("deleted task");
-
-    preserve_apple_sort_order(&mut store, &client).await?;
-    restart_and_compare(&client, &dir, &discovered.calendars).await?;
-    println!("E2E OK");
     Ok(())
 }
 
 async fn preserve_apple_sort_order(
-    store: &mut Store,
+    state: &StoreState,
     client: &CalDavClient,
 ) -> Result<(), Box<dyn Error>> {
-    let mut task = store
-        .tasks()
+    let task = state
+        .read(Store::tasks)
+        .await
         .into_iter()
         .find(|task| task.title.eq_ignore_ascii_case("brush"))
         .ok_or("the tasks.org Brush fixture is missing from Radicale")?;
@@ -183,8 +208,13 @@ async fn preserve_apple_sort_order(
         "fixture has no sort order",
     )?;
 
-    task.title = format!("{original_title} (e2e)");
-    ops::update_task(store, client, task.clone()).await?;
+    ops::update_task(
+        state,
+        client,
+        task.id.as_str(),
+        &[TaskPatch::Title(format!("{original_title} (e2e)"))],
+    )
+    .await?;
     let after = fetch_one(client, &href).await?;
     ensure(
         after.contains("X-APPLE-SORT-ORDER:"),
@@ -195,8 +225,13 @@ async fn preserve_apple_sort_order(
         "the renamed summary did not reach the server",
     )?;
 
-    task.title = original_title;
-    ops::update_task(store, client, task).await?;
+    ops::update_task(
+        state,
+        client,
+        task.id.as_str(),
+        &[TaskPatch::Title(original_title)],
+    )
+    .await?;
     println!("X-APPLE-SORT-ORDER survives an app edit");
     Ok(())
 }

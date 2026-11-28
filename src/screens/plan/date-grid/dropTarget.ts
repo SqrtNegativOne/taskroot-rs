@@ -1,4 +1,4 @@
-import { snappedDropMinute } from './dropPayload';
+import { MINUTES_PER_DAY, snappedDropMinuteFrom } from '../snapping';
 import type { DragStateTarget } from '../day-timeline/types';
 
 /** Translate the element under the pointer into a drop target. */
@@ -13,8 +13,12 @@ export function targetFromElement(
     if (kind === 'grid-day') return { kind, date };
     if (kind !== 'day-time') return undefined;
 
+    const rawStart = Number(element.getAttribute('data-start-minute') ?? 0);
+    const startMinute = Number.isFinite(rawStart)
+        ? Math.min(MINUTES_PER_DAY, Math.max(0, rawStart))
+        : 0;
     const rect = element.getBoundingClientRect();
-    const minute = snappedDropMinute(clientY - rect.top, duration);
+    const minute = snappedDropMinuteFrom(clientY - rect.top, duration, startMinute);
     return { kind, date, minute, duration };
 }
 

@@ -7,7 +7,13 @@
     import { allTasks as allTasksQueryArgs } from '../../lib/queries';
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
-    import type { AppTask, AppTaskStatus } from '../../lib/domain';
+    import {
+        calendarsForComponent,
+        DEFAULT_TASK_PRIORITY,
+        isCalendarReadOnly,
+        type AppTask,
+        type AppTaskStatus,
+    } from '../../lib/domain';
     import TaskMenu from './TaskMenu.svelte';
     import {
         createMinitrackerController,
@@ -122,6 +128,20 @@
     let listQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(listQuery.data ?? []);
 
+    let calendarsQuery = useAutoQuery(commands.getActiveCalendars);
+    let calendars = $derived(calendarsQuery.data ?? []);
+
+    function resolveDefaultTaskCollection(): string | undefined {
+        const writable = calendarsForComponent(calendars, 'VTODO').filter(
+            (calendar) => !isCalendarReadOnly(calendar),
+        );
+        const preferred = store.settings?.default_task_list;
+        if (preferred !== undefined && writable.some((calendar) => calendar.id === preferred)) {
+            return preferred;
+        }
+        return writable[0]?.id;
+    }
+
     let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
 
     let currentMs = $derived(stopwatchState.currentMs);
@@ -168,7 +188,8 @@
 
     async function setTaskStatus(task: AppTask, status: AppTaskStatus): Promise<void> {
         if (task.status === status) return;
-        await store.mutate('Failed to update task status', () => store.updateTask({ ...task, status }));
+        await store.mutate('Failed to update task status', () =>
+            store.updateTask(task.id, [{ field: 'status', value: status }]));
     }
 
     async function stopClock(): Promise<void> {
@@ -182,6 +203,25 @@
 
         await controller.closeMenu();
         await stopwatchState.startTask(selected);
+    }
+
+    async function addAndTrackTask(title: string): Promise<void> {
+        const trimmed = title.trim();
+        if (trimmed === '') return;
+
+        const newTask: AppTask = {
+            id: crypto.randomUUID(),
+            title: trimmed,
+            status: 'todo',
+            priority: DEFAULT_TASK_PRIORITY,
+            remoteCollectionId: resolveDefaultTaskCollection(),
+        };
+
+        const result = await store.mutate('Failed to create task', () => store.addTask(newTask));
+        if (result.isOk()) {
+            await controller.closeMenu();
+            await stopwatchState.startTask(newTask);
+        }
     }
 
     async function setCustomLabel(text: string): Promise<void> {
@@ -385,6 +425,7 @@
             onStop={() => void stopWorking()}
             onSetCustom={(label) => void setCustomLabel(label)}
             onToggleDone={(task) => void toggleDone(task)}
+            onAddTask={(title) => void addAndTrackTask(title)}
         />
     {/if}
 </div>

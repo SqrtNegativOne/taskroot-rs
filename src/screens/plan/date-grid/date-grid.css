@@ -7,7 +7,7 @@
     padding: 0 16px 8px;
   }
   .cal-dow {
-    display: grid; grid-template-columns: repeat(7, 1fr);
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     border-bottom: 1px solid var(--border);
     padding-bottom: 4px;
   }
@@ -17,23 +17,38 @@
     letter-spacing: 0.08em;
     padding: 0 6px;
   }
+  .cal-cells-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
   .cal-cells {
     --day-pad-top: 4px;
     --day-hd-h: 20px;
     --span-h: 18px;
-    flex: 1; min-height: 0;
+    position: absolute;
+    inset: 0;
     display: flex; flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-anchor: none;
+    scrollbar-width: none;
     border-left: 1px solid var(--border-soft);
     border-top: 1px solid var(--border-soft);
   }
+  .cal-cells::-webkit-scrollbar { display: none; }
   .cal-cells.is-strip-1,
   .cal-cells.is-strip-3 { --day-pad-top: 6px; }
   .cal-week {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     position: relative;
+  }
+  .cal-cells.has-week-height .cal-week {
+    flex: 0 0 var(--week-height);
+    height: var(--week-height);
   }
 
   .day-cell {
@@ -41,8 +56,10 @@
     border-bottom: 1px solid var(--border-soft);
     padding: var(--day-pad-top, 4px) 6px;
     display: flex; flex-direction: column;
+    min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    /* clip avoids making cells wheel-swallowing scroll containers under overscroll-behavior: none. */
+    overflow: clip;
     position: relative;
     background: var(--bg);
     transition: background 80ms;
@@ -88,6 +105,21 @@
     font-size: 0.82em;
     color: var(--fg-muted);
     font-variant-numeric: tabular-nums;
+    transition: color 120ms ease;
+  }
+  .day-cell-month {
+    font-size: 0.76em;
+    color: var(--fg-dim);
+    letter-spacing: 0.02em;
+    transition: color 120ms ease;
+  }
+  .cal-cells.is-grid .day-cell:not(.is-today) .day-cell-num,
+  .cal-cells.is-grid .day-cell .day-cell-month {
+    color: var(--fg);
+  }
+  .cal-cells.is-grid .day-cell.is-out:not(.is-today) .day-cell-num,
+  .cal-cells.is-grid .day-cell.is-out .day-cell-month {
+    color: var(--fg-dimmer);
   }
   .day-cell-today-flag {
     font-size: 0.7em;
@@ -98,16 +130,18 @@
     display: flex; flex-direction: column;
     padding-top: calc(var(--span-lanes, 0) * var(--span-h, 18px));
     flex: 1;
+    min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow: clip;
   }
   .day-cell-events-scroll {
     position: relative;
     display: flex; flex-direction: column;
     gap: 2px;
     flex: 1;
+    min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow: clip;
   }
   .day-cell-chip-probe {
     position: absolute;
@@ -136,7 +170,7 @@
     line-height: var(--span-h, 18px);
     text-align: left;
     white-space: nowrap;
-    overflow: hidden;
+    overflow: clip;
     text-overflow: ellipsis;
     cursor: grab;
   }
@@ -175,7 +209,7 @@
     border-left: 2px solid var(--ev-color, var(--fg-dimmer));
     border-radius: 4px;
     background: var(--ev-bg, var(--bg-surface));
-    overflow: hidden;
+    overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;
     display: flex; gap: 4px;
@@ -194,8 +228,8 @@
   .day-cell-event.is-done { opacity: 0.45; text-decoration: line-through; }
   .day-cell-event.is-done .day-cell-event-title-text { text-decoration: line-through; }
   .day-cell-event-time { color: var(--ev-secondary, var(--on-event)); flex-shrink: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .day-cell-event-title { overflow: hidden; text-overflow: ellipsis; }
-  .day-cell-event-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .day-cell-event-title { overflow: clip; text-overflow: ellipsis; }
+  .day-cell-event-title-text { overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
   .day-cell .day-cell-events .task-circle { border-color: currentColor; opacity: 0.6; }
   .day-cell .day-cell-events .task-circle:hover { opacity: 1; }
   .day-cell-task {
@@ -207,21 +241,23 @@
     border-left: 2px solid var(--ev-color, var(--accent));
     border-radius: 4px;
     background: var(--ev-bg, color-mix(in srgb, var(--ev-color, var(--accent)) 16%, var(--bg-surface)));
-    overflow: hidden;
+    overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;
     display: flex;
     align-items: center;
     gap: 4px;
     flex-shrink: 0;
-    cursor: pointer;
+    cursor: grab;
   }
   .day-cell-task:hover { filter: brightness(1.3); }
+  .day-cell-task.is-readonly { opacity: 0.6; cursor: default; }
+  .day-cell-task.is-dragging { opacity: 0.4; }
   .day-cell-task.is-done { opacity: 0.45; text-decoration: line-through; }
   .day-cell-task.is-done .day-cell-task-title { text-decoration: line-through; }
   .day-cell-task.is-due { border-left-color: var(--p0); }
   .day-cell-task-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ev-secondary, var(--fg-dim)); }
-  .day-cell-task-title { overflow: hidden; text-overflow: ellipsis; }
+  .day-cell-task-title { overflow: clip; text-overflow: ellipsis; }
   .day-cell-more {
     font-family: var(--sans);
     font-size: 0.72em;
@@ -230,7 +266,7 @@
     color: var(--fg-dim);
     background: var(--bg-surface);
     border-radius: 4px;
-    overflow: hidden;
+    overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;
     flex-shrink: 0;

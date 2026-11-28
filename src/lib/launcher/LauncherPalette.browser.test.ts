@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
-import { emptyFilterGroup, filterGroup } from '../domain';
+import { emptyFilterGroup, filterGroup, type AppCalendar } from '../domain';
 import { ymd } from '../time';
 import LauncherPalette from './LauncherPalette.svelte';
 
@@ -12,37 +12,10 @@ vi.mock('@tauri-apps/api/core', async () => {
 
 const tauri = mockTauriInvoke();
 
-interface PreviewOverrides {
-    title?: string;
-    due?: string | null;
-    hasTime?: boolean;
-    tags?: string[];
-    priority?: number | null;
-    estimateMinutes?: number | null;
-    list?: {
-        id: string;
-        summary: string;
-        writable: boolean;
-        component: 'VEVENT' | 'VTODO';
-    } | null;
-    listQuery?: string | null;
-    listError?: string | null;
-}
-
-function makePreview(overrides: PreviewOverrides = {}) {
-    return {
-        title: 'Buy milk',
-        due: null,
-        hasTime: false,
-        tags: [],
-        priority: null,
-        estimateMinutes: null,
-        list: null,
-        listQuery: null,
-        listError: null,
-        ...overrides,
-    };
-}
+const TASK_CALENDARS: AppCalendar[] = [
+    { id: '/tasks/', summary: 'Tasks', writable: true, component: 'VTODO' },
+    { id: '/events/', summary: 'Events', writable: true, component: 'VEVENT' },
+];
 
 function callFor(command: string) {
     return tauri.invoke.mock.calls.find(([name]) => name === command);
@@ -57,6 +30,7 @@ async function type(value: string): Promise<HTMLElement> {
 describe('LauncherPalette', () => {
     beforeEach(() => {
         tauri.reset();
+        tauri.stubCommandValue('get_active_calendars', TASK_CALENDARS);
         tauri.stubCommandValue('query_event_instances', []);
         tauri.stubCommandValue('query_tasks', []);
     });
@@ -83,39 +57,28 @@ describe('LauncherPalette', () => {
         );
     });
 
-    it('parses typed text and previews the captured task', async () => {
-        tauri.stubCommandValue('parse_quick_capture', makePreview());
+    it('parses typed text synchronously on the client and previews the captured task', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 10, 19, 10, 0, 0));
+
         render(LauncherPalette);
+        await waitFor(() => expect(callFor('get_active_calendars')).toBeDefined());
 
-        await type('buy milk');
+        await type('Buy milk tomorrow at 9:30am #errands p2 ^30m +tasks');
 
-        await waitFor(() => {
-            expect(callFor('parse_quick_capture')?.[1]).toEqual({ text: 'buy milk' });
-        });
-        expect(await screen.findByText('Buy milk')).not.toBeNull();
+        expect(screen.getByText('Buy milk')).not.toBeNull();
+        expect(screen.getByText('Tomorrow 09:30 · #errands · P3 · 30 min · Tasks')).not.toBeNull();
+        expect(callFor('parse_quick_capture')).toBeUndefined();
     });
 
     it('creates the previewed task with its due, tags, priority, estimate, list and zone', async () => {
-        tauri.stubCommandValue(
-            'parse_quick_capture',
-            makePreview({
-                due: '2026-11-20T09:30:00',
-                hasTime: true,
-                tags: ['work', 'urgent'],
-                priority: 2,
-                estimateMinutes: 45,
-                list: {
-                    id: '/tasks/',
-                    summary: 'Tasks',
-                    writable: true,
-                    component: 'VTODO',
-                },
-                listQuery: '+tasks',
-            }),
-        );
-        render(LauncherPalette);
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 10, 19, 10, 0, 0));
 
-        const input = await type('buy milk');
+        render(LauncherPalette);
+        await waitFor(() => expect(callFor('get_active_calendars')).toBeDefined());
+
+        const input = await type('Buy milk tomorrow at 9:30am #work #urgent p3 ^45m +tasks');
         await screen.findByText('Buy milk');
         await fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -136,17 +99,13 @@ describe('LauncherPalette', () => {
     });
 
     it('does not create a task when the preview reports a list error', async () => {
-        tauri.stubCommandValue(
-            'parse_quick_capture',
-            makePreview({ listError: 'No writable task list' }),
-        );
         render(LauncherPalette);
+        await waitFor(() => expect(callFor('get_active_calendars')).toBeDefined());
 
-        const input = await type('buy milk');
-        await screen.findByText('No writable task list');
+        const input = await type('Buy milk +missing');
+        await screen.findByText('Unknown task list "missing"');
         await fireEvent.keyDown(input, { key: 'Enter' });
 
-        await waitFor(() => expect(callFor('parse_quick_capture')).toBeDefined());
         expect(callFor('create_task')).toBeUndefined();
     });
 

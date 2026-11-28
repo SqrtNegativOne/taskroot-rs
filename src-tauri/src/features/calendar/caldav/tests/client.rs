@@ -108,6 +108,69 @@ async fn clearing_a_collection_colour_removes_the_property() {
 }
 
 #[tokio::test]
+async fn proppatch_failure_inside_multistatus_surfaces_as_error() {
+    let (server, client) = start_server().await;
+    let forbidden_body = r#"<?xml version="1.0" encoding="utf-8"?>
+<multistatus xmlns="DAV:">
+  <response>
+    <href>/me/readonly/</href>
+    <propstat>
+      <prop><displayname/></prop>
+      <status>HTTP/1.1 403 Forbidden</status>
+    </propstat>
+  </response>
+</multistatus>"#;
+    Mock::given(method("PROPPATCH"))
+        .and(path("/me/readonly/"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(forbidden_body))
+        .mount(&server)
+        .await;
+
+    let error = client
+        .set_display_name("/me/readonly/", "Blocked")
+        .await
+        .expect_err("a 403 propstat inside 207 must not succeed silently");
+
+    assert_eq!(error.code(), "remote");
+    assert!(error.to_string().contains("403"), "was: {error}");
+}
+
+#[tokio::test]
+async fn proppatch_ignores_spurious_empty_error_propstats_when_target_succeeded() {
+    // Stolen from libdav SetProperty::test_parse_response_ignores_spurious_propstats (Rustical quirk)
+    // and Cyrus wrong-namespace quirk.
+    let (server, client) = start_server().await;
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<multistatus xmlns="DAV:" xmlns:X="http://wrong.namespace/">
+  <response>
+    <href>/me/imported/</href>
+    <propstat>
+      <prop><X:calendar-color>#ff0000</X:calendar-color></prop>
+      <status>HTTP/1.1 200 OK</status>
+    </propstat>
+    <propstat>
+      <prop></prop>
+      <status>HTTP/1.1 404 Not Found</status>
+    </propstat>
+    <propstat>
+      <prop></prop>
+      <status>HTTP/1.1 409 Conflict</status>
+    </propstat>
+  </response>
+</multistatus>"#;
+    Mock::given(method("PROPPATCH"))
+        .and(path("/me/imported/"))
+        .respond_with(ResponseTemplate::new(207).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    client
+        .set_calendar_color("/me/imported/", Some("#ff0000"))
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn deleting_a_collection_sends_delete_and_accepts_404() {
     let (server, client) = start_server().await;
     Mock::given(method("DELETE"))

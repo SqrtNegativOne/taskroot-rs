@@ -3,9 +3,11 @@
 use super::model::Store;
 use super::persist;
 use super::query;
+use super::state::StoreState;
 use crate::features::calendar::domain::FilterGroup;
 use crate::features::calendar::domain::{
-    AppTask, AppTaskFilter, AppTaskFilterColumn, EventScope, FilterOperator, TaskId, TaskPriority,
+    AppTask, AppTaskFilter, AppTaskFilterColumn, EventPatch, EventScope, FilterOperator, TaskId,
+    TaskPatch, TaskPriority,
 };
 use serde_json::json;
 
@@ -215,10 +217,10 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(series());
+    let state = StoreState::new(store_with_series(series()));
 
     ops::delete_event(
-        &mut store,
+        &state,
         &client,
         "series",
         EventScope::This,
@@ -227,7 +229,14 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
     .await
     .unwrap();
 
-    let raw = series_raw(&store);
+    let (raw, starts) = state
+        .read(|store| {
+            (
+                series_raw(store).to_string(),
+                occurrence_starts(store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+            )
+        })
+        .await;
     assert!(
         raw.contains("EXDATE;TZID=Asia/Kolkata:20261026T110000"),
         "the occurrence must be excluded in the event's zone: {raw}"
@@ -237,7 +246,7 @@ async fn deleting_one_occurrence_excludes_it_and_keeps_the_rule() {
         "the rule is untouched: {raw}"
     );
     assert_eq!(
-        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        starts,
         vec!["2026-10-19T11:00:00", "2026-11-02T11:00:00"],
         "only the excluded occurrence disappears"
     );
@@ -248,10 +257,10 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(&with_exception(series()));
+    let state = StoreState::new(store_with_series(&with_exception(series())));
 
     ops::delete_event(
-        &mut store,
+        &state,
         &client,
         "series",
         EventScope::Following,
@@ -260,7 +269,14 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
     .await
     .unwrap();
 
-    let raw = series_raw(&store);
+    let (raw, starts) = state
+        .read(|store| {
+            (
+                series_raw(store).to_string(),
+                occurrence_starts(store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+            )
+        })
+        .await;
     assert!(
         raw.contains("UNTIL=20261026T052959Z"),
         "the rule ends one second before 11:00 IST: {raw}"
@@ -269,10 +285,7 @@ async fn deleting_this_and_following_truncates_the_rule_and_drops_later_exceptio
         !raw.contains("RECURRENCE-ID"),
         "an exception after the cutoff must not survive: {raw}"
     );
-    assert_eq!(
-        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
-        vec!["2026-10-19T11:00:00"]
-    );
+    assert_eq!(starts, vec!["2026-10-19T11:00:00"]);
 }
 
 #[tokio::test]
@@ -280,10 +293,10 @@ async fn deleting_all_removes_the_whole_resource_when_an_exception_was_selected(
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(&with_exception(series()));
+    let state = StoreState::new(store_with_series(&with_exception(series())));
 
     ops::delete_event(
-        &mut store,
+        &state,
         &client,
         "series@2026-11-02T11:00:00",
         EventScope::All,
@@ -292,7 +305,10 @@ async fn deleting_all_removes_the_whole_resource_when_an_exception_was_selected(
     .await
     .unwrap();
 
-    assert!(store.resources.is_empty(), "the series resource is gone");
+    assert!(
+        state.read(|store| store.resources.is_empty()).await,
+        "the series resource is gone"
+    );
 }
 
 #[tokio::test]
@@ -300,10 +316,10 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(series());
+    let state = StoreState::new(store_with_series(series()));
 
     ops::reschedule_event(
-        &mut store,
+        &state,
         &client,
         ops::Reschedule {
             id: "series".to_string(),
@@ -317,7 +333,14 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
     .await
     .unwrap();
 
-    let raw = series_raw(&store);
+    let (raw, starts) = state
+        .read(|store| {
+            (
+                series_raw(store).to_string(),
+                timed_starts(store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+            )
+        })
+        .await;
     assert!(
         raw.contains("RECURRENCE-ID;TZID=Asia/Kolkata:20261026T110000"),
         "the moved occurrence becomes an exception: {raw}"
@@ -328,7 +351,7 @@ async fn rescheduling_one_occurrence_writes_an_exception_and_leaves_the_series()
     );
     assert!(raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T110000"));
     assert_eq!(
-        timed_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        starts,
         vec![
             "2026-10-19T05:30:00+00:00",
             "2026-10-26T08:30:00+00:00",
@@ -343,10 +366,10 @@ async fn rescheduling_the_series_moves_the_master() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(series());
+    let state = StoreState::new(store_with_series(series()));
 
     ops::reschedule_event(
-        &mut store,
+        &state,
         &client,
         ops::Reschedule {
             id: "series".to_string(),
@@ -360,14 +383,21 @@ async fn rescheduling_the_series_moves_the_master() {
     .await
     .unwrap();
 
-    let raw = series_raw(&store);
+    let (raw, starts) = state
+        .read(|store| {
+            (
+                series_raw(store).to_string(),
+                occurrence_starts(store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+            )
+        })
+        .await;
     assert!(
         raw.contains("DTSTART;TZID=Asia/Kolkata:20261019T150000"),
         "{raw}"
     );
     assert!(raw.contains("RRULE:FREQ=WEEKLY"), "{raw}");
     assert_eq!(
-        occurrence_starts(&store, OCTOBER_RANGE.0, OCTOBER_RANGE.1),
+        starts,
         vec![
             "2026-10-19T15:00:00",
             "2026-10-26T15:00:00",
@@ -381,10 +411,10 @@ async fn moving_a_series_from_one_occurrence_is_refused() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(series());
+    let state = StoreState::new(store_with_series(series()));
 
     let error = ops::reschedule_event(
-        &mut store,
+        &state,
         &client,
         ops::Reschedule {
             id: "series".to_string(),
@@ -406,10 +436,10 @@ async fn deleting_this_on_a_non_recurring_event_deletes_it() {
     use super::ops;
 
     let (_server, client) = editing_server().await;
-    let mut store = store_with_series(all_day());
+    let state = StoreState::new(store_with_series(all_day()));
 
     ops::delete_event(
-        &mut store,
+        &state,
         &client,
         "dsh-20261017-first-day-of-durga@dsh-import",
         EventScope::This,
@@ -419,7 +449,7 @@ async fn deleting_this_on_a_non_recurring_event_deletes_it() {
     .unwrap();
 
     assert!(
-        store.resources.is_empty(),
+        state.read(|store| store.resources.is_empty()).await,
         "a one-off event has no occurrence to except; it is removed outright"
     );
 }
@@ -434,6 +464,7 @@ fn task(id: &str, title: &str, priority: TaskPriority) -> AppTask {
         parent_task: None,
         dependencies: None,
         est: None,
+        time_spent: None,
         added: None,
         remote_id: None,
         remote_collection_id: None,
@@ -636,12 +667,16 @@ async fn conflict_retry_revalidates_recurring_task_completion_against_refetched_
     store
         .set_resource(TASK_HREF, "/cal/tasks/", Some("\"v1\""), INITIAL)
         .unwrap();
-    let mut updated = store.task("t1").unwrap().clone();
-    updated.status = Some(AppTaskStatus::Done);
+    let state = StoreState::new(store);
 
-    let error = ops::update_task(&mut store, &client, updated)
-        .await
-        .expect_err("a remotely added RRULE must block completion on retry");
+    let error = ops::update_task(
+        &state,
+        &client,
+        "t1",
+        &[TaskPatch::Status(Some(AppTaskStatus::Done))],
+    )
+    .await
+    .expect_err("a remotely added RRULE must block completion on retry");
     assert_eq!(error.code(), "invalid-input");
 }
 
@@ -665,39 +700,50 @@ async fn read_only_source_collections_reject_deletes_and_moves_before_network_io
     store
         .set_resource("/cal/ro-events/ev.ics", "/cal/ro-events/", Some("\"e\""), all_day())
         .unwrap();
-
-    assert_eq!(
-        ops::delete_task(&mut store, &client, "ro-task")
-            .await
-            .unwrap_err()
-            .code(),
-        "invalid-input"
-    );
-    let mut moved_task = store.task("ro-task").unwrap().clone();
-    moved_task.remote_collection_id = Some(CollectionId::from("/cal/tasks/"));
-    assert_eq!(
-        ops::update_task(&mut store, &client, moved_task)
-            .await
-            .unwrap_err()
-            .code(),
-        "invalid-input"
-    );
-
     let event_id = store.events().first().unwrap().id.to_string();
+    let state = StoreState::new(store);
+
     assert_eq!(
-        ops::delete_event(&mut store, &client, &event_id, EventScope::All, None)
+        ops::delete_task(&state, &client, "ro-task")
             .await
             .unwrap_err()
             .code(),
         "invalid-input"
     );
-    let mut moved_event = store.event(&event_id).unwrap().clone();
-    moved_event.remote_collection_id = Some(CollectionId::from("/cal/events/"));
     assert_eq!(
-        ops::update_event(&mut store, &client, moved_event)
+        ops::update_task(
+            &state,
+            &client,
+            "ro-task",
+            &[TaskPatch::RemoteCollectionId(Some(CollectionId::from(
+                "/cal/tasks/"
+            )))],
+        )
+        .await
+        .unwrap_err()
+        .code(),
+        "invalid-input"
+    );
+
+    assert_eq!(
+        ops::delete_event(&state, &client, &event_id, EventScope::All, None)
             .await
             .unwrap_err()
             .code(),
+        "invalid-input"
+    );
+    assert_eq!(
+        ops::update_event(
+            &state,
+            &client,
+            &event_id,
+            &[EventPatch::RemoteCollectionId(Some(CollectionId::from(
+                "/cal/events/"
+            )))],
+        )
+        .await
+        .unwrap_err()
+        .code(),
         "invalid-input"
     );
 }
@@ -718,17 +764,18 @@ async fn collection_mutations_bump_store_revision() {
         .mount(&server)
         .await;
 
-    let mut store = store_with_calendars();
+    let store = store_with_calendars();
     let dir = store.data_dir.clone();
-    let before_rename = store.revision();
-    calendars::rename(&dir, &client, &mut store, "/cal/tasks/", "Renamed")
+    let state = StoreState::new(store);
+    let before_rename = state.read(Store::revision).await;
+    calendars::rename(&dir, &client, &state, "/cal/tasks/", "Renamed")
         .await
         .unwrap();
-    let after_rename = store.revision();
+    let after_rename = state.read(Store::revision).await;
     assert_ne!(after_rename, before_rename);
 
-    calendars::delete(&dir, &client, &mut store, "/cal/tasks/")
+    calendars::delete(&dir, &client, &state, "/cal/tasks/")
         .await
         .unwrap();
-    assert_ne!(store.revision(), after_rename);
+    assert_ne!(state.read(Store::revision).await, after_rename);
 }

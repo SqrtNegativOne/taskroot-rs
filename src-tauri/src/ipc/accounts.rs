@@ -94,7 +94,7 @@ pub async fn connect_account(
     let account = service(&app)?
         .connect(&state, &server_url, &username, &password)
         .await?;
-    changed(&app, true);
+    changed(&app, true).await;
     Ok(account.into())
 }
 
@@ -109,7 +109,7 @@ pub async fn switch_account(app: AppHandle, account_id: String) -> Result<(), Ap
     accounts.activate(&state, &account_id).await?;
     // Re-emit even when the id is unchanged: the fetch refreshes data, and the
     // frontend treats this event as "resources may have changed".
-    changed(&app, previous.as_deref() != Some(&account_id));
+    changed(&app, previous.as_deref() != Some(&account_id)).await;
     Ok(())
 }
 
@@ -121,7 +121,7 @@ pub async fn switch_account(app: AppHandle, account_id: String) -> Result<(), Ap
 pub async fn disconnect_account(app: AppHandle) -> Result<(), AppError> {
     let state = super::session::store_state(&app)?;
     service(&app)?.disconnect(&state).await?;
-    changed(&app, true);
+    changed(&app, true).await;
     Ok(())
 }
 
@@ -134,13 +134,13 @@ pub async fn remove_account(app: AppHandle, account_id: String) -> Result<(), Ap
     let was_active = accounts.registry().await?.active_id.as_deref() == Some(&account_id);
     let state = super::session::store_state(&app)?;
     accounts.remove(&state, &account_id).await?;
-    changed(&app, was_active);
+    changed(&app, was_active).await;
     Ok(())
 }
 
-fn changed(app: &AppHandle, clear_focus: bool) {
+async fn changed(app: &AppHandle, clear_focus: bool) {
     if clear_focus {
-        super::stopwatch::clear_account_focus(app);
+        super::stopwatch::clear_account_focus(app).await;
         let _ = AccountChanged.emit(app);
     }
     let _ = StoreUpdated.emit(app);

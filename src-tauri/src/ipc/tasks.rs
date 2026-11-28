@@ -4,15 +4,16 @@ use crate::error::AppError;
 use crate::features::calendar as domain;
 use crate::features::calendar::ops;
 use crate::ipc::session::{client_for, store_state};
-use crate::ipc_events::StopwatchUpdated;
+use crate::ipc_events::{StopwatchUpdated, StoreUpdated};
 
-fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
-    let Ok(Some(updated)) =
+async fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
+    let Ok(Some(transition)) =
         crate::features::stopwatch::with_manager(app, |manager| manager.clear_task_if(task_id))
     else {
         return;
     };
-    let _ = StopwatchUpdated(updated).emit(app);
+    let _ = StopwatchUpdated(transition.state).emit(app);
+    super::stopwatch::credit_time_spent(app, transition.entries).await;
 }
 
 #[tauri::command]
@@ -31,8 +32,8 @@ pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
 pub async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::create_task(&mut store, &client, task).await?;
+    ops::create_task(&state, &client, task).await?;
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 
@@ -41,17 +42,19 @@ pub async fn create_task(app: tauri::AppHandle, task: domain::AppTask) -> Result
 /// Returns an error when the task is missing or the `CalDAV` write fails.
 #[tauri::command]
 #[specta::specta]
-pub async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result<(), AppError> {
-    let task_id = task.id.0.clone();
-    let completed = task.status == Some(domain::AppTaskStatus::Done);
+pub async fn update_task(
+    app: tauri::AppHandle,
+    id: String,
+    patches: Vec<domain::TaskPatch>,
+) -> Result<(), AppError> {
+    let completed = domain::patches_mark_task_done(&patches);
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::update_task(&mut store, &client, task).await?;
-    drop(store);
+    ops::update_task(&state, &client, &id, &patches).await?;
     if completed {
-        clear_focus(&app, &task_id);
+        clear_focus(&app, &id).await;
     }
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 
@@ -63,25 +66,24 @@ pub async fn update_task(app: tauri::AppHandle, task: domain::AppTask) -> Result
 pub async fn toggle_task(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    let mut task = store
-        .task(&id)
-        .cloned()
+    let current_status = state
+        .read(|store| store.task(&id).map(|task| task.status.clone()))
+        .await
         .ok_or_else(|| AppError::NotFound(format!("task {id}")))?;
 
-    let new_status = if task.status == Some(domain::AppTaskStatus::Done) {
+    let new_status = if current_status == Some(domain::AppTaskStatus::Done) {
         domain::AppTaskStatus::Todo
     } else {
         domain::AppTaskStatus::Done
     };
     let completed = new_status == domain::AppTaskStatus::Done;
-    task.status = Some(new_status);
+    let patches = [domain::TaskPatch::Status(Some(new_status))];
 
-    ops::update_task(&mut store, &client, task).await?;
-    drop(store);
+    ops::update_task(&state, &client, &id, &patches).await?;
     if completed {
-        clear_focus(&app, &id);
+        clear_focus(&app, &id).await;
     }
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 
@@ -93,10 +95,9 @@ pub async fn toggle_task(app: tauri::AppHandle, id: String) -> Result<(), AppErr
 pub async fn delete_task(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::delete_task(&mut store, &client, &id).await?;
-    drop(store);
-    clear_focus(&app, &id);
+    ops::delete_task(&state, &client, &id).await?;
+    clear_focus(&app, &id).await;
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 

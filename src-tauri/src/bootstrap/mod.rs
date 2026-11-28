@@ -87,7 +87,13 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let http = calendar::HttpClient::new()?;
     let handle = app.handle().clone();
 
-    platform::build_tray(app)?;
+    platform::build_tray(app, |app| {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            ipc::stopwatch::flush_and_credit_on_exit(&app).await;
+            platform::quit_app(&app);
+        });
+    })?;
 
     let data_dir = platform::app_data_dir(&handle)?;
     app.manage(stopwatch::StopwatchManager::load(&data_dir));

@@ -70,8 +70,8 @@ for (const scheme of ['slate', 'ember']) {
         expect(contrast(colours.muted, colours.surface)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(colours.onAccent, colours.accent)).toBeGreaterThanOrEqual(4.5);
         if (scheme === 'slate') {
-            expect(luminance(colours.surface)).toBeGreaterThan(0.02);
-            expect(luminance(colours.surface)).toBeLessThan(0.08);
+            expect(luminance(colours.surface)).toBeGreaterThan(0.01);
+            expect(luminance(colours.surface)).toBeLessThan(0.022);
             expect(colours.accent[2]).toBeGreaterThan(colours.accent[0]);
         }
     });

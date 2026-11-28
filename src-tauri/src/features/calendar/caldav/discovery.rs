@@ -227,28 +227,48 @@ pub async fn refresh_collections(
 async fn discover_principal(client: &CalDavClient) -> Result<String, AppError> {
     match principal_from_well_known(client).await {
         Ok(principal) => Ok(principal),
-        // Bad credentials will fail at `/` as well; keep the auth error instead
-        // of wrapping it in a generic discovery failure.
+        // Bad credentials will fail at fallback paths as well; keep the auth
+        // error instead of wrapping it in a generic discovery failure.
         Err(error @ AppError::Auth(_)) => Err(error),
         Err(well_known_error) => {
-            let body = match fetch_propfind(client, "/", ROOT_PROPFIND_BODY).await {
-                Ok(body) => body,
-                Err(error @ AppError::Auth(_)) => return Err(error),
-                Err(root_error) => {
-                    return Err(AppError::Remote(format!(
-                        "CalDAV discovery failed at `{WELL_KNOWN_PATH}` ({well_known_error}) \
-                         and at `/` ({root_error})"
-                    )));
+            let mut candidates = Vec::new();
+            let configured_path = client.base_url().path();
+            if !configured_path.is_empty() && configured_path != "/" {
+                candidates.push(configured_path.to_string());
+            }
+            candidates.push("/".to_string());
+
+            let mut last_error = None;
+            for candidate in &candidates {
+                match fetch_propfind(client, candidate, ROOT_PROPFIND_BODY).await {
+                    Ok(body) => match parse_current_user_principal(&body, candidate) {
+                        Ok(principal) => return Ok(principal),
+                        Err(error) => last_error = Some((candidate.as_str(), error)),
+                    },
+                    Err(error @ AppError::Auth(_)) => return Err(error),
+                    Err(error) => last_error = Some((candidate.as_str(), error)),
                 }
-            };
-            parse_current_user_principal(&body, "/")
+            }
+            let (fallback_path, fallback_error) = last_error.unwrap_or_else(|| {
+                (
+                    "/",
+                    AppError::Remote("No fallback discovery path succeeded".to_string()),
+                )
+            });
+            Err(AppError::Remote(format!(
+                "CalDAV discovery failed at `{WELL_KNOWN_PATH}` ({well_known_error}) \
+                 and at `{fallback_path}` ({fallback_error})"
+            )))
         }
     }
 }
 
 async fn principal_from_well_known(client: &CalDavClient) -> Result<String, AppError> {
-    let mut target = WELL_KNOWN_PATH.to_string();
+    let mut current = client.base_url().join(WELL_KNOWN_PATH).map_err(|error| {
+        AppError::InvalidInput(format!("Invalid well-known URL: {error}"))
+    })?;
     for _ in 0..=MAX_REDIRECTS {
+        let target = path_and_query(&current);
         let response = client
             .send_raw(
                 &CalDavRequest::propfind(&target)
@@ -262,15 +282,36 @@ async fn principal_from_well_known(client: &CalDavClient) -> Result<String, AppE
                     "The CalDAV server redirected without a Location header".to_string(),
                 ));
             };
-            target = location;
+            let next = current.join(&location).map_err(|error| {
+                AppError::Remote(format!("Invalid redirect Location `{location}`: {error}"))
+            })?;
+            if !same_origin(client.base_url(), &next) {
+                return Err(AppError::Remote(format!(
+                    "Refusing CalDAV redirect to a different origin: {location}"
+                )));
+            }
+            current = next;
             continue;
         }
         let response = check_status(response)?;
-        return parse_current_user_principal(&response.body, &target);
+        return parse_current_user_principal(&response.body, current.path());
     }
     Err(AppError::Remote(
         "Too many redirects while discovering the CalDAV principal".to_string(),
     ))
+}
+
+fn path_and_query(url: &Url) -> String {
+    url.query().map_or_else(
+        || url.path().to_string(),
+        |query| format!("{}?{query}", url.path()),
+    )
+}
+
+fn same_origin(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host() == right.host()
+        && left.port_or_known_default() == right.port_or_known_default()
 }
 
 async fn fetch_propfind(client: &CalDavClient, href: &str, body: &str) -> Result<String, AppError> {

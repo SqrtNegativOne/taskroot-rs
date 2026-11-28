@@ -89,6 +89,7 @@ describe('stopwatch clock projection', () => {
         expect(stopwatchState.currentMs).toBe(35_000);
         expect(stopwatchState.taskId).toBe('proposal');
         expect(stopwatchState.label).toBe('Write proposal');
+        playedSounds.length = 0;
         runtime.now += 2_000;
         expect(stopwatchState.workMs).toBe(37_000);
         expect(playedSounds).toEqual([]);
@@ -206,6 +207,30 @@ describe('stopwatch feedback', () => {
         expect(stopwatchState.currentMs).toBe(30_000);
         expect(stopwatchState.label).toBe('Reading');
         expect(playedSounds).toEqual(['/sounds/windows-xp-error.mp3']);
+    });
+
+    it('plays the task start sound when switching to a task, and skips hydration or clearing', async () => {
+        tauri.stubCommandValue('get_stopwatch_state', snapshot({
+            phase: 'paused',
+            taskId: 'hydrated-task',
+            label: 'Already selected',
+            labelSource: 'task',
+        }));
+        await stopwatchState.init();
+        flushSync();
+        expect(playedSounds).toEqual([]);
+
+        apply({ taskId: 'task-b', label: 'Task B', labelSource: 'task' });
+        expect(playedSounds).toEqual(['/sounds/task_start.wav']);
+
+        apply({ phase: 'running', taskId: 'task-b', label: 'Task B', labelSource: 'task' });
+        expect(playedSounds).toEqual(['/sounds/task_start.wav']);
+
+        apply({ taskId: null, label: null, labelSource: 'unset' });
+        expect(playedSounds).toEqual(['/sounds/task_start.wav']);
+
+        apply({ taskId: 'task-c', label: 'Task C', labelSource: 'task' });
+        expect(playedSounds).toEqual(['/sounds/task_start.wav', '/sounds/task_start.wav']);
     });
 });
 

@@ -59,6 +59,52 @@
   color: var(--fg-dimmer);
 }
 
+.inspector-quick-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  font-size: 0.78em;
+  line-height: 1.35;
+}
+
+.inspector-quick-preview.is-error {
+  border-color: var(--p0-line);
+}
+
+.inspector-quick-parts {
+  color: var(--fg-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inspector-quick-error {
+  color: var(--p0);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inspector-quick-dismiss {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.inspector-quick-dismiss:hover {
+  background: var(--bg-surface-hover);
+  color: var(--fg);
+}
+
 .inspector-body {
   flex: 1;
   display: flex;
@@ -125,10 +171,6 @@
   justify-content: space-between;
 }
 
-.inspector-inline .inspector-date-field {
-  flex: 1 1 140px;
-}
-
 .inspector-readonly-value {
   color: var(--fg-muted);
   overflow-wrap: anywhere;
@@ -137,51 +179,6 @@
 .inspector-suffix {
   color: var(--fg-dim);
   font-size: 0.85em;
-}
-
-/* ── Date field ─────────────────────────────────────────────────────── */
-
-.inspector-date-field {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 24px;
-  min-width: 120px;
-  border-radius: 4px;
-}
-
-.inspector-date-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fg);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inspector-date-field.is-empty .inspector-date-label {
-  color: var(--fg-dim);
-}
-
-.inspector-date-field:focus-within {
-  outline: 1px solid var(--accent-line);
-  outline-offset: 2px;
-}
-
-.inspector-date-native {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: none;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.inspector-date-native:disabled {
-  cursor: not-allowed;
 }
 
 .inspector-clear {
@@ -240,8 +237,14 @@
 .inspector-recurrence {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
+}
+
+.inspector-recurrence-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .inspector-advanced-toggle {
@@ -266,6 +269,166 @@
   font-size: 16px;
 }
 
+.inspector-recurrence-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+
+.inspector-recurrence-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inspector-recurrence-label {
+  color: var(--fg-muted);
+  font-size: 0.85em;
+}
+
+.inspector-recurrence-number {
+  width: 52px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-highlight);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.88em;
+  text-align: center;
+}
+
+.inspector-recurrence-number:focus,
+.inspector-recurrence-date:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.inspector-recurrence-unit {
+  flex: 1 1 90px;
+  min-width: 90px;
+}
+
+.inspector-recurrence-end {
+  flex: 0 1 100px;
+  min-width: 92px;
+}
+
+.inspector-recurrence-date {
+  flex: 1 1 120px;
+  min-width: 110px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-highlight);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.84em;
+}
+
+.inspector-recurrence-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.inspector-recurrence-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-highlight);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.78em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.inspector-recurrence-day:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--fg);
+}
+
+.inspector-recurrence-day.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.inspector-recurrence-day:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inspector-recurrence-preview {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.82em;
+  line-height: 1.35;
+}
+
+.inspector-recurrence-note {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.78em;
+}
+
+.inspector-recurrence-error {
+  margin: 0;
+  color: var(--p0);
+  font-size: 0.8em;
+  line-height: 1.35;
+}
+
+.inspector-recurrence-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inspector-recurrence-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-highlight);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.82em;
+  cursor: pointer;
+}
+
+.inspector-recurrence-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--fg);
+}
+
+.inspector-recurrence-btn.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.inspector-recurrence-btn.is-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.inspector-recurrence-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .inspector-raw-rule {
   width: 100%;
   padding: 6px 8px;
@@ -280,6 +443,10 @@
 .inspector-raw-rule:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+.inspector-raw-rule.is-invalid {
+  border-color: var(--p0);
 }
 
 /* ── Metadata & actions ─────────────────────────────────────────────── */

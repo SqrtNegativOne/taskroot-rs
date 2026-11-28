@@ -1,7 +1,12 @@
+use tauri_specta::Event;
+
 use crate::error::AppError;
 use crate::features::calendar::ops;
-use crate::features::calendar::{AppCalendar, AppEvent, CalendarDateTime, EventScope};
+use crate::features::calendar::{
+    AppCalendar, AppEvent, CalendarDateTime, EventPatch, EventScope,
+};
 use crate::ipc::session::{app_calendar, client_for, store_state};
+use crate::ipc_events::StoreUpdated;
 
 /// # Errors
 ///
@@ -12,8 +17,8 @@ use crate::ipc::session::{app_calendar, client_for, store_state};
 pub async fn create_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::create_event(&mut store, &client, event).await?;
+    ops::create_event(&state, &client, event).await?;
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 
@@ -22,11 +27,15 @@ pub async fn create_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), 
 /// Returns an error when the event is missing or the `CalDAV` write fails.
 #[tauri::command]
 #[specta::specta]
-pub async fn update_event(app: tauri::AppHandle, event: AppEvent) -> Result<(), AppError> {
+pub async fn update_event(
+    app: tauri::AppHandle,
+    id: String,
+    patches: Vec<EventPatch>,
+) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::update_event(&mut store, &client, event).await?;
+    ops::update_event(&state, &client, &id, &patches).await?;
+    let _ = StoreUpdated.emit(&app);
     Ok(())
 }
 
@@ -49,8 +58,9 @@ pub async fn delete_event(
 ) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
-    ops::delete_event(&mut store, &client, &id, scope, occurrence_start).await
+    ops::delete_event(&state, &client, &id, scope, occurrence_start).await?;
+    let _ = StoreUpdated.emit(&app);
+    Ok(())
 }
 
 /// Move the clicked occurrence or the whole series to a new time.
@@ -72,9 +82,8 @@ pub async fn reschedule_event(
 ) -> Result<(), AppError> {
     let client = client_for(&app).await?;
     let state = store_state(&app)?;
-    let mut store = state.lock().await;
     ops::reschedule_event(
-        &mut store,
+        &state,
         &client,
         ops::Reschedule {
             id,
@@ -85,7 +94,9 @@ pub async fn reschedule_event(
             occurrence_start,
         },
     )
-    .await
+    .await?;
+    let _ = StoreUpdated.emit(&app);
+    Ok(())
 }
 
 /// The store's discovered calendars, projected for the frontend.

@@ -62,8 +62,10 @@ and persists `account.json`. Read-only collections reject edits with
    queue, no background sync). Source and target collections must be writable
    for writes, moves and deletes.
 4. `PUT` updates send `If-Match: <etag>`; creates send `If-None-Match: *`.
-   Ordinary same-collection updates re-fetch, re-parse, re-validate guards and
-   retry a `412` once; moves and scoped deletes currently propagate conflicts.
+   Ordinary same-collection updates apply typed field patches (`TaskPatch` /
+   `EventPatch`): on a `412 Conflict`, they re-fetch, re-parse, re-apply only
+   the patched fields, re-validate guards and retry once so concurrent edits to
+   other fields survive. Moves and scoped deletes currently propagate conflicts.
 5. Whole-resource deletion uses `DELETE` (`404`/`410` count as success). HTTP
    errors map `401 → auth`, `412 → conflict`, `410 → gone`, other non-2xx →
    `remote`.

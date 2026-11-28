@@ -182,6 +182,7 @@
         {:else}
             <div class="calendar-wrap" class:half={sidebar.showNotes}>
                 <DayTimeline
+                    calendars={calendarsQuery.data ?? []}
                     {onAddEvent}
                     variant="sidebar"
                 />

@@ -1,4 +1,4 @@
-import type { EventInstance } from '../../../lib/domain';
+import type { EventInstance, TaskDateKind } from '../../../lib/domain';
 
 export interface LaidEvent {
     event: EventInstance;
@@ -30,5 +30,5 @@ export interface DragStateTarget {
 export interface DragState {
     target?: DragStateTarget;
     event?: { id: string };
-    task?: { id: string };
+    task?: { id: string; markerKind?: TaskDateKind; occurrenceKey?: string };
 }
