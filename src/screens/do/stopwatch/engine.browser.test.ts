@@ -62,18 +62,9 @@ beforeEach(async () => {
         playedSounds.push(new URL(this.src).pathname);
         return Promise.resolve();
     });
-    const wasInBreak = stopwatchState.isBreak;
     tauri.stubCommandValue('get_stopwatch_state', snapshot());
     await stopwatchState.init();
     flushSync();
-    if (wasInBreak) {
-        await vi.waitFor(() => {
-            const cleared = runtime.emit.mock.calls.some(
-                ([ev, payload]) => ev === SCREEN_EFFECT && payload === undefined,
-            );
-            if (!cleared) throw new Error('Waiting for break screen effect clear');
-        });
-    }
     tauri.reset();
     runtime.emit.mockClear();
     playedSounds.length = 0;
@@ -231,6 +222,21 @@ describe('stopwatch feedback', () => {
 
         apply({ taskId: 'task-c', label: 'Task C', labelSource: 'task' });
         expect(playedSounds).toEqual(['/sounds/task_start.wav', '/sounds/task_start.wav']);
+    });
+
+    it('does not play break transition feedback when hydrating an already-active break', async () => {
+        tauri.stubCommandValue('get_stopwatch_state', snapshot({
+            phase: 'breaking',
+            breakStartedAt: runtime.now,
+            breakDuration: 60_000,
+        }));
+        await stopwatchState.init();
+        flushSync();
+        await Promise.resolve();
+
+        expect(playedSounds).toEqual([]);
+        expect(tauri.invoke).not.toHaveBeenCalledWith('show_screen_effect', undefined, undefined);
+        expect(runtime.emit).not.toHaveBeenCalled();
     });
 });
 

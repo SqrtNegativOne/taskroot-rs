@@ -246,6 +246,10 @@ let completingBreak = false;
 if (typeof window !== 'undefined') {
     $effect.root(() => {
         $effect(() => {
+            if (!stopwatchState.hydrated) {
+                lastInBreak = undefined;
+                return;
+            }
             const inBreak = stopwatchState.phase === 'breaking';
             if (lastInBreak !== undefined && lastInBreak !== inBreak) {
                 notifyBreakTransition(stopwatchState.phase);
