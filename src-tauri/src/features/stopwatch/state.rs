@@ -295,6 +295,7 @@ impl StopwatchState {
 
     /// Clear the clock, recording whatever segment was running.
     pub fn reset(&mut self, now: u64) -> Vec<StopwatchHistoryEntry> {
+        self.expire_pause(now);
         let entry = match self.phase {
             StopwatchPhase::Running => self.take_work_segment(now),
             StopwatchPhase::Breaking => self.take_break_segment(now),

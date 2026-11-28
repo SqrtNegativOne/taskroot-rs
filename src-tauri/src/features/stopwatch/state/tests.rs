@@ -375,6 +375,24 @@ fn manager_flush_for_exit_and_history_persist_entries_with_task_id() {
 }
 
 #[test]
+fn reset_after_an_expired_timed_pause_records_resumed_work() {
+    let mut state = state_running_since(0);
+    let paused = state.toggle_pause(minutes(2), 5);
+    assert_eq!(paused.len(), 1);
+    assert_eq!(state.paused_until, Some(minutes(7)));
+
+    // Reset two minutes after the timed pause expired without an intervening tick.
+    let entries = state.reset(minutes(9));
+
+    assert_eq!(state.phase, StopwatchPhase::Paused);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].kind, StopwatchHistoryKind::Work);
+    assert_eq!(entries[0].started_at, minutes(7));
+    assert_eq!(entries[0].ended_at, minutes(9));
+    assert_eq!(entries[0].duration_ms, minutes(2));
+}
+
+#[test]
 fn concurrent_transitions_preserve_all_history_entries() {
     use std::sync::Arc;
 
