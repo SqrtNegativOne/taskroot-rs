@@ -1,7 +1,6 @@
 //! `lists` and `list-rm`.
 
 use crate::error::AppError;
-use crate::features::calendar::calendars;
 
 use super::super::output::print_json;
 use super::super::session::open;
@@ -26,6 +25,9 @@ pub async fn remove_list(needle: &str) -> Result<(), AppError> {
         .read(|store| resolve_list(store, needle))
         .await?;
 
-    calendars::delete(&session.dir, &session.client, &session.store, &href).await?;
+    session
+        .accounts
+        .delete_calendar(&session.store, &href)
+        .await?;
     print_json(&serde_json::json!({ "deleted": href }))
 }

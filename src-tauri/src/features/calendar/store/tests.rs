@@ -750,9 +750,29 @@ async fn read_only_source_collections_reject_deletes_and_moves_before_network_io
 
 #[tokio::test]
 async fn collection_mutations_bump_store_revision() {
-    use crate::features::calendar::caldav::calendars;
+    use std::sync::Arc;
 
-    let (server, client) = start_server().await;
+    use crate::error::AppError;
+    use crate::features::calendar::caldav::account::{
+        Account, AccountProfile, AccountRegistry, AccountRepository, AccountService,
+        CredentialStore, JsonAccountRepository,
+    };
+    use crate::features::calendar::HttpClient;
+
+    struct StaticCredentials;
+    impl CredentialStore for StaticCredentials {
+        fn load(&self, _id: &str) -> Result<Option<String>, AppError> {
+            Ok(Some("pw".to_string()))
+        }
+        fn save(&self, _id: &str, _password: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+        fn delete(&self, _id: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    let (server, _client) = start_server().await;
     Mock::given(method("PROPPATCH"))
         .and(path("/cal/tasks/"))
         .respond_with(ResponseTemplate::new(207))
@@ -765,17 +785,32 @@ async fn collection_mutations_bump_store_revision() {
         .await;
 
     let store = store_with_calendars();
-    let dir = store.data_dir.clone();
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Arc::new(JsonAccountRepository::new(dir.path().to_path_buf()));
+    repo.write(&AccountRegistry {
+        active_id: Some("p1".to_string()),
+        profiles: vec![AccountProfile {
+            id: "p1".to_string(),
+            account: Account {
+                server_url: server.uri(),
+                username: "me".to_string(),
+                principal_href: "/me/".to_string(),
+                home_href: "/cal/".to_string(),
+                calendars: store.calendars.clone(),
+            },
+        }],
+    })
+    .unwrap();
+    let service = AccountService::new(repo, Arc::new(StaticCredentials), HttpClient::new().unwrap());
     let state = StoreState::new(store);
     let before_rename = state.read(Store::revision).await;
-    calendars::rename(&dir, &client, &state, "/cal/tasks/", "Renamed")
+    service
+        .rename_calendar(&state, "/cal/tasks/", "Renamed")
         .await
         .unwrap();
     let after_rename = state.read(Store::revision).await;
     assert_ne!(after_rename, before_rename);
 
-    calendars::delete(&dir, &client, &state, "/cal/tasks/")
-        .await
-        .unwrap();
+    service.delete_calendar(&state, "/cal/tasks/").await.unwrap();
     assert_ne!(state.read(Store::revision).await, after_rename);
 }

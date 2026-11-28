@@ -203,3 +203,97 @@ async fn an_in_flight_client_lease_prevents_switching_accounts() {
     transition.await.unwrap().unwrap();
     assert_eq!(service.client().await.err().unwrap().code(), "auth");
 }
+
+#[tokio::test]
+async fn collection_lifecycle_routes_through_account_service_and_updates_registry() {
+    use crate::features::calendar::CalendarComponent;
+    use wiremock::matchers::path;
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = service(dir.path(), Arc::new(MemoryCredentials::default()));
+    let store = StoreState::new(Store::load(dir.path().to_path_buf()));
+    let server = server("first").await;
+    service
+        .connect(&store, &server.uri(), "me", "first")
+        .await
+        .unwrap();
+
+    let href = store
+        .read(|store| store.calendars.first().unwrap().href.clone())
+        .await;
+    Mock::given(method("MKCALENDAR"))
+        .respond_with(ResponseTemplate::new(201))
+        .mount(&server)
+        .await;
+    Mock::given(method("PROPPATCH"))
+        .and(path(href.as_str()))
+        .respond_with(ResponseTemplate::new(207))
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path(href.as_str()))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+
+    // Create re-discovers and updates both store and account.json.
+    service
+        .create_calendar(&store, "Projects", CalendarComponent::VTodo)
+        .await
+        .unwrap();
+    assert!(service
+        .create_calendar(&store, "   ", CalendarComponent::VTodo)
+        .await
+        .is_err());
+
+    // Rename and recolour persist into registry and mirror into store.
+    service
+        .rename_calendar(&store, &href, "Renamed List")
+        .await
+        .unwrap();
+    service
+        .set_calendar_color(&store, &href, Some("#336699".to_string()))
+        .await
+        .unwrap();
+    assert_eq!(
+        service
+            .set_calendar_color(&store, &href, Some("not-a-color".to_string()))
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+    let active_calendars = service
+        .registry()
+        .await
+        .unwrap()
+        .active()
+        .unwrap()
+        .account
+        .calendars
+        .clone();
+    let updated = active_calendars
+        .iter()
+        .find(|calendar| calendar.href == href)
+        .unwrap();
+    assert_eq!(updated.display_name, "Renamed List");
+    assert_eq!(updated.color.as_deref(), Some("#336699"));
+    assert_eq!(
+        store.read(|store| store.calendars.clone()).await,
+        active_calendars
+    );
+
+    // Delete removes the collection from both store and account.json.
+    service.delete_calendar(&store, &href).await.unwrap();
+    assert!(store.read(|store| store.calendar(&href).is_none()).await);
+    assert!(service
+        .registry()
+        .await
+        .unwrap()
+        .active()
+        .unwrap()
+        .account
+        .calendars
+        .iter()
+        .all(|calendar| calendar.href != href));
+}

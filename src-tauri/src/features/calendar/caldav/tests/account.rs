@@ -5,8 +5,8 @@
 //! testable branch beyond `NoEntry`).
 
 use crate::features::calendar::caldav::account::{
-    account_path, delete_account_file, read_account, read_client_account, write_account, Account,
-    AccountProfile, AccountRegistry, AccountRepository, JsonAccountRepository,
+    account_path, delete_account_file, Account, AccountProfile, AccountRegistry, AccountRepository,
+    JsonAccountRepository,
 };
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 
@@ -26,20 +26,31 @@ fn sample_account() -> Account {
     }
 }
 
+fn single_registry(account: Account) -> AccountRegistry {
+    AccountRegistry {
+        active_id: Some("primary".to_string()),
+        profiles: vec![AccountProfile {
+            id: "primary".to_string(),
+            account,
+        }],
+    }
+}
+
 #[test]
 fn account_round_trips_and_never_contains_a_password() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
     let account = sample_account();
 
-    write_account(dir, &account).unwrap();
+    repo.write(&single_registry(account.clone())).unwrap();
 
-    assert_eq!(read_account(dir).unwrap(), Some(account));
+    let loaded = repo.read().unwrap();
+    assert_eq!(loaded.active().map(|p| &p.account), Some(&account));
     assert!(
-        !dir.join("account.json.tmp").exists(),
+        !dir.path().join("account.json.tmp").exists(),
         "the temporary file is renamed away"
     );
-    let raw = std::fs::read_to_string(account_path(dir)).unwrap();
+    let raw = std::fs::read_to_string(account_path(dir.path())).unwrap();
     assert!(!raw.to_lowercase().contains("password"));
     assert!(raw.contains(r#""serverUrl": "http://127.0.0.1:5232""#));
 }
@@ -47,18 +58,18 @@ fn account_round_trips_and_never_contains_a_password() {
 #[test]
 fn a_missing_account_file_is_not_an_error() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
 
-    assert_eq!(read_account(dir).unwrap(), None);
+    assert_eq!(repo.read().unwrap(), AccountRegistry::default());
 }
 
 #[test]
 fn a_malformed_account_file_is_a_store_error() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    std::fs::write(account_path(dir), r#"{"serverUrl": 42}"#).unwrap();
+    std::fs::write(account_path(dir.path()), r#"{"serverUrl": 42}"#).unwrap();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
 
-    let error = read_account(dir).unwrap_err();
+    let error = repo.read().unwrap_err();
 
     assert_eq!(error.code(), "store");
     assert!(error.to_string().contains("Malformed account file"));
@@ -67,10 +78,10 @@ fn a_malformed_account_file_is_a_store_error() {
 #[test]
 fn unparsable_json_is_a_store_error() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    std::fs::write(account_path(dir), "not json").unwrap();
+    std::fs::write(account_path(dir.path()), "not json").unwrap();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
 
-    let error = read_account(dir).unwrap_err();
+    let error = repo.read().unwrap_err();
 
     assert_eq!(error.code(), "store");
 }
@@ -78,59 +89,21 @@ fn unparsable_json_is_a_store_error() {
 #[test]
 fn an_incomplete_registry_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    std::fs::write(account_path(dir), "{}").unwrap();
+    std::fs::write(account_path(dir.path()), "{}").unwrap();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
 
-    let account = read_account(dir).unwrap_err();
+    let error = repo.read().unwrap_err();
 
-    assert_eq!(account.code(), "store");
-}
-
-#[test]
-fn client_metadata_updates_do_not_target_the_newly_active_profile() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut first = sample_account();
-    let second = Account {
-        server_url: "http://127.0.0.1:15233".to_string(),
-        ..sample_account()
-    };
-    let repository = JsonAccountRepository::new(dir.path().to_path_buf());
-    repository
-        .write(&AccountRegistry {
-            active_id: Some("second".to_string()),
-            profiles: vec![
-                AccountProfile {
-                    id: "first".to_string(),
-                    account: first.clone(),
-                },
-                AccountProfile {
-                    id: "second".to_string(),
-                    account: second.clone(),
-                },
-            ],
-        })
-        .unwrap();
-    let http = crate::features::calendar::HttpClient::new().unwrap();
-    let client =
-        crate::features::calendar::CalDavClient::from_account(&http, &first, "fake").unwrap();
-    first.calendars.first_mut().unwrap().display_name = "Changed on first".to_string();
-    write_account(dir.path(), &first).unwrap();
-    assert_eq!(read_account(dir.path()).unwrap(), Some(second));
-    assert_eq!(
-        read_client_account(dir.path(), &client).unwrap(),
-        Some(first)
-    );
-    assert_eq!(repository.read().unwrap().profiles.len(), 2);
+    assert_eq!(error.code(), "store");
 }
 
 #[test]
 fn deleting_the_account_file_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    write_account(dir, &sample_account()).unwrap();
+    let repo = JsonAccountRepository::new(dir.path().to_path_buf());
+    repo.write(&single_registry(sample_account())).unwrap();
 
-    delete_account_file(dir).unwrap();
-    assert!(!account_path(dir).exists());
-    delete_account_file(dir).unwrap();
+    delete_account_file(dir.path()).unwrap();
+    assert!(!account_path(dir.path()).exists());
+    delete_account_file(dir.path()).unwrap();
 }
-

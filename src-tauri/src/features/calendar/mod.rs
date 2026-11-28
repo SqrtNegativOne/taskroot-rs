@@ -24,7 +24,7 @@ pub(crate) mod window;
 pub use caldav::client::CalDavClient;
 pub use caldav::model::{CalendarComponent, CalendarInfo};
 pub use caldav::transport::HttpClient;
-pub use caldav::{account, calendars, connect, discovery};
+pub use caldav::{account, discovery};
 pub use domain::*;
 pub use event_query::query_event_instances;
 pub use ics::{

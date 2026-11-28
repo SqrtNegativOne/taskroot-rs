@@ -139,11 +139,11 @@ impl AccountService {
     /// Returns account, credential, fetch or persistence failures.
     pub async fn refresh(&self, state: &StoreState) -> Result<(), AppError> {
         let _guard = self.gate.read().await;
-        let registry = self.repository.read()?;
-        let profile = registry.active().ok_or_else(no_account)?;
-        let client = self.profile_client(profile)?;
+        let mut registry = self.repository.read()?;
+        let profile = registry.active().ok_or_else(no_account)?.clone();
+        let client = self.profile_client(&profile)?;
         let revision = state.read(Store::revision).await;
-        let mut account = profile.account.clone();
+        let mut account = profile.account;
         account.calendars =
             discovery::refresh_calendar_list(&client, &account.home_href, &account.calendars)
                 .await?;
@@ -152,8 +152,6 @@ impl AccountService {
         if store.revision() != revision {
             return Ok(());
         }
-        // Re-read under the store lock so concurrent collection edits cannot be lost.
-        let mut registry = self.repository.read()?;
         if let Some(active) = registry
             .profiles
             .iter_mut()
@@ -172,7 +170,10 @@ impl AccountService {
         profile: &AccountProfile,
     ) -> Result<CalDavClient, AppError> {
         let password = self.credentials.load(&profile.id)?.ok_or_else(|| {
-            AppError::Auth("The saved password is missing; reconnect this account".to_string())
+            AppError::Auth(format!(
+                "The saved password is missing; reconnect this account or set {}",
+                super::PASSWORD_ENV
+            ))
         })?;
         CalDavClient::from_account(&self.http, &profile.account, &password)
     }
@@ -188,7 +189,7 @@ impl AccountService {
     }
 }
 
-fn no_account() -> AppError {
+pub(super) fn no_account() -> AppError {
     AppError::Auth("No CalDAV account is active".to_string())
 }
 

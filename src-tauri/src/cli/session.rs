@@ -3,9 +3,8 @@
 use std::path::PathBuf;
 
 use crate::error::AppError;
-use crate::features::calendar::{Session, open as open_calendar};
-
-const APP_IDENTIFIER: &str = "com.arkma.taskroot";
+use crate::features::calendar::{open as open_calendar, Session};
+use crate::storage;
 
 /// Load the account, the keychain password and every collection.
 ///
@@ -18,20 +17,8 @@ pub async fn open() -> Result<Session, AppError> {
 
 /// # Errors
 ///
-/// Returns [`AppError::Store`] when no data directory can be located.
+/// Returns [`AppError::Store`] or [`AppError::Internal`] when the data
+/// directory cannot be located or created.
 pub fn data_dir() -> Result<PathBuf, AppError> {
-    if let Some(dir) = std::env::var_os("TASKROOT_DATA_DIR") {
-        return Ok(PathBuf::from(dir));
-    }
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share"))
-        })
-        .ok_or_else(|| {
-            AppError::Store(
-                "cannot locate the app data directory; set TASKROOT_DATA_DIR".to_string(),
-            )
-        })?;
-    Ok(base.join(APP_IDENTIFIER))
+    storage::resolve_default_data_dir(storage::APP_IDENTIFIER)
 }

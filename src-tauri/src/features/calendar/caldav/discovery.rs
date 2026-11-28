@@ -2,7 +2,7 @@
 //!
 //! Full discovery runs when the account is connected. The cheaper half — the
 //! `PROPFIND` of the calendar home — also runs at every startup
-//! ([`refresh_collections`]), so `account.json` cannot go stale:
+//! ([`refresh_calendar_list`]), so `account.json` cannot go stale:
 //!
 //! `PROPFIND /.well-known/caldav` → `current-user-principal` →
 //! `calendar-home-set` → `PROPFIND <home> Depth: 1` → calendars.
@@ -12,14 +12,12 @@
 //! method, body and Basic credentials. When the well-known endpoint cannot
 //! produce a principal, discovery falls back to a `PROPFIND` on `/`.
 
-use std::path::Path;
 use std::time::Duration;
 
 use reqwest::Url;
 
 use crate::error::AppError;
 
-use super::account::{self, Account};
 use super::model::CalendarInfo;
 use super::transport::{check_status, CalDavClient, CalDavRequest, HttpClient};
 use super::xml::{
@@ -191,37 +189,6 @@ pub async fn refresh_calendar_list(
         )),
         Ok(Err(_)) | Err(_) => Ok(cached.to_vec()),
     }
-}
-
-/// Re-read the account's collection list, persisting it when it changed.
-///
-/// `account.json` is a cache of what the server has, not the truth: a list
-/// created or deleted from another client would otherwise stay invisible until
-/// the next load, and a *deleted* one would fail the collection fetch with a
-/// `404`. Called at startup, on Refresh and by the CLI, so one `PROPFIND` per
-/// load.
-///
-/// When the server cannot be asked and cached collections exist, the cached
-/// list is returned unchanged; when no cached collections exist, the failure is
-/// propagated.
-///
-/// # Errors
-///
-/// Returns the discovery failure when the server cannot be reached and
-/// `account.calendars` is empty.
-pub async fn refresh_collections(
-    dir: &Path,
-    client: &CalDavClient,
-    account: &mut Account,
-) -> Result<Vec<CalendarInfo>, AppError> {
-    let calendars = refresh_calendar_list(client, &account.home_href, &account.calendars).await?;
-    if calendars != account.calendars {
-        account.calendars.clone_from(&calendars);
-        if let Err(error) = account::write_account(dir, account) {
-            eprintln!("Could not persist the refreshed list of calendars: {error}");
-        }
-    }
-    Ok(calendars)
 }
 
 async fn discover_principal(client: &CalDavClient) -> Result<String, AppError> {

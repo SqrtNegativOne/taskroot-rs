@@ -1,41 +1,47 @@
-//! A headless calendar session: the store, the client and a one-shot load.
+//! A headless calendar session: the store, account service, client and load.
 //!
 //! This is the calendar API the CLI uses. The Tauri adapters (`ipc::session`)
 //! resolve a session from managed state and the app data directory.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::error::AppError;
 
+use super::caldav::account::{AccountService, JsonAccountRepository, KeychainCredentials};
 use super::caldav::client::CalDavClient;
-use super::caldav::connect;
-use super::caldav::discovery;
 use super::caldav::model::CalendarInfo;
 use super::caldav::transport::HttpClient;
 use super::domain::{AppCalendar, CollectionId};
-use super::store::{ops, Store, StoreState};
+use super::store::{Store, StoreState};
 
 pub struct Session {
     pub dir: PathBuf,
+    pub accounts: AccountService,
     pub store: StoreState,
     pub client: CalDavClient,
 }
 
-/// Load the account, the keychain password and every collection.
+/// Load the account, the keychain/env password and every collection via the
+/// shared [`AccountService::refresh`] startup path.
 ///
 /// # Errors
 ///
 /// Propagates account, discovery and load failures.
 pub async fn open(dir: PathBuf) -> Result<Session, AppError> {
-    let mut store = Store::load(dir.clone());
+    let store = StoreState::new(Store::load(dir.clone()));
     let http = HttpClient::new()?;
-    let (mut account, client) = connect::connect(&dir, &http, None)?;
-    let calendars = discovery::refresh_collections(&dir, &client, &mut account).await?;
-    store.set_calendars(calendars);
-    ops::full_load(&mut store, &client).await?;
+    let accounts = AccountService::new(
+        Arc::new(JsonAccountRepository::new(dir.clone())),
+        Arc::new(KeychainCredentials),
+        http,
+    );
+    accounts.refresh(&store).await?;
+    let client = accounts.client().await?.into_client();
     Ok(Session {
         dir,
-        store: StoreState::new(store),
+        accounts,
+        store,
         client,
     })
 }

@@ -4,7 +4,7 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use crate::error::AppError;
-use crate::features::calendar::{calendars, CalendarComponent};
+use crate::features::calendar::CalendarComponent;
 use crate::ipc_events::StoreUpdated;
 
 /// # Errors
@@ -16,10 +16,10 @@ pub async fn create_calendar(
     display_name: String,
     component: CalendarComponent,
 ) -> Result<(), AppError> {
-    let dir = crate::platform::app_data_dir(&app)?;
-    let client = super::session::client_for(&app).await?;
     let state = super::session::store_state(&app)?;
-    calendars::create(&dir, &client, &state, &display_name, component).await?;
+    super::accounts::service(&app)?
+        .create_calendar(&state, &display_name, component)
+        .await?;
     let _ = StoreUpdated.emit(&app);
     Ok(())
 }
@@ -33,10 +33,10 @@ pub async fn rename_calendar(
     href: String,
     display_name: String,
 ) -> Result<(), AppError> {
-    let dir = crate::platform::app_data_dir(&app)?;
-    let client = super::session::client_for(&app).await?;
     let state = super::session::store_state(&app)?;
-    calendars::rename(&dir, &client, &state, &href, &display_name).await?;
+    super::accounts::service(&app)?
+        .rename_calendar(&state, &href, &display_name)
+        .await?;
     let _ = StoreUpdated.emit(&app);
     Ok(())
 }
@@ -50,10 +50,10 @@ pub async fn set_calendar_color(
     href: String,
     color: Option<String>,
 ) -> Result<(), AppError> {
-    let dir = crate::platform::app_data_dir(&app)?;
-    let client = super::session::client_for(&app).await?;
     let state = super::session::store_state(&app)?;
-    calendars::set_color(&dir, &client, &state, &href, color).await?;
+    super::accounts::service(&app)?
+        .set_calendar_color(&state, &href, color)
+        .await?;
     let _ = StoreUpdated.emit(&app);
     Ok(())
 }
@@ -63,10 +63,10 @@ pub async fn set_calendar_color(
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_calendar(app: AppHandle, href: String) -> Result<(), AppError> {
-    let dir = crate::platform::app_data_dir(&app)?;
-    let client = super::session::client_for(&app).await?;
     let state = super::session::store_state(&app)?;
-    calendars::delete(&dir, &client, &state, &href).await?;
+    super::accounts::service(&app)?
+        .delete_calendar(&state, &href)
+        .await?;
     let _ = StoreUpdated.emit(&app);
     Ok(())
 }

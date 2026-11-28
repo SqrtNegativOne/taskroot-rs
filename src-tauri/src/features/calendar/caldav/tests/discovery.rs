@@ -4,10 +4,16 @@
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
-use crate::features::calendar::caldav::account::{read_account, write_account, Account};
-use crate::features::calendar::caldav::discovery::{
-    discover, normalize_server_url, refresh_collections, DEFAULT_SERVER_URL,
+use std::sync::Arc;
+
+use crate::features::calendar::caldav::account::{
+    Account, AccountProfile, AccountRegistry, AccountRepository, AccountService, CredentialStore,
+    JsonAccountRepository,
 };
+use crate::features::calendar::caldav::discovery::{
+    discover, normalize_server_url, refresh_calendar_list, DEFAULT_SERVER_URL,
+};
+use crate::features::calendar::store::{Store, StoreState};
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 use crate::features::calendar::caldav::transport::HttpClient;
 use crate::test_support::caldav::{start_http_server, start_server};
@@ -353,32 +359,47 @@ async fn discovery_works_against_the_real_radicale() {
 
 #[tokio::test]
 async fn a_refresh_persists_the_list_the_server_actually_has() {
-    let (server, client) = start_server().await;
+    let (server, _client) = start_server().await;
     Mock::given(method("PROPFIND"))
         .and(path("/me/"))
         .and(header("depth", "1"))
         .respond_with(ResponseTemplate::new(207).set_body_string(HOME_PROPFIND))
         .mount(&server)
         .await;
+    Mock::given(method("REPORT"))
+        .respond_with(
+            ResponseTemplate::new(207).set_body_string("<d:multistatus xmlns:d=\"DAV:\"/>"),
+        )
+        .mount(&server)
+        .await;
 
     let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    let mut account = Account {
-        server_url: server.uri(),
-        username: "me".to_string(),
-        principal_href: "/me/".to_string(),
-        home_href: "/me/".to_string(),
-        calendars: Vec::new(),
-    };
-    write_account(dir, &account).expect("seed the account file");
+    let repo = Arc::new(JsonAccountRepository::new(dir.path().to_path_buf()));
+    repo.write(&AccountRegistry {
+        active_id: Some("p1".to_string()),
+        profiles: vec![AccountProfile {
+            id: "p1".to_string(),
+            account: Account {
+                server_url: server.uri(),
+                username: "me".to_string(),
+                principal_href: "/me/".to_string(),
+                home_href: "/me/".to_string(),
+                calendars: Vec::new(),
+            },
+        }],
+    })
+    .expect("seed the account registry");
+    let creds = Arc::new(super::account_support::MemoryCredentials::default());
+    creds.save("p1", "pw").unwrap();
+    let service = AccountService::new(repo.clone(), creds, HttpClient::new().unwrap());
+    let store = StoreState::new(Store::load(dir.path().to_path_buf()));
 
-    let calendars = refresh_collections(dir, &client, &mut account)
-        .await
-        .unwrap();
+    service.refresh(&store).await.unwrap();
 
+    let calendars = store.read(|store| store.calendars.clone()).await;
     assert_eq!(calendars.len(), 2);
     assert_eq!(
-        read_account(dir).unwrap().unwrap().calendars,
+        repo.read().unwrap().active().unwrap().account.calendars,
         calendars,
         "the fresh list must be written back, not just returned"
     );
@@ -398,23 +419,12 @@ async fn a_refresh_that_cannot_reach_the_server_keeps_the_cached_list() {
         component: CalendarComponent::VTodo,
         ..CalendarInfo::default()
     }];
-    let dir = tempfile::tempdir().unwrap();
-    let dir = dir.path();
-    let mut account = Account {
-        server_url: server.uri(),
-        username: "me".to_string(),
-        principal_href: "/me/".to_string(),
-        home_href: "/me/".to_string(),
-        calendars: cached.clone(),
-    };
-    write_account(dir, &account).expect("seed the account file");
 
-    let calendars = refresh_collections(dir, &client, &mut account)
+    let calendars = refresh_calendar_list(&client, "/me/", &cached)
         .await
         .unwrap();
 
     assert_eq!(calendars, cached, "an offline start must still have lists");
-    assert_eq!(read_account(dir).unwrap().unwrap().calendars, cached);
 }
 
 #[tokio::test]
@@ -425,17 +435,7 @@ async fn a_refresh_with_no_cached_lists_surfaces_discovery_failure() {
         .mount(&server)
         .await;
 
-    let dir = tempfile::tempdir().unwrap();
-    let mut account = Account {
-        server_url: server.uri(),
-        username: "me".to_string(),
-        principal_href: "/me/".to_string(),
-        home_href: "/me/".to_string(),
-        calendars: Vec::new(),
-    };
-    write_account(dir.path(), &account).expect("seed the account file");
-
-    let error = refresh_collections(dir.path(), &client, &mut account)
+    let error = refresh_calendar_list(&client, "/me/", &[])
         .await
         .expect_err("empty cache must not mask an unreachable server");
     assert_eq!(error.code(), "remote");

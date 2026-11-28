@@ -8,8 +8,8 @@ The CalDAV-backed task and event domain. Base feature: imports no other feature,
 
 - `domain/` — DTOs, typed IDs, recursive AND/OR `FilterGroup<F>`, recurrence and
   `EventTiming` / `TaskTiming` render normalization.
-- `caldav/` — HTTP transport, XML parsers, discovery, multi-profile accounts
-  (`account/`) and collection lifecycle (`calendars.rs`).
+- `caldav/` — HTTP transport, XML parsers, discovery, multi-profile accounts,
+  session leases and collection lifecycle (`account/`).
 - `ics/` — `ical-rs` CST-backed lossless `.ics` reader/writer; see
   [CalDAV](../../../../docs/caldav.md) and
   [iCalendar mapping](../../../../docs/icalendar-mapping.md).

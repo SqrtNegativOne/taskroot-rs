@@ -18,6 +18,15 @@ pub struct ClientLease {
     _scope: AccountScope,
 }
 
+impl ClientLease {
+    /// Release the account gate and return the leased client for one-shot
+    /// headless sessions that manage their own lifecycle.
+    #[must_use]
+    pub fn into_client(self) -> CalDavClient {
+        self.client
+    }
+}
+
 impl Deref for ClientLease {
     type Target = CalDavClient;
     fn deref(&self) -> &Self::Target {

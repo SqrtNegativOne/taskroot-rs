@@ -8,6 +8,12 @@ use serde::Serialize;
 
 use crate::error::AppError;
 
+mod data_dir;
+
+pub use data_dir::{
+    is_writable, resolve_data_dir, resolve_default_data_dir, APP_IDENTIFIER, DATA_DIR_ENV,
+};
+
 pub const ACCOUNT_FILE: &str = "account.json";
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const UI_STATE_FILE: &str = "ui-state.json";

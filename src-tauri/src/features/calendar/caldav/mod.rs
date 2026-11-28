@@ -9,18 +9,15 @@
 //!   responses.
 //! - [`discovery`] — server URL normalisation and the
 //!   `well-known` → principal → home → collections chain.
-//! - [`account`] — the saved-profile `account.json` registry (password-free) and the
-//!   per-profile OS keychain passwords.
+//! - [`account`] — the saved-profile `account.json` registry (password-free),
+//!   per-profile OS keychain/env credentials, session leases and collection
+//!   lifecycle.
 //! - [`client`] — `sync-collection`, `calendar-multiget`, `PUT`, `DELETE`,
 //!   `MKCALENDAR` and `PROPPATCH`.
-//! - [`calendars`] — collection lifecycle (create, rename, recolour, delete).
-//! - [`connect`] — shared account/password/client session setup.
 //! - [`model`] — the discovered calendar metadata shared with the frontend.
 
 pub mod account;
-pub mod calendars;
 pub mod client;
-pub mod connect;
 pub mod discovery;
 pub mod model;
 pub mod transport;
