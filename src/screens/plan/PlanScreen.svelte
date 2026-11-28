@@ -44,15 +44,10 @@
     const calendarsQuery = useAutoQuery(commands.getActiveCalendars);
     let calendars = $derived(calendarsQuery.data ?? []);
 
-    let defaultTaskCollection = $derived(
-        calendars.find((c) => c.component === 'VTODO' && c.writable)?.id
-    );
-
     function scheduleTask(task: { id: string; title: string }, slot: TaskScheduleSlot) {
         const event = buildNewEvent(parseLocalYmd(slot.date), {
             startMinutes: slot.minute,
             endMinutes: slot.minute + slot.duration,
-            calendars,
             title: task.title,
             taskId: task.id,
         });
@@ -91,7 +86,6 @@
         const newTask: AppTask = {
             id: crypto.randomUUID(),
             title: 'New Task',
-            remoteCollectionId: defaultTaskCollection,
             ...defaults,
             status: defaults?.status ?? 'todo',
             priority: defaults?.priority ?? DEFAULT_TASK_PRIORITY,
@@ -114,7 +108,6 @@
         const newEvent = buildNewEvent(date, {
             startMinutes: startMins,
             endMinutes: endMins,
-            calendars,
         });
         inspectorState = { type: 'event', id: newEvent.id, draft: newEvent };
         const result = await store.mutate('Failed to create event', () => store.addEvent(newEvent));

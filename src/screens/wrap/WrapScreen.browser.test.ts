@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
 import { store } from '../../lib/store.svelte';
 import { persistedKeys } from '../../lib/persisted.svelte';
-import type { AppCalendar, AppTask, StopwatchHistoryEntry } from '../../lib/domain';
+import type { AppTask, StopwatchHistoryEntry } from '../../lib/domain';
 import WrapScreen from './WrapScreen.svelte';
 import StageIndicator from '../../components/shell/StageIndicator.svelte';
 import MoreScreensDropdown from '../../components/shell/MoreScreensDropdown.svelte';
@@ -39,10 +39,6 @@ vi.mock('$app/state', () => ({
 
 const tauri = mockTauriInvoke();
 
-const calendars: AppCalendar[] = [
-    { id: 'tasks-cal', summary: 'Tasks', writable: true, component: 'VTODO' },
-];
-
 describe('WrapScreen & navigation visibility', () => {
     beforeEach(() => {
         vi.useFakeTimers({ toFake: ['Date'] });
@@ -52,7 +48,6 @@ describe('WrapScreen & navigation visibility', () => {
         store.settings = { earliest_wake_up_time: 7 * 60 };
         tauri.stubCommandValue('query_tasks', []);
         tauri.stubCommandValue('get_stopwatch_history', []);
-        tauri.stubCommandValue('get_active_calendars', calendars);
         tauri.stubCommandValue('get_ui_state', undefined);
     });
 
@@ -239,9 +234,10 @@ describe('WrapScreen & navigation visibility', () => {
                     title: 'Fresh morning priority',
                     status: 'next-up',
                     start: '2026-11-27',
-                    remoteCollectionId: 'tasks-cal',
                 },
             });
+            const created = (createCall?.[1] as { task: AppTask } | undefined)?.task;
+            expect(created?.remoteCollectionId).toBeUndefined();
         });
     });
 

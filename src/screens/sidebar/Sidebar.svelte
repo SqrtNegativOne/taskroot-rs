@@ -146,7 +146,6 @@
         const newEvent = buildNewEvent(date, {
             startMinutes: startMins,
             endMinutes: endMins,
-            calendars: calendarsQuery.data ?? [],
         });
         return store
             .mutate('Failed to create event', () => store.addEvent(newEvent))

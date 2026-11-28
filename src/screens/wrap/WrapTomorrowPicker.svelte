@@ -1,30 +1,19 @@
 <script lang="ts">
-    import { DEFAULT_TASK_PRIORITY, type AppCalendar, type AppTask, type TaskPatch } from '../../lib/domain';
+    import { DEFAULT_TASK_PRIORITY, type AppTask, type TaskPatch } from '../../lib/domain';
     import { store } from '../../lib/store.svelte';
     import SearchBar from '../../components/SearchBar.svelte';
     import { formatWrapDateLabel } from './wrapWindow';
 
     interface Props {
         tasks: readonly AppTask[];
-        calendars: readonly AppCalendar[];
         tomorrowDate: Date;
         tomorrowYmd: string;
     }
 
-    let { tasks, calendars, tomorrowDate, tomorrowYmd }: Props = $props();
+    let { tasks, tomorrowDate, tomorrowYmd }: Props = $props();
 
     let search = $state('');
     let newTaskTitle = $state('');
-
-    let defaultTaskCollection = $derived.by(() => {
-        const writable = calendars.filter((cal) => cal.component === 'VTODO' && cal.writable);
-        const preferred = store.settings?.default_task_list;
-        if (preferred) {
-            const match = writable.find((cal) => cal.id === preferred);
-            if (match) return match.id;
-        }
-        return writable[0]?.id;
-    });
 
     function isSlatedForTomorrow(task: AppTask, targetYmd: string): boolean {
         if (task.status === 'done' || task.status === 'cancelled') return false;
@@ -82,7 +71,6 @@
             status: 'next-up',
             priority: DEFAULT_TASK_PRIORITY,
             start: tomorrowYmd,
-            remoteCollectionId: defaultTaskCollection,
         };
         const result = await store.mutate('Failed to create task', () => store.addTask(newTask));
         if (result.isOk()) {

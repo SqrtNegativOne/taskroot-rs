@@ -1,5 +1,11 @@
 import * as chrono from 'chrono-node';
-import type { AppCalendar, TaskPriority } from '../domain';
+import {
+    calendarsForComponent,
+    isCalendarReadOnly,
+    resolveDefaultCalendar,
+    type AppCalendar,
+    type TaskPriority,
+} from '../domain';
 import { addDays, formatHhMm, parseLocalYmd, sameDay, ymd } from '../time';
 
 export interface QuickCapturePreview {
@@ -181,16 +187,16 @@ function resolveList(
     listQuery: string | null,
     defaultTaskList?: string,
 ): { list: AppCalendar | null; listError: string | null } {
-    const writable = calendars.filter((cal) => cal.writable && cal.component === 'VTODO');
-
     if (listQuery === null) {
-        const configured =
-            defaultTaskList !== undefined && defaultTaskList !== ''
-                ? writable.find((cal) => cal.id === defaultTaskList)
-                : undefined;
-        return { list: configured ?? writable[0] ?? null, listError: null };
+        return {
+            list: resolveDefaultCalendar(calendars, 'VTODO', defaultTaskList) ?? null,
+            listError: null,
+        };
     }
 
+    const writable = calendarsForComponent(calendars, 'VTODO').filter(
+        (cal) => !isCalendarReadOnly(cal),
+    );
     const needle = listQuery.toLowerCase();
     const exact = writable.filter((cal) => cal.summary.toLowerCase() === needle);
     if (exact.length === 1) return { list: exact[0], listError: null };

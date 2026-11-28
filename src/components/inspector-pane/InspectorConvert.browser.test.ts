@@ -71,9 +71,9 @@ describe('InspectorPane convert to task', () => {
             start: '2026-10-19',
             status: 'todo',
             priority: 1,
-            remoteCollectionId: 'cal-tasks',
             tags: [{ name: 'work' }],
         });
+        expect(createdTask()?.remoteCollectionId).toBeUndefined();
         expect(onConverted).toHaveBeenCalledWith({
             type: 'task',
             id: createdTask()?.id,

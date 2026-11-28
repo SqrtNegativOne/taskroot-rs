@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
-import { emptyFilterGroup, filterGroup, type AppCalendar } from '../domain';
+import { emptyFilterGroup, filterGroup, type AppCalendar, type AppTask } from '../domain';
+import { store } from '../store.svelte';
 import { ymd } from '../time';
 import LauncherPalette from './LauncherPalette.svelte';
 
@@ -37,6 +38,7 @@ describe('LauncherPalette', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        store.settings = null;
     });
 
     it("queries today's agenda while the input is empty", async () => {
@@ -96,6 +98,26 @@ describe('LauncherPalette', () => {
             },
         });
         await waitFor(() => expect(callFor('hide_launcher')).toBeDefined());
+    });
+
+    it('previews the configured default_task_list and leaves remoteCollectionId unset when no +list sigil is given', async () => {
+        tauri.stubCommandValue('get_active_calendars', [
+            { id: '/tasks/', summary: 'Tasks', writable: true, component: 'VTODO' },
+            { id: '/work/', summary: 'Work', writable: true, component: 'VTODO' },
+        ]);
+        store.settings = { default_task_list: '/work/' };
+
+        render(LauncherPalette);
+        await waitFor(() => expect(callFor('get_active_calendars')).toBeDefined());
+
+        const input = await type('Buy milk');
+        await screen.findByText('Work');
+        await fireEvent.keyDown(input, { key: 'Enter' });
+
+        await waitFor(() => expect(callFor('create_task')).toBeDefined());
+        const created = (callFor('create_task')?.[1] as { task: AppTask } | undefined)?.task;
+        expect(created?.title).toBe('Buy milk');
+        expect(created?.remoteCollectionId).toBeUndefined();
     });
 
     it('does not create a task when the preview reports a list error', async () => {

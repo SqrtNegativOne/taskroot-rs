@@ -9,10 +9,10 @@ import type {
 } from '../../lib/domain';
 import {
     DEFAULT_TASK_PRIORITY,
-    calendarsForComponent,
     isCalendarReadOnly,
     isEventReadOnly,
     isRecurring,
+    resolveDefaultCalendar,
 } from '../../lib/domain';
 import { allEvents, allTasks } from '../../lib/queries';
 import { commands, useAutoQuery, type AutoQueryResult } from '../../lib/safeInvoke.svelte';
@@ -24,19 +24,6 @@ import { buildTaskQuickEditPatches, type TaskTitleQuickEdit } from './quickEdit'
 export type InspectorTarget =
     | { type: 'task'; id: string; draft?: AppTask }
     | { type: 'event'; id: string; occurrenceStart?: string; draft?: AppEvent };
-
-function writableTaskListId(
-    calendars: readonly AppCalendar[],
-    preferred?: string,
-): string | undefined {
-    const writable = calendarsForComponent(calendars, 'VTODO').filter(
-        (calendar) => !isCalendarReadOnly(calendar),
-    );
-    if (preferred !== undefined && writable.some((calendar) => calendar.id === preferred)) {
-        return preferred;
-    }
-    return writable[0]?.id;
-}
 
 /** Reactive inspector state: queries, the selected item, mutations and the recurring-delete scope prompt. */
 export class InspectorPaneState {
@@ -205,8 +192,9 @@ export class InspectorPaneState {
         scope: EventScope,
         occurrenceStart: string | undefined,
     ): Promise<void> {
-        const taskList = writableTaskListId(
+        const taskList = resolveDefaultCalendar(
             this.calendars,
+            'VTODO',
             store.settings?.default_task_list,
         );
         if (taskList === undefined) {
@@ -230,7 +218,6 @@ export class InspectorPaneState {
             tags: event.tags?.map((tag) => ({ id: crypto.randomUUID(), name: tag.name })),
             notes: event.description,
             start,
-            remoteCollectionId: taskList,
         };
 
         const created = await store.mutate('Failed to convert event to task', () => store.addTask(task));

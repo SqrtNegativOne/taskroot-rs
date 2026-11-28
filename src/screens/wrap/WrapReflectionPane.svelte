@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { AppCalendar, AppTask } from '../../lib/domain';
+    import type { AppTask } from '../../lib/domain';
     import { persistedKeys, persistState } from '../../lib/persisted.svelte';
     import { ymd } from '../../lib/time';
     import WrapNextUpCard from './WrapNextUpCard.svelte';
@@ -18,10 +18,9 @@
         tomorrow: Date;
         tasks: readonly AppTask[];
         completedTasks: readonly AppTask[];
-        calendars: readonly AppCalendar[];
     }
 
-    let { wrapDate, tomorrow, tasks, completedTasks, calendars }: Props = $props();
+    let { wrapDate, tomorrow, tasks, completedTasks }: Props = $props();
 
     let wrapYmd = $derived(ymd(wrapDate));
     let tomorrowYmd = $derived(ymd(tomorrow));
@@ -61,7 +60,6 @@
 
     <WrapTomorrowPicker
         {tasks}
-        {calendars}
         tomorrowDate={tomorrow}
         {tomorrowYmd}
     />

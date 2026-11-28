@@ -8,9 +8,7 @@
     import { reloadTaskListState, taskListQueryArgs } from '../../lib/taskList.svelte';
     import { stopwatchState, splitTime } from '../../screens/do/stopwatch/engine.svelte';
     import {
-        calendarsForComponent,
         DEFAULT_TASK_PRIORITY,
-        isCalendarReadOnly,
         type AppTask,
         type AppTaskStatus,
     } from '../../lib/domain';
@@ -122,20 +120,6 @@
     let listQuery = useAutoQuery(commands.queryTasks, () => taskListQueryArgs(), { debounceMs: 150 });
     let tasks = $derived(listQuery.data ?? []);
 
-    let calendarsQuery = useAutoQuery(commands.getActiveCalendars);
-    let calendars = $derived(calendarsQuery.data ?? []);
-
-    function resolveDefaultTaskCollection(): string | undefined {
-        const writable = calendarsForComponent(calendars, 'VTODO').filter(
-            (calendar) => !isCalendarReadOnly(calendar),
-        );
-        const preferred = store.settings?.default_task_list;
-        if (preferred !== undefined && writable.some((calendar) => calendar.id === preferred)) {
-            return preferred;
-        }
-        return writable[0]?.id;
-    }
-
     let activeTask = $derived(allTasks.find((task) => task.id === stopwatchState.taskId));
 
     let currentMs = $derived(stopwatchState.currentMs);
@@ -208,7 +192,6 @@
             title: trimmed,
             status: 'todo',
             priority: DEFAULT_TASK_PRIORITY,
-            remoteCollectionId: resolveDefaultTaskCollection(),
         };
 
         const result = await store.mutate('Failed to create task', () => store.addTask(newTask));

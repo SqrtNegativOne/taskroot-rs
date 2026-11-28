@@ -130,7 +130,7 @@
             est: current.estimateMinutes ?? undefined,
             due: current.due ?? undefined,
             timezone: current.hasTime ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined,
-            remoteCollectionId: current.list?.id,
+            remoteCollectionId: current.listQuery !== null ? current.list?.id : undefined,
         };
 
         const result = await store.mutate('Failed to create task', () => store.addTask(task));

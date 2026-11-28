@@ -5,6 +5,7 @@ import {
     computeFilterDefaults,
     filterGroup,
     isEventReadOnly,
+    resolveDefaultCalendar,
 } from './domain';
 
 describe('computeFilterDefaults', () => {
@@ -76,16 +77,47 @@ describe('isEventReadOnly', () => {
     });
 });
 
-describe('buildNewEvent', () => {
-    const date = new Date(2026, 8, 3, 15, 0);
+describe('resolveDefaultCalendar', () => {
     const calendars: AppCalendar[] = [
-        { id: 'cal-tasks', summary: 'Tasks', writable: true, component: 'VTODO' },
-        { id: 'cal-readonly', summary: 'Holidays', writable: false, component: 'VEVENT' },
-        { id: 'cal-events', summary: 'Events', writable: true, component: 'VEVENT' },
+        { id: 'cal-ro-events', summary: 'Holidays', writable: false, component: 'VEVENT' },
+        { id: 'cal-events-1', summary: 'Personal', writable: true, component: 'VEVENT' },
+        { id: 'cal-events-2', summary: 'Work', writable: true, component: 'VEVENT' },
+        { id: 'cal-ro-tasks', summary: 'Archive', writable: false, component: 'VTODO' },
+        { id: 'cal-tasks-1', summary: 'Inbox', writable: true, component: 'VTODO' },
+        { id: 'cal-tasks-2', summary: 'Projects', writable: true, component: 'VTODO' },
     ];
 
-    it('creates a floating all-day event and targets a writable VEVENT calendar', () => {
-        const event = buildNewEvent(date, { calendars });
+    it('prefers the configured default_event_list or default_task_list when writable and matching', () => {
+        expect(resolveDefaultCalendar(calendars, 'VEVENT', 'cal-events-2')?.id).toBe('cal-events-2');
+        expect(resolveDefaultCalendar(calendars, 'VTODO', 'cal-tasks-2')?.id).toBe('cal-tasks-2');
+    });
+
+    it('falls back to the first writable calendar of the component when preferred is unset, missing, read-only, or wrong component', () => {
+        expect(resolveDefaultCalendar(calendars, 'VEVENT')?.id).toBe('cal-events-1');
+        expect(resolveDefaultCalendar(calendars, 'VEVENT', '')?.id).toBe('cal-events-1');
+        expect(resolveDefaultCalendar(calendars, 'VEVENT', 'cal-missing')?.id).toBe('cal-events-1');
+        expect(resolveDefaultCalendar(calendars, 'VEVENT', 'cal-ro-events')?.id).toBe('cal-events-1');
+        expect(resolveDefaultCalendar(calendars, 'VEVENT', 'cal-tasks-2')?.id).toBe('cal-events-1');
+
+        expect(resolveDefaultCalendar(calendars, 'VTODO')?.id).toBe('cal-tasks-1');
+        expect(resolveDefaultCalendar(calendars, 'VTODO', '')?.id).toBe('cal-tasks-1');
+        expect(resolveDefaultCalendar(calendars, 'VTODO', 'cal-ro-tasks')?.id).toBe('cal-tasks-1');
+        expect(resolveDefaultCalendar(calendars, 'VTODO', 'cal-events-2')?.id).toBe('cal-tasks-1');
+    });
+
+    it('returns undefined when no writable calendar exists for the component', () => {
+        const readOnlyOnly = calendars.filter((calendar) => !calendar.writable);
+        expect(resolveDefaultCalendar(readOnlyOnly, 'VTODO', 'cal-ro-tasks')).toBeUndefined();
+        expect(resolveDefaultCalendar(readOnlyOnly, 'VEVENT', 'cal-ro-events')).toBeUndefined();
+        expect(resolveDefaultCalendar([], 'VTODO')).toBeUndefined();
+    });
+});
+
+describe('buildNewEvent', () => {
+    const date = new Date(2026, 8, 3, 15, 0);
+
+    it('creates a floating all-day event and leaves remoteCollectionId unset for Rust default resolution', () => {
+        const event = buildNewEvent(date);
 
         expect(event.title).toBe('New Event');
         expect(typeof event.id).toBe('string');
@@ -93,20 +125,20 @@ describe('buildNewEvent', () => {
         expect(event.endTime).toBe('2026-09-04');
         expect(event.isAllDay).toBe(true);
         expect(event.timezone).toBeUndefined();
-        expect(event.remoteCollectionId).toBe('cal-events');
+        expect(event.remoteCollectionId).toBeUndefined();
     });
 
-    it('creates a timed event with UTC instants in the system timezone', () => {
+    it('creates a timed event with UTC instants in the system timezone and leaves remoteCollectionId unset', () => {
         const event = buildNewEvent(date, {
             startMinutes: 10 * 60,
             endMinutes: 11 * 60 + 30,
-            calendars,
         });
 
         expect(event.startTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
         expect(event.endTime).toBe(new Date(2026, 8, 3, 11, 30).toISOString());
         expect(event.isAllDay).toBe(false);
         expect(event.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        expect(event.remoteCollectionId).toBeUndefined();
     });
 
     it('defaults a timed event to one hour when no end is given', () => {
@@ -114,12 +146,6 @@ describe('buildNewEvent', () => {
 
         expect(event.startTime).toBe(new Date(2026, 8, 3, 9, 0).toISOString());
         expect(event.endTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
-    });
-
-    it('leaves the collection unset when no writable event calendar exists', () => {
-        const taskCalendars = calendars.filter((calendar) => calendar.component === 'VTODO');
-        const event = buildNewEvent(date, { calendars: taskCalendars });
-
         expect(event.remoteCollectionId).toBeUndefined();
     });
 
@@ -127,12 +153,12 @@ describe('buildNewEvent', () => {
         const event = buildNewEvent(date, {
             startMinutes: 9 * 60,
             endMinutes: 9 * 60 + 30,
-            calendars,
             title: 'Write the report',
             taskId: 'task-42',
         });
 
         expect(event.title).toBe('Write the report');
         expect(event.taskId).toBe('task-42');
+        expect(event.remoteCollectionId).toBeUndefined();
     });
 });

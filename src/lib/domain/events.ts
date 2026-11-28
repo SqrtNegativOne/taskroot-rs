@@ -15,7 +15,6 @@ export type CalendarLike = AppCalendar | {
 export interface NewEventOptions {
     readonly startMinutes?: number;
     readonly endMinutes?: number;
-    readonly calendars?: readonly CalendarLike[];
     /** Title of the draft; defaults to "New Event". */
     readonly title?: string;
     /** Task the new event is scheduled for, stored as the event's task link. */
@@ -43,24 +42,38 @@ export function calendarsForComponent<T extends CalendarLike>(
     return calendars.filter((calendar) => calendar.component === component);
 }
 
-function writableEventCalendar(
-    calendars: readonly CalendarLike[],
-): CalendarLike | undefined {
-    return calendarsForComponent(calendars, 'VEVENT').find(
+/**
+ * Resolves the default writable calendar for `component`, mirroring Rust's
+ * `Store::default_calendar`: returns `preferred` when it names a writable
+ * calendar of that component, otherwise the first writable calendar of that
+ * component. Intended for UI previews and pre-checks; omit `remoteCollectionId`
+ * when creating items so Rust resolves the target list atomically.
+ */
+export function resolveDefaultCalendar<T extends CalendarLike>(
+    calendars: readonly T[],
+    component: CalendarComponent,
+    preferred?: string,
+): T | undefined {
+    const writable = calendarsForComponent(calendars, component).filter(
         (calendar) => !isCalendarReadOnly(calendar),
     );
+    if (preferred !== undefined && preferred !== '') {
+        const match = writable.find((calendar) => calendar.id === preferred);
+        if (match !== undefined) return match;
+    }
+    return writable[0];
 }
 
 /**
  * Builds an unsaved `AppEvent` draft for a date and optional time-of-day.
  * Omitting `startMinutes` creates an all-day event with floating dates; passing
- * it creates a timed event using the system timezone.
+ * it creates a timed event using the system timezone. Leaves
+ * `remoteCollectionId` unset so Rust resolves `default_event_list` atomically.
  */
 export function buildNewEvent(
     date: Date,
-    { startMinutes, endMinutes, calendars = [], title, taskId }: NewEventOptions = {},
+    { startMinutes, endMinutes, title, taskId }: NewEventOptions = {},
 ): AppEvent {
-    const calendar = writableEventCalendar(calendars);
     const isAllDay = startMinutes === undefined;
     const link = taskId ? { taskId } : {};
 
@@ -70,7 +83,6 @@ export function buildNewEvent(
             title: title ?? 'New Event',
             startTime: ymd(date),
             endTime: ymd(addDays(date, 1)),
-            remoteCollectionId: calendar?.id,
             isAllDay: true,
             ...link,
         };
@@ -86,7 +98,6 @@ export function buildNewEvent(
         title: title ?? 'New Event',
         startTime: new Date(year, month, day, 0, startMinutes).toISOString(),
         endTime: new Date(year, month, day, 0, end).toISOString(),
-        remoteCollectionId: calendar?.id,
         isAllDay: false,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         ...link,

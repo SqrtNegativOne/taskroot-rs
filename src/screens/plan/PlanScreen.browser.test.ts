@@ -48,7 +48,8 @@ describe('PlanScreen task list', () => {
     });
 
     afterEach(() => {
-store.loaded = false;
+        store.loaded = false;
+        store.settings = null;
     });
 
     it('completes the task when its circle is clicked', async () => {
@@ -99,6 +100,29 @@ store.loaded = false;
         expect(store.error).toBeNull();
         expect(screen.getByText('Buy milk')).toBeTruthy();
         expect(screen.queryByText(/Error loading data from backend/)).toBeNull();
+    });
+
+    it('leaves remoteCollectionId unset when adding a task so Rust honors default_task_list', async () => {
+        tauri.stubCommandValue('get_active_calendars', [
+            { id: 'tasks-first', summary: 'Personal Tasks', writable: true, component: 'VTODO' },
+            { id: 'tasks-default', summary: 'Work Tasks', writable: true, component: 'VTODO' },
+        ]);
+        store.settings = { default_task_list: 'tasks-default' };
+
+        render(PlanScreen);
+        await screen.findByText('Buy milk');
+
+        await fireEvent.click(screen.getByTitle('Add Task'));
+
+        await waitFor(() => {
+            const createCall = tauri.invoke.mock.calls.find(([name]) => name === 'create_task');
+            expect(createCall).toBeDefined();
+            const created = (
+                createCall?.[1] as { task: { title: string; remoteCollectionId?: string } } | undefined
+            )?.task;
+            expect(created?.title).toBe('New Task');
+            expect(created?.remoteCollectionId).toBeUndefined();
+        });
     });
 });
 
@@ -261,7 +285,14 @@ describe('PlanScreen date-grid task drag and drop', () => {
         expect(updateCalls).toHaveLength(0);
     });
 
-    it('schedules a linked event when dropping a date-grid task capsule onto the timeline', async () => {
+    it('schedules a linked event when dropping a date-grid task capsule onto the timeline without bypassing default_event_list', async () => {
+        tauri.stubCommandValue('get_active_calendars', [
+            { id: 'events-first', summary: 'Personal', writable: true, component: 'VEVENT' },
+            { id: 'events-default', summary: 'Work', writable: true, component: 'VEVENT' },
+            { id: 'tasks', summary: 'Tasks', writable: true, component: 'VTODO' },
+        ]);
+        store.settings = { default_event_list: 'events-default' };
+
         const { container } = render(PlanScreen, { target: host });
         const todayStr = ymd(new Date());
         const timelineScroller = container.querySelector<HTMLElement>('.day-scroll')!;
@@ -294,6 +325,10 @@ describe('PlanScreen date-grid task drag and drop', () => {
                     isAllDay: false,
                 },
             });
+            const created = (
+                createCall?.[1] as { event: { remoteCollectionId?: string } } | undefined
+            )?.event;
+            expect(created?.remoteCollectionId).toBeUndefined();
         });
     });
 
