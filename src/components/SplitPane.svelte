@@ -62,8 +62,9 @@
     }
 
     function onPointerUp(e: PointerEvent) {
+        if (!isDragging) return;
         isDragging = false;
-        if (e.target instanceof Element) {
+        if (e.target instanceof Element && e.target.hasPointerCapture?.(e.pointerId)) {
             e.target.releasePointerCapture(e.pointerId);
         }
     }
@@ -94,6 +95,7 @@
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}
+        onpointercancel={onPointerUp}
         class="split-pane-divider"
         class:dragging={isDragging}
         style="
