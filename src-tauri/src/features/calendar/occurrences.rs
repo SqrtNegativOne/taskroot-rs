@@ -121,22 +121,21 @@ fn expand_recurring(
             start_date,
             end_date_exclusive,
         } => {
+            let Ok(span) = u64::try_from(end_date_exclusive.signed_duration_since(start_date).num_days()) else {
+                return;
+            };
+            let search_start = range
+                .start_date
+                .checked_sub_days(Days::new(span.saturating_sub(1)))
+                .unwrap_or(range.start_date);
             let Ok(occurrences) = get_all_day_occurrences(
                 rrule,
                 start_date,
                 event.timezone.as_deref(),
                 event.exdates.as_deref().unwrap_or_default(),
-                range.start_date,
+                search_start,
                 range.end_date_inclusive,
             ) else {
-                return;
-            };
-            let Some(span) = end_date_exclusive
-                .signed_duration_since(start_date)
-                .num_days()
-                .try_into()
-                .ok()
-            else {
                 return;
             };
             for date in occurrences {
@@ -162,17 +161,21 @@ fn expand_recurring(
             end,
             timezone,
         } => {
+            let duration = end.signed_duration_since(start);
+            let search_start = range
+                .start_instant
+                .checked_sub_signed(duration)
+                .unwrap_or(range.start_instant);
             let Ok(occurrences) = get_occurrences(
                 rrule,
                 &start,
                 event.timezone.as_deref(),
                 event.exdates.as_deref().unwrap_or_default(),
-                &range.start_instant,
+                &search_start,
                 &range.end_instant,
             ) else {
                 return;
             };
-            let duration = end.signed_duration_since(start);
             for occ_start in occurrences {
                 let key = format!("{}@{}", event.id, occ_start.to_rfc3339());
                 if exceptions.contains(&key) {

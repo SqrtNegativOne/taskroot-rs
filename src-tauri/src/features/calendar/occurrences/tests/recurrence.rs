@@ -230,3 +230,29 @@ fn hourly_recurrence_produces_distinct_occurrence_keys() {
         .collect();
     assert_eq!(keys.len(), 4, "sub-daily instances need unique keys");
 }
+
+#[test]
+fn multi_day_recurring_all_day_event_overlapping_window_start_is_included() {
+    let mut master = event("evt-1", "2026-09-07", "2026-09-10");
+    master.rrule = Some("RRULE:FREQ=WEEKLY".into());
+    master.is_all_day = Some(true);
+
+    // The Sep 7..10 occurrence started before Sep 8 but covers Sep 8 and Sep 9.
+    let instances = expand_event_instances(&[master], "2026-09-08", "2026-09-13");
+
+    let starts: Vec<String> = instances.iter().map(all_day_start).collect();
+    assert_eq!(starts, vec!["2026-09-07"]);
+}
+
+#[test]
+fn overnight_recurring_timed_event_overlapping_window_start_is_included() {
+    let mut master = event("evt-1", "2026-09-07T22:00:00Z", "2026-09-08T02:00:00Z");
+    master.rrule = Some("RRULE:FREQ=DAILY;COUNT=2".into());
+
+    // The Sep 7 22:00Z..Sep 8 02:00Z occurrence overlaps the Sep 8 window.
+    let instances =
+        expand_event_instances(&[master], "2026-09-08T00:00:00Z", "2026-09-08T20:00:00Z");
+
+    let starts: Vec<String> = instances.iter().map(timed_start).collect();
+    assert_eq!(starts, vec!["2026-09-07T22:00:00+00:00"]);
+}
