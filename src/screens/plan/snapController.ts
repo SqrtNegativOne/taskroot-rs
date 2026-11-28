@@ -150,27 +150,26 @@ class AxisSnapController {
 
     attach(): () => void {
         const el = this.scroller;
+        const hasScrollEnd = supportsScrollEnd(el);
         el.addEventListener('wheel', this.onWheel, { passive: true });
         el.addEventListener('pointerdown', this.onPointerInput, { passive: true });
         el.addEventListener('touchstart', this.onPointerInput, { passive: true });
 
-        if (supportsScrollEnd(el)) {
+        if (hasScrollEnd) {
             el.addEventListener('scroll', this.onScrollActivity, { passive: true });
             el.addEventListener('scrollend', this.onScrollEnd);
-            return () => {
-                this.clearTimer();
-                el.removeEventListener('scroll', this.onScrollActivity);
-                el.removeEventListener('scrollend', this.onScrollEnd);
-                el.removeEventListener('wheel', this.onWheel);
-                el.removeEventListener('pointerdown', this.onPointerInput);
-                el.removeEventListener('touchstart', this.onPointerInput);
-            };
+        } else {
+            el.addEventListener('scroll', this.onScrollFallback);
         }
 
-        el.addEventListener('scroll', this.onScrollFallback);
         return () => {
             this.clearTimer();
-            el.removeEventListener('scroll', this.onScrollFallback);
+            if (hasScrollEnd) {
+                el.removeEventListener('scroll', this.onScrollActivity);
+                el.removeEventListener('scrollend', this.onScrollEnd);
+            } else {
+                el.removeEventListener('scroll', this.onScrollFallback);
+            }
             el.removeEventListener('wheel', this.onWheel);
             el.removeEventListener('pointerdown', this.onPointerInput);
             el.removeEventListener('touchstart', this.onPointerInput);

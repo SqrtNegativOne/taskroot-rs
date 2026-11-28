@@ -42,7 +42,7 @@ function channelLuminance(value: number): number {
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 }
 
-export function relativeLuminance([red, green, blue]: Rgb): number {
+function relativeLuminance([red, green, blue]: Rgb): number {
     return 0.2126 * channelLuminance(red)
         + 0.7152 * channelLuminance(green)
         + 0.0722 * channelLuminance(blue);
@@ -56,7 +56,7 @@ export function contrastRatio(first: Rgb, second: Rgb): number {
     return (high + 0.05) / (low + 0.05);
 }
 
-export function mixColor(from: Rgb, to: Rgb, shareOfTo: number): Rgb {
+function mixColor(from: Rgb, to: Rgb, shareOfTo: number): Rgb {
     return [
         Math.round(from[0] * (1 - shareOfTo) + to[0] * shareOfTo),
         Math.round(from[1] * (1 - shareOfTo) + to[1] * shareOfTo),

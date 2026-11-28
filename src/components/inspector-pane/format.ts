@@ -7,12 +7,6 @@ const friendlyDate = new Intl.DateTimeFormat(undefined, {
     day: 'numeric',
 });
 
-const friendlyDateWithYear = new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-});
-
 const friendlyTimestamp = new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -89,13 +83,6 @@ export function formatTaskDateTime(
     if (!date) return placeholder;
     const time = getFormattedTime(iso);
     return time ? `${date} · ${time}` : date;
-}
-
-/** A human date with its year, for read-only metadata. */
-export function formatFriendlyDateWithYear(iso?: string | null): string {
-    const date = getFormattedDate(iso);
-    if (!date) return '';
-    return friendlyDateWithYear.format(parseLocalYmd(date));
 }
 
 /** A read-only timestamp (created/modified) in local time. */

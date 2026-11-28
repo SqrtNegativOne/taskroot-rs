@@ -1,7 +1,8 @@
+import { MS_PER_MINUTE } from '../../lib/time';
+
 export const MINUTES_IN_HOUR = 60;
 export const HOURS_PER_DAY = 24;
 export const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_IN_HOUR;
-export const MS_PER_MINUTE = 60_000;
 export const MS_PER_SECOND = 1_000;
 
 export type WrapTimelineItemKind = 'work' | 'completed' | 'completion-pin';

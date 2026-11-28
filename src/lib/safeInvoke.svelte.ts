@@ -1,4 +1,3 @@
-import { onDestroy } from 'svelte';
 import { ResultAsync } from 'neverthrow';
 import type { AppError } from './errors';
 import { commands, events } from './bindings/index.generated';
@@ -45,7 +44,6 @@ export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
 
     const guard = createStaleGuard();
     let lastArgs: Args | undefined;
-    let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
     let resolveScheduled: (() => void) | undefined;
 
     const debouncer = options.debounceMs === undefined
@@ -63,6 +61,7 @@ export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
 
     $effect(() => {
         let isCleanedUp = false;
+        let unlisten: import('@tauri-apps/api/event').UnlistenFn | undefined;
 
         void events.storeUpdated.listen(() => {
             if (isCleanedUp) return;
@@ -77,15 +76,12 @@ export function useTauriQuery<T, Args extends unknown[] = [], E = AppError>(
 
         return () => {
             isCleanedUp = true;
-            if (unlisten) unlisten();
+            unlisten?.();
+            debouncer?.cancel();
+            guard.invalidate();
+            resolveScheduled?.();
+            resolveScheduled = undefined;
         };
-    });
-
-    onDestroy(() => {
-        debouncer?.cancel();
-        guard.invalidate();
-        resolveScheduled?.();
-        resolveScheduled = undefined;
     });
 
     async function dispatch(args: Args): Promise<void> {
@@ -152,22 +148,17 @@ export function useAutoQuery<T, Args extends unknown[]>(
     getArgsOrOptions?: (() => Args) | Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
     maybeOptions?: Omit<UseTauriQueryOptions<T, Args, AppError>, 'args'>,
 ): AutoQueryResult<T, AppError> {
-    if (typeof getArgsOrOptions === 'function') {
-        const query = useTauriQuery<T, Args>(command, maybeOptions ?? {});
-        $effect(() => {
-            void query.execute(...getArgsOrOptions());
-        });
-        return {
-            get data() { return query.data; },
-            get error() { return query.error; },
-            get isLoading() { return query.isLoading; },
-        };
-    }
-
-    const noArgCommand = command as () => Promise<T>;
-    const query = useTauriQuery<T, []>(noArgCommand, getArgsOrOptions ?? {});
+    const hasArgs = typeof getArgsOrOptions === 'function';
+    const query = useTauriQuery<T, Args>(
+        command,
+        (hasArgs ? maybeOptions : getArgsOrOptions) ?? {},
+    );
     $effect(() => {
-        void query.execute();
+        if (hasArgs) {
+            void query.execute(...getArgsOrOptions());
+        } else {
+            void (query.execute as () => Promise<void>)();
+        }
     });
     return {
         get data() { return query.data; },

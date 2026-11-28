@@ -256,9 +256,7 @@ if (typeof window !== 'undefined') {
             }
             lastInBreak = inBreak;
         });
-    });
 
-    $effect.root(() => {
         $effect(() => {
             if (!stopwatchState.hydrated) {
                 taskIdInitialized = false;
@@ -272,9 +270,7 @@ if (typeof window !== 'undefined') {
             lastTaskId = nextTaskId;
             taskIdInitialized = true;
         });
-    });
 
-    $effect.root(() => {
         $effect(() => {
             void now.ms;
             if (completingBreak) return;

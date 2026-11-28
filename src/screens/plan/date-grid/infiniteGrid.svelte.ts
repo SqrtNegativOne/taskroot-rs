@@ -28,7 +28,7 @@ const EMERGENCY_MARGIN_WEEKS = 2;
 const SETTLE_DRIFT_WEEKS = 2;
 const ALREADY_ALIGNED_EPSILON_PX = 1;
 
-export function gridWindowConfig(view: DateGridView): InfiniteWindowConfig {
+function gridWindowConfig(view: DateGridView): InfiniteWindowConfig {
     const visibleCount = VISIBLE_WEEKS[view];
     const bufferCount = Math.max(8, visibleCount + 4);
     return { visibleCount, bufferCount, recenterMargin: EMERGENCY_MARGIN_WEEKS };

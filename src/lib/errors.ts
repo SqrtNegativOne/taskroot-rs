@@ -2,7 +2,7 @@ import type { BackendErrorCode } from './bindings/index.generated';
 
 export type { BackendErrorCode };
 
-export const BACKEND_ERROR_CODES = [
+const BACKEND_ERROR_CODES = [
     'not-found',
     'auth',
     'remote',

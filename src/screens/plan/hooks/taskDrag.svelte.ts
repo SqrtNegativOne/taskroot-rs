@@ -61,7 +61,7 @@ function scheduleSlotFor(
  * A grid day sets the task's start date; a timeline column schedules a linked
  * event at the dropped minute.
  */
-export function taskDropFor(
+function taskDropFor(
     target: DragStateTarget,
     duration: number,
 ): TaskDrop | undefined {

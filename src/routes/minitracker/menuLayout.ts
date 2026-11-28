@@ -1,4 +1,3 @@
-export const DEFAULT_BAR_WIDTH = 340;
 export const DEFAULT_BAR_HEIGHT = 48;
 
 const MENU_SEARCH_HEIGHT = 44;

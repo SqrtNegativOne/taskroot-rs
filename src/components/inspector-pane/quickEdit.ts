@@ -33,7 +33,7 @@ export function parseTaskTitleQuickEdit(
     calendars: readonly AppCalendar[],
 ): TaskTitleQuickEdit {
     const preview = parseQuickCapture(input, referenceDate, calendars);
-    const tags = dedupeStrings(preview.tags);
+    const tags = [...new Set(preview.tags)];
     const list = preview.listQuery !== null ? preview.list : null;
     const listError = preview.listQuery !== null ? preview.listError : null;
     const hasProperties =
@@ -127,17 +127,6 @@ export function buildTaskQuickEditPatches(
     }
 
     return patches;
-}
-
-function dedupeStrings(items: readonly string[]): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const item of items) {
-        if (seen.has(item)) continue;
-        seen.add(item);
-        result.push(item);
-    }
-    return result;
 }
 
 function formatPreviewParts(

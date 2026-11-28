@@ -3,12 +3,7 @@ import { commands, safeInvoke } from './safeInvoke.svelte';
 import { minutesSinceMidnight, ymd } from './time';
 
 /** Local time (minutes since midnight) the daily startup screen may first open. */
-export const DAILY_STARTUP_OPEN_MINUTES = 4 * 60 + 30;
-
-/** True when the app has not yet been opened on `today` (local date). */
-export function isFirstOpenToday(lastOpened: string | null | undefined, today: string): boolean {
-    return lastOpened !== today;
-}
+const DAILY_STARTUP_OPEN_MINUTES = 4 * 60 + 30;
 
 /**
  * Claims the first launch of the day, recording today's local date so a later
@@ -23,8 +18,7 @@ export async function claimFirstOpenOfDay(now: Date = new Date()): Promise<boole
     const today = ymd(now);
     const stored = await safeInvoke(commands.getUiState(persistedKeys.appLastOpened));
     if (stored.isErr()) return false;
-    const lastOpened = typeof stored.value === 'string' ? stored.value : null;
-    if (!isFirstOpenToday(lastOpened, today)) return false;
+    if (stored.value === today) return false;
 
     const saved = await safeInvoke(commands.setUiState(persistedKeys.appLastOpened, today));
     return saved.isOk();

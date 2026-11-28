@@ -6,11 +6,10 @@ import {
     DEFAULT_DROP_DURATION_MINUTES,
     gridDayDropPayload,
     movedTaskDateValue,
-    snappedDropMinute,
     timelineDropPayload,
 } from './dropPayload';
 import { taskMarkerDropFor } from '../hooks/taskDrag.svelte';
-import { MINUTES_PER_DAY } from '../snapping';
+import { MINUTES_PER_DAY, snappedDropMinuteFrom } from '../snapping';
 import { PX_PER_MIN, SNAP_MIN } from '../day-timeline/constants';
 
 function timed(id: string, start: Date, end: Date): EventInstance {
@@ -29,22 +28,22 @@ function allDay(id: string, startDate: string, endDateExclusive: string): EventI
     return makeInstance({ id, timing: { kind: 'allDay', startDate, endDateExclusive } });
 }
 
-describe('snappedDropMinute', () => {
+describe('snappedDropMinuteFrom', () => {
     const pxFor = (minutes: number) => minutes * PX_PER_MIN;
 
     it('snaps a pixel offset to the nearest step', () => {
-        expect(snappedDropMinute(pxFor(7), 60)).toBe(0);
-        expect(snappedDropMinute(pxFor(8), 60)).toBe(SNAP_MIN);
-        expect(snappedDropMinute(pxFor(37), 60)).toBe(30);
+        expect(snappedDropMinuteFrom(pxFor(7), 60)).toBe(0);
+        expect(snappedDropMinuteFrom(pxFor(8), 60)).toBe(SNAP_MIN);
+        expect(snappedDropMinuteFrom(pxFor(37), 60)).toBe(30);
     });
 
     it('clamps a drop so the block stays inside the day', () => {
-        expect(snappedDropMinute(pxFor(23 * 60), 60)).toBe(23 * 60);
-        expect(snappedDropMinute(pxFor(-30), 60)).toBe(0);
+        expect(snappedDropMinuteFrom(pxFor(23 * 60), 60)).toBe(23 * 60);
+        expect(snappedDropMinuteFrom(pxFor(-30), 60)).toBe(0);
     });
 
     it('keeps a longer-than-day duration inside the day instead of going negative', () => {
-        expect(snappedDropMinute(pxFor(10 * 60), MINUTES_PER_DAY * 2)).toBe(0);
+        expect(snappedDropMinuteFrom(pxFor(10 * 60), MINUTES_PER_DAY * 2)).toBe(0);
     });
 });
 

@@ -8,7 +8,7 @@ import {
     parseLocalYmd,
     ymd,
 } from '../../../lib/time';
-import { MINUTES_PER_DAY, clampDuration, snapPixels } from '../snapping';
+import { clampDuration } from '../snapping';
 
 export const DEFAULT_DROP_DURATION_MINUTES = 60;
 
@@ -16,12 +16,6 @@ export interface ReschedulePayload {
     startTime: string;
     endTime: string;
     isAllDay: boolean;
-}
-
-/** Snap a pixel offset within a timeline column to a valid start minute. */
-export function snappedDropMinute(offsetPx: number, durationMins: number): number {
-    const fitted = Math.min(Math.max(durationMins, 0), MINUTES_PER_DAY);
-    return Math.max(0, Math.min(MINUTES_PER_DAY - fitted, snapPixels(offsetPx)));
 }
 
 /**

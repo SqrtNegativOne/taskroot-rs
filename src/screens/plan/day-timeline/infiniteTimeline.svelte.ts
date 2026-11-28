@@ -18,13 +18,13 @@ const EMERGENCY_MARGIN_DAYS = 2;
 const SETTLE_DRIFT_DAYS = 3;
 const ALREADY_ALIGNED_EPSILON_PX = 1;
 
-export function timelineWindowConfig(numDays: number): InfiniteWindowConfig {
+function timelineWindowConfig(numDays: number): InfiniteWindowConfig {
     const visibleCount = Math.max(1, numDays);
     const bufferCount = Math.max(14, visibleCount * 2 + 6);
     return { visibleCount, bufferCount, recenterMargin: EMERGENCY_MARGIN_DAYS };
 }
 
-export function timelineColumnWidth(
+function timelineColumnWidth(
     viewportWidth: number,
     gutterWidth: number,
     numDays: number,
