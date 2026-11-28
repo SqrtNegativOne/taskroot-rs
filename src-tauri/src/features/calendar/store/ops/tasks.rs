@@ -13,8 +13,8 @@ use crate::features::calendar::ics;
 use super::super::model::{Resource, Store};
 use super::super::state::StoreState;
 use super::{
-    apply_resource_create, apply_resource_move, apply_resource_removal, apply_resource_update,
-    collection_for, ensure_source_writable, refetch_resource, require_uid, resource_href,
+    apply_resource_create, apply_resource_removal, collection_for, delete_with_conflict_retry,
+    ensure_source_writable, move_resource, put_with_conflict_retry, require_uid, resource_href,
     writable_calendar, UpdateGuard,
 };
 
@@ -103,82 +103,33 @@ pub async fn update_task(
 
     if target.href != resource.collection {
         let new_href = resource_href(&target.href, id);
-        let new_etag = client.put_resource(&new_href, &merged, None, true).await?;
-        client
-            .delete_resource(&resource.href, resource.etag.as_deref())
-            .await?;
-        return state
-            .write(|store| {
-                apply_resource_move(
-                    store,
-                    &resource.href,
-                    &new_href,
-                    &target.href,
-                    base_revision,
-                    resource.etag.as_deref(),
-                    new_etag.as_deref(),
-                    &merged,
-                )
-            })
-            .await;
+        return move_resource(
+            state,
+            client,
+            &resource,
+            &target.href,
+            &new_href,
+            &merged,
+            base_revision,
+        )
+        .await;
     }
 
-    let (final_raw, final_etag, committed_from) =
-        put_task_with_retry(client, &resource, id, patches, merged).await?;
-
-    state
-        .write(|store| {
-            apply_resource_update(
-                store,
-                &resource.href,
-                &resource.collection,
-                UpdateGuard {
-                    base_revision,
-                    initial_etag: resource.etag.as_deref(),
-                    committed_from_etag: committed_from.as_deref(),
-                },
-                final_etag.as_deref(),
-                &final_raw,
-            )
-        })
-        .await
-}
-
-async fn put_task_with_retry(
-    client: &CalDavClient,
-    resource: &Resource,
-    id: &str,
-    patches: &[TaskPatch],
-    merged: String,
-) -> Result<(String, Option<String>, Option<String>), AppError> {
-    match client
-        .put_resource(&resource.href, &merged, resource.etag.as_deref(), false)
-        .await
-    {
-        Ok(etag) => Ok((
-            merged,
-            etag.or_else(|| resource.etag.clone()),
-            resource.etag.clone(),
-        )),
-        Err(AppError::Conflict(_)) => {
-            let fresh = refetch_resource(client, &resource.collection, &resource.href)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("task {id}")))?;
-            let mut fresh_task = find_task_in(&fresh, id)?.clone();
+    put_with_conflict_retry(
+        state,
+        client,
+        &resource,
+        base_revision,
+        merged,
+        &format!("task {id}"),
+        |fresh| {
+            let mut fresh_task = find_task_in(fresh, id)?.clone();
             apply_task_patches(&mut fresh_task, patches);
-            ensure_not_ending_a_series(&fresh, &fresh_task)?;
-            let retried = ics::write_task_resource(&fresh.raw, &fresh_task)?;
-            let etag = client
-                .put_resource(&resource.href, &retried, fresh.etag.as_deref(), false)
-                .await?;
-            Ok((
-                retried,
-                etag.or_else(|| fresh.etag.clone()),
-                fresh.etag.clone(),
-            ))
-        }
-        Err(error) => Err(error),
-    }
+            ensure_not_ending_a_series(fresh, &fresh_task)?;
+            ics::write_task_resource(&fresh.raw, &fresh_task)
+        },
+    )
+    .await
 }
 
 /// Delete a task resource without holding the store lock during network I/O.
@@ -214,34 +165,34 @@ pub async fn delete_task(
     };
 
     if let Some(raw) = rewritten {
-        let etag = client
-            .put_resource(&resource.href, &raw, resource.etag.as_deref(), false)
-            .await?;
-        let final_etag = etag.or_else(|| resource.etag.clone());
-        return state
-            .write(|store| {
-                apply_resource_update(
-                    store,
-                    &resource.href,
-                    &resource.collection,
-                    UpdateGuard {
-                        base_revision,
-                        initial_etag: resource.etag.as_deref(),
-                        committed_from_etag: resource.etag.as_deref(),
-                    },
-                    final_etag.as_deref(),
-                    &raw,
-                )
-            })
-            .await;
+        return put_with_conflict_retry(
+            state,
+            client,
+            &resource,
+            base_revision,
+            raw,
+            &format!("task {id}"),
+            |fresh| {
+                let fresh_task = find_task_in(fresh, id)?;
+                ics::delete_task_component(&fresh.raw, fresh_task)?
+                    .ok_or_else(|| AppError::NotFound(format!("task {id}")))
+            },
+        )
+        .await;
     }
 
-    client
-        .delete_resource(&resource.href, resource.etag.as_deref())
-        .await?;
+    let deleted_etag = delete_with_conflict_retry(client, &resource).await?;
     state
         .write(|store| {
-            apply_resource_removal(store, &resource.href, base_revision, resource.etag.as_deref());
+            apply_resource_removal(
+                store,
+                &resource.href,
+                UpdateGuard {
+                    base_revision,
+                    initial_etag: resource.etag.as_deref(),
+                    committed_from_etag: deleted_etag.as_deref(),
+                },
+            );
         })
         .await;
     Ok(())

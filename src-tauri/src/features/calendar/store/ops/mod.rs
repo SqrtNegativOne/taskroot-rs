@@ -6,14 +6,15 @@
 //! result under a revision/ETag guard.
 //!
 //! Split by aggregate: [`load`] for the one-shot pull, [`tasks`], [`events`],
-//! [`event_delete`], and [`tags`] for their respective writes. The shared helpers
-//! and re-exports live here so call sites keep using `ops::<operation>`.
+//! [`event_delete`], and [`tags`] for their respective writes, and [`write`]
+//! for shared conditional-write retry and cross-collection move rollback.
 
 mod event_delete;
 mod events;
 mod load;
 mod tags;
 mod tasks;
+mod write;
 
 pub use event_delete::delete_event;
 pub use events::{create_event, reschedule_event, update_event, Reschedule};
@@ -22,126 +23,13 @@ pub use tags::rename_tag;
 pub use tasks::{create_task, delete_task, past_due_task_ids, update_task};
 
 use crate::error::AppError;
-use crate::features::calendar::caldav::client::CalDavClient;
 use crate::features::calendar::caldav::model::{CalendarComponent, CalendarInfo};
 
-use super::model::{parse_items, Resource, Store};
-
-/// Guard for applying an in-flight `PUT` back into [`Store`].
-///
-/// If nothing mutated the store while the request ran (`store.revision() ==
-/// base_revision`), the write applies unconditionally. Otherwise it applies only
-/// when the resource's current `ETag` still matches `initial_etag` (what we read
-/// before the write) or `committed_from_etag` (what a `412` retry matched on the
-/// server), so a newer concurrent write or refresh is never overwritten while an
-/// older `full_load` snapshot is superseded.
-#[derive(Clone, Copy)]
-pub(super) struct UpdateGuard<'a> {
-    pub(super) base_revision: u64,
-    pub(super) initial_etag: Option<&'a str>,
-    pub(super) committed_from_etag: Option<&'a str>,
-}
-
-pub(super) async fn refetch_resource(
-    client: &CalDavClient,
-    collection: &str,
-    href: &str,
-) -> Result<Option<Resource>, AppError> {
-    let fetched = client
-        .fetch_hrefs(collection, &[href.to_string()])
-        .await?;
-    let Some(mut fetched) = fetched.into_iter().next() else {
-        return Ok(None);
-    };
-    let Some(raw) = fetched.calendar_data.take() else {
-        return Ok(None);
-    };
-    let items = parse_items(&raw, href, collection)?;
-    Ok(Some(Resource {
-        href: href.to_string(),
-        collection: collection.to_string(),
-        etag: fetched.etag,
-        raw,
-        items,
-    }))
-}
-
-pub(super) fn apply_resource_create(
-    store: &mut Store,
-    href: &str,
-    collection: &str,
-    base_revision: u64,
-    etag: Option<&str>,
-    raw: &str,
-) -> Result<(), AppError> {
-    if store.revision() == base_revision {
-        return store.set_resource(href, collection, etag, raw);
-    }
-    if store.calendar(collection).is_some() && !store.resources.contains_key(href) {
-        return store.set_resource(href, collection, etag, raw);
-    }
-    Ok(())
-}
-
-pub(super) fn apply_resource_update(
-    store: &mut Store,
-    href: &str,
-    collection: &str,
-    guard: UpdateGuard<'_>,
-    final_etag: Option<&str>,
-    raw: &str,
-) -> Result<(), AppError> {
-    if store.revision() == guard.base_revision {
-        return store.set_resource(href, collection, final_etag, raw);
-    }
-    let Some(current) = store.resources.get(href) else {
-        return Ok(());
-    };
-    let current_etag = current.etag.as_deref();
-    if current_etag == guard.initial_etag || current_etag == guard.committed_from_etag {
-        return store.set_resource(href, collection, final_etag, raw);
-    }
-    Ok(())
-}
-
-pub(super) fn apply_resource_removal(
-    store: &mut Store,
-    href: &str,
-    base_revision: u64,
-    initial_etag: Option<&str>,
-) {
-    if store.revision() == base_revision
-        || store
-            .resources
-            .get(href)
-            .is_some_and(|current| current.etag.as_deref() == initial_etag)
-    {
-        store.remove_resource(href);
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn apply_resource_move(
-    store: &mut Store,
-    old_href: &str,
-    new_href: &str,
-    target_collection: &str,
-    base_revision: u64,
-    initial_etag: Option<&str>,
-    new_etag: Option<&str>,
-    raw: &str,
-) -> Result<(), AppError> {
-    let unchanged = store.revision() == base_revision;
-    if unchanged {
-        store.remove_resource(old_href);
-        return store.set_resource(new_href, target_collection, new_etag, raw);
-    }
-    apply_resource_removal(store, old_href, base_revision, initial_etag);
-    if store.calendar(target_collection).is_some() && !store.resources.contains_key(new_href) {
-        return store.set_resource(new_href, target_collection, new_etag, raw);
-    }
-    Ok(())
-}
+use super::model::Store;
+use write::{
+    apply_resource_create, apply_resource_removal, delete_with_conflict_retry, move_resource,
+    put_with_conflict_retry, resolve_master, UpdateGuard,
+};
 
 pub(super) fn ensure_source_writable(
     store: &Store,

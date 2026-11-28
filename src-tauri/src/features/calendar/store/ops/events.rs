@@ -12,9 +12,8 @@ use crate::features::calendar::ics;
 use super::super::model::Resource;
 use super::super::state::StoreState;
 use super::{
-    apply_resource_create, apply_resource_move, apply_resource_update, collection_for,
-    ensure_source_writable, refetch_resource, require_uid, resource_href, writable_calendar,
-    UpdateGuard,
+    apply_resource_create, collection_for, ensure_source_writable, move_resource,
+    put_with_conflict_retry, require_uid, resolve_master, resource_href, writable_calendar,
 };
 
 /// Create one event resource without holding the store lock during network I/O.
@@ -101,81 +100,32 @@ pub async fn update_event(
 
     if target.href != resource.collection {
         let new_href = resource_href(&target.href, id);
-        let new_etag = client.put_resource(&new_href, &merged, None, true).await?;
-        client
-            .delete_resource(&resource.href, resource.etag.as_deref())
-            .await?;
-        return state
-            .write(|store| {
-                apply_resource_move(
-                    store,
-                    &resource.href,
-                    &new_href,
-                    &target.href,
-                    base_revision,
-                    resource.etag.as_deref(),
-                    new_etag.as_deref(),
-                    &merged,
-                )
-            })
-            .await;
+        return move_resource(
+            state,
+            client,
+            &resource,
+            &target.href,
+            &new_href,
+            &merged,
+            base_revision,
+        )
+        .await;
     }
 
-    let (final_raw, final_etag, committed_from) =
-        put_event_with_retry(client, &resource, id, patches, merged).await?;
-
-    state
-        .write(|store| {
-            apply_resource_update(
-                store,
-                &resource.href,
-                &resource.collection,
-                UpdateGuard {
-                    base_revision,
-                    initial_etag: resource.etag.as_deref(),
-                    committed_from_etag: committed_from.as_deref(),
-                },
-                final_etag.as_deref(),
-                &final_raw,
-            )
-        })
-        .await
-}
-
-async fn put_event_with_retry(
-    client: &CalDavClient,
-    resource: &Resource,
-    id: &str,
-    patches: &[EventPatch],
-    merged: String,
-) -> Result<(String, Option<String>, Option<String>), AppError> {
-    match client
-        .put_resource(&resource.href, &merged, resource.etag.as_deref(), false)
-        .await
-    {
-        Ok(etag) => Ok((
-            merged,
-            etag.or_else(|| resource.etag.clone()),
-            resource.etag.clone(),
-        )),
-        Err(AppError::Conflict(_)) => {
-            let fresh = refetch_resource(client, &resource.collection, &resource.href)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
-            let mut fresh_event = find_event_in(&fresh, id)?.clone();
+    put_with_conflict_retry(
+        state,
+        client,
+        &resource,
+        base_revision,
+        merged,
+        &format!("event {id}"),
+        |fresh| {
+            let mut fresh_event = find_event_in(fresh, id)?.clone();
             apply_event_patches(&mut fresh_event, patches);
-            let retried = ics::write_event_resource(&fresh.raw, &fresh_event)?;
-            let etag = client
-                .put_resource(&resource.href, &retried, fresh.etag.as_deref(), false)
-                .await?;
-            Ok((
-                retried,
-                etag.or_else(|| fresh.etag.clone()),
-                fresh.etag.clone(),
-            ))
-        }
-        Err(error) => Err(error),
-    }
+            ics::write_event_resource(&fresh.raw, &fresh_event)
+        },
+    )
+    .await
 }
 
 /// A requested move of one occurrence or of a whole series.
@@ -192,12 +142,13 @@ pub struct Reschedule {
 /// Move one occurrence, or the whole series, to a new time.
 ///
 /// [`EventScope::This`] writes an exception (`RECURRENCE-ID`) for the selected
-/// occurrence, so the rest of the series keeps its slot; [`EventScope::All`]
-/// moves the master. Moving a series from an occurrence is not supported.
+/// occurrence (or updates an existing exception row directly); [`EventScope::All`]
+/// resolves and moves the series master even when invoked from an exception row.
+/// Moving a series from one occurrence (`following`) is not supported.
 ///
 /// # Errors
 ///
-/// Returns [`AppError::NotFound`] for an unknown event,
+/// Returns [`AppError::NotFound`] for an unknown event or missing master,
 /// [`AppError::InvalidInput`] for a `following` move, and propagates transport
 /// errors.
 pub async fn reschedule_event(
@@ -213,11 +164,42 @@ pub async fn reschedule_event(
         scope,
         occurrence_start,
     } = request;
-    let event = state
-        .read(|store| store.event(&id).cloned())
-        .await
-        .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
-    if !event.is_recurring() || scope == EventScope::All || event.recurring_event_id.is_some() {
+    let (event, master) = state
+        .read(|store| {
+            let event = store
+                .event(&id)
+                .cloned()
+                .ok_or_else(|| AppError::NotFound(format!("event {id}")))?;
+            let master = resolve_master(store, &event);
+            Ok::<_, AppError>((event, master))
+        })
+        .await?;
+
+    let is_series = master.as_ref().is_some_and(AppEvent::is_recurring);
+    if scope == EventScope::Following && is_series {
+        return Err(AppError::InvalidInput(
+            "moving a series from one occurrence is not supported".to_string(),
+        ));
+    }
+
+    if scope == EventScope::All {
+        let target_id = if event.recurring_event_id.is_some() {
+            master
+                .ok_or_else(|| AppError::NotFound(format!("series of event {id}")))?
+                .id
+                .to_string()
+        } else {
+            id
+        };
+        let patches = [
+            EventPatch::StartTime(start_time),
+            EventPatch::EndTime(end_time),
+            EventPatch::IsAllDay(Some(is_all_day)),
+        ];
+        return update_event(state, client, &target_id, &patches).await;
+    }
+
+    if !event.is_recurring() || event.recurring_event_id.is_some() {
         let patches = [
             EventPatch::StartTime(start_time),
             EventPatch::EndTime(end_time),
@@ -225,11 +207,7 @@ pub async fn reschedule_event(
         ];
         return update_event(state, client, &id, &patches).await;
     }
-    if scope == EventScope::Following {
-        return Err(AppError::InvalidInput(
-            "moving a series from one occurrence is not supported".to_string(),
-        ));
-    }
+
     let occurrence = selected_occurrence(&event, occurrence_start);
     write_exception(
         state,
@@ -266,51 +244,21 @@ async fn write_exception(
         })
         .await?;
 
-    let (final_raw, final_etag, committed_from) = match client
-        .put_resource(&resource.href, &merged, resource.etag.as_deref(), false)
-        .await
-    {
-        Ok(etag) => (
-            merged,
-            etag.or_else(|| resource.etag.clone()),
-            resource.etag.clone(),
-        ),
-        Err(AppError::Conflict(_)) => {
-            let fresh = refetch_resource(client, &resource.collection, &resource.href)
-                .await?
-                .ok_or_else(|| AppError::NotFound(format!("event {master_id}")))?;
-            let fresh_master = find_event_in(&fresh, master_id)?;
+    put_with_conflict_retry(
+        state,
+        client,
+        &resource,
+        base_revision,
+        merged,
+        &format!("event {master_id}"),
+        |fresh| {
+            let fresh_master = find_event_in(fresh, master_id)?;
             let exception =
                 exception_for(fresh_master, occurrence, start_time, end_time, is_all_day);
-            let retried = ics::write_event_resource(&fresh.raw, &exception)?;
-            let etag = client
-                .put_resource(&resource.href, &retried, fresh.etag.as_deref(), false)
-                .await?;
-            (
-                retried,
-                etag.or_else(|| fresh.etag.clone()),
-                fresh.etag.clone(),
-            )
-        }
-        Err(error) => return Err(error),
-    };
-
-    state
-        .write(|store| {
-            apply_resource_update(
-                store,
-                &resource.href,
-                &resource.collection,
-                UpdateGuard {
-                    base_revision,
-                    initial_etag: resource.etag.as_deref(),
-                    committed_from_etag: committed_from.as_deref(),
-                },
-                final_etag.as_deref(),
-                &final_raw,
-            )
-        })
-        .await
+            ics::write_event_resource(&fresh.raw, &exception)
+        },
+    )
+    .await
 }
 
 pub(super) fn selected_occurrence(

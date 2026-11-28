@@ -16,3 +16,5 @@ pub use state::StoreState;
 mod tests;
 #[cfg(test)]
 mod tests_patches;
+#[cfg(test)]
+mod tests_resilience;
