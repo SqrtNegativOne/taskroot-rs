@@ -7,7 +7,6 @@
     let {
         task,
         onDragStart,
-        dragging,
         updateTask,
         isPastDue,
         selected,
@@ -17,7 +16,6 @@
     }: {
         task: AppTask;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
-        dragging?: boolean;
         updateTask: (id: string, patches: TaskPatch[]) => void;
         isPastDue?: boolean;
         selected?: boolean;
@@ -28,10 +26,7 @@
 
     function handlePointerDown(e: PointerEvent | MouseEvent) {
         if (e.button !== 0) return;
-        if (e.target instanceof Element && (
-            e.target.closest('.task-row-subtask-toggle') ||
-            e.target.closest('.task-circle')
-        )) return;
+        if (e.target instanceof Element && e.target.closest('.task-circle')) return;
         if (onDragStart) onDragStart(e, task);
     }
 
@@ -77,16 +72,12 @@
 
 <div
     class="task-row"
-    class:is-dragging={dragging}
     class:is-done={task.status === "done"}
     class:is-selected={selected}
     onpointerdown={handlePointerDown}
     oncontextmenu={handleContextMenu}
     onclick={(e) => {
-        if (e.target instanceof Element && (
-            e.target.closest('.task-row-subtask-toggle') ||
-            e.target.closest('.task-circle')
-        )) return;
+        if (e.target instanceof Element && e.target.closest('.task-circle')) return;
         if (onTaskClick) onTaskClick(task);
     }}
 >

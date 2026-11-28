@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { getCurrentWindow } from '@tauri-apps/api/window';
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
@@ -8,11 +7,6 @@
     import StageIndicator from './shell/StageIndicator.svelte';
     import MoreScreensDropdown from './shell/MoreScreensDropdown.svelte';
     import WindowControls from './shell/WindowControls.svelte';
-    import type { WindowLabel } from '$lib/domain';
-
-    const appWindow = getCurrentWindow();
-    const label = appWindow.label as WindowLabel;
-    const isMinitracker = label === 'minitracker';
 
     function navigate(stage: 'settings' | 'home'): void {
         void goto(resolve(stage === 'home' ? Routes.HOME : Routes.SETTINGS));
@@ -29,7 +23,7 @@
         <MoreScreensDropdown />
     </div>
 
-    <WindowControls {isMinitracker}>
+    <WindowControls>
         <RefreshButton />
     </WindowControls>
 </header>

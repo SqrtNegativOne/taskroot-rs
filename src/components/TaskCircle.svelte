@@ -4,7 +4,6 @@
         isDoneOrChecking,
         isActive,
         onclick,
-        oncontextmenu,
         title = "Toggle Done",
         ariaLabel,
         size = "md",
@@ -13,7 +12,6 @@
         isDoneOrChecking: boolean;
         isActive?: boolean;
         onclick: (e: MouseEvent) => void;
-        oncontextmenu?: (e: MouseEvent) => void;
         title?: string;
         ariaLabel?: string;
         size?: "sm" | "md";
@@ -36,7 +34,6 @@
     aria-label={ariaLabel ?? (priority !== undefined ? `Priority ${priority.toString()}` : 'Toggle Done')}
     onpointerdown={(e) => { e.stopPropagation(); }}
     {onclick}
-    {oncontextmenu}
 >
     {#if isActive}
         <svg

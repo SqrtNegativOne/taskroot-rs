@@ -52,9 +52,6 @@
         if (!task.remoteCollectionId) {
             return [{ label: 'Default list', value: '' }, ...mapped];
         }
-        if (current && !selectable.some(c => c.id === current.id)) {
-            return [{ label: current.summary || current.id, value: current.id }, ...mapped];
-        }
         return mapped;
     });
 

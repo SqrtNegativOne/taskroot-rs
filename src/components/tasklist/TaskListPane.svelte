@@ -21,26 +21,22 @@
         calendars: propCalendars,
         onUpdateTask,
         onDragStart,
-        activeDragId,
         onAddTask,
         onDeleteTask,
         onTaskClick,
         selectedTaskId,
         activeTaskId,
         onStartTask,
-        footer,
     }: {
         calendars?: AppCalendar[];
         onUpdateTask?: (id: string, patches: TaskPatch[]) => void;
         onDragStart?: (e: PointerEvent | MouseEvent, task: AppTask) => void;
-        activeDragId?: string;
         onAddTask: (defaults?: Partial<AppTask>) => void;
         onDeleteTask?: (id: string) => void;
         onTaskClick?: (task: AppTask) => void;
         selectedTaskId?: string;
         activeTaskId?: string;
         onStartTask?: (task: AppTask) => void;
-        footer?: import('svelte').Snippet;
     } = $props();
 
     let query = $state('');
@@ -183,7 +179,6 @@
                     <TaskRow
                         task={item.task}
                         {onDragStart}
-                        dragging={activeDragId === item.task.id}
                         {updateTask}
                         isPastDue={pastDueTaskIds.has(item.task.id)}
                         selected={item.task.id === selectedTaskId}
@@ -195,10 +190,6 @@
             {/each}
         {/if}
     </div>
-
-    {#if footer}
-        {@render footer()}
-    {/if}
 </aside>
 
 {#if contextMenu}

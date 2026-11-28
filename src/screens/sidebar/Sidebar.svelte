@@ -22,10 +22,6 @@
     let dragStartScreenY = 0;
     let dragStartTabTop = 0;
 
-    $effect(() => {
-        if (!store.loaded) return;
-    });
-
     let sf = 1;
     let screenW = 0;
     let screenH = 0;

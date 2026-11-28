@@ -8,8 +8,6 @@
         title,
         active = false,
         badge = 0,
-        addLabel,
-        onadd,
         trigger,
         children,
         onOpenChange,
@@ -20,8 +18,6 @@
         title: string;
         active?: boolean;
         badge?: number;
-        addLabel?: string;
-        onadd?: () => void;
         trigger: Snippet;
         children?: Snippet;
         onOpenChange?: (open: boolean) => void;
@@ -67,12 +63,6 @@
                     <div {...wrapperProps}>
                         <div {...props} class="shared-floating-menu">
                             {@render children?.()}
-                            {#if addLabel && onadd}
-                                <button class="filter-add-button" onclick={onadd}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    {addLabel}
-                                </button>
-                            {/if}
                         </div>
                     </div>
                 {/snippet}
@@ -129,24 +119,5 @@
 .menu-trigger-badge {
     font-size: 0.8em;
     font-weight: bold;
-}
-
-.filter-add-button {
-    background: transparent;
-    border: none;
-    color: var(--fg);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    align-self: flex-start;
-    padding: 4px 4px;
-    font-size: 0.9em;
-    opacity: 0.8;
-    transition: opacity 0.1s ease;
-}
-
-.filter-add-button:hover {
-    opacity: 1;
 }
 </style>

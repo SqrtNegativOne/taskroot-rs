@@ -27,7 +27,6 @@
     style={`display: flex; gap: 12px; align-items: center; color: var(--fg); cursor: ${disabled ? 'not-allowed' : 'pointer'}; background: none; border: none; padding: 0; opacity: ${disabled ? 0.5 : 1}; ${style}`}
     onclick={() => onchange(!checked)}
     class={className}
-    data-cuelume-toggle
 >
     <span class={`toggle-switch ${checked ? "is-on" : ""}`}>
         <span class="toggle-switch-thumb"></span>
