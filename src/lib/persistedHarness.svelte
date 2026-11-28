@@ -29,3 +29,4 @@
 
 <div data-testid="value">{value.join(',')}</div>
 <button onclick={() => { value = [...value, 'added']; }}>add</button>
+<button onclick={() => { value = value.slice(0, -1); }}>pop</button>

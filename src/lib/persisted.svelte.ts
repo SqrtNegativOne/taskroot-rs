@@ -100,7 +100,10 @@ export function persistState<T>(
         const snapshot = $state.snapshot(read()) as T;
         if (!hydrated) return;
         const serialized = serialize(snapshot);
-        if (serialized === saved) return;
+        if (serialized === saved) {
+            writer.cancel();
+            return;
+        }
         writer.schedule(snapshot);
     });
 

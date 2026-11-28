@@ -130,4 +130,18 @@ describe('persistState', () => {
 
         expect(invoke).toHaveBeenCalledWith('set_ui_state', { key: KEY, value: ['added'] }, undefined);
     });
+
+    it('cancels a pending write when the value reverts to the saved state before debounce fires', async () => {
+        mockStoredSetting(['stored']);
+
+        render(Harness, { props: { storageKey: KEY, fallback: ['fallback'], debounceMs: 20 } });
+        await screen.findByText('stored');
+
+        await fireEvent.click(screen.getByText('add'));
+        await fireEvent.click(screen.getByText('pop'));
+
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        expect(screen.getByTestId('value').textContent).toBe('stored');
+        expect(updateWrites()).toHaveLength(0);
+    });
 });
