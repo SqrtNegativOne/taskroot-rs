@@ -10,6 +10,7 @@
     import { calendarsForComponent, isCalendarReadOnly } from '../../lib/domain';
     import { resolveEventColor } from '../../lib/eventColor';
     import type { EventDateFields } from './eventDates';
+    import { localTimezoneIfUtc } from './format';
     import NumberInput from '../inputs/NumberInput.svelte';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TagsInput from '../inputs/TagsInput.svelte';
@@ -77,10 +78,14 @@
     }
 
     function applyDates(fields: EventDateFields): void {
+        const tz = !fields.isAllDay
+            ? localTimezoneIfUtc([event.startTime, event.endTime], event.timezone)
+            : undefined;
         updateEvent(event.id, [
             { field: 'startTime', value: fields.startTime },
             { field: 'endTime', value: fields.endTime },
             { field: 'isAllDay', value: fields.isAllDay ?? null },
+            ...(tz ? [{ field: 'timezone' as const, value: tz }] : []),
         ]);
     }
 

@@ -1,5 +1,5 @@
 import { CalendarDate } from '@internationalized/date';
-import { parseLocalYmd, ymd } from '../../lib/time';
+import { hasExplicitOffset, isUtcZone, parseLocalYmd, toWallClockParts, ymd } from '../../lib/time';
 
 const friendlyDate = new Intl.DateTimeFormat(undefined, {
     weekday: 'short',
@@ -12,27 +12,32 @@ const friendlyTimestamp = new Intl.DateTimeFormat(undefined, {
     timeStyle: 'short',
 });
 
-export function getFormattedDate(iso?: string | null): string {
-    if (!iso) return '';
-    return iso.split('T')[0] ?? '';
+export function getFormattedDate(iso?: string | null, timezone?: string | null): string {
+    return toWallClockParts(iso, timezone)?.date ?? '';
 }
 
-export function getFormattedTime(iso?: string | null): string {
-    if (!iso?.includes('T')) return '';
-    const t = iso.split('T')[1];
-    return t?.substring(0, 5) ?? '';
+export function getFormattedTime(iso?: string | null, timezone?: string | null): string {
+    return toWallClockParts(iso, timezone)?.time ?? '';
 }
 
-/** Replace the date of a canonical value, keeping its time (if any). */
-export function withDate(iso: string | null | undefined, date: string): string | undefined {
+/** Replace the date of a canonical value, keeping its wall-clock time (if any). */
+export function withDate(
+    iso: string | null | undefined,
+    date: string,
+    timezone?: string | null,
+): string | undefined {
     if (!date) return undefined;
-    const time = iso?.includes('T') ? iso.slice(iso.indexOf('T')) : '';
-    return `${date}${time}`;
+    const time = getFormattedTime(iso, timezone);
+    return time ? `${date}T${time}:00` : date;
 }
 
 /** Replace the time of a canonical value; an empty time makes it date-only. */
-export function withTime(iso: string | null | undefined, time: string): string | undefined {
-    const date = iso?.split('T')[0];
+export function withTime(
+    iso: string | null | undefined,
+    time: string,
+    timezone?: string | null,
+): string | undefined {
+    const date = getFormattedDate(iso, timezone);
     if (!date) return undefined;
     return time ? `${date}T${time}:00` : date;
 }
@@ -41,6 +46,20 @@ export function withTime(iso: string | null | undefined, time: string): string |
 export function combineDateAndTime(date: string, time: string): string | null {
     if (!date) return null;
     return time ? `${date}T${time}:00` : date;
+}
+
+/**
+ * When editing a timed value that arrived with an explicit UTC/offset suffix
+ * and no named non-UTC timezone, returns the host IANA timezone so saving
+ * local wall-clock digits is not re-interpreted as UTC by the backend.
+ */
+export function localTimezoneIfUtc(
+    previousValues: readonly (string | null | undefined)[],
+    timezone: string | null | undefined,
+): string | undefined {
+    if (timezone && !isUtcZone(timezone)) return undefined;
+    if (!previousValues.some((value) => hasExplicitOffset(value))) return undefined;
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /** Parse a `YYYY-MM-DD` string into a `@internationalized/date` `CalendarDate`. */
@@ -68,8 +87,8 @@ export function todayCalendarDate(): CalendarDate {
 }
 
 /** A short, human date such as "Mon, Nov 5". */
-export function formatFriendlyDate(iso?: string | null): string {
-    const date = getFormattedDate(iso);
+export function formatFriendlyDate(iso?: string | null, timezone?: string | null): string {
+    const date = getFormattedDate(iso, timezone);
     if (!date) return '';
     return friendlyDate.format(parseLocalYmd(date));
 }
@@ -78,10 +97,11 @@ export function formatFriendlyDate(iso?: string | null): string {
 export function formatTaskDateTime(
     iso: string | null | undefined,
     placeholder: string,
+    timezone?: string | null,
 ): string {
-    const date = formatFriendlyDate(iso);
+    const date = formatFriendlyDate(iso, timezone);
     if (!date) return placeholder;
-    const time = getFormattedTime(iso);
+    const time = getFormattedTime(iso, timezone);
     return time ? `${date} · ${time}` : date;
 }
 

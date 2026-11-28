@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
+import { makeTaskDateInstance } from '../../test/factories';
 import { store } from '../../lib/store.svelte';
 import { persistedKeys } from '../../lib/persisted.svelte';
 import type { AppTask, StopwatchHistoryEntry } from '../../lib/domain';
@@ -47,6 +48,7 @@ describe('WrapScreen & navigation visibility', () => {
         pageState.url.pathname = '/';
         store.settings = { earliest_wake_up_time: 7 * 60 };
         tauri.stubCommandValue('query_tasks', []);
+        tauri.stubCommandValue('query_task_dates', []);
         tauri.stubCommandValue('get_stopwatch_history', []);
         tauri.stubCommandValue('get_ui_state', undefined);
     });
@@ -280,5 +282,63 @@ describe('WrapScreen & navigation visibility', () => {
             },
             undefined,
         );
+    });
+
+    it('slates tomorrow tasks from projected query_task_dates and clears start when unplanning', async () => {
+        vi.setSystemTime(new Date(2026, 10, 26, 22, 30, 0));
+
+        const tomorrowLocalStart = new Date(2026, 10, 27, 9, 0, 0).toISOString();
+        const tasks: AppTask[] = [
+            {
+                id: 'planned-tom',
+                title: 'Morning review',
+                status: 'next-up',
+                start: tomorrowLocalStart,
+            },
+            {
+                id: 'backlog-due',
+                title: 'Later deadline',
+                status: 'todo',
+                due: '2026-11-29T23:30:00Z',
+                timezone: 'Asia/Kolkata',
+            },
+        ];
+        tauri.stubCommandValue('query_tasks', tasks);
+        tauri.stubCommandValue('query_task_dates', [
+            makeTaskDateInstance({
+                taskId: 'planned-tom',
+                kind: 'start',
+                title: 'Morning review',
+                status: 'next-up',
+                timing: { kind: 'timed', start: tomorrowLocalStart, timezone: null },
+            }),
+        ]);
+
+        render(WrapScreen);
+
+        await waitFor(() => {
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'query_task_dates',
+                { startDate: '2026-11-27', endDate: '2026-11-27' },
+                undefined,
+            );
+            expect(screen.getByText('Morning review')).toBeTruthy();
+        });
+        expect(screen.getByText('due 2026-11-30')).toBeTruthy();
+
+        await fireEvent.click(screen.getByRole('button', { name: 'Unplan' }));
+        await waitFor(() => {
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'update_task',
+                {
+                    id: 'planned-tom',
+                    patches: [
+                        { field: 'status', value: 'todo' },
+                        { field: 'start', value: null },
+                    ],
+                },
+                undefined,
+            );
+        });
     });
 });

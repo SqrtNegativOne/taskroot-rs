@@ -1,5 +1,5 @@
 import type { AppCalendar, AppEvent, CalendarComponent } from '../bindings/index.generated';
-import { addDays, ymd } from '../time';
+import { addDays, formatLocalDateTime, ymd } from '../time';
 
 const DEFAULT_EVENT_MINUTES = 60;
 
@@ -96,8 +96,8 @@ export function buildNewEvent(
     return {
         id: crypto.randomUUID(),
         title: title ?? 'New Event',
-        startTime: new Date(year, month, day, 0, startMinutes).toISOString(),
-        endTime: new Date(year, month, day, 0, end).toISOString(),
+        startTime: formatLocalDateTime(new Date(year, month, day, 0, startMinutes)),
+        endTime: formatLocalDateTime(new Date(year, month, day, 0, end)),
         isAllDay: false,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         ...link,

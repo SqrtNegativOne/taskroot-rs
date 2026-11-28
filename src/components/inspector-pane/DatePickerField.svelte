@@ -15,6 +15,7 @@
 
     interface Props {
         value?: string | null;
+        timezone?: string | null;
         placeholder: string;
         ariaLabel: string;
         timeAriaLabel: string;
@@ -24,6 +25,7 @@
 
     let {
         value = null,
+        timezone = null,
         placeholder,
         ariaLabel,
         timeAriaLabel,
@@ -32,10 +34,10 @@
     }: Props = $props();
 
     let open = $state(false);
-    let selectedDate = $derived(getFormattedDate(value));
-    let selectedTime = $derived(getFormattedTime(value));
+    let selectedDate = $derived(getFormattedDate(value, timezone));
+    let selectedTime = $derived(getFormattedTime(value, timezone));
     let calendarPlaceholder = $state<DateValue>(
-        untrack(() => parseYmdToCalendarDate(getFormattedDate(value)) ?? todayCalendarDate()),
+        untrack(() => parseYmdToCalendarDate(getFormattedDate(value, timezone)) ?? todayCalendarDate()),
     );
 
     const calendarValue = $derived(parseYmdToCalendarDate(selectedDate));
@@ -49,8 +51,8 @@
             calendarPlaceholder = parseYmdToCalendarDate(selectedDate) ?? todayCalendarDate();
             return;
         }
-        selectedDate = getFormattedDate(value);
-        selectedTime = getFormattedTime(value);
+        selectedDate = getFormattedDate(value, timezone);
+        selectedTime = getFormattedTime(value, timezone);
     }
 
     function handleDateSelect(next: DateValue | undefined): void {

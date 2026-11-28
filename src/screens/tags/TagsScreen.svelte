@@ -3,6 +3,7 @@
     import { allEvents, allTasks } from '../../lib/queries';
     import type { AppEvent, AppTask } from '../../lib/domain';
     import { store } from '../../lib/store.svelte';
+    import { toWallClockParts } from '../../lib/time';
     import Icon from '../../components/Icon.svelte';
     import SearchBar from '../../components/SearchBar.svelte';
     import InspectorPane from '../../components/inspector-pane/InspectorPane.svelte';
@@ -35,15 +36,17 @@
     }
 
     function eventWhen(event: AppEvent): string {
-        const day = event.startTime.slice(0, 10);
-        if (event.isAllDay || event.startTime.length <= 10) return day;
-        return `${day} ${event.startTime.slice(11, 16)}`;
+        const parts = toWallClockParts(event.startTime, event.timezone);
+        if (!parts) return event.startTime;
+        if (event.isAllDay || !parts.time) return parts.date;
+        return `${parts.date} ${parts.time}`;
     }
 
     function taskMeta(task: AppTask): string {
         const parts: string[] = [];
         if (task.status) parts.push(task.status);
-        if (task.due) parts.push(`due ${task.due.slice(0, 10)}`);
+        const due = toWallClockParts(task.due, task.timezone);
+        if (due) parts.push(`due ${due.date}`);
         return parts.join(' · ');
     }
 

@@ -1,21 +1,20 @@
 import type { AppEvent } from '../../lib/domain';
 import { addDays, dayDiff, parseLocalYmd, ymd } from '../../lib/time';
-import { formatFriendlyDate, getFormattedTime } from './format';
+import { formatFriendlyDate, getFormattedDate, getFormattedTime } from './format';
 
-export type EventDateFields = Pick<AppEvent, 'startTime' | 'endTime' | 'isAllDay'>;
+export type EventDateFields = Pick<AppEvent, 'startTime' | 'endTime' | 'isAllDay'> & {
+    timezone?: string | null;
+};
 
-const DATE_LENGTH = 10;
 const DEFAULT_START_TIME = '09:00';
 const DEFAULT_DURATION_MINUTES = 60;
 
-function datePart(value?: string): string | undefined {
-    const part = value?.slice(0, DATE_LENGTH);
-    return part && /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : undefined;
+function datePart(value?: string, timezone?: string | null): string | undefined {
+    return getFormattedDate(value, timezone) || undefined;
 }
 
-function timePart(value?: string): string | undefined {
-    if (!value?.includes('T')) return undefined;
-    return getFormattedTime(value) || undefined;
+function timePart(value?: string, timezone?: string | null): string | undefined {
+    return getFormattedTime(value, timezone) || undefined;
 }
 
 function shiftDay(date: string, days: number): string {
@@ -67,14 +66,18 @@ export function eventIsAllDay(event: Pick<AppEvent, 'startTime' | 'isAllDay'>): 
     return event.isAllDay ?? !event.startTime.includes('T');
 }
 
-export function eventStartDate(event: Pick<AppEvent, 'startTime'>): string | undefined {
-    return datePart(event.startTime);
+export function eventStartDate(
+    event: Pick<AppEvent, 'startTime'> & { timezone?: string | null },
+): string | undefined {
+    return datePart(event.startTime, event.timezone);
 }
 
 /** The inclusive end day the UI shows for an all-day event. */
-export function eventEndDateInclusive(event: Pick<AppEvent, 'startTime' | 'endTime'>): string | undefined {
-    const start = datePart(event.startTime);
-    const endExclusive = datePart(event.endTime);
+export function eventEndDateInclusive(
+    event: Pick<AppEvent, 'startTime' | 'endTime'> & { timezone?: string | null },
+): string | undefined {
+    const start = datePart(event.startTime, event.timezone);
+    const endExclusive = datePart(event.endTime, event.timezone);
     if (!start) return undefined;
     if (!endExclusive || endExclusive <= start) return start;
     const inclusive = shiftDay(endExclusive, -1);
@@ -82,20 +85,22 @@ export function eventEndDateInclusive(event: Pick<AppEvent, 'startTime' | 'endTi
 }
 
 /** The calendar date an event ends on (inclusive for all-day, wall date for timed). */
-export function eventEndDate(event: Pick<AppEvent, 'startTime' | 'endTime'>): string | undefined {
-    return datePart(event.endTime) ?? datePart(event.startTime);
+export function eventEndDate(
+    event: Pick<AppEvent, 'startTime' | 'endTime'> & { timezone?: string | null },
+): string | undefined {
+    return datePart(event.endTime, event.timezone) ?? datePart(event.startTime, event.timezone);
 }
 
 export function toAllDay(event: EventDateFields): EventDateFields {
-    const start = datePart(event.startTime) ?? ymd(new Date());
-    const end = datePart(event.endTime);
+    const start = datePart(event.startTime, event.timezone) ?? ymd(new Date());
+    const end = datePart(event.endTime, event.timezone);
 
     if (eventIsAllDay(event)) {
         const endExclusive = end && end > start ? end : shiftDay(start, 1);
         return { startTime: start, endTime: endExclusive, isAllDay: true };
     }
 
-    const endTime = timePart(event.endTime) ?? DEFAULT_START_TIME;
+    const endTime = timePart(event.endTime, event.timezone) ?? DEFAULT_START_TIME;
     const inclusiveEnd = end && end > start ? end : start;
     const lastDay = endTime === '00:00' && inclusiveEnd > start
         ? shiftDay(inclusiveEnd, -1)
@@ -104,12 +109,12 @@ export function toAllDay(event: EventDateFields): EventDateFields {
 }
 
 export function toTimed(event: EventDateFields): EventDateFields {
-    const startDate = datePart(event.startTime) ?? ymd(new Date());
-    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
+    const startDate = datePart(event.startTime, event.timezone) ?? ymd(new Date());
+    const startTime = timePart(event.startTime, event.timezone) ?? DEFAULT_START_TIME;
     const endDate = eventIsAllDay(event)
         ? eventEndDateInclusive(event) ?? startDate
-        : datePart(event.endTime) ?? startDate;
-    const parsedEnd = timePart(event.endTime);
+        : datePart(event.endTime, event.timezone) ?? startDate;
+    const parsedEnd = timePart(event.endTime, event.timezone);
     const fallback = addMinutes(startTime, DEFAULT_DURATION_MINUTES);
     const candidateEndDate = parsedEnd !== undefined || fallback.dayOffset === 0
         ? endDate
@@ -118,9 +123,9 @@ export function toTimed(event: EventDateFields): EventDateFields {
 }
 
 export function withStartDate(event: EventDateFields, date: string): EventDateFields {
-    const oldStart = datePart(event.startTime) ?? date;
+    const oldStart = datePart(event.startTime, event.timezone) ?? date;
     const delta = dayDiff(parseLocalYmd(date), parseLocalYmd(oldStart));
-    const end = datePart(event.endTime);
+    const end = datePart(event.endTime, event.timezone);
 
     if (eventIsAllDay(event)) {
         const endExclusive = end ? shiftDay(end, delta) : shiftDay(date, 1);
@@ -131,27 +136,27 @@ export function withStartDate(event: EventDateFields, date: string): EventDateFi
         };
     }
 
-    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
+    const startTime = timePart(event.startTime, event.timezone) ?? DEFAULT_START_TIME;
     const movedEndDate = end ? shiftDay(end, delta) : date;
-    return timedRange(date, startTime, movedEndDate, timePart(event.endTime));
+    return timedRange(date, startTime, movedEndDate, timePart(event.endTime, event.timezone));
 }
 
 export function withStartTime(event: EventDateFields, time: string): EventDateFields {
-    const date = datePart(event.startTime) ?? ymd(new Date());
-    const endDate = datePart(event.endTime) ?? date;
-    return timedRange(date, time, endDate, timePart(event.endTime));
+    const date = datePart(event.startTime, event.timezone) ?? ymd(new Date());
+    const endDate = datePart(event.endTime, event.timezone) ?? date;
+    return timedRange(date, time, endDate, timePart(event.endTime, event.timezone));
 }
 
 export function withEndDate(event: EventDateFields, date: string): EventDateFields {
-    const start = datePart(event.startTime) ?? date;
+    const start = datePart(event.startTime, event.timezone) ?? date;
 
     if (eventIsAllDay(event)) {
         const inclusive = date && date > start ? date : start;
         return { startTime: start, endTime: shiftDay(inclusive, 1), isAllDay: true };
     }
 
-    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
+    const startTime = timePart(event.startTime, event.timezone) ?? DEFAULT_START_TIME;
+    const endTime = timePart(event.endTime, event.timezone) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
     const minEndDate = endTime > startTime ? start : shiftDay(start, 1);
     const clamped = date < minEndDate ? minEndDate : date;
     return {
@@ -162,9 +167,9 @@ export function withEndDate(event: EventDateFields, date: string): EventDateFiel
 }
 
 export function withEndTime(event: EventDateFields, time: string): EventDateFields {
-    const start = datePart(event.startTime) ?? ymd(new Date());
-    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endDate = datePart(event.endTime) ?? start;
+    const start = datePart(event.startTime, event.timezone) ?? ymd(new Date());
+    const startTime = timePart(event.startTime, event.timezone) ?? DEFAULT_START_TIME;
+    const endDate = datePart(event.endTime, event.timezone) ?? start;
     const clampedDate = !isBefore(start, startTime, endDate, time)
         ? shiftDay(start, 1)
         : endDate;
@@ -186,8 +191,8 @@ export function withDateRange(
         return { startTime: start, endTime: shiftDay(end, 1), isAllDay: true };
     }
 
-    const startTime = timePart(event.startTime) ?? DEFAULT_START_TIME;
-    const endTime = timePart(event.endTime) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
+    const startTime = timePart(event.startTime, event.timezone) ?? DEFAULT_START_TIME;
+    const endTime = timePart(event.endTime, event.timezone) ?? addMinutes(startTime, DEFAULT_DURATION_MINUTES).time;
     if (isBefore(start, startTime, end, endTime)) {
         return { startTime: `${start}T${startTime}:00`, endTime: `${end}T${endTime}:00`, isAllDay: false };
     }
@@ -213,8 +218,8 @@ export function formatEventSchedule(event: EventDateFields): string {
     }
 
     const endYmd = eventEndDate(event) ?? startYmd;
-    const startHm = getFormattedTime(event.startTime) || '00:00';
-    const endHm = getFormattedTime(event.endTime) || startHm;
+    const startHm = getFormattedTime(event.startTime, event.timezone) || '00:00';
+    const endHm = getFormattedTime(event.endTime, event.timezone) || startHm;
     if (endYmd === startYmd) return `${startLabel} · ${startHm} – ${endHm}`;
     return `${startLabel}, ${startHm} – ${formatFriendlyDate(endYmd)}, ${endHm}`;
 }

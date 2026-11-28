@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
     formatHhMm,
+    formatLocalDateTime,
     isoWeeksInYear,
+    minutesSinceMidnight,
     parseLocalYmd,
     startOfWeek,
+    toWallClockParts,
     ymd,
 } from './time';
 
@@ -51,5 +54,46 @@ describe('isoWeeksInYear', () => {
         expect(isoWeeksInYear(2025)).toBe(52);
         expect(isoWeeksInYear(2026)).toBe(53);
         expect(isoWeeksInYear(2020)).toBe(53);
+    });
+});
+
+describe('formatLocalDateTime and toWallClockParts', () => {
+    it('formats local dates as canonical wall-clock YYYY-MM-DDTHH:MM:SS without a Z suffix', () => {
+        expect(formatLocalDateTime(new Date(2026, 8, 7, 9, 5, 3))).toBe('2026-09-07T09:05:03');
+        expect(formatLocalDateTime(new Date(2026, 10, 5, 0, 0, 0))).toBe('2026-11-05T00:00:00');
+    });
+
+    it('keeps date-only and naive wall-clock timestamps literal regardless of timezone', () => {
+        expect(toWallClockParts('2026-11-05')).toEqual({ date: '2026-11-05', time: '' });
+        expect(toWallClockParts('2026-11-05T09:30:00', 'America/New_York')).toEqual({
+            date: '2026-11-05',
+            time: '09:30',
+        });
+    });
+
+    it('converts UTC and offset instants into the named IANA timezone across midnight boundaries', () => {
+        expect(toWallClockParts('2026-11-05T23:30:00Z', 'Asia/Kolkata')).toEqual({
+            date: '2026-11-06',
+            time: '05:00',
+        });
+        expect(toWallClockParts('2026-11-05T01:30:00Z', 'America/Chicago')).toEqual({
+            date: '2026-11-04',
+            time: '19:30',
+        });
+        expect(toWallClockParts('2026-11-05T14:30:00+02:00', 'America/New_York')).toEqual({
+            date: '2026-11-05',
+            time: '07:30',
+        });
+    });
+
+    it('converts UTC instants to host local wall clock when timezone is omitted or UTC', () => {
+        const instant = new Date('2026-11-05T14:30:00Z');
+        const expected = {
+            date: ymd(instant),
+            time: formatHhMm(minutesSinceMidnight(instant)),
+        };
+
+        expect(toWallClockParts('2026-11-05T14:30:00Z')).toEqual(expected);
+        expect(toWallClockParts('2026-11-05T14:30:00Z', 'UTC')).toEqual(expected);
     });
 });

@@ -21,10 +21,6 @@ export const persistedKeys = {
     sidebarTimelineNumDays: 'ui.sidebar_timeline.num_days',
     planTaskPaneSize: 'ui.plan.task_pane_size',
     planCalendarSplitSize: 'ui.plan.calendar_split_size',
-    doDistractionLogOpen: 'ui.do.distraction_log_open',
-    doCurrentTasksOpen: 'ui.do.current_tasks_open',
-    doTipsOpen: 'ui.do.tips_open',
-    doNotesOpen: 'ui.do.notes_open',
     minitrackerPosition: 'ui.minitracker.position',
     wrapReflections: 'ui.wrap.reflections',
 } as const;

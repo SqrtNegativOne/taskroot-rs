@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { AppTask } from '../../lib/domain';
     import { store } from '../../lib/store.svelte';
-    import { formatHhMm, minutesSinceMidnight } from '../../lib/time';
+    import { formatHhMm, minutesSinceMidnight, toWallClockParts } from '../../lib/time';
 
     interface Props {
         tasks: readonly AppTask[];
@@ -13,11 +13,11 @@
     let { tasks, completedTasks, wrapYmd, tomorrowYmd }: Props = $props();
 
     let unfinishedNextUp = $derived(
-        tasks.filter(
-            (task) =>
-                task.status === 'next-up'
-                && (!task.start || task.start.slice(0, 10) <= wrapYmd),
-        ),
+        tasks.filter((task) => {
+            if (task.status !== 'next-up') return false;
+            const startDate = toWallClockParts(task.start, task.timezone)?.date;
+            return !startDate || startDate <= wrapYmd;
+        }),
     );
 
     function formatDoneTime(completedAt: string | null | undefined): string {

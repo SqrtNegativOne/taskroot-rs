@@ -12,7 +12,13 @@ import {
     withStartDate,
     withStartTime,
 } from './eventDates';
-import { formatTaskDateTime, withDate, withTime } from './format';
+import {
+    formatTaskDateTime,
+    getFormattedDate,
+    getFormattedTime,
+    withDate,
+    withTime,
+} from './format';
 
 function allDayEvent(startTime: string, endTime: string) {
     return makeEvent({ startTime, endTime, isAllDay: true });
@@ -269,5 +275,34 @@ describe('date range updates and formatting', () => {
         );
         expect(multiDayTimed).toContain(', 09:00 – ');
         expect(multiDayTimed).toContain(', 17:00');
+    });
+
+    it('converts UTC Z timestamps to event/local wall clock instead of slicing UTC digits', () => {
+        expect(getFormattedDate('2026-11-05T23:30:00Z', 'Asia/Kolkata')).toBe('2026-11-06');
+        expect(getFormattedTime('2026-11-05T23:30:00Z', 'Asia/Kolkata')).toBe('05:00');
+        expect(withDate('2026-11-05T14:15:00Z', '2026-11-08', 'America/New_York')).toBe(
+            '2026-11-08T09:15:00',
+        );
+        expect(withTime('2026-11-05T23:30:00Z', '10:00', 'Asia/Kolkata')).toBe(
+            '2026-11-06T10:00:00',
+        );
+
+        const utcEvent = {
+            startTime: '2026-11-05T23:30:00Z',
+            endTime: '2026-11-06T00:30:00Z',
+            isAllDay: false,
+            timezone: 'Asia/Kolkata',
+        };
+        expect(formatEventSchedule(utcEvent)).toContain('· 05:00 – 06:00');
+        expect(withEndTime(utcEvent, '07:15')).toEqual({
+            startTime: '2026-11-06T05:00:00',
+            endTime: '2026-11-06T07:15:00',
+            isAllDay: false,
+        });
+        expect(toAllDay(utcEvent)).toEqual({
+            startTime: '2026-11-06',
+            endTime: '2026-11-07',
+            isAllDay: true,
+        });
     });
 });

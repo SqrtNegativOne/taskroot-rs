@@ -33,6 +33,7 @@
             startTime: source.startTime,
             endTime: source.endTime,
             isAllDay: source.isAllDay,
+            timezone: source.timezone,
         };
     }
 
@@ -178,7 +179,7 @@
                     <div class="inspector-popover-row">
                         <span class="inspector-popover-label">Start time</span>
                         <TimeInput
-                            value={getFormattedTime(draft.startTime)}
+                            value={getFormattedTime(draft.startTime, draft.timezone)}
                             onchange={handleStartTimeChange}
                             {disabled}
                             ariaLabel="Start time"
@@ -187,7 +188,7 @@
                     <div class="inspector-popover-row">
                         <span class="inspector-popover-label">End time</span>
                         <TimeInput
-                            value={getFormattedTime(draft.endTime)}
+                            value={getFormattedTime(draft.endTime, draft.timezone)}
                             onchange={handleEndTimeChange}
                             {disabled}
                             ariaLabel="End time"

@@ -77,19 +77,19 @@ describe('instanceOccursOnDay', () => {
 });
 
 describe('buildNewEvent across DST transitions', () => {
-    it('places timed events at local wall-clock hours on spring-forward and fall-back days', () => {
+    it('places timed events at canonical local wall-clock hours on spring-forward and fall-back days', () => {
         const spring = buildNewEvent(new Date(2026, 2, 8), {
             startMinutes: 9 * 60,
             endMinutes: 10 * 60,
         });
-        expect(new Date(spring.startTime).getHours()).toBe(9);
-        expect(new Date(spring.endTime).getHours()).toBe(10);
+        expect(spring.startTime).toBe('2026-03-08T09:00:00');
+        expect(spring.endTime).toBe('2026-03-08T10:00:00');
 
         const fall = buildNewEvent(new Date(2026, 10, 1), {
             startMinutes: 9 * 60,
             endMinutes: 10 * 60,
         });
-        expect(new Date(fall.startTime).getHours()).toBe(9);
-        expect(new Date(fall.endTime).getHours()).toBe(10);
+        expect(fall.startTime).toBe('2026-11-01T09:00:00');
+        expect(fall.endTime).toBe('2026-11-01T10:00:00');
     });
 });

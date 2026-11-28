@@ -128,14 +128,14 @@ describe('buildNewEvent', () => {
         expect(event.remoteCollectionId).toBeUndefined();
     });
 
-    it('creates a timed event with UTC instants in the system timezone and leaves remoteCollectionId unset', () => {
+    it('creates a timed event with canonical local wall-clock strings in the system timezone and leaves remoteCollectionId unset', () => {
         const event = buildNewEvent(date, {
             startMinutes: 10 * 60,
             endMinutes: 11 * 60 + 30,
         });
 
-        expect(event.startTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
-        expect(event.endTime).toBe(new Date(2026, 8, 3, 11, 30).toISOString());
+        expect(event.startTime).toBe('2026-09-03T10:00:00');
+        expect(event.endTime).toBe('2026-09-03T11:30:00');
         expect(event.isAllDay).toBe(false);
         expect(event.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
         expect(event.remoteCollectionId).toBeUndefined();
@@ -144,8 +144,8 @@ describe('buildNewEvent', () => {
     it('defaults a timed event to one hour when no end is given', () => {
         const event = buildNewEvent(date, { startMinutes: 9 * 60 });
 
-        expect(event.startTime).toBe(new Date(2026, 8, 3, 9, 0).toISOString());
-        expect(event.endTime).toBe(new Date(2026, 8, 3, 10, 0).toISOString());
+        expect(event.startTime).toBe('2026-09-03T09:00:00');
+        expect(event.endTime).toBe('2026-09-03T10:00:00');
         expect(event.remoteCollectionId).toBeUndefined();
     });
 

@@ -184,4 +184,33 @@ describe('TagsScreen tag renaming', () => {
         });
         expect((screen.getByRole('textbox', { name: 'Tag name' }) as HTMLInputElement).value).toBe('office');
     });
+
+    it('renders wall-clock dates and times for UTC timestamps instead of slicing raw UTC strings', async () => {
+        tauri.stubCommandValue('query_tasks', [
+            {
+                id: 'utc-task',
+                title: 'Timezone task',
+                status: 'todo',
+                due: '2026-09-07T23:30:00Z',
+                timezone: 'Asia/Kolkata',
+                tags: [{ id: 'tz', name: 'tz' }],
+            },
+        ]);
+        tauri.stubCommandValue('query_events', [
+            {
+                id: 'utc-event',
+                title: 'Timezone event',
+                startTime: '2026-09-07T23:30:00Z',
+                endTime: '2026-09-08T00:30:00Z',
+                isAllDay: false,
+                timezone: 'Asia/Kolkata',
+                tags: [{ id: 'tz', name: 'tz' }],
+            },
+        ]);
+
+        render(TagsScreen);
+
+        expect(await screen.findByText('2026-09-08 05:00')).toBeTruthy();
+        expect(screen.getByText('todo · due 2026-09-08')).toBeTruthy();
+    });
 });

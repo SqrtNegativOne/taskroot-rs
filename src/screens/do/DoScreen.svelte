@@ -4,7 +4,6 @@
     import { stopwatchState } from './stopwatch/engine.svelte';
 
     import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
-    import { persistedKeys } from '../../lib/persisted.svelte';
     import { taskListQueryArgs } from '../../lib/taskList.svelte';
 
     let isBreak = $derived(stopwatchState.isBreak);
@@ -46,28 +45,28 @@
                 </div>
             {/if}
 
-            <Collapsible title="distraction log" defaultOpen={true} persistKey={persistedKeys.doDistractionLogOpen}>
+            <Collapsible title="distraction log" defaultOpen={true}>
                 {#snippet badge()}
                     <span class="badge-count">0 entries</span>
                 {/snippet}
                 <div class="stub-content">Distraction Log Stub</div>
             </Collapsible>
 
-            <Collapsible title="current tasks" defaultOpen={false} persistKey={persistedKeys.doCurrentTasksOpen}>
+            <Collapsible title="current tasks" defaultOpen={false}>
                 {#snippet badge()}
                     <span class="badge-count">{tasks.length} tasks</span>
                 {/snippet}
                 <div class="stub-content">Kanban Stub</div>
             </Collapsible>
 
-            <Collapsible title="tips" defaultOpen={false} persistKey={persistedKeys.doTipsOpen}>
+            <Collapsible title="tips" defaultOpen={false}>
                 {#snippet badge()}
                     <span class="badge-count">0 tips</span>
                 {/snippet}
                 <div class="stub-content">Tips Stub</div>
             </Collapsible>
 
-            <Collapsible title="notes" defaultOpen={false} persistKey={persistedKeys.doNotesOpen}>
+            <Collapsible title="notes" defaultOpen={false}>
                 {#snippet badge()}
                     <span class="badge-count">0 notes</span>
                 {/snippet}

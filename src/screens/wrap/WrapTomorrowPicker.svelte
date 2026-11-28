@@ -1,6 +1,14 @@
 <script lang="ts">
-    import { DEFAULT_TASK_PRIORITY, type AppTask, type TaskPatch } from '../../lib/domain';
+    import {
+        DEFAULT_TASK_PRIORITY,
+        taskDateOccursOnDay,
+        type AppTask,
+        type TaskPatch,
+    } from '../../lib/domain';
+    import { taskDates } from '../../lib/queries';
+    import { commands, useAutoQuery } from '../../lib/safeInvoke.svelte';
     import { store } from '../../lib/store.svelte';
+    import { toWallClockParts } from '../../lib/time';
     import SearchBar from '../../components/SearchBar.svelte';
     import { formatWrapDateLabel } from './wrapWindow';
 
@@ -15,15 +23,30 @@
     let search = $state('');
     let newTaskTitle = $state('');
 
-    function isSlatedForTomorrow(task: AppTask, targetYmd: string): boolean {
-        if (task.status === 'done' || task.status === 'cancelled') return false;
-        const startDay = task.start?.slice(0, 10);
-        const dueDay = task.due?.slice(0, 10);
-        return startDay === targetYmd || dueDay === targetYmd;
-    }
+    const tomorrowMarkersQuery = useAutoQuery(
+        commands.queryTaskDates,
+        () => taskDates({ startDate: tomorrowYmd, endDate: tomorrowYmd }),
+    );
+
+    let tomorrowMarkers = $derived(
+        (tomorrowMarkersQuery.data ?? []).filter((marker) => taskDateOccursOnDay(marker, tomorrowDate)),
+    );
+    let tomorrowSlatedIds = $derived(new Set(tomorrowMarkers.map((marker) => marker.taskId)));
+    let tomorrowStartIds = $derived(
+        new Set(
+            tomorrowMarkers
+                .filter((marker) => marker.kind === 'start')
+                .map((marker) => marker.taskId),
+        ),
+    );
 
     let slatedTomorrow = $derived(
-        tasks.filter((task) => isSlatedForTomorrow(task, tomorrowYmd)),
+        tasks.filter(
+            (task) =>
+                task.status !== 'done'
+                && task.status !== 'cancelled'
+                && tomorrowSlatedIds.has(task.id),
+        ),
     );
 
     let slatedIds = $derived(new Set(slatedTomorrow.map((task) => task.id)));
@@ -49,7 +72,7 @@
     }
 
     function unplanFromTomorrow(task: AppTask): void {
-        const patches: TaskPatch[] = task.start?.slice(0, 10) === tomorrowYmd
+        const patches: TaskPatch[] = tomorrowStartIds.has(task.id)
             ? [
                 { field: 'status', value: 'todo' },
                 { field: 'start', value: null },
@@ -160,7 +183,10 @@
                         <div class="wrap-task-info">
                             <span class="wrap-task-title">{task.title}</span>
                             {#if task.due}
-                                <span class="wrap-task-meta">due {task.due.slice(0, 10)}</span>
+                                {@const dueDate = toWallClockParts(task.due, task.timezone)?.date}
+                                {#if dueDate}
+                                    <span class="wrap-task-meta">due {dueDate}</span>
+                                {/if}
                             {/if}
                         </div>
                         <span class="wrap-btn is-accent">+ Tomorrow</span>

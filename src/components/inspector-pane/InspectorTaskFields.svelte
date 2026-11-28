@@ -8,7 +8,7 @@
         TaskPriority,
     } from '../../lib/domain';
     import { calendarsForComponent, DEFAULT_TASK_PRIORITY } from '../../lib/domain';
-    import { formatTimestamp, formatTrackedDuration } from './format';
+    import { formatTimestamp, formatTrackedDuration, localTimezoneIfUtc } from './format';
     import NumberInput from '../inputs/NumberInput.svelte';
     import SelectInput from '../inputs/SelectInput.svelte';
     import TagsInput from '../inputs/TagsInput.svelte';
@@ -83,7 +83,13 @@
     }
 
     function handleDateTimeChange(field: 'start' | 'due', value: string | null): void {
-        updateTask(task.id, [field === 'start' ? { field: 'start', value } : { field: 'due', value }]);
+        const tz = value?.includes('T')
+            ? localTimezoneIfUtc([field === 'start' ? task.start : task.due], task.timezone)
+            : undefined;
+        updateTask(task.id, [
+            field === 'start' ? { field: 'start', value } : { field: 'due', value },
+            ...(tz ? [{ field: 'timezone' as const, value: tz }] : []),
+        ]);
     }
 
     function handleTagsChange(newTags: string[]): void {
@@ -148,6 +154,7 @@
 <InspectorField icon="calendar_month" label="Start" disabled={readOnly}>
     <DatePickerField
         value={task.start}
+        timezone={task.timezone}
         placeholder="No start date"
         ariaLabel="Start date"
         timeAriaLabel="Start time"
@@ -159,6 +166,7 @@
 <InspectorField icon="hourglass" label="Deadline" disabled={readOnly}>
     <DatePickerField
         value={task.due}
+        timezone={task.timezone}
         placeholder="No due date"
         ariaLabel="Due date"
         timeAriaLabel="Due time"
