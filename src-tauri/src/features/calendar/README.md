@@ -45,8 +45,8 @@ The CalDAV-backed task and event domain. Base feature: imports no other feature,
 
 ## Loading and writes
 
-- `load::fetch_into` / `AccountService::refresh` fetch outside the store lock
-  and apply under `Store::revision()`; every resource and collection mutation
+- `AccountService::refresh` fetches outside the store lock
+  and applies under `Store::revision()`; every resource and collection mutation
   bumps the revision. Startup retries transient `Remote` failures up to 20 times
   (2 s delay); Refresh does not retry.
 - `store/ops/` owns conditional writes, writability preflight and scoped

@@ -2,9 +2,7 @@
 
 use std::error::Error;
 
-use tauri::Manager;
-
-use super::windows::{WindowLabel, restore_main};
+use super::windows::restore_main;
 
 /// Build the tray icon and its menu.
 ///
@@ -38,12 +36,7 @@ pub fn build_tray(
                 ..
             } = event
             {
-                let app = tray.app_handle();
-                if let Some(main_win) = app.get_webview_window(WindowLabel::Main.as_str()) {
-                    let _ = main_win.show();
-                    let _ = main_win.unminimize();
-                    let _ = main_win.set_focus();
-                }
+                restore_main(tray.app_handle());
             }
         })
         .build(app)?;

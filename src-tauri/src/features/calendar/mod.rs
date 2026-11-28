@@ -35,7 +35,7 @@ pub use ics::{
     create_event_resource, create_task_resource, delete_event_component, delete_task_component,
     read_event_resource, read_task_resource, write_event_resource, write_task_resource,
 };
-pub use load::{apply, fetch_into, load_into, Fetched};
+pub use load::{apply, Fetched};
 pub use occurrences::{expand_event_instances, single_instance};
 pub use quick_capture::{parse as parse_quick_capture, QuickCaptureDraft};
 pub use session::{app_calendar, open, Session};

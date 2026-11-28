@@ -32,15 +32,6 @@ impl EventTiming {
         Self::timed_from_event(event)
     }
 
-    /// Floating date if this timing is all-day.
-    #[must_use]
-    pub const fn start_date(&self) -> Option<NaiveDate> {
-        match self {
-            Self::AllDay { start_date, .. } => Some(*start_date),
-            Self::Timed { .. } => None,
-        }
-    }
-
     fn all_day_from_event(event: &AppEvent) -> Option<Self> {
         let start_date = event.start_time.date();
         let parsed_end = event.end_time.date();
