@@ -3,7 +3,7 @@ import { SvelteDate } from 'svelte/reactivity';
 const DEFAULT_NOW_INTERVAL_MS = 1000;
 
 export function useNow(intervalMs: number = DEFAULT_NOW_INTERVAL_MS) {
-    const now = new SvelteDate();
+    const now = new SvelteDate(Date.now());
 
     $effect(() => {
         now.setTime(Date.now());

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { createDebouncer, createStaleGuard } from './asyncState.svelte';
+import { mountEffectRoot } from './effectRootHarness.svelte';
 import HydrateHarness from './hydrateOnceHarness.svelte';
+import { useNow } from './useNow.svelte';
 
 describe('hydrateOnce', () => {
     it('applies a load that resolves while the component is alive', async () => {
@@ -101,5 +103,25 @@ describe('createDebouncer', () => {
         writer.flush();
 
         expect(write).not.toHaveBeenCalled();
+    });
+});
+
+describe('useNow', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('seeds its initial timestamp from Date.now() before effects run', () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        const target = new Date(2026, 8, 7, 5, 30, 0);
+        vi.setSystemTime(target);
+
+        let now!: ReturnType<typeof useNow>;
+        const dispose = mountEffectRoot(() => {
+            now = useNow(60_000);
+        });
+
+        expect(now.ms).toBe(target.getTime());
+        dispose();
     });
 });
