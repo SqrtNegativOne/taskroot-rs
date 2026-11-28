@@ -66,6 +66,15 @@ vi.restoreAllMocks();
         expect(screen.getByText(/read-only/)).not.toBeNull();
     });
 
+    it('disables clearing colour on a read-only list that has a colour', async () => {
+        render(CalendarManager, {
+            props: { calendars: [{ ...shared, color: '#336699' }] },
+        });
+
+        const clearBtn = screen.getByLabelText('Clear colour of Shared') as HTMLButtonElement;
+        expect(clearBtn.disabled).toBe(true);
+    });
+
     it('creates a list with the chosen name and kind', async () => {
         render(CalendarManager, { props: { calendars: [] } });
 

@@ -81,7 +81,7 @@
             {#if calendar.color}
                 <button
                     class="icon"
-                    disabled={busy}
+                    disabled={!calendar.writable || busy}
                     title="Clear colour"
                     aria-label={`Clear colour of ${calendar.summary}`}
                     onclick={() => void handleClearColor(calendar)}
