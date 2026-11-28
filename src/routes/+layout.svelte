@@ -39,10 +39,14 @@
         isSidebar = (label as string) === 'sidebar';
         isEffect = label === 'effect';
 
-        let unlistenNav = () => { /* noop */ };
+        const isMainWindow = !isLauncher && !isMinitracker && !isSidebar && !isEffect;
+
+        let disposed = false;
+        let unlistenNav: (() => void) | undefined;
 
         const redirectForAccount = async (): Promise<boolean> => {
             const configured = await safeInvoke(commands.isAccountConfigured());
+            if (disposed) return false;
             if (configured.isErr()) {
                 store.error = `Could not check the CalDAV account: ${describeError(configured.error)}`;
                 return false;
@@ -61,41 +65,46 @@
 
         const redirectToStartup = async () => {
             if (page.url.pathname !== Routes.HOME) return;
-            if (await claimFirstOpenOfDay()) {
+            if (await claimFirstOpenOfDay() && !disposed) {
                 await goto(resolve(Routes.STARTUP));
             }
         };
 
+        const attachLauncherNavigation = async () => {
+            const stop = await events.launcherNavigate.listen((event) => {
+                if (disposed || !isRouteId(event.payload)) return;
+                const route = event.payload;
+                void (async () => {
+                    await goto(resolve(route));
+                    await safeInvoke(commands.windowRestoreMain());
+                })();
+            });
+            if (disposed) stop();
+            else unlistenNav = stop;
+        };
+
         const initialize = async () => {
             const initResult = await store.init();
+            if (disposed) return;
             if (initResult.isErr()) {
                 store.error = `Error loading data from backend: ${describeError(initResult.error)}`;
             }
 
-            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
+            if (isMainWindow) {
                 const configured = await redirectForAccount();
-                if (configured) await redirectToStartup();
+                if (configured && !disposed) await redirectToStartup();
+                if (disposed) return;
             }
 
             isBooting = false;
-
-            if (!isLauncher && !isMinitracker && !isSidebar && !isEffect) {
-                unlistenNav = await events.launcherNavigate.listen((event) => {
-                    const route = event.payload;
-                    if (isRouteId(route)) {
-                        void (async () => {
-                            await goto(resolve(route));
-                            await safeInvoke(commands.windowRestoreMain());
-                        })();
-                    }
-                });
-            }
+            if (isMainWindow) await attachLauncherNavigation();
         };
 
         void initialize();
 
         return () => {
-            unlistenNav();
+            disposed = true;
+            unlistenNav?.();
         };
     });
 </script>
