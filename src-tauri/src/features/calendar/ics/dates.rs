@@ -1,7 +1,7 @@
 //! Date, date-time and ISO-8601 duration conversions for iCalendar properties.
 
 use crate::features::calendar::domain::{
-    utc_to_wall_clock, CalendarDateTime, ICAL_DATE, ICAL_DATE_TIME, ICAL_UTC,
+    resolve_wall_clock, utc_to_wall_clock, CalendarDateTime, ICAL_DATE, ICAL_DATE_TIME, ICAL_UTC,
 };
 use crate::features::calendar::ics::cst::encode;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
@@ -42,8 +42,10 @@ impl DateValue {
     pub(super) fn wall_clock(&self, zone: Option<&str>) -> Option<NaiveDateTime> {
         match self {
             Self::Date(_) => None,
-            Self::Timed { naive, utc, .. } => Some(if *utc {
+            Self::Timed { naive, tzid, utc } => Some(if *utc {
                 utc_to_wall_clock(naive.and_utc(), zone)
+            } else if tzid.as_deref().is_some_and(|src| Some(src) != zone) {
+                utc_to_wall_clock(resolve_wall_clock(*naive, tzid.as_deref()), zone)
             } else {
                 *naive
             }),
@@ -100,7 +102,11 @@ pub(super) fn parse_date_text(
 pub(super) fn stamp_from_line(line: &IcalLine<'_>) -> Option<DateTime<Utc>> {
     match parse_date_line(line)? {
         DateValue::Date(date) => date.and_hms_opt(0, 0, 0).map(|dt| dt.and_utc()),
-        DateValue::Timed { naive, .. } => Some(naive.and_utc()),
+        DateValue::Timed { naive, tzid, utc } => Some(if utc {
+            naive.and_utc()
+        } else {
+            resolve_wall_clock(naive, tzid.as_deref())
+        }),
     }
 }
 

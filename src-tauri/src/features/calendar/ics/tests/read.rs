@@ -221,3 +221,31 @@ fn floating_timed_event_reads_with_no_timezone() {
     assert_eq!(event.start_time.to_string(), "2026-04-10T14:00:00");
     assert_eq!(event.end_time.to_string(), "2026-04-10T15:00:00");
 }
+
+#[test]
+fn cross_timezone_exdate_and_dtend_convert_into_the_event_zone() {
+    let raw = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:cross-tz-1\r\n",
+        "DTSTART:20260410T140000Z\r\n",
+        "DTEND;TZID=America/New_York:20260410T110000\r\n",
+        "RRULE:FREQ=WEEKLY\r\n",
+        "EXDATE;TZID=America/New_York:20260417T100000\r\n",
+        "SUMMARY:Cross-zone\r\n",
+        "DTSTAMP:20260401T000000Z\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+
+    let event = read_one(raw);
+
+    assert_eq!(event.timezone.as_deref(), Some("UTC"));
+    assert_eq!(event.start_time.to_string(), "2026-04-10T14:00:00");
+    assert_eq!(event.end_time.to_string(), "2026-04-10T15:00:00");
+    assert_eq!(
+        event.exdates,
+        Some(vec!["2026-04-17T14:00:00".parse().unwrap()])
+    );
+}
