@@ -26,7 +26,7 @@ export function createPointerGestureRecognizer(): PointerGestureRecognizer {
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', finish);
             window.removeEventListener('pointercancel', cancel);
-            activeTeardowns.delete(detach);
+            activeTeardowns.delete(cancel);
         };
 
         const finish = (e: PointerEvent) => {
@@ -42,7 +42,7 @@ export function createPointerGestureRecognizer(): PointerGestureRecognizer {
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', finish);
         window.addEventListener('pointercancel', cancel);
-        activeTeardowns.add(detach);
+        activeTeardowns.add(cancel);
         return detach;
     };
 }

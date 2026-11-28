@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { flushSync } from 'svelte';
+import { mountEffectRoot } from '../../../lib/effectRootHarness.svelte';
+import { createPointerGestureRecognizer } from './hooks/pointerGesture.svelte';
 import { attachDaySnap, daySnapTarget, snapDayScroll } from './scrollSnap';
 
 const IDLE_SNAP_DELAY_MS = 200;
@@ -299,5 +302,28 @@ describe('attachDaySnap', () => {
 
             expect(scroller.scrollLeft).toBe(130);
         });
+    });
+});
+
+describe('createPointerGestureRecognizer', () => {
+    it('cancels an active gesture and removes listeners when torn down mid-drag', () => {
+        const onMove = vi.fn();
+        const onEnd = vi.fn();
+        const onCancel = vi.fn();
+        let track!: ReturnType<typeof createPointerGestureRecognizer>;
+
+        const dispose = mountEffectRoot(() => {
+            track = createPointerGestureRecognizer();
+        });
+        flushSync();
+
+        track({ onMove, onEnd, onCancel });
+        dispose();
+
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        window.dispatchEvent(new PointerEvent('pointermove'));
+        window.dispatchEvent(new PointerEvent('pointerup'));
+        expect(onMove).not.toHaveBeenCalled();
+        expect(onEnd).not.toHaveBeenCalled();
     });
 });
