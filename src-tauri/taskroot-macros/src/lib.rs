@@ -172,7 +172,7 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
             continue;
         };
         let mut label: Option<String> = None;
-        let mut kind: Option<String> = None;
+        let mut kind: Option<TokenStream2> = None;
         let mut section: Option<String> = None;
         let mut description: Option<String> = None;
         let mut keywords: Vec<String> = Vec::new();
@@ -196,12 +196,7 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                         "label",
                     )?;
                 } else if meta.path.is_ident("kind") {
-                    set_once(
-                        &mut kind,
-                        meta.value()?.parse::<LitStr>()?.value(),
-                        &meta,
-                        "kind",
-                    )?;
+                    set_once(&mut kind, parse_setting_kind(&meta)?, &meta, "kind")?;
                 } else if meta.path.is_ident("section") {
                     set_once(
                         &mut section,
@@ -309,7 +304,7 @@ pub fn settings_meta_derive(input: TokenStream) -> TokenStream {
                 label: #label.to_string(),
                 description: #description,
                 keywords: vec![ #(#keyword_tokens),* ],
-                kind: #kind.to_string(),
+                kind: #kind,
                 options: #options,
                 min: #min,
                 max: #max,
@@ -405,4 +400,18 @@ fn parse_setting_option(
     };
 
     Ok(SettingOptionTokens { value, label })
+}
+
+fn parse_setting_kind(meta: &syn::meta::ParseNestedMeta) -> syn::Result<TokenStream2> {
+    let raw = meta.value()?.parse::<LitStr>()?.value();
+    match raw.as_str() {
+        "select" => Ok(quote! { crate::settings::SettingKind::Select }),
+        "checkbox" => Ok(quote! { crate::settings::SettingKind::Checkbox }),
+        "number" => Ok(quote! { crate::settings::SettingKind::Number }),
+        "time" => Ok(quote! { crate::settings::SettingKind::Time }),
+        "calendar" => Ok(quote! { crate::settings::SettingKind::Calendar }),
+        other => Err(meta.error(format!(
+            "unknown setting kind `{other}`; expected one of select, checkbox, number, time, calendar"
+        ))),
+    }
 }

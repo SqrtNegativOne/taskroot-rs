@@ -1,37 +1,18 @@
 use super::*;
 use std::collections::BTreeSet;
 
-/// The control kinds `SettingRow`/`schema.ts` know how to render. `custom` is
-/// for the button-only pseudo-settings, `action` for frontend-only controls;
-/// anything else produces no control.
-const KNOWN_SETTING_KINDS: &[&str] = &[
-    "select",
-    "checkbox",
-    "number",
-    "time",
-    "keybinding",
-    "calendar",
-    "custom",
-    "action",
-];
-
 fn schema_setting_ids() -> Vec<String> {
-    let schema = settings_schema_value();
-    let mut ids = Vec::new();
-
-    for tab in schema["tabs"].as_array().expect("tabs") {
-        for section in tab["sections"].as_array().expect("sections") {
-            for setting in section["settings"].as_array().expect("settings") {
-                ids.push(setting["id"].as_str().expect("id").to_string());
-            }
-        }
-    }
-
-    ids
+    settings_schema()
+        .tabs
+        .into_iter()
+        .flat_map(|tab| tab.sections)
+        .flat_map(|section| section.settings)
+        .map(|setting| setting.id)
+        .collect()
 }
 
 fn is_select_of(meta: &SettingMeta, predicate: impl Fn(&Value) -> bool) -> bool {
-    meta.kind == "select"
+    meta.kind == SettingKind::Select
         && meta.options.as_ref().is_some_and(|options| {
             !options.is_empty() && options.iter().all(|o| predicate(&o.value))
         })
@@ -79,21 +60,6 @@ fn schema_places_every_setting_exactly_once() {
 }
 
 #[test]
-fn every_setting_kind_is_known() {
-    let kinds: Vec<String> = AppSettings::setting_metadata()
-        .into_iter()
-        .map(|meta| meta.kind)
-        .collect();
-
-    for kind in kinds {
-        assert!(
-            KNOWN_SETTING_KINDS.contains(&kind.as_str()),
-            "unknown setting kind '{kind}'; expected one of {KNOWN_SETTING_KINDS:?}"
-        );
-    }
-}
-
-#[test]
 fn every_setting_section_is_registered() {
     let registered: BTreeSet<&str> = SETTING_SECTIONS.iter().map(|section| section.key).collect();
     let used: BTreeSet<&str> = AppSettings::setting_metadata()
@@ -113,12 +79,13 @@ fn every_setting_section_is_registered() {
     );
 }
 
-/// The Settings screen reads the command's JSON directly, so the serialized
-/// keys are part of the contract: `kind` must be `type`, `default_value` must be
-/// `defaultValue`, and a select must carry renderable options.
+/// The Settings screen consumes `SettingsSchema` over IPC, so the serialized
+/// wire shape is part of the contract: `kind` must serialize as `type`,
+/// `default_value` as `defaultValue`, `section` must be omitted, and every
+/// `select` row must carry renderable options.
 #[test]
 fn schema_rows_expose_the_frontend_wire_contract() {
-    let schema = settings_schema_value();
+    let schema = serde_json::to_value(settings_schema()).expect("serialize settings schema");
 
     for tab in schema["tabs"].as_array().expect("tabs") {
         for section in tab["sections"].as_array().expect("sections") {
@@ -131,21 +98,16 @@ fn schema_rows_expose_the_frontend_wire_contract() {
                     setting.get("kind").is_none(),
                     "{id}: `kind` leaked instead of `type`"
                 );
-
-                let kind = setting["type"].as_str().expect("type");
-                if kind == "custom" {
-                    assert!(
-                        setting.get("defaultValue").is_none(),
-                        "{id}: custom setting must not carry a default"
-                    );
-                    continue;
-                }
-
+                assert!(
+                    setting.get("section").is_none(),
+                    "{id}: internal `section` key leaked onto wire"
+                );
                 assert!(
                     setting.get("defaultValue").is_some(),
                     "{id}: missing `defaultValue`"
                 );
 
+                let kind = setting["type"].as_str().expect("type");
                 if kind == "select" {
                     let options = setting["options"].as_array().expect("select options");
                     assert!(!options.is_empty(), "{id}: select without options");
@@ -165,18 +127,19 @@ fn schema_rows_expose_the_frontend_wire_contract() {
 fn setting_kind_matches_the_default_value_type() {
     for meta in AppSettings::setting_metadata() {
         let default = meta.default_value.as_ref().expect("default value");
-        let kind = meta.kind.as_str();
+        let kind = meta.kind;
 
         match default {
-            Value::Bool(_) => assert_eq!(kind, "checkbox", "{}", meta.id),
+            Value::Bool(_) => assert_eq!(kind, SettingKind::Checkbox, "{}", meta.id),
             Value::Number(_) => assert!(
-                matches!(kind, "number" | "time") || is_select_of(&meta, Value::is_number),
-                "{}: number setting declared as `{kind}`",
+                matches!(kind, SettingKind::Number | SettingKind::Time)
+                    || is_select_of(&meta, Value::is_number),
+                "{}: number setting declared as `{kind:?}`",
                 meta.id
             ),
             Value::String(_) => assert!(
-                matches!(kind, "keybinding" | "calendar") || is_select_of(&meta, Value::is_string),
-                "{}: string setting declared as `{kind}`",
+                kind == SettingKind::Calendar || is_select_of(&meta, Value::is_string),
+                "{}: string setting declared as `{kind:?}`",
                 meta.id
             ),
             other => panic!("{}: unexpected default {other}", meta.id),

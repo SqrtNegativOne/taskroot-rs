@@ -9,15 +9,15 @@ use tauri_specta::Event;
 use crate::error::AppError;
 use crate::ipc::session::store_state;
 use crate::ipc_events::SettingsUpdated;
-use crate::settings::{metadata, storage, AppSettings};
+use crate::settings::{metadata, storage, AppSettings, SettingsSchema};
 
 /// The settings screen's tab/section/setting metadata, derived from the
 /// `#[setting(..)]` attributes on [`AppSettings`].
 #[tauri::command]
 #[specta::specta]
 #[must_use]
-pub fn get_settings_schema() -> Value {
-    metadata::settings_schema_value()
+pub fn get_settings_schema() -> SettingsSchema {
+    metadata::settings_schema()
 }
 
 /// # Errors

@@ -5,17 +5,25 @@
 
     import SettingRow from './SettingRow.svelte';
     import AccountPanel from './AccountPanel.svelte';
-    import type { AppSettings, SettingsSchema, SettingValue } from './schema';
-    import { isSettingsSchema } from './schema';
-    import type { AppCalendar } from '$lib/domain';
+    import type { AppCalendar, AppSettings, SettingsSchema, SettingValue } from '$lib/domain';
 
     const ACCOUNT_TAB_ID = 'account';
+    type SettingKey = keyof AppSettings;
 
     let schema = $state<SettingsSchema | null>(null);
     let settings = $state<AppSettings | null>(null);
     let calendars = $state<AppCalendar[]>([]);
     let activeTabId = $state(ACCOUNT_TAB_ID);
     let saveError = $state<string | null>(null);
+
+    function isSettingKey(id: string, current: AppSettings): id is SettingKey {
+        return Object.hasOwn(current, id);
+    }
+
+    function settingValue(id: string): SettingValue | undefined {
+        if (!settings || !isSettingKey(id, settings)) return undefined;
+        return settings[id];
+    }
 
     onMount(() => {
         void initialize();
@@ -39,7 +47,7 @@
         const result = await safeInvoke(commands.getSettingsSchema());
         result.match(
             (loaded) => {
-                if (isSettingsSchema(loaded)) schema = loaded;
+                schema = loaded;
             },
             (error) => console.error('Failed to load schema:', error)
         );
@@ -48,7 +56,7 @@
     async function loadSettings(): Promise<void> {
         const result = await safeInvoke(commands.getSettings());
         result.match(
-            (loaded) => (settings = loaded as AppSettings),
+            (loaded) => (settings = loaded),
             (error) => console.error('Failed to load settings:', error)
         );
     }
@@ -115,7 +123,7 @@
                                             <SettingRow
                                                 {item}
                                                 {calendars}
-                                                value={settings?.[item.id]}
+                                                value={settingValue(item.id)}
                                                 onchange={(value: SettingValue) => handleSettingChange(item.id, value)}
                                             />
                                         {/each}

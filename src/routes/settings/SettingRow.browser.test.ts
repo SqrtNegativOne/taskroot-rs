@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import SettingRow from './SettingRow.svelte';
-import type { SettingValue, SettingsSchemaItem } from './schema';
-import type { AppCalendar } from '../../lib/domain';
+import type { AppCalendar, SettingMeta, SettingValue } from '$lib/domain';
 
-const numericSelect: SettingsSchemaItem = {
+const numericSelect: SettingMeta = {
     id: 'default_task_duration',
     label: 'Default Duration',
+    keywords: [],
     type: 'select',
     defaultValue: 0,
     options: [
@@ -15,9 +15,10 @@ const numericSelect: SettingsSchemaItem = {
     ],
 };
 
-const stringSelect: SettingsSchemaItem = {
+const stringSelect: SettingMeta = {
     id: 'clock_style',
     label: 'Clock Style',
+    keywords: [],
     type: 'select',
     defaultValue: 'flowtime',
     options: [
@@ -95,6 +96,7 @@ describe('SettingRow calendar select', () => {
                 item: {
                     id: 'default_task_list',
                     label: 'Default Tasks List',
+                    keywords: [],
                     type: 'calendar',
                     defaultValue: '',
                 },
@@ -124,6 +126,7 @@ describe('SettingRow calendar select', () => {
                 item: {
                     id: 'default_event_list',
                     label: 'Default Events List',
+                    keywords: [],
                     type: 'calendar',
                     defaultValue: '',
                 },
@@ -150,6 +153,7 @@ describe('SettingRow calendar select', () => {
                 item: {
                     id: 'default_task_list',
                     label: 'Default Tasks List',
+                    keywords: [],
                     type: 'calendar',
                     defaultValue: '',
                 },
@@ -167,9 +171,10 @@ describe('SettingRow calendar select', () => {
 describe('SettingRow time input', () => {
     afterEach(cleanup);
 
-    const wakeUpSetting: SettingsSchemaItem = {
+    const wakeUpSetting: SettingMeta = {
         id: 'earliest_wake_up_time',
         label: 'Earliest Wake Up Time',
+        keywords: [],
         type: 'time',
         defaultValue: 0,
     };

@@ -36,7 +36,7 @@
         const label = appWindow.label as WindowLabel;
         isLauncher = label === 'launcher';
         isMinitracker = label === 'minitracker';
-        isSidebar = (label as string) === 'sidebar';
+        isSidebar = label === 'sidebar';
         isEffect = label === 'effect';
 
         const isMainWindow = !isLauncher && !isMinitracker && !isSidebar && !isEffect;

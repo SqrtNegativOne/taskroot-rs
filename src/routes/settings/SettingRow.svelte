@@ -1,14 +1,12 @@
 <script lang="ts">
-    import type { SettingsSchemaItem, SettingValue } from './schema';
-    import type { AppCalendar } from '../../lib/domain';
-    import { formatHhMm } from '../../lib/time';
+    import type { AppCalendar, JsonValue, SettingMeta, SettingValue } from '$lib/domain';
+    import { formatHhMm } from '$lib/time';
     import ToggleSwitch from '../../components/inputs/ToggleSwitch.svelte';
-    import KeybindingInput from '../../components/inputs/KeybindingInput.svelte';
 
     const MAX_TIME_MINUTES = 23 * 60 + 59;
 
     interface Props {
-        item: SettingsSchemaItem;
+        item: SettingMeta;
         value: SettingValue | undefined;
         onchange: (value: SettingValue) => void;
         calendars?: AppCalendar[];
@@ -16,8 +14,17 @@
 
     let { item, value, onchange, calendars = [] }: Props = $props();
 
+    function isSettingValue(candidate: JsonValue | null | undefined): candidate is SettingValue {
+        return (
+            typeof candidate === 'string' ||
+            typeof candidate === 'number' ||
+            typeof candidate === 'boolean'
+        );
+    }
+
     function selectValue(): SettingValue | undefined {
-        return value ?? item.defaultValue;
+        if (value !== undefined) return value;
+        return isSettingValue(item.defaultValue) ? item.defaultValue : undefined;
     }
 
     function minutesToTimeString(raw: SettingValue | undefined): string {
@@ -56,9 +63,10 @@
         );
     });
 
-    let calendarValue = $derived(
-        typeof selectValue() === 'string' ? selectValue() : '',
-    );
+    let calendarValue = $derived.by(() => {
+        const current = selectValue();
+        return typeof current === 'string' ? current : '';
+    });
     let missingCalendar = $derived(
         calendarValue !== '' && !calendarOptions.some((calendar) => calendar.id === calendarValue),
     );
@@ -68,7 +76,7 @@
     // strings the backend then rejects.
     function selectedValue(raw: string): SettingValue {
         const picked = item.options?.find((option) => String(option.value) === raw);
-        return picked ? picked.value : raw;
+        return picked && isSettingValue(picked.value) ? picked.value : raw;
     }
 </script>
 
@@ -86,7 +94,7 @@
                 value={selectValue()}
                 onchange={(e) => onchange(selectedValue(e.currentTarget.value))}
             >
-                {#each item.options as option (option.value)}
+                {#each item.options as option (String(option.value))}
                     <option value={option.value}>{option.label}</option>
                 {/each}
             </select>
@@ -126,11 +134,6 @@
                 value={minutesToTimeString(selectValue())}
                 oninput={(e) => handleTimeChange(e.currentTarget.value)}
                 onchange={(e) => handleTimeChange(e.currentTarget.value)}
-            />
-        {:else if item.type === 'keybinding'}
-            <KeybindingInput
-                value={selectValue() as string}
-                onchange={(val: string) => onchange(val)}
             />
         {/if}
     </div>

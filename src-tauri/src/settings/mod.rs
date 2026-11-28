@@ -33,7 +33,9 @@ use taskroot_macros::SettingsMeta;
 
 pub use clock_style::ClockStyle;
 pub use colour_scheme::ColourScheme;
-pub use metadata::{SettingMeta, SettingOption};
+pub use metadata::{
+    SettingKind, SettingMeta, SettingOption, SettingSection, SettingTab, SettingsSchema,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, SettingsMeta)]
 #[serde(default)]
