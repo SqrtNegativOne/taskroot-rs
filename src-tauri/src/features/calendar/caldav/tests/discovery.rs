@@ -96,6 +96,16 @@ fn unsupported_schemes_and_embedded_credentials_are_rejected() {
     );
 }
 
+#[test]
+fn password_only_embedded_credentials_are_rejected() {
+    assert_eq!(
+        normalize_server_url("https://:secret@dav.example")
+            .unwrap_err()
+            .code(),
+        "invalid-input"
+    );
+}
+
 #[tokio::test]
 async fn discovery_follows_the_well_known_redirect_and_persists_nothing() {
     let (server, http) = start_http_server().await;

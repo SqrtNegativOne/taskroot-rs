@@ -98,7 +98,7 @@ pub fn normalize_server_url(raw: &str) -> Result<String, AppError> {
         }
     }
 
-    if !url.username().is_empty() {
+    if !url.username().is_empty() || url.password().is_some() {
         return Err(AppError::InvalidInput(
             "The server URL must not contain a username or password".to_string(),
         ));
