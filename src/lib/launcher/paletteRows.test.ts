@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { AppCalendar, AppTask, EventInstance } from '../domain';
-import { makeInstance } from '../../test/factories';
+import type { AppCalendar, EventInstance, TaskDateInstance } from '../domain';
+import { makeInstance, makeTaskDateInstance } from '../../test/factories';
 import { Routes } from '../routes';
 import { parseQuickCapture } from './quickCapture';
 import {
     buildPaletteRows,
     buildTaskFromQuickCapture,
-    filterTodayTasks,
     formatEventDetail,
     formatPreviewParts,
     formatTaskDetail,
     matchRouteCommand,
+    projectTodayTasks,
+    type TodayTask,
 } from './paletteRows';
 
 const SAMPLE_CALENDARS: AppCalendar[] = [
@@ -38,15 +39,77 @@ describe('paletteRows', () => {
         expect(matchRouteCommand('buy milk')).toBeUndefined();
     });
 
-    it('filters today tasks by start or due prefix', () => {
-        const tasks: AppTask[] = [
-            { id: '1', title: 'Due today', status: 'todo', due: '2026-11-19T14:00:00' },
-            { id: '2', title: 'Started today', status: 'todo', start: '2026-11-19' },
-            { id: '3', title: 'Tomorrow', status: 'todo', due: '2026-11-20' },
-            { id: '4', title: 'Undated', status: 'todo' },
+    it('projects timed and all-day task markers onto the local calendar day, excluding done tasks and neighboring days', () => {
+        const earlyToday = new Date(2026, 10, 19, 0, 30, 0);
+        const lateToday = new Date(2026, 10, 19, 23, 30, 0);
+        const lateYesterday = new Date(2026, 10, 18, 23, 30, 0);
+        const earlyTomorrow = new Date(2026, 10, 20, 0, 30, 0);
+
+        const markers: TaskDateInstance[] = [
+            makeTaskDateInstance({
+                taskId: 'early-today',
+                kind: 'due',
+                title: 'Early local due',
+                status: 'todo',
+                timing: { kind: 'timed', start: earlyToday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'late-today',
+                kind: 'start',
+                title: 'Late local start',
+                status: 'next-up',
+                timing: { kind: 'timed', start: lateToday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'all-day',
+                kind: 'start',
+                title: 'All-day start',
+                status: 'todo',
+                timing: { kind: 'allDay', date: '2026-11-19' },
+            }),
+            makeTaskDateInstance({
+                taskId: 'done-today',
+                kind: 'due',
+                title: 'Already done',
+                status: 'done',
+                timing: { kind: 'allDay', date: '2026-11-19' },
+            }),
+            makeTaskDateInstance({
+                taskId: 'yesterday',
+                kind: 'due',
+                title: 'Late yesterday',
+                status: 'todo',
+                timing: { kind: 'timed', start: lateYesterday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'tomorrow',
+                kind: 'due',
+                title: 'Early tomorrow',
+                status: 'todo',
+                timing: { kind: 'timed', start: earlyTomorrow.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'both-markers',
+                kind: 'start',
+                title: 'Both start and due',
+                status: 'todo',
+                timing: { kind: 'allDay', date: '2026-11-19' },
+            }),
+            makeTaskDateInstance({
+                taskId: 'both-markers',
+                kind: 'due',
+                title: 'Both start and due',
+                status: 'todo',
+                timing: { kind: 'allDay', date: '2026-11-19' },
+            }),
         ];
 
-        expect(filterTodayTasks(tasks, '2026-11-19').map((t) => t.id)).toEqual(['1', '2']);
+        expect(projectTodayTasks(markers, TODAY)).toEqual([
+            { taskId: 'early-today', title: 'Early local due', kind: 'due' },
+            { taskId: 'late-today', title: 'Late local start', kind: 'start' },
+            { taskId: 'all-day', title: 'All-day start', kind: 'start' },
+            { taskId: 'both-markers', title: 'Both start and due', kind: 'due' },
+        ]);
     });
 
     it('builds agenda rows without a create row when empty, and prepends create + filters when typed', () => {
@@ -54,9 +117,9 @@ describe('paletteRows', () => {
             makeEvent('e1', 'Design sync', { kind: 'allDay', startDate: '2026-11-19', endDateExclusive: '2026-11-20' }),
             makeEvent('e2', 'Lunch', { kind: 'allDay', startDate: '2026-11-19', endDateExclusive: '2026-11-20' }),
         ];
-        const tasks: AppTask[] = [
-            { id: 't1', title: 'Review design doc', status: 'todo', due: '2026-11-19' },
-            { id: 't2', title: 'Buy groceries', status: 'todo', start: '2026-11-19' },
+        const tasks: TodayTask[] = [
+            { taskId: 't1', title: 'Review design doc', kind: 'due' },
+            { taskId: 't2', title: 'Buy groceries', kind: 'start' },
         ];
 
         const emptyRows = buildPaletteRows('   ', events, tasks);
@@ -95,12 +158,8 @@ describe('paletteRows', () => {
         });
         expect(formatEventDetail(timed)).toBe('09:30–10:00');
 
-        expect(formatTaskDetail({ id: 't1', title: 'A', status: 'todo', due: '2026-11-19' }, '2026-11-19')).toBe(
-            'Due today',
-        );
-        expect(formatTaskDetail({ id: 't2', title: 'B', status: 'todo', start: '2026-11-19' }, '2026-11-19')).toBe(
-            'Planned today',
-        );
+        expect(formatTaskDetail({ taskId: 't1', title: 'A', kind: 'due' })).toBe('Due today');
+        expect(formatTaskDetail({ taskId: 't2', title: 'B', kind: 'start' })).toBe('Planned today');
     });
 
     it('sets remoteCollectionId only for explicit +list queries and omits it for default captures', () => {

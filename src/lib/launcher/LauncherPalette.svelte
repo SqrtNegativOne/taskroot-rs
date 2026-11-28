@@ -3,28 +3,24 @@
     import { commands, events, safeInvoke, useAutoQuery } from '$lib/safeInvoke.svelte';
     import { store } from '$lib/store.svelte';
     import { Routes } from '$lib/routes';
-    import { eventInstances } from '$lib/queries';
+    import { eventInstances, taskDates } from '$lib/queries';
     import { useNow } from '$lib/useNow.svelte';
     import { parseLocalYmd, ymd } from '$lib/time';
-    import type { AppTaskFilter, AppTaskSort, FilterGroup } from '$lib/domain';
-    import { emptyFilterGroup, filterGroup } from '$lib/domain';
+    import { emptyFilterGroup } from '$lib/domain';
     import { parseQuickCapture } from './quickCapture';
     import {
         buildPaletteRows,
         buildTaskFromQuickCapture,
-        filterTodayTasks,
         formatEventDetail,
         formatPreviewParts,
         formatTaskDetail,
         matchRouteCommand,
+        projectTodayTasks,
         type PaletteRow,
     } from './paletteRows';
     import './launcherPalette.css';
 
     const DAY_CHECK_INTERVAL_MS = 60_000;
-    const OPEN_TASK_FILTERS: FilterGroup<AppTaskFilter> = filterGroup([
-        { column: 'status', operator: 'is not', value: ['done'] },
-    ]);
 
     const now = useNow(DAY_CHECK_INTERVAL_MS);
     let currentNow = $derived(new Date(now.ms));
@@ -44,15 +40,11 @@
     const eventsQuery = useAutoQuery(commands.queryEventInstances, () =>
         eventInstances(todayRange, emptyFilterGroup(), ''),
     );
-    const tasksQuery = useAutoQuery(commands.queryTasks, (): [FilterGroup<AppTaskFilter>, AppTaskSort[], string] => [
-        OPEN_TASK_FILTERS,
-        [],
-        '',
-    ]);
+    const taskDatesQuery = useAutoQuery(commands.queryTaskDates, () => taskDates(todayRange));
 
     let calendars = $derived(calendarsQuery.data ?? []);
     let todayEvents = $derived(eventsQuery.data ?? []);
-    let todayTasks = $derived(filterTodayTasks(tasksQuery.data ?? [], todayIso));
+    let todayTasks = $derived(projectTodayTasks(taskDatesQuery.data ?? [], today));
     let rows = $derived(buildPaletteRows(text, todayEvents, todayTasks));
 
     let activeIndex = $derived(rows.length === 0 ? 0 : Math.min(selected, rows.length - 1));
@@ -209,7 +201,7 @@
                         <span class="row-kind">Task</span>
                         <span class="row-body">
                             <span class="row-title">{row.task.title}</span>
-                            <span class="row-detail">{formatTaskDetail(row.task, todayIso)}</span>
+                            <span class="row-detail">{formatTaskDetail(row.task)}</span>
                         </span>
                     </button>
                 {/if}

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { mockTauriInvoke } from '../../test/tauriMock';
-import { emptyFilterGroup, filterGroup, type AppCalendar, type AppTask } from '../domain';
+import { makeTaskDateInstance } from '../../test/factories';
+import { emptyFilterGroup, type AppCalendar, type AppTask } from '../domain';
 import { store } from '../store.svelte';
 import { ymd } from '../time';
 import LauncherPalette from './LauncherPalette.svelte';
@@ -33,7 +34,7 @@ describe('LauncherPalette', () => {
         tauri.reset();
         tauri.stubCommandValue('get_active_calendars', TASK_CALENDARS);
         tauri.stubCommandValue('query_event_instances', []);
-        tauri.stubCommandValue('query_tasks', []);
+        tauri.stubCommandValue('query_task_dates', []);
     });
 
     afterEach(() => {
@@ -41,7 +42,7 @@ describe('LauncherPalette', () => {
         store.settings = null;
     });
 
-    it("queries today's agenda while the input is empty", async () => {
+    it("queries today's projected events and task dates while the input is empty", async () => {
         render(LauncherPalette);
 
         const today = ymd(new Date());
@@ -53,10 +54,69 @@ describe('LauncherPalette', () => {
             );
         });
         expect(tauri.invoke).toHaveBeenCalledWith(
-            'query_tasks',
-            { filters: filterGroup([{ column: 'status', operator: 'is not', value: ['done'] }]), sort: [], query: '' },
+            'query_task_dates',
+            { startDate: today, endDate: today },
             undefined,
         );
+        expect(callFor('query_tasks')).toBeUndefined();
+    });
+
+    it('matches local-day timed tasks via projected TaskDateInstance markers instead of raw date prefixes', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 10, 19, 10, 0, 0));
+
+        const earlyToday = new Date(2026, 10, 19, 0, 30, 0);
+        const lateToday = new Date(2026, 10, 19, 23, 30, 0);
+        const lateYesterday = new Date(2026, 10, 18, 23, 30, 0);
+        const earlyTomorrow = new Date(2026, 10, 20, 0, 30, 0);
+
+        tauri.stubCommandValue('query_task_dates', [
+            makeTaskDateInstance({
+                taskId: 'early-today',
+                kind: 'due',
+                title: 'Early local task',
+                status: 'todo',
+                timing: { kind: 'timed', start: earlyToday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'late-today',
+                kind: 'start',
+                title: 'Late local task',
+                status: 'next-up',
+                timing: { kind: 'timed', start: lateToday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'done-today',
+                kind: 'due',
+                title: 'Done today task',
+                status: 'done',
+                timing: { kind: 'allDay', date: '2026-11-19' },
+            }),
+            makeTaskDateInstance({
+                taskId: 'yesterday',
+                kind: 'due',
+                title: 'Yesterday task',
+                status: 'todo',
+                timing: { kind: 'timed', start: lateYesterday.toISOString(), timezone: null },
+            }),
+            makeTaskDateInstance({
+                taskId: 'tomorrow',
+                kind: 'due',
+                title: 'Tomorrow task',
+                status: 'todo',
+                timing: { kind: 'timed', start: earlyTomorrow.toISOString(), timezone: null },
+            }),
+        ]);
+
+        render(LauncherPalette);
+
+        await screen.findByText('Early local task');
+        expect(screen.getByText('Due today')).not.toBeNull();
+        expect(screen.getByText('Late local task')).not.toBeNull();
+        expect(screen.getByText('Planned today')).not.toBeNull();
+        expect(screen.queryByText('Done today task')).toBeNull();
+        expect(screen.queryByText('Yesterday task')).toBeNull();
+        expect(screen.queryByText('Tomorrow task')).toBeNull();
     });
 
     it('parses typed text synchronously on the client and previews the captured task', async () => {
@@ -150,6 +210,11 @@ describe('LauncherPalette', () => {
                 expect.objectContaining({ startDate: '2026-11-20', endDate: '2026-11-20' }),
                 undefined,
             );
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'query_task_dates',
+                { startDate: '2026-11-20', endDate: '2026-11-20' },
+                undefined,
+            );
         });
 
         vi.setSystemTime(new Date(2026, 10, 21, 0, 1, 0));
@@ -159,6 +224,11 @@ describe('LauncherPalette', () => {
             expect(tauri.invoke).toHaveBeenCalledWith(
                 'query_event_instances',
                 expect.objectContaining({ startDate: '2026-11-21', endDate: '2026-11-21' }),
+                undefined,
+            );
+            expect(tauri.invoke).toHaveBeenCalledWith(
+                'query_task_dates',
+                { startDate: '2026-11-21', endDate: '2026-11-21' },
                 undefined,
             );
         });

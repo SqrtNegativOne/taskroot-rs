@@ -1,12 +1,24 @@
-import type { AppTask, EventInstance } from '../domain';
+import {
+    taskDateOccursOnDay,
+    type AppTask,
+    type EventInstance,
+    type TaskDateInstance,
+    type TaskDateKind,
+} from '../domain';
 import { Routes } from '../routes';
 import { formatHhMm, minutesSinceMidnight } from '../time';
 import { formatQuickCaptureDue, type QuickCapturePreview } from './quickCapture';
 
+export interface TodayTask {
+    readonly taskId: string;
+    readonly title: string;
+    readonly kind: TaskDateKind;
+}
+
 export type PaletteRow =
     | { readonly key: 'create'; readonly kind: 'create' }
     | { readonly key: string; readonly kind: 'event'; readonly event: EventInstance }
-    | { readonly key: string; readonly kind: 'task'; readonly task: AppTask };
+    | { readonly key: string; readonly kind: 'task'; readonly task: TodayTask };
 
 export const ROUTE_COMMANDS: Readonly<Record<string, string>> = {
     home: Routes.HOME,
@@ -20,16 +32,38 @@ export function matchRouteCommand(text: string): string | undefined {
     return ROUTE_COMMANDS[text.trim().toLowerCase()];
 }
 
-export function filterTodayTasks(tasks: readonly AppTask[], todayIso: string): AppTask[] {
-    return tasks.filter(
-        (task) => task.start?.startsWith(todayIso) === true || task.due?.startsWith(todayIso) === true,
-    );
+/**
+ * Projects `queryTaskDates` markers onto open tasks occurring on `today`'s local
+ * calendar day. Deduplicates tasks that have both a `start` and `due` marker
+ * today, giving precedence to `due`.
+ */
+export function projectTodayTasks(
+    markers: readonly TaskDateInstance[],
+    today: Date,
+): TodayTask[] {
+    const byTaskId = new Map<string, TodayTask>();
+
+    for (const marker of markers) {
+        if (marker.status === 'done' || !taskDateOccursOnDay(marker, today)) continue;
+        const existing = byTaskId.get(marker.taskId);
+        if (existing === undefined) {
+            byTaskId.set(marker.taskId, {
+                taskId: marker.taskId,
+                title: marker.title,
+                kind: marker.kind,
+            });
+        } else if (marker.kind === 'due' && existing.kind !== 'due') {
+            byTaskId.set(marker.taskId, { ...existing, kind: 'due' });
+        }
+    }
+
+    return Array.from(byTaskId.values());
 }
 
 export function buildPaletteRows(
     text: string,
     todayEvents: readonly EventInstance[],
-    todayTasks: readonly AppTask[],
+    todayTasks: readonly TodayTask[],
 ): PaletteRow[] {
     const value = text.trim();
     const typed = value !== '';
@@ -46,7 +80,7 @@ export function buildPaletteRows(
 
     for (const task of todayTasks) {
         if (!typed || task.title.toLowerCase().includes(needle)) {
-            result.push({ key: `task:${task.id}`, kind: 'task', task });
+            result.push({ key: `task:${task.taskId}`, kind: 'task', task });
         }
     }
 
@@ -72,8 +106,8 @@ export function formatEventDetail(event: EventInstance): string {
     return `${formatHhMm(minutesSinceMidnight(start))}–${formatHhMm(minutesSinceMidnight(end))}`;
 }
 
-export function formatTaskDetail(task: AppTask, todayIso: string): string {
-    return task.due?.startsWith(todayIso) === true ? 'Due today' : 'Planned today';
+export function formatTaskDetail(task: TodayTask): string {
+    return task.kind === 'due' ? 'Due today' : 'Planned today';
 }
 
 export function buildTaskFromQuickCapture(
