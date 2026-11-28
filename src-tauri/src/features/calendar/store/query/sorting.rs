@@ -1,6 +1,6 @@
 use crate::features::calendar::domain::{
     AppEvent, AppEventFilterColumn, AppEventSort, AppTask, AppTaskFilterColumn, AppTaskSort,
-    EventStatus, SortDirection, Tag,
+    AppTaskStatus, CollectionId, EventStatus, SortDirection, Tag,
 };
 use std::cmp::Ordering;
 
@@ -11,11 +11,7 @@ pub(super) fn compare_events(a: &AppEvent, b: &AppEvent, sorts: &[AppEventSort])
         let Some(column) = &sort.column else {
             continue;
         };
-        let ordering = compare_event_column(a, b, column);
-        let ordering = match sort.direction {
-            Some(SortDirection::Desc) => ordering.reverse(),
-            _ => ordering,
-        };
+        let ordering = apply_direction(compare_event_column(a, b, column), sort.direction.as_ref());
         if ordering != Ordering::Equal {
             return ordering;
         }
@@ -36,7 +32,8 @@ fn compare_event_column(a: &AppEvent, b: &AppEvent, column: &AppEventFilterColum
             tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref()))
         }
         AppEventFilterColumn::Remotecollectionid => {
-            event_collection_id(a).cmp(event_collection_id(b))
+            collection_href(a.remote_collection_id.as_ref())
+                .cmp(collection_href(b.remote_collection_id.as_ref()))
         }
     }
 }
@@ -46,11 +43,7 @@ pub(super) fn compare_tasks(a: &AppTask, b: &AppTask, sorts: &[AppTaskSort]) -> 
         let Some(column) = &sort.column else {
             continue;
         };
-        let ordering = compare_task_column(a, b, column);
-        let ordering = match sort.direction {
-            Some(SortDirection::Desc) => ordering.reverse(),
-            _ => ordering,
-        };
+        let ordering = apply_direction(compare_task_column(a, b, column), sort.direction.as_ref());
         if ordering != Ordering::Equal {
             return ordering;
         }
@@ -74,7 +67,17 @@ fn compare_task_column(a: &AppTask, b: &AppTask, column: &AppTaskFilterColumn) -
         AppTaskFilterColumn::Tags => {
             tag_names(a.tags.as_deref()).cmp(&tag_names(b.tags.as_deref()))
         }
-        AppTaskFilterColumn::Remotecollectionid => collection_id(a).cmp(collection_id(b)),
+        AppTaskFilterColumn::Remotecollectionid => {
+            collection_href(a.remote_collection_id.as_ref())
+                .cmp(collection_href(b.remote_collection_id.as_ref()))
+        }
+    }
+}
+
+const fn apply_direction(ordering: Ordering, direction: Option<&SortDirection>) -> Ordering {
+    match direction {
+        Some(SortDirection::Desc) => ordering.reverse(),
+        _ => ordering,
     }
 }
 
@@ -87,17 +90,8 @@ fn compare_opt<T: Ord>(a: Option<T>, b: Option<T>) -> Ordering {
     }
 }
 
-fn collection_id(task: &AppTask) -> &str {
-    task.remote_collection_id
-        .as_ref()
-        .map_or("", |id| id.as_str())
-}
-
-fn event_collection_id(event: &AppEvent) -> &str {
-    event
-        .remote_collection_id
-        .as_ref()
-        .map_or("", |id| id.as_str())
+fn collection_href(id: Option<&CollectionId>) -> &str {
+    id.map_or("", |id| id.as_str())
 }
 
 fn tag_names(tags: Option<&[Tag]>) -> String {
@@ -109,12 +103,12 @@ fn tag_names(tags: Option<&[Tag]>) -> String {
     })
 }
 
-const fn status_rank(status: Option<&crate::features::calendar::domain::AppTaskStatus>) -> u8 {
+const fn status_rank(status: Option<&AppTaskStatus>) -> u8 {
     match status {
-        Some(crate::features::calendar::domain::AppTaskStatus::Todo) => 0,
-        Some(crate::features::calendar::domain::AppTaskStatus::NextUp) => 1,
-        Some(crate::features::calendar::domain::AppTaskStatus::Done) => 2,
-        Some(crate::features::calendar::domain::AppTaskStatus::Cancelled) => 3,
+        Some(AppTaskStatus::Todo) => 0,
+        Some(AppTaskStatus::NextUp) => 1,
+        Some(AppTaskStatus::Done) => 2,
+        Some(AppTaskStatus::Cancelled) => 3,
         None => 4,
     }
 }

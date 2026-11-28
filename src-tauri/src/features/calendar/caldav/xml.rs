@@ -138,46 +138,46 @@ pub struct MultiGetResource {
 ///
 /// # Errors
 ///
-/// Returns [`AppError::Sync`] for malformed XML or a response without a
+/// Returns [`AppError::Remote`] for malformed XML or a response without a
 /// principal.
 pub fn parse_current_user_principal(xml: &str, base_href: &str) -> Result<String, AppError> {
-    let document = parse_document(xml)?;
-    for response in response_nodes(&document) {
-        let props = successful_props(response);
-        let Some(principal) = prop(&props, "current-user-principal") else {
-            continue;
-        };
-        let Some(href) = href_child(principal) else {
-            continue;
-        };
-        return Ok(resolve_href(base_href, &href));
-    }
-    Err(AppError::Remote(
-        "The server did not advertise a current-user-principal".to_string(),
-    ))
+    parse_href_property(
+        xml,
+        base_href,
+        "current-user-principal",
+        "The server did not advertise a current-user-principal",
+    )
 }
 
 /// Parse the `calendar-home-set` href from a principal `PROPFIND` response.
 ///
 /// # Errors
 ///
-/// Returns [`AppError::Sync`] for malformed XML or a response without a home
+/// Returns [`AppError::Remote`] for malformed XML or a response without a home
 /// set.
 pub fn parse_calendar_home_set(xml: &str, base_href: &str) -> Result<String, AppError> {
+    parse_href_property(
+        xml,
+        base_href,
+        "calendar-home-set",
+        "The server did not advertise a calendar-home-set",
+    )
+}
+
+fn parse_href_property(
+    xml: &str,
+    base_href: &str,
+    property: &str,
+    missing_message: &str,
+) -> Result<String, AppError> {
     let document = parse_document(xml)?;
     for response in response_nodes(&document) {
         let props = successful_props(response);
-        let Some(home_set) = prop(&props, "calendar-home-set") else {
-            continue;
-        };
-        let Some(href) = href_child(home_set) else {
-            continue;
-        };
-        return Ok(resolve_href(base_href, &href));
+        if let Some(href) = prop(&props, property).and_then(href_child) {
+            return Ok(resolve_href(base_href, &href));
+        }
     }
-    Err(AppError::Remote(
-        "The server did not advertise a calendar-home-set".to_string(),
-    ))
+    Err(AppError::Remote(missing_message.to_string()))
 }
 
 /// Parse the calendars in a `Depth: 1` calendar-home `PROPFIND` response.
