@@ -6,15 +6,6 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	parseSigils: (taskName: string, options?: InvokeOptions) => __TAURI_INVOKE<ParsedSigils>("parse_sigils", { taskName }, options),
-	/**
-	 *  Parse a quick-capture line and resolve its target list. Read-only.
-	 * 
-	 *  # Errors
-	 * 
-	 *  Returns an error if the store is not initialized.
-	 */
-	parseQuickCapture: (text: string, options?: InvokeOptions) => __TAURI_INVOKE<QuickCapturePreview>("parse_quick_capture", { text }, options),
 	/**
 	 *  # Errors
 	 * 
@@ -92,7 +83,6 @@ export const commands = {
 	 *  Reload every collection from the `CalDAV` server.
 	 * 
 	 *  # Errors
-	 * 
 	 *  Returns the account/transport/parse failure from the load.
 	 */
 	refreshData: (options?: InvokeOptions) => __TAURI_INVOKE<null>("refresh_data", undefined, options),
@@ -143,16 +133,7 @@ export const commands = {
 	 *  read-only, the account/store is unavailable, or a `CalDAV` write fails.
 	 */
 	renameTag: (from: string, to: string, options?: InvokeOptions) => __TAURI_INVOKE<null>("rename_tag", { from, to }, options),
-	/**
-	 *  Fetch one raw event by id (used to reschedule instances back onto the master).
-	 * 
-	 *  # Errors
-	 * 
-	 *  Returns an error if the store is not initialized.
-	 */
-	getEvent: (id: string, options?: InvokeOptions) => __TAURI_INVOKE<AppEvent | null>("get_event", { id }, options),
 	getTaskSchema: (options?: InvokeOptions) => __TAURI_INVOKE<AppTaskColumnDef[]>("get_task_schema", undefined, options),
-	getEventSchema: (options?: InvokeOptions) => __TAURI_INVOKE<AppEventColumnDef[]>("get_event_schema", undefined, options),
 	windowRestoreMain: (options?: InvokeOptions) => __TAURI_INVOKE<void>("window_restore_main", undefined, options),
 	/**
 	 *  # Errors
@@ -168,13 +149,6 @@ export const commands = {
 	 */
 	showScreenEffect: (options?: InvokeOptions) => __TAURI_INVOKE<null>("show_screen_effect", undefined, options),
 	hideScreenEffect: (options?: InvokeOptions) => __TAURI_INVOKE<void>("hide_screen_effect", undefined, options),
-	quitApp: (options?: InvokeOptions) => __TAURI_INVOKE<void>("quit_app", undefined, options),
-	/**
-	 *  # Errors
-	 * 
-	 *  Returns an internal error if the launcher cannot be created or shown.
-	 */
-	toggleLauncher: (options?: InvokeOptions) => __TAURI_INVOKE<null>("toggle_launcher", undefined, options),
 	resizeLauncher: (width: number | null, height: number | null, options?: InvokeOptions) => __TAURI_INVOKE<void>("resize_launcher", { width, height }, options),
 	/**
 	 *  # Errors
@@ -302,16 +276,6 @@ export const commands = {
 	 *  # Errors
 	 *  Returns registry storage failures.
 	 */
-	isAccountConfigured: (options?: InvokeOptions) => __TAURI_INVOKE<boolean>("is_account_configured", undefined, options),
-	/**
-	 *  # Errors
-	 *  Returns registry storage failures.
-	 */
-	getAccount: (options?: InvokeOptions) => __TAURI_INVOKE<Account | null>("get_account", undefined, options),
-	/**
-	 *  # Errors
-	 *  Returns registry storage failures.
-	 */
 	getAccounts: (options?: InvokeOptions) => __TAURI_INVOKE<AccountRegistry>("get_accounts", undefined, options),
 	/**
 	 *  # Errors
@@ -364,7 +328,6 @@ export const commands = {
 /** Events */
 export const events = {
 	accountChanged: makeEvent<AccountChanged, AccountChanged>("account-changed"),
-	deepLink: makeEvent<DeepLink, DeepLink>("deep-link"),
 	launcherNavigate: makeEvent<LauncherNavigate, LauncherNavigate>("launcher-navigate"),
 	screenEffect: makeEvent<ScreenEffect, ScreenEffect>("screen-effect"),
 	settingsUpdated: makeEvent<SettingsUpdated, SettingsUpdated>("settings-updated"),
@@ -446,13 +409,6 @@ export type AppEvent = {
 	timezone?: string | null,
 };
 
-export type AppEventColumnDef = {
-	id: AppEventFilterColumn,
-	label: string,
-	filter_type: FilterType,
-	sortable: boolean,
-};
-
 export type AppEventFilter = {
 	column: AppEventFilterColumn | null,
 	operator: FilterOperator | null,
@@ -468,20 +424,14 @@ export type AppEventSort = {
 
 export type AppSettings = {
 	colour_scheme?: ColourScheme,
-	default_calendar_view?: string,
 	default_task_list?: string,
 	default_event_list?: string,
-	day_timeline_start_view?: number,
 	earliest_wake_up_time?: number,
 	default_task_duration?: number,
-	clock_style?: string,
+	clock_style?: ClockStyle,
 	flowtime_break_divisor?: number,
 	pause_minutes?: number,
 	mini_tracker_enabled?: boolean,
-	keybinding_launcher?: string,
-	keybinding_open_settings?: string,
-	keybinding_restore_app?: string,
-	tracker_show_border?: boolean,
 	tracker_opacity?: number,
 	focus_feed_enabled?: boolean,
 	focus_feed_port?: number,
@@ -564,13 +514,13 @@ export type CalendarInfo = {
 	writable?: boolean,
 };
 
+export type ClockStyle = "flowtime" | "counter";
+
 export type CollectionId = string;
 
 export type Color = string;
 
 export type ColourScheme = "slate" | "ember";
-
-export type DeepLink = string;
 
 export type EventId = string;
 
@@ -643,36 +593,11 @@ export type LauncherNavigate = string;
 
 export type LogicalOperator = "and" | "or";
 
-export type ParsedSigils = {
-	cleanTitle: string,
-	properties: SigilProperties,
-};
-
-export type QuickCapturePreview = {
-	title: string,
-	due: CalendarDateTime | null,
-	hasTime: boolean,
-	tags: string[],
-	priority: TaskPriority | null,
-	estimateMinutes: number | null,
-	list: AppCalendar | null,
-	listQuery: string | null,
-	listError: string | null,
-};
-
 export type RemoteId = string;
 
 export type ScreenEffect = null;
 
 export type SettingsUpdated = null;
-
-export type SigilProperties = {
-	priority?: TaskPriority | null,
-	tags: string[],
-	duration?: number | null,
-	day?: string | null,
-	list?: string | null,
-};
 
 export type SortDirection = "asc" | "desc";
 

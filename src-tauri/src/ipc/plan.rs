@@ -135,15 +135,3 @@ pub async fn query_task_dates(
     let tasks = state.read(crate::features::calendar::Store::tasks).await;
     Ok(expand_task_dates(&tasks, &start_date, &end_date))
 }
-
-/// Fetch one raw event by id (used to reschedule instances back onto the master).
-///
-/// # Errors
-///
-/// Returns an error if the store is not initialized.
-#[tauri::command]
-#[specta::specta]
-pub async fn get_event(app: tauri::AppHandle, id: String) -> Result<Option<AppEvent>, AppError> {
-    let state = store_state(&app)?;
-    Ok(state.read(|store| store.event(&id).cloned()).await)
-}

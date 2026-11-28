@@ -71,12 +71,6 @@ const SETTING_SECTIONS: &[SectionDef] = &[
         name: "Stopwatch",
     },
     SectionDef {
-        key: "keybindings",
-        tab: "keybindings",
-        tab_label: "Keybindings",
-        name: "Keybindings",
-    },
-    SectionDef {
         key: "tracker_appearance",
         tab: "tracker_window",
         tab_label: "Tracker window",

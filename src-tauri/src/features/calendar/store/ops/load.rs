@@ -13,6 +13,18 @@ pub struct FetchedCollection {
     pub resources: Vec<crate::features::calendar::caldav::xml::MultiGetResource>,
 }
 
+/// A complete load that has not touched any store yet.
+pub struct Fetched {
+    pub calendars: Vec<CalendarInfo>,
+    pub collections: Vec<FetchedCollection>,
+}
+
+/// Replace the store with a fetched snapshot.
+pub fn apply(store: &mut Store, fetched: Fetched) {
+    store.set_calendars(fetched.calendars);
+    apply_full_load(store, fetched.collections);
+}
+
 /// Fetch every collection without touching the store.
 ///
 /// # Errors

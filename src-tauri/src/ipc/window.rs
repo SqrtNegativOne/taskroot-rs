@@ -48,24 +48,6 @@ pub async fn hide_screen_effect(app: tauri::AppHandle) {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn quit_app(app: tauri::AppHandle) {
-    super::stopwatch::flush_and_credit_on_exit(&app).await;
-    platform::quit_app(&app);
-}
-
-/// # Errors
-///
-/// Returns an internal error if the launcher cannot be created or shown.
-#[tauri::command]
-#[specta::specta]
-pub async fn toggle_launcher(app: tauri::AppHandle) -> Result<(), AppError> {
-    platform::toggle_launcher_window(&app)
-        .await
-        .map_err(|error| AppError::Internal(error.to_string()))
-}
-
-#[tauri::command]
-#[specta::specta]
 pub fn resize_launcher(app: tauri::AppHandle, width: f64, height: f64) {
     platform::resize_launcher(&app, width, height);
 }

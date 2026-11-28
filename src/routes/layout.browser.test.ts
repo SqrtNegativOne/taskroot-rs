@@ -1,6 +1,7 @@
 import { createRawSnippet } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/svelte';
+import { goto } from '$app/navigation';
 import { mockTauriInvoke } from '../test/tauriMock';
 import Layout from './+layout.svelte';
 
@@ -53,11 +54,24 @@ const emptyChildren = createRawSnippet(() => ({
 
 describe('root layout', () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         tauri.reset();
         eventState.resolveNavListen = undefined;
         tauri.stubCommandValue('get_settings', { colour_scheme: 'slate' });
-        tauri.stubCommandValue('is_account_configured', true);
+        tauri.stubCommandValue('get_accounts', {
+            activeId: 'acc-1',
+            profiles: [{ id: 'acc-1', account: { serverUrl: 'http://localhost', username: 'u', principalHref: '/', homeHref: '/', calendars: [] } }],
+        });
         tauri.stubCommandValue('get_ui_state', '9999-12-31');
+    });
+
+    it('redirects to /connect when get_accounts has no active profile', async () => {
+        tauri.stubCommandValue('get_accounts', { activeId: null, profiles: [] });
+        render(Layout, { props: { children: emptyChildren } });
+
+        await waitFor(() => {
+            expect(goto).toHaveBeenCalledWith('/connect');
+        });
     });
 
     it('unsubscribes launcherNavigate if unmounted before listen resolves', async () => {

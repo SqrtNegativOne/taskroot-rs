@@ -1,6 +1,6 @@
 //! Store-backed settings command tests.
 
-use super::{storage, AppSettings};
+use super::{storage, AppSettings, ClockStyle};
 use crate::features::calendar::{persist, Store, StoreState};
 use serde_json::{json, Value};
 
@@ -26,11 +26,11 @@ async fn update_setting_round_trips_through_the_json_file() {
 
     assert_eq!(
         storage::read_settings(&state).await.unwrap().clock_style,
-        "counter"
+        ClockStyle::Counter
     );
     assert_eq!(
         persist::read_settings(dir.path()).clock_style,
-        "counter",
+        ClockStyle::Counter,
         "the write must reach settings.json"
     );
 }
@@ -189,7 +189,7 @@ async fn failed_writes_leave_in_memory_settings_and_ui_state_unchanged() {
     assert_eq!(settings_err.code(), "store");
     assert_eq!(
         storage::read_settings(&state).await.unwrap().clock_style,
-        "counter",
+        ClockStyle::Counter,
         "in-memory settings must not diverge when persistence fails"
     );
 
@@ -202,4 +202,51 @@ async fn failed_writes_leave_in_memory_settings_and_ui_state_unchanged() {
         json!("week"),
         "in-memory ui-state must not diverge when persistence fails"
     );
+}
+
+#[tokio::test]
+async fn invalid_clock_style_does_not_change_saved_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+    storage::write_setting(&state, "clock_style", &json!("counter"))
+        .await
+        .unwrap();
+    let path = dir.path().join("settings.json");
+    let saved = std::fs::read_to_string(&path).unwrap();
+
+    for invalid in [json!("pomodoro"), json!(42), Value::Null] {
+        let error = storage::write_setting(&state, "clock_style", &invalid)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "invalid-input");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), saved);
+        assert_eq!(
+            storage::read_settings(&state).await.unwrap().clock_style,
+            ClockStyle::Counter
+        );
+    }
+}
+
+#[test]
+fn settings_file_with_removed_keys_loads_valid_fields_without_error() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        persist::settings_path(dir.path()),
+        r#"{
+            "default_calendar_view": "week",
+            "day_timeline_start_view": 420,
+            "keybinding_launcher": "Meta+Space",
+            "keybinding_open_settings": "Ctrl+,",
+            "keybinding_restore_app": "Ctrl+Alt+R",
+            "tracker_show_border": false,
+            "clock_style": "counter",
+            "pause_minutes": 15
+        }"#,
+    )
+    .unwrap();
+
+    let loaded = persist::read_settings(dir.path());
+    assert_eq!(loaded.clock_style, ClockStyle::Counter);
+    assert_eq!(loaded.pause_minutes, 15);
+    assert!(!dir.path().join("settings.json.bad").exists());
 }

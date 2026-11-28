@@ -19,6 +19,7 @@
 //! This module is split into [`storage`] (the store-level command bodies) and
 //! [`metadata`] (schema assembly); the IPC commands live in `commands::settings`.
 
+mod clock_style;
 mod colour_scheme;
 pub mod metadata;
 pub mod storage;
@@ -30,12 +31,12 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use taskroot_macros::SettingsMeta;
 
+pub use clock_style::ClockStyle;
 pub use colour_scheme::ColourScheme;
 pub use metadata::{SettingMeta, SettingOption};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, SettingsMeta)]
 #[serde(default)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct AppSettings {
     #[setting(
         label = "Colour scheme",
@@ -46,14 +47,6 @@ pub struct AppSettings {
         options = [("slate", "Slate"), ("ember", "Ember")]
     )]
     pub colour_scheme: ColourScheme,
-    #[setting(
-        label = "Default View",
-        keywords = ["calendar", "view", "month", "week"],
-        kind = "select",
-        section = "plan_calendar",
-        options = [("month", "Month"), ("week", "Week")]
-    )]
-    pub default_calendar_view: String,
     #[setting(
         label = "Default Tasks List",
         description = "List new tasks are added to when no list is chosen. Leave empty to use the first writable tasks list.",
@@ -70,13 +63,6 @@ pub struct AppSettings {
         section = "plan_calendar"
     )]
     pub default_event_list: String,
-    #[setting(
-        label = "Timeline View Start Time",
-        keywords = ["timeline", "day", "start", "time", "scroll", "view"],
-        kind = "time",
-        section = "plan_calendar"
-    )]
-    pub day_timeline_start_view: i32,
     #[setting(
         label = "Earliest Wake Up Time",
         description = "Hide hours before this time on the day timeline.",
@@ -103,7 +89,7 @@ pub struct AppSettings {
             ("counter", "Counter")
         ]
     )]
-    pub clock_style: String,
+    pub clock_style: ClockStyle,
     #[setting(
         label = "Flowtime Break Divisor",
         description = "How much break time you earn (e.g. 5 means 1 min break for every 5 mins of work).",
@@ -130,34 +116,6 @@ pub struct AppSettings {
         section = "do_stopwatch"
     )]
     pub mini_tracker_enabled: bool,
-    #[setting(
-        label = "Open Launcher",
-        keywords = ["keyboard", "shortcut", "launcher", "open"],
-        kind = "keybinding",
-        section = "keybindings"
-    )]
-    pub keybinding_launcher: String,
-    #[setting(
-        label = "Open Settings",
-        keywords = ["keyboard", "shortcut", "settings", "open"],
-        kind = "keybinding",
-        section = "keybindings"
-    )]
-    pub keybinding_open_settings: String,
-    #[setting(
-        label = "Restore App",
-        keywords = ["keyboard", "shortcut", "restore", "maximize", "mini tracker", "minitracker"],
-        kind = "keybinding",
-        section = "keybindings"
-    )]
-    pub keybinding_restore_app: String,
-    #[setting(
-        label = "Show Window Border",
-        keywords = ["tracker", "border", "show", "outline"],
-        kind = "checkbox",
-        section = "tracker_appearance"
-    )]
-    pub tracker_show_border: bool,
     #[setting(
         label = "Base Opacity (%)",
         description = "The baseline opacity of the mini tracker window (0 to 100).",
@@ -192,20 +150,14 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             colour_scheme: ColourScheme::default(),
-            default_calendar_view: "month".to_string(),
             default_task_list: String::new(),
             default_event_list: String::new(),
-            day_timeline_start_view: 300,
             earliest_wake_up_time: 0,
             default_task_duration: 0,
-            clock_style: "flowtime".to_string(),
+            clock_style: ClockStyle::default(),
             flowtime_break_divisor: 5,
             pause_minutes: 10,
             mini_tracker_enabled: false,
-            keybinding_launcher: "Meta+Shift+Space".to_string(),
-            keybinding_open_settings: "Ctrl+,".to_string(),
-            keybinding_restore_app: "Ctrl+Alt+R".to_string(),
-            tracker_show_border: true,
             tracker_opacity: 85,
             focus_feed_enabled: false,
             focus_feed_port: 8765,

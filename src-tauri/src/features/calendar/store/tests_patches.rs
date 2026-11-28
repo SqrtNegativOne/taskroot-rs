@@ -402,7 +402,7 @@ async fn assert_store_readable_while_in_flight(state: &StoreState) {
     )
     .await
     .expect("store lock must not be held during network I/O");
-    assert_ne!(settings.clock_style, "");
+    assert_eq!(settings.clock_style, crate::settings::ClockStyle::Flowtime);
 }
 
 #[tokio::test]

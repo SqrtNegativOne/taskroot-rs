@@ -2,20 +2,12 @@
 
 use tauri::Manager;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
-use tauri_specta::Event;
 
 use crate::features::{calendar, reminders, stopwatch};
 use crate::ipc;
-use crate::ipc_events::DeepLink;
 use crate::platform;
 
 pub const LAUNCHER_SHORTCUT: &str = "CommandOrControl+Shift+Space";
-
-#[must_use]
-pub fn extract_deep_link_route(arg: &str) -> Option<&str> {
-    let route = arg.strip_prefix("taskroot://")?;
-    Some(route.trim_end_matches('/'))
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -44,7 +36,6 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
     let invoke_handler = specta.invoke_handler();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -54,13 +45,8 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             platform::restore_main(app);
-            for arg in &args {
-                if let Some(route) = extract_deep_link_route(arg) {
-                    let _ = DeepLink(route.to_string()).emit(app);
-                }
-            }
         }))
         .setup(move |app| {
             specta.mount_events(app);
@@ -125,23 +111,4 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     reminders::start_reminder_engine(handle);
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_deep_link_route() {
-        assert_eq!(extract_deep_link_route("taskroot://day"), Some("day"));
-        assert_eq!(extract_deep_link_route("taskroot://day/"), Some("day"));
-        assert_eq!(
-            extract_deep_link_route("taskroot://settings"),
-            Some("settings")
-        );
-        assert_eq!(extract_deep_link_route("taskroot://"), Some(""));
-        assert_eq!(extract_deep_link_route("taskroot:///"), Some(""));
-        assert_eq!(extract_deep_link_route("https://example.com"), None);
-        assert_eq!(extract_deep_link_route("--other-arg"), None);
-    }
 }

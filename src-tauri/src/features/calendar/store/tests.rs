@@ -101,13 +101,13 @@ fn settings_round_trip_and_partial_or_malformed_files_fall_back_to_defaults() {
     let dir = tempfile::tempdir().unwrap();
     let dir = dir.path();
     let settings = crate::settings::AppSettings {
-        clock_style: "counter".to_string(),
+        clock_style: crate::settings::ClockStyle::Counter,
         ..crate::settings::AppSettings::default()
     };
     persist::write_settings(dir, &settings).unwrap();
 
     let loaded = persist::read_settings(dir);
-    assert_eq!(loaded.clock_style, "counter");
+    assert_eq!(loaded.clock_style, crate::settings::ClockStyle::Counter);
 
     std::fs::write(persist::settings_path(dir), r#"{"pause_minutes":20}"#).unwrap();
     let partial = persist::read_settings(dir);

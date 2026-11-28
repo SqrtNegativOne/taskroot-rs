@@ -96,15 +96,21 @@ fn every_setting_kind_is_known() {
 #[test]
 fn every_setting_section_is_registered() {
     let registered: BTreeSet<&str> = SETTING_SECTIONS.iter().map(|section| section.key).collect();
+    let used: BTreeSet<&str> = AppSettings::setting_metadata()
+        .into_iter()
+        .map(|meta| meta.section)
+        .collect();
 
-    for meta in AppSettings::setting_metadata() {
+    for section in &used {
         assert!(
-            registered.contains(meta.section),
-            "setting '{}' references unknown section '{}'; add it to SETTING_SECTIONS",
-            meta.id,
-            meta.section
+            registered.contains(section),
+            "setting references unknown section '{section}'; add it to SETTING_SECTIONS"
         );
     }
+    assert_eq!(
+        registered, used,
+        "every registered section must contain at least one setting"
+    );
 }
 
 /// The Settings screen reads the command's JSON directly, so the serialized

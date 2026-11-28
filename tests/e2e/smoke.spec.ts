@@ -3,19 +3,14 @@ import type { AppSettings } from '../../src/lib/domain';
 
 const settings: AppSettings = {
   colour_scheme: 'slate',
-  default_calendar_view: 'month',
   default_task_list: '',
   default_event_list: '',
-  day_timeline_start_view: 1,
+  earliest_wake_up_time: 0,
   default_task_duration: 30,
   clock_style: 'flowtime',
   flowtime_break_divisor: 5,
   pause_minutes: 5,
   mini_tracker_enabled: false,
-  keybinding_launcher: '',
-  keybinding_open_settings: '',
-  keybinding_restore_app: '',
-  tracker_show_border: false,
   tracker_opacity: 1,
   focus_feed_enabled: false,
   focus_feed_port: 8765,
@@ -32,7 +27,7 @@ test('spa mounts the main window and routes an unconfigured account to connect',
         unregisterCallback: () => undefined,
         invoke: (command: string) => {
           if (command === 'get_settings') return Promise.resolve(appSettings);
-          if (command === 'is_account_configured') return Promise.resolve(false);
+          if (command === 'get_accounts') return Promise.resolve({ activeId: null, profiles: [] });
           if (command === 'plugin:event|listen') return Promise.resolve(1);
           return Promise.resolve(undefined);
         },

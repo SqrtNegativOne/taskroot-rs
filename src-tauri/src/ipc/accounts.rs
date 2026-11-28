@@ -40,28 +40,18 @@ pub(crate) fn service(app: &AppHandle) -> Result<State<'_, AccountService>, AppE
 /// Returns registry storage failures.
 #[tauri::command]
 #[specta::specta]
-pub async fn is_account_configured(app: AppHandle) -> Result<bool, AppError> {
-    Ok(service(&app)?.registry().await?.active().is_some())
-}
-
-/// # Errors
-/// Returns registry storage failures.
-#[tauri::command]
-#[specta::specta]
 pub async fn get_accounts(app: AppHandle) -> Result<AccountRegistry, AppError> {
     service(&app)?.registry().await
 }
 
+/// Reload every collection from the `CalDAV` server.
+///
 /// # Errors
-/// Returns registry storage failures.
+/// Returns the account/transport/parse failure from the load.
 #[tauri::command]
 #[specta::specta]
-pub async fn get_account(app: AppHandle) -> Result<Option<Account>, AppError> {
-    Ok(service(&app)?
-        .registry()
-        .await?
-        .active()
-        .map(|profile| profile.account.clone()))
+pub async fn refresh_data(app: AppHandle) -> Result<(), AppError> {
+    super::session::load_all(&app).await
 }
 
 /// # Errors

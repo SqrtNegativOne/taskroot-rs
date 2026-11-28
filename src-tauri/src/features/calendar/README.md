@@ -16,8 +16,7 @@ The CalDAV-backed task and event domain. Base feature: imports no other feature,
 - `store/` — in-memory resource map (`model.rs`), recursive query engine
   (`query/`), settings/UI-state JSON (`persist.rs`) and read-modify-write ops
   (`ops/`).
-- `load.rs` & `session.rs` — one-shot CalDAV fetch/apply and the headless
-  `Session` used by the CLI.
+- `session.rs` — the headless `Session` used by the CLI.
 - `occurrences.rs` & `event_query.rs` — recurrence expansion into
   `EventInstance`, and filtered projection that expands matching rows while
   retaining every master/exception as suppression and rule context.

@@ -11,11 +11,7 @@ mod event_query;
 #[allow(unreachable_pub)]
 pub(crate) mod ics;
 #[allow(unreachable_pub)]
-pub(crate) mod load;
-#[allow(unreachable_pub)]
 pub(crate) mod occurrences;
-#[allow(unreachable_pub)]
-pub(crate) mod quick_capture;
 #[allow(unreachable_pub)]
 pub(crate) mod session;
 #[allow(unreachable_pub)]
@@ -35,10 +31,9 @@ pub use ics::{
     create_event_resource, create_task_resource, delete_event_component, delete_task_component,
     read_event_resource, read_task_resource, write_event_resource, write_task_resource,
 };
-pub use load::{apply, Fetched};
 pub use occurrences::{expand_event_instances, single_instance};
-pub use quick_capture::{parse as parse_quick_capture, QuickCaptureDraft};
 pub use session::{app_calendar, open, Session};
+pub use store::ops::{apply, Fetched};
 pub use store::persist;
 pub use store::{ops, query, Resource, ResourceItems, Store, StoreState};
 pub use task_dates::expand_task_dates;

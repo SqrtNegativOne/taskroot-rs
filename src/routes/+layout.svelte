@@ -45,22 +45,25 @@
         let unlistenNav: (() => void) | undefined;
 
         const redirectForAccount = async (): Promise<boolean> => {
-            const configured = await safeInvoke(commands.isAccountConfigured());
+            const accounts = await safeInvoke(commands.getAccounts());
             if (disposed) return false;
-            if (configured.isErr()) {
-                store.error = `Could not check the CalDAV account: ${describeError(configured.error)}`;
+            if (accounts.isErr()) {
+                store.error = `Could not check the CalDAV account: ${describeError(accounts.error)}`;
                 return false;
             }
 
+            const configured =
+                accounts.value.activeId !== null &&
+                accounts.value.profiles.some((profile) => profile.id === accounts.value.activeId);
             const onConnect = page.url.pathname === Routes.CONNECT;
-            if (!configured.value && !onConnect) {
+            if (!configured && !onConnect) {
                 await goto(resolve(Routes.CONNECT));
                 return false;
             }
-            if (configured.value && onConnect) {
+            if (configured && onConnect) {
                 await goto(resolve(Routes.HOME));
             }
-            return configured.value;
+            return configured;
         };
 
         const redirectToStartup = async () => {

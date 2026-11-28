@@ -34,7 +34,6 @@ uuid = { version = "1.24.0", features = ["v4", "serde"] }
 specta = { version = "=2.0.0-rc.28", features = ["derive", "chrono", "serde_json"] }
 specta-typescript = "0.0.15"
 tauri-specta = { version = "=2.0.0-rc.29", features = ["derive", "typescript"] }
-tauri-plugin-deep-link = "2"
 rrule = "0.14.0"
 chrono-tz = "0.10"
 serde_repr = "0.1.21"

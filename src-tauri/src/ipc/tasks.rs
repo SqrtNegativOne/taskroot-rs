@@ -16,13 +16,6 @@ async fn clear_focus(app: &tauri::AppHandle, task_id: &str) {
     super::stopwatch::credit_time_spent(app, transition.entries).await;
 }
 
-#[tauri::command]
-#[specta::specta]
-#[must_use]
-pub fn parse_sigils(task_name: String) -> domain::ParsedSigils {
-    domain::parse_sigils(task_name)
-}
-
 /// # Errors
 ///
 /// Returns an error when the account/store is unavailable or the `CalDAV` write

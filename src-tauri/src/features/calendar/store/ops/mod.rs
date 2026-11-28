@@ -17,7 +17,7 @@ mod tasks;
 
 pub use event_delete::delete_event;
 pub use events::{create_event, reschedule_event, update_event, Reschedule};
-pub use load::{apply_full_load, fetch_collections, full_load, FetchedCollection};
+pub use load::{apply, apply_full_load, fetch_collections, full_load, Fetched, FetchedCollection};
 pub use tags::rename_tag;
 pub use tasks::{create_task, delete_task, past_due_task_ids, update_task};
 

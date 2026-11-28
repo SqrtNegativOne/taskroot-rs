@@ -8,8 +8,6 @@ pub mod accounts;
 pub mod calendars;
 pub mod events;
 pub mod plan;
-pub mod quick_capture;
-pub mod refresh;
 pub mod schema;
 pub mod session;
 pub mod settings;
@@ -22,8 +20,7 @@ use tauri_specta::{collect_commands, collect_events, Builder};
 use crate::error::{AppError, BackendErrorCode};
 use crate::features::stopwatch::history::{StopwatchHistoryEntry, StopwatchHistoryKind};
 use crate::ipc_events::{
-    AccountChanged, DeepLink, LauncherNavigate, ScreenEffect, SettingsUpdated, StopwatchUpdated,
-    StoreUpdated,
+    AccountChanged, LauncherNavigate, ScreenEffect, SettingsUpdated, StopwatchUpdated, StoreUpdated,
 };
 use crate::platform::WindowLabel;
 
@@ -33,8 +30,6 @@ use crate::platform::WindowLabel;
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
-            tasks::parse_sigils,
-            quick_capture::parse_quick_capture,
             tasks::create_task,
             tasks::update_task,
             tasks::toggle_task,
@@ -45,23 +40,19 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             events::delete_event,
             events::reschedule_event,
             events::get_active_calendars,
-            refresh::refresh_data,
+            accounts::refresh_data,
             plan::query_tasks,
             plan::query_events,
             plan::query_event_instances,
             plan::query_task_dates,
             plan::list_tags,
             plan::rename_tag,
-            plan::get_event,
             schema::get_task_schema,
-            schema::get_event_schema,
             window::window_restore_main,
             window::set_minitracker_visible,
             window::hide_launcher,
             window::show_screen_effect,
             window::hide_screen_effect,
-            window::quit_app,
-            window::toggle_launcher,
             window::resize_launcher,
             stopwatch::get_stopwatch_state,
             stopwatch::get_stopwatch_history,
@@ -78,8 +69,6 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             settings::get_ui_state,
             settings::set_ui_state,
             settings::update_setting,
-            accounts::is_account_configured,
-            accounts::get_account,
             accounts::get_accounts,
             accounts::test_account,
             accounts::connect_account,
@@ -96,7 +85,6 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             AccountChanged,
             StoreUpdated,
             SettingsUpdated,
-            DeepLink,
             ScreenEffect,
             LauncherNavigate
         ])
