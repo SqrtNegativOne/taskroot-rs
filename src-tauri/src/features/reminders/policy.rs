@@ -1,8 +1,11 @@
-//! Reminder policy: which `VALARM` triggers are due at a given instant.
+//! Reminder policy: which `VALARM` triggers are due at a given instant and
+//! bounded deduplication across poll ticks.
 //!
 //! Reminders live in the VTODO as `VALARM` triggers (see
 //! [`crate::features::calendar::ics`]). This module is pure and has no Tauri
 //! dependency; [`super::tauri`] delivers the notifications.
+
+use std::collections::HashSet;
 
 use chrono::{DateTime, Duration, NaiveTime, Utc};
 
@@ -18,18 +21,70 @@ const DATE_ONLY_REMINDER_HOUR: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DueReminder {
-    pub key: String,
     pub task_id: String,
     pub title: String,
     pub trigger: DateTime<Utc>,
 }
 
+/// Stable deduplication identity for a delivered reminder.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ReminderKey {
+    pub scope_id: String,
+    pub task_id: String,
+    pub trigger: DateTime<Utc>,
+}
+
+/// Bounded record of reminders delivered inside the active missed window.
+#[derive(Debug, Default)]
+pub struct SentReminders {
+    delivered: HashSet<ReminderKey>,
+}
+
+impl SentReminders {
+    /// Prunes entries older than the missed window and returns reminders due at
+    /// `now` that have not yet been delivered for `scope_id`, recording them as
+    /// delivered.
+    pub fn take_due(
+        &mut self,
+        scope_id: &str,
+        tasks: &[AppTask],
+        now: DateTime<Utc>,
+    ) -> Vec<DueReminder> {
+        self.prune(now);
+        alarms_due(tasks, now)
+            .into_iter()
+            .filter(|reminder| {
+                self.delivered.insert(ReminderKey {
+                    scope_id: scope_id.to_string(),
+                    task_id: reminder.task_id.clone(),
+                    trigger: reminder.trigger,
+                })
+            })
+            .collect()
+    }
+
+    /// Drops entries whose trigger is no longer inside the missed window at
+    /// `now` and therefore cannot be returned by [`alarms_due`].
+    pub fn prune(&mut self, now: DateTime<Utc>) {
+        let window_start = missed_window_start(now);
+        self.delivered.retain(|key| key.trigger > window_start);
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.delivered.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.delivered.is_empty()
+    }
+}
+
 /// Reminders whose trigger fell inside the missed window ending at `now`.
 #[must_use]
 pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
-    let window_start = now
-        .checked_sub_signed(Duration::minutes(MISSED_WINDOW_MINUTES))
-        .unwrap_or(now);
+    let window_start = missed_window_start(now);
     let mut due = Vec::new();
 
     for task in tasks {
@@ -39,7 +94,7 @@ pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
         ) {
             continue;
         }
-        for (index, trigger) in task.alarms.iter().flatten().enumerate() {
+        for trigger in task.alarms.iter().flatten() {
             let Some(trigger_at) = trigger_at(task, trigger) else {
                 continue;
             };
@@ -47,7 +102,6 @@ pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
                 continue;
             }
             due.push(DueReminder {
-                key: format!("{}#{index}", task.id),
                 task_id: task.id.to_string(),
                 title: task.title.clone(),
                 trigger: trigger_at,
@@ -56,6 +110,11 @@ pub fn alarms_due(tasks: &[AppTask], now: DateTime<Utc>) -> Vec<DueReminder> {
     }
 
     due
+}
+
+fn missed_window_start(now: DateTime<Utc>) -> DateTime<Utc> {
+    now.checked_sub_signed(Duration::minutes(MISSED_WINDOW_MINUTES))
+        .unwrap_or(now)
 }
 
 /// The instant one `VALARM` trigger names.
@@ -78,114 +137,4 @@ fn trigger_at(task: &AppTask, trigger: &TaskAlarmTrigger) -> Option<DateTime<Utc
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn task(due: &str, alarm: TaskAlarmTrigger, timezone: Option<&str>) -> AppTask {
-        AppTask {
-            id: "task-1".into(),
-            title: "Brush".to_string(),
-            status: Some(AppTaskStatus::Todo),
-            priority: None,
-            tags: None,
-            parent_task: None,
-            dependencies: None,
-            est: None,
-            time_spent: None,
-            added: None,
-            remote_id: None,
-            remote_collection_id: None,
-            notes: None,
-            start: None,
-            due: Some(due.parse().unwrap()),
-            completed_at: None,
-            rrule: None,
-            geo: None,
-            alarms: Some(vec![alarm]),
-            timezone: timezone.map(ToString::to_string),
-            updated_at: None,
-            etag: None,
-        }
-    }
-
-    fn utc(text: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(text)
-            .unwrap()
-            .with_timezone(&Utc)
-    }
-
-    fn before(minutes_before: i32) -> TaskAlarmTrigger {
-        TaskAlarmTrigger::Relative {
-            minutes_before,
-            anchor: TaskAlarmAnchor::End,
-        }
-    }
-
-    #[test]
-    fn a_relative_reminder_fires_inside_its_window_only() {
-        let tasks = [task("2026-10-27T10:00:00", before(15), Some("UTC"))];
-
-        assert_eq!(
-            alarms_due(&tasks, utc("2026-10-27T09:44:00Z")).len(),
-            0,
-            "not yet due"
-        );
-        let due = alarms_due(&tasks, utc("2026-10-27T09:46:00Z"));
-        assert_eq!(due.len(), 1);
-        assert_eq!(due[0].trigger, utc("2026-10-27T09:45:00Z"));
-        assert_eq!(due[0].title, "Brush");
-
-        assert_eq!(
-            alarms_due(&tasks, utc("2026-10-27T10:00:00Z")).len(),
-            0,
-            "too late to replay"
-        );
-    }
-
-    #[test]
-    fn a_completed_or_cancelled_task_never_reminds() {
-        for status in [AppTaskStatus::Done, AppTaskStatus::Cancelled] {
-            let mut item = task("2026-10-27T10:00:00", before(15), Some("UTC"));
-            item.status = Some(status);
-
-            let due = alarms_due(&[item], utc("2026-10-27T09:46:00Z"));
-            assert!(due.is_empty(), "expected no due alarms, got {due:?}");
-        }
-    }
-
-    #[test]
-    fn a_date_only_due_date_reminds_at_nine_in_the_task_zone() {
-        let tasks = [task("2026-10-27", before(30), Some("Asia/Kolkata"))];
-
-        // 08:30 IST == 03:00 UTC.
-        let due = alarms_due(&tasks, utc("2026-10-27T03:01:00Z"));
-        assert_eq!(due.len(), 1);
-        assert_eq!(due[0].trigger, utc("2026-10-27T03:00:00Z"));
-    }
-
-    #[test]
-    fn a_start_anchor_prefers_the_start_and_falls_back_to_due() {
-        let mut item = task("2026-10-27T10:00:00", before(10), Some("UTC"));
-        item.start = Some("2026-10-27T08:00:00".parse().unwrap());
-        item.alarms = Some(vec![TaskAlarmTrigger::Relative {
-            minutes_before: 10,
-            anchor: TaskAlarmAnchor::Start,
-        }]);
-
-        let due = alarms_due(&[item], utc("2026-10-27T07:51:00Z"));
-        assert_eq!(due.len(), 1);
-        assert_eq!(due[0].trigger, utc("2026-10-27T07:50:00Z"));
-    }
-
-    #[test]
-    fn an_absolute_trigger_uses_its_own_instant() {
-        let alarm = TaskAlarmTrigger::Absolute {
-            at: "2026-10-27T09:00:00Z".parse().unwrap(),
-        };
-        let tasks = [task("2026-10-27T10:00:00", alarm, Some("UTC"))];
-
-        let due = alarms_due(&tasks, utc("2026-10-27T09:01:00Z"));
-        assert_eq!(due.len(), 1);
-        assert_eq!(due[0].trigger, utc("2026-10-27T09:00:00Z"));
-    }
-}
+mod tests;

@@ -1,18 +1,16 @@
 //! Tauri adapter: poll the store and raise desktop notifications.
 
-use std::collections::HashMap;
-
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::features::calendar::{account::AccountService, Store, StoreState};
 
-use super::policy::{alarms_due, POLL_SECONDS};
+use super::policy::{SentReminders, POLL_SECONDS};
 
-/// Remembers which trigger instant was last delivered per task/alarm slot.
+/// Remembers which reminders have already been delivered in the active window.
 #[derive(Default)]
-pub struct ReminderState(pub std::sync::Mutex<HashMap<String, DateTime<Utc>>>);
+pub struct ReminderState(std::sync::Mutex<SentReminders>);
 
 /// Start the reminder poller. Safe to call once from `setup`.
 pub fn start_reminder_engine(app: AppHandle) {
@@ -36,21 +34,22 @@ async fn tick(app: &AppHandle) {
         eprintln!("[reminders] store unavailable");
         return;
     };
+    let Some(reminder_state) = app.try_state::<ReminderState>() else {
+        eprintln!("[reminders] reminder state unavailable");
+        return;
+    };
+
     let now = Utc::now();
     let tasks = state.read(Store::tasks).await;
-    let due = alarms_due(&tasks, now);
-
-    let reminder_state = app.state::<ReminderState>();
-    for reminder in due {
-        let key = format!("{}:{}", scope.id, reminder.key);
-        let already_sent = reminder_state
-            .0
-            .lock()
-            .is_ok_and(|sent| sent.get(&key) == Some(&reminder.trigger));
-        if already_sent {
-            continue;
+    let due = match reminder_state.0.lock() {
+        Ok(mut sent) => sent.take_due(&scope.id, &tasks, now),
+        Err(error) => {
+            eprintln!("[reminders] reminder state poisoned: {error}");
+            return;
         }
+    };
 
+    for reminder in due {
         if let Err(error) = app
             .notification()
             .builder()
@@ -59,10 +58,6 @@ async fn tick(app: &AppHandle) {
             .show()
         {
             eprintln!("[reminders] could not show `{}`: {error}", reminder.title);
-        }
-
-        if let Ok(mut sent) = reminder_state.0.lock() {
-            sent.insert(key, reminder.trigger);
         }
     }
 }

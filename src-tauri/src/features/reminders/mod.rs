@@ -6,5 +6,5 @@
 mod policy;
 mod tauri;
 
-pub use policy::{DueReminder, alarms_due};
+pub use policy::{DueReminder, ReminderKey, SentReminders, alarms_due};
 pub use tauri::{ReminderState, start_reminder_engine};

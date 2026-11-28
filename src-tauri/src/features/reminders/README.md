@@ -1,7 +1,7 @@
 # Reminders feature
 
 - `policy.rs` — pure decision logic: which task `VALARM` triggers fall inside the
-  missed window at a given instant.
+  missed window at a given instant, plus bounded delivery deduplication.
 - `tauri.rs` — the adapter that polls the calendar store through its managed
   `StoreState` and raises desktop notifications.
 
