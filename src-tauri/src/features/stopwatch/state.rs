@@ -456,7 +456,6 @@ impl StopwatchManager {
         state.normalize_focus();
         let focus_changed = focus_before != focus_key(&state);
         let snapshot = state.clone();
-        drop(state);
         if focus_changed {
             if let Err(error) = super::focus::save(&self.focus_path, &snapshot) {
                 eprintln!("Failed to persist stopwatch focus: {error}");
@@ -465,6 +464,7 @@ impl StopwatchManager {
         if let Err(error) = history::append(&self.history_path, &entries) {
             eprintln!("Failed to record stopwatch history: {error}");
         }
+        drop(state);
         Ok(StopwatchTransition {
             state: snapshot,
             entries,

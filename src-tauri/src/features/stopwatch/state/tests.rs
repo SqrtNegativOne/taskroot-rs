@@ -373,3 +373,45 @@ fn manager_flush_for_exit_and_history_persist_entries_with_task_id() {
     assert_eq!(history[0].task_id.as_deref(), Some("task-1"));
     assert_eq!(history[0].label, "Learn Python");
 }
+
+#[test]
+fn concurrent_transitions_preserve_all_history_entries() {
+    use std::sync::Arc;
+
+    let dir = tempfile::tempdir().unwrap();
+    let manager = Arc::new(StopwatchManager::load(dir.path()));
+    manager.toggle_work().unwrap();
+
+    let handles: Vec<_> = (0..6)
+        .map(|worker| {
+            let manager = Arc::clone(&manager);
+            std::thread::spawn(move || {
+                let mut produced = 0usize;
+                for step in 0..8 {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                    let transition = manager
+                        .set_task(
+                            Some(format!("task-{worker}-{step}")),
+                            Some(format!("Label {worker}-{step}")),
+                        )
+                        .unwrap();
+                    produced = produced.saturating_add(transition.entries.len());
+                }
+                produced
+            })
+        })
+        .collect();
+
+    let mut total_produced = 0usize;
+    for handle in handles {
+        total_produced = total_produced.saturating_add(handle.join().unwrap());
+    }
+    assert!(total_produced >= 6, "expected multiple recorded segments");
+
+    let persisted = manager.history().unwrap();
+    assert_eq!(
+        persisted.len(),
+        total_produced,
+        "every recorded transition entry must survive concurrent persistence"
+    );
+}

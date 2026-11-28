@@ -54,10 +54,7 @@ pub fn append(path: &Path, entries: &[StopwatchHistoryEntry]) -> Result<(), AppE
 
     let mut all = read(path)?;
     all.extend_from_slice(entries);
-    let raw = serde_json::to_string_pretty(&all)
-        .map_err(|e| AppError::Store(format!("Failed to encode {}: {e}", path.display())))?;
-    std::fs::write(path, raw)
-        .map_err(|e| AppError::Store(format!("Failed to write {}: {e}", path.display())))
+    crate::features::calendar::persist::write_json_pretty(path, &all)
 }
 
 /// Read every persisted history entry from `path`.

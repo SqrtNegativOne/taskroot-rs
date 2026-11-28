@@ -56,13 +56,7 @@ pub(super) fn save(path: &Path, state: &StopwatchState) -> Result<(), AppError> 
         label: state.label.as_deref(),
         label_source: state.label_source,
     };
-    let raw = serde_json::to_string_pretty(&focus)
-        .map_err(|error| AppError::Store(format!("Failed to encode {}: {error}", path.display())))?;
-    let temp = path.with_extension("json.tmp");
-    std::fs::write(&temp, raw)
-        .map_err(|error| AppError::Store(format!("Failed to write {}: {error}", temp.display())))?;
-    std::fs::rename(&temp, path)
-        .map_err(|error| AppError::Store(format!("Failed to replace {}: {error}", path.display())))
+    crate::features::calendar::persist::write_json_pretty(path, &focus)
 }
 
 #[cfg(test)]
@@ -109,5 +103,25 @@ mod tests {
         std::fs::write(&path, "not json").unwrap();
 
         assert!(load(&path).is_none());
+    }
+
+    #[test]
+    fn failed_save_does_not_leave_temp_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = focus_path(dir.path());
+        std::fs::create_dir(&path).unwrap();
+
+        let err = save(
+            &path,
+            &state(Some("task-1"), Some("Focus"), StopwatchLabelSource::Task),
+        )
+        .unwrap_err();
+        assert_eq!(err.code(), "store");
+
+        let entries: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries, vec!["stopwatch-focus.json"]);
     }
 }
