@@ -23,11 +23,17 @@ pub async fn write_setting(
     key: &str,
     value: &Value,
 ) -> Result<(), AppError> {
-    let mut store = state.lock().await;
-    if !persist::apply_setting(&mut store.settings, key, value)? {
-        return Ok(());
-    }
-    persist::write_settings(&store.data_dir, &store.settings)
+    state
+        .write(|store| {
+            let mut next = store.settings.clone();
+            if !persist::apply_setting(&mut next, key, value)? {
+                return Ok(());
+            }
+            persist::write_settings(&store.data_dir, &next)?;
+            store.settings = next;
+            Ok(())
+        })
+        .await
 }
 
 /// # Errors
@@ -47,9 +53,15 @@ pub async fn write_ui_state(
     key: &str,
     value: &Value,
 ) -> Result<(), AppError> {
-    let mut store = state.lock().await;
-    store.ui_state.insert(key.to_string(), value.clone());
-    persist::write_ui_state(&store.data_dir, &store.ui_state)
+    state
+        .write(|store| {
+            let mut next = store.ui_state.clone();
+            next.insert(key.to_string(), value.clone());
+            persist::write_ui_state(&store.data_dir, &next)?;
+            store.ui_state = next;
+            Ok(())
+        })
+        .await
 }
 
 /// The whole UI-state map, used by tests and the dev inspector.

@@ -164,3 +164,42 @@ async fn earliest_wake_up_time_defaults_to_zero_and_round_trips_through_settings
         360
     );
 }
+
+#[tokio::test]
+async fn failed_writes_leave_in_memory_settings_and_ui_state_unchanged() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = StoreState::new(Store::load(dir.path().to_path_buf()));
+
+    storage::write_setting(&state, "clock_style", &json!("counter"))
+        .await
+        .unwrap();
+    storage::write_ui_state(&state, "view", &json!("week"))
+        .await
+        .unwrap();
+
+    // Replace both JSON files with directories so atomic replacement fails.
+    std::fs::remove_file(dir.path().join("settings.json")).unwrap();
+    std::fs::create_dir(dir.path().join("settings.json")).unwrap();
+    std::fs::remove_file(dir.path().join("ui-state.json")).unwrap();
+    std::fs::create_dir(dir.path().join("ui-state.json")).unwrap();
+
+    let settings_err = storage::write_setting(&state, "clock_style", &json!("flowtime"))
+        .await
+        .unwrap_err();
+    assert_eq!(settings_err.code(), "store");
+    assert_eq!(
+        storage::read_settings(&state).await.unwrap().clock_style,
+        "counter",
+        "in-memory settings must not diverge when persistence fails"
+    );
+
+    let ui_err = storage::write_ui_state(&state, "view", &json!("month"))
+        .await
+        .unwrap_err();
+    assert_eq!(ui_err.code(), "store");
+    assert_eq!(
+        storage::read_ui_state(&state, "view").await.unwrap(),
+        json!("week"),
+        "in-memory ui-state must not diverge when persistence fails"
+    );
+}
