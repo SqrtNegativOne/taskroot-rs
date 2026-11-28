@@ -222,6 +222,15 @@ async fn respond_json(socket: &mut TcpStream, status: &str, body: &str) -> io::R
 async fn stream_events(
     socket: &mut TcpStream,
     app: &tauri::AppHandle,
+    updates: watch::Receiver<String>,
+) -> io::Result<()> {
+    let initial = serde_json::to_string(&current_snapshot(app).await).unwrap_or_default();
+    stream_events_with_initial(socket, &initial, updates).await
+}
+
+async fn stream_events_with_initial(
+    socket: &mut TcpStream,
+    initial: &str,
     mut updates: watch::Receiver<String>,
 ) -> io::Result<()> {
     socket
@@ -230,8 +239,13 @@ async fn stream_events(
         )
         .await?;
 
-    let initial = serde_json::to_string(&current_snapshot(app).await).unwrap_or_default();
-    send_event(socket, &initial).await?;
+    let mut last_sent = initial.to_string();
+    send_event(socket, &last_sent).await?;
+    let current = updates.borrow_and_update().clone();
+    if !current.is_empty() && current != last_sent {
+        send_event(socket, &current).await?;
+        last_sent = current;
+    }
 
     let mut keepalive = tokio::time::interval(KEEPALIVE_INTERVAL);
     keepalive.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -243,8 +257,9 @@ async fn stream_events(
                     break;
                 }
                 let json = updates.borrow_and_update().clone();
-                if !json.is_empty() {
+                if !json.is_empty() && json != last_sent {
                     send_event(socket, &json).await?;
+                    last_sent = json;
                 }
             }
             _ = keepalive.tick() => {
@@ -360,5 +375,34 @@ mod tests {
             Some(("GET", "/focus/events"))
         );
         assert_eq!(request_target("nonsense"), None);
+    }
+
+    #[tokio::test]
+    async fn sse_stream_does_not_duplicate_unchanged_initial_snapshot() {
+        let (tx, rx) = watch::channel(String::new());
+        let initial = r#"{"phase":"paused","active":false}"#.to_string();
+        // Simulate publish_loop having already populated the channel before the client connects.
+        tx.send(initial.clone()).unwrap();
+
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client_rx = rx.clone();
+        let server_initial = initial.clone();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let _ = stream_events_with_initial(&mut socket, &server_initial, client_rx).await;
+        });
+
+        let mut client = TcpStream::connect(addr).await.unwrap();
+        drop(tx);
+        let mut received = String::new();
+        client.read_to_string(&mut received).await.unwrap();
+        server.await.unwrap();
+
+        assert_eq!(
+            received.matches("event: focus\n").count(),
+            1,
+            "initial SSE snapshot must not be sent twice: {received:?}"
+        );
     }
 }
