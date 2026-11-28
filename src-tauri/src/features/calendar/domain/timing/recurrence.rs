@@ -41,13 +41,16 @@ fn until_before(
             Ok(previous.format(ICAL_DATE).to_string())
         }
         CalendarDateTime::WallClock(wall) => {
+            if let Some(zone) = timezone {
+                let last = resolve_wall_clock(wall, Some(zone))
+                    .checked_sub_signed(chrono::Duration::seconds(1))
+                    .ok_or_else(|| invalid("the occurrence cannot be moved back a second"))?;
+                return Ok(last.format(ICAL_UTC).to_string());
+            }
             let last = wall
                 .checked_sub_signed(chrono::Duration::seconds(1))
                 .ok_or_else(|| invalid("the occurrence cannot be moved back a second"))?;
-            Ok(timezone.map_or_else(
-                || last.format(ICAL_DATE_TIME).to_string(),
-                |zone| resolve_wall_clock(last, Some(zone)).format(ICAL_UTC).to_string(),
-            ))
+            Ok(last.format(ICAL_DATE_TIME).to_string())
         }
         CalendarDateTime::Utc(instant) => {
             let last = instant
@@ -152,12 +155,15 @@ pub fn get_occurrences(
 pub fn get_all_day_occurrences(
     rrule_str: &str,
     start_date: NaiveDate,
-    timezone: Option<&str>,
+    _timezone: Option<&str>,
     exdates: &[CalendarDateTime],
     range_start: NaiveDate,
     range_end_inclusive: NaiveDate,
 ) -> Result<Vec<NaiveDate>, AppError> {
-    let tz = resolve_tz(timezone);
+    // Floating all-day recurrences have no instant or DST transitions; anchoring
+    // them at UTC midnight keeps weekdays independent of the host timezone and
+    // avoids midnight spring-forward gaps (e.g. America/Havana, America/Santiago).
+    let tz = rrule::Tz::UTC;
 
     let mut full_rrule = rrule_str.to_string();
     if !full_rrule.contains("DTSTART") {
@@ -531,5 +537,55 @@ mod tests {
         let all_day_err =
             get_all_day_occurrences("RRULE:NOT_A_RULE", day, None, &[], day, day).unwrap_err();
         assert_eq!(all_day_err.code(), "invalid-input");
+    }
+
+    #[test]
+    fn truncating_at_dst_spring_forward_excludes_that_occurrence() {
+        // Europe/Berlin springs forward 02:00 -> 03:00 on 2026-03-29.
+        // 03:00 local on 2026-03-29 is 01:00Z, while 02:59:59 local does not exist.
+        let dt_start = "2026-03-22T03:00:00"
+            .parse::<CalendarDateTime>()
+            .unwrap()
+            .to_utc(Some("Europe/Berlin"))
+            .unwrap();
+        let rrule = truncate_before(
+            "RRULE:FREQ=WEEKLY",
+            "2026-03-29T03:00:00".parse().unwrap(),
+            Some("Europe/Berlin"),
+        )
+        .unwrap();
+
+        let occ = get_occurrences(
+            &rrule,
+            &dt_start,
+            Some("Europe/Berlin"),
+            &[],
+            &Utc.with_ymd_and_hms(2026, 3, 22, 0, 0, 0).unwrap(),
+            &Utc.with_ymd_and_hms(2026, 4, 6, 23, 59, 59).unwrap(),
+        )
+        .unwrap();
+
+        let days: Vec<String> = occ.iter().map(|dt| dt.format("%Y-%m-%d").to_string()).collect();
+        assert_eq!(days, vec!["2026-03-22"]);
+    }
+
+    #[test]
+    fn all_day_recurrence_survives_midnight_dst_transition_boundaries() {
+        // America/Havana springs forward at midnight (00:00 -> 01:00) on 2026-03-08.
+        let start = NaiveDate::from_ymd_opt(2026, 3, 7).unwrap();
+        let range_start = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap();
+        let range_end = NaiveDate::from_ymd_opt(2026, 3, 9).unwrap();
+
+        let occ = get_all_day_occurrences(
+            "RRULE:FREQ=DAILY",
+            start,
+            Some("America/Havana"),
+            &[],
+            range_start,
+            range_end,
+        )
+        .unwrap();
+
+        assert_eq!(occ, vec![range_start, range_end]);
     }
 }

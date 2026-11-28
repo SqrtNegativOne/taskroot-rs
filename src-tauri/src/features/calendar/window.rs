@@ -51,13 +51,70 @@ fn parse_boundary_instant(iso: &str, end_of_day: bool) -> Option<DateTime<Utc>> 
         return Some(dt.with_timezone(&Utc));
     }
     let date = NaiveDate::parse_from_str(iso, DTO_DATE).ok()?;
+    boundary_instant_in_tz(date, end_of_day, &chrono::Local)
+}
+
+fn boundary_instant_in_tz<Tz: chrono::TimeZone>(
+    date: NaiveDate,
+    end_of_day: bool,
+    tz: &Tz,
+) -> Option<DateTime<Utc>> {
     let time = if end_of_day {
         NaiveTime::from_hms_opt(23, 59, 59)?
     } else {
         NaiveTime::from_hms_opt(0, 0, 0)?
     };
-    date.and_time(time)
-        .and_local_timezone(chrono::Local)
-        .single()
-        .map(|dt| dt.with_timezone(&Utc))
+    let naive = date.and_time(time);
+    let resolved = match tz.from_local_datetime(&naive) {
+        chrono::LocalResult::Single(dt) => dt.with_timezone(&Utc),
+        chrono::LocalResult::Ambiguous(earliest, latest) => {
+            if end_of_day {
+                latest.with_timezone(&Utc)
+            } else {
+                earliest.with_timezone(&Utc)
+            }
+        }
+        chrono::LocalResult::None => {
+            let step = if end_of_day { -30_i64 } else { 30_i64 };
+            [1_i64, 2, 4]
+                .into_iter()
+                .find_map(|factor| {
+                    let shifted = naive.checked_add_signed(chrono::Duration::minutes(
+                        step.saturating_mul(factor),
+                    ))?;
+                    let res = tz.from_local_datetime(&shifted);
+                    if end_of_day {
+                        res.latest()
+                    } else {
+                        res.earliest()
+                    }
+                })
+                .map_or_else(|| naive.and_utc(), |dt| dt.with_timezone(&Utc))
+        }
+    };
+    Some(resolved)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn boundary_instant_handles_midnight_dst_gap_and_ambiguous_fall_back() {
+        // America/Havana transitions at midnight:
+        // - 2026-03-08 00:00 -> 01:00 (LocalResult::None)
+        // - 2026-11-01 01:00 -> 00:00 (00:00 is LocalResult::Ambiguous)
+        let havana = chrono_tz::America::Havana;
+        let spring_forward = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap();
+        let fall_back = NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+
+        assert!(
+            boundary_instant_in_tz(spring_forward, false, &havana).is_some(),
+            "midnight DST spring-forward gap must not collapse the render window"
+        );
+        assert!(
+            boundary_instant_in_tz(fall_back, false, &havana).is_some(),
+            "ambiguous midnight DST fall-back must not collapse the render window"
+        );
+    }
 }
