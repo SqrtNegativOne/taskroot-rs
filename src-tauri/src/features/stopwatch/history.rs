@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::error::AppError;
+use crate::storage;
 
 use super::state::StopwatchLabelSource;
 
@@ -36,7 +37,16 @@ pub struct StopwatchHistoryEntry {
 
 #[must_use]
 pub fn history_path(dir: &Path) -> PathBuf {
-    dir.join("stopwatch-history.json")
+    dir.join(storage::STOPWATCH_HISTORY_FILE)
+}
+
+/// Atomically replace the history file with `entries`.
+///
+/// # Errors
+///
+/// Returns [`AppError::Store`] when the file cannot be serialized or replaced.
+pub(super) fn write(path: &Path, entries: &[StopwatchHistoryEntry]) -> Result<(), AppError> {
+    storage::write_json_pretty_atomic(path, entries)
 }
 
 /// Append `entries` to the history file, creating it when absent.
@@ -54,7 +64,7 @@ pub fn append(path: &Path, entries: &[StopwatchHistoryEntry]) -> Result<(), AppE
 
     let mut all = read(path)?;
     all.extend_from_slice(entries);
-    crate::features::calendar::persist::write_json_pretty(path, &all)
+    write(path, &all)
 }
 
 /// Read every persisted history entry from `path`.
@@ -66,40 +76,7 @@ pub fn append(path: &Path, entries: &[StopwatchHistoryEntry]) -> Result<(), AppE
 ///
 /// Returns [`AppError::Store`] when an existing file cannot be read.
 pub fn read(path: &Path) -> Result<Vec<StopwatchHistoryEntry>, AppError> {
-    let raw = match std::fs::read_to_string(path) {
-        Ok(raw) => raw,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => {
-            return Err(AppError::Store(format!(
-                "Failed to read {}: {error}",
-                path.display()
-            )));
-        }
-    };
-
-    serde_json::from_str(&raw).map_or_else(
-        |error| {
-            eprintln!(
-                "Failed to parse {}: {error}; starting a fresh history",
-                path.display()
-            );
-            mark_bad(path);
-            Ok(Vec::new())
-        },
-        Ok,
-    )
-}
-
-fn mark_bad(path: &Path) {
-    let bad = path.with_extension("json.bad");
-    let _ = std::fs::remove_file(&bad);
-    if let Err(error) = std::fs::rename(path, &bad) {
-        eprintln!(
-            "Failed to rename {} to {}: {error}",
-            path.display(),
-            bad.display()
-        );
-    }
+    Ok(storage::read_json_or_quarantine(path)?.unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -168,5 +145,22 @@ mod tests {
         append(&path, &[]).unwrap();
 
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn malformed_history_is_quarantined_before_appending_new_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = history_path(dir.path());
+        std::fs::write(&path, "not json").unwrap();
+
+        append(&path, &[entry(StopwatchHistoryKind::Work, Some("t1"), "a", 10)]).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("stopwatch-history.json.bad")).unwrap(),
+            "not json"
+        );
+        let parsed = read(&path).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].task_id.as_deref(), Some("t1"));
     }
 }

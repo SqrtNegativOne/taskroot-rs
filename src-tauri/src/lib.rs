@@ -12,6 +12,7 @@ pub mod ipc;
 pub mod ipc_events;
 pub mod platform;
 pub mod settings;
+pub mod storage;
 #[cfg(test)]
 pub mod test_support;
 

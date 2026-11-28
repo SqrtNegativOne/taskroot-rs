@@ -29,37 +29,26 @@ impl JsonAccountRepository {
 impl AccountRepository for JsonAccountRepository {
     fn read(&self) -> Result<AccountRegistry, AppError> {
         let path = account_path(&self.dir);
-        let raw = match std::fs::read_to_string(&path) {
-            Ok(raw) => raw,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(AccountRegistry::default())
-            }
-            Err(error) => {
-                return Err(AppError::Store(format!(
-                    "Could not read account file `{}`: {error}",
+        let Some(registry) = crate::storage::read_optional_json::<AccountRegistry>(&path)
+            .map_err(|error| {
+                AppError::Store(format!(
+                    "Malformed account file `{}`: {error}. The file holds no password; \
+                     fix or delete it to recover. A pre-registry single-account file is not \
+                     migrated; convert it by hand or reconnect (the old password may still \
+                     be in the keychain under `taskroot.caldav`).",
                     path.display()
-                )))
-            }
+                ))
+            })?
+        else {
+            return Ok(AccountRegistry::default());
         };
-        let registry: AccountRegistry = serde_json::from_str(&raw).map_err(|error| {
-            AppError::Store(format!(
-                "Malformed account file `{}`: {error}. The file holds no password; \
-                 fix or delete it to recover. A pre-registry single-account file is not \
-                 migrated; convert it by hand or reconnect (the old password may still \
-                 be in the keychain under `taskroot.caldav`).",
-                path.display()
-            ))
-        })?;
         validate(&registry)?;
         Ok(registry)
     }
 
     fn write(&self, registry: &AccountRegistry) -> Result<(), AppError> {
         validate(registry)?;
-        crate::features::calendar::store::persist::write_json_pretty(
-            &account_path(&self.dir),
-            registry,
-        )
+        crate::storage::write_json_pretty_atomic(&account_path(&self.dir), registry)
     }
 }
 

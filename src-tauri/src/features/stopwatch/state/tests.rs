@@ -432,4 +432,74 @@ fn concurrent_transitions_preserve_all_history_entries() {
         total_produced,
         "every recorded transition entry must survive concurrent persistence"
     );
+
+    // Final on-disk focus and history must match the live manager after reload
+    // (no out-of-order focus overwrites or lost history appends).
+    let live_focus = manager.snapshot().unwrap();
+    let reloaded = StopwatchManager::load(dir.path());
+    let reloaded_focus = reloaded.snapshot().unwrap();
+    assert_eq!(reloaded_focus.task_id, live_focus.task_id);
+    assert_eq!(reloaded_focus.label, live_focus.label);
+    assert_eq!(reloaded_focus.label_source, live_focus.label_source);
+    assert_eq!(reloaded.history().unwrap().len(), total_produced);
+}
+
+#[test]
+fn corrupted_history_and_focus_are_quarantined_and_manager_recovers() {
+    let dir = tempfile::tempdir().unwrap();
+    let focus_file = dir.path().join(crate::storage::STOPWATCH_FOCUS_FILE);
+    let history_file = dir.path().join(crate::storage::STOPWATCH_HISTORY_FILE);
+    std::fs::write(&focus_file, "{bad focus").unwrap();
+    std::fs::write(&history_file, "{bad history").unwrap();
+
+    let manager = StopwatchManager::load(dir.path());
+    assert_eq!(manager.snapshot().unwrap().task_id, None);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("stopwatch-focus.json.bad")).unwrap(),
+        "{bad focus"
+    );
+
+    manager
+        .set_task(Some("task-1".to_string()), Some("Recovered".to_string()))
+        .unwrap();
+    manager.toggle_work().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    manager.flush_for_exit().unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("stopwatch-history.json.bad")).unwrap(),
+        "{bad history"
+    );
+    let history = manager.history().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].task_id.as_deref(), Some("task-1"));
+
+    let reloaded = StopwatchManager::load(dir.path());
+    assert_eq!(reloaded.history().unwrap().len(), 1);
+    assert_eq!(reloaded.snapshot().unwrap().task_id.as_deref(), Some("task-1"));
+}
+
+#[test]
+fn history_cache_rolls_back_when_disk_write_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = StopwatchManager::load(dir.path());
+    manager
+        .set_task(Some("task-1".to_string()), Some("First".to_string()))
+        .unwrap();
+    manager.toggle_work().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    manager.flush_for_exit().unwrap();
+    assert_eq!(manager.history().unwrap().len(), 1);
+
+    // Replace the history file with a directory so the next persist fails.
+    let history_file = dir.path().join(crate::storage::STOPWATCH_HISTORY_FILE);
+    std::fs::remove_file(&history_file).unwrap();
+    std::fs::create_dir(&history_file).unwrap();
+
+    manager.toggle_work().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    manager.flush_for_exit().unwrap();
+
+    // In-memory cache must stay aligned with what actually persisted.
+    assert_eq!(manager.history().unwrap().len(), 1);
 }

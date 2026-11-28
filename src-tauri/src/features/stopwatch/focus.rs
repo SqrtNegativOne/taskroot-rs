@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
+use crate::storage;
 
 use super::state::{StopwatchLabelSource, StopwatchState};
 
@@ -31,19 +32,15 @@ struct FocusOnDisk<'a> {
 
 #[must_use]
 pub(super) fn focus_path(dir: &Path) -> PathBuf {
-    dir.join("stopwatch-focus.json")
+    dir.join(storage::STOPWATCH_FOCUS_FILE)
 }
 
-/// Read the stored focus pointer, ignoring a missing or malformed file.
+/// Read the stored focus pointer, quarantining a malformed file to `.json.bad`.
 pub(super) fn load(path: &Path) -> Option<PersistedFocus> {
-    let raw = std::fs::read_to_string(path).ok()?;
-    match serde_json::from_str(&raw) {
-        Ok(stored) => Some(stored),
+    match storage::read_json_or_quarantine(path) {
+        Ok(stored) => stored,
         Err(error) => {
-            eprintln!(
-                "Failed to parse {}: {error}; starting without a focus task",
-                path.display()
-            );
+            eprintln!("{error}; starting without a focus task");
             None
         }
     }
@@ -56,14 +53,18 @@ pub(super) fn save(path: &Path, state: &StopwatchState) -> Result<(), AppError> 
         label: state.label.as_deref(),
         label_source: state.label_source,
     };
-    crate::features::calendar::persist::write_json_pretty(path, &focus)
+    storage::write_json_pretty_atomic(path, &focus)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn state(task_id: Option<&str>, label: Option<&str>, source: StopwatchLabelSource) -> StopwatchState {
+    fn state(
+        task_id: Option<&str>,
+        label: Option<&str>,
+        source: StopwatchLabelSource,
+    ) -> StopwatchState {
         StopwatchState {
             task_id: task_id.map(str::to_string),
             label: label.map(str::to_string),
@@ -79,7 +80,11 @@ mod tests {
 
         save(
             &path,
-            &state(Some("task-1"), Some("Learn Python"), StopwatchLabelSource::Task),
+            &state(
+                Some("task-1"),
+                Some("Learn Python"),
+                StopwatchLabelSource::Task,
+            ),
         )
         .unwrap();
         let stored = load(&path).unwrap();
@@ -97,12 +102,17 @@ mod tests {
     }
 
     #[test]
-    fn a_malformed_file_is_ignored() {
+    fn a_malformed_file_is_quarantined_and_ignored() {
         let dir = tempfile::tempdir().unwrap();
         let path = focus_path(dir.path());
         std::fs::write(&path, "not json").unwrap();
 
         assert!(load(&path).is_none());
+        assert!(!path.exists());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("stopwatch-focus.json.bad")).unwrap(),
+            "not json"
+        );
     }
 
     #[test]
@@ -122,6 +132,6 @@ mod tests {
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
-        assert_eq!(entries, vec!["stopwatch-focus.json"]);
+        assert_eq!(entries, vec![storage::STOPWATCH_FOCUS_FILE]);
     }
 }

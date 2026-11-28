@@ -83,7 +83,7 @@ fn dev_data_fallback(preferred: &Path, exe_dir: &Path) -> Option<PathBuf> {
 }
 
 fn seed_from(source: &Path, target: &Path) {
-    for name in ["account.json", "settings.json", "ui-state.json"] {
+    for name in crate::storage::PERSISTED_FILES {
         let file = target.join(name);
         if !file.exists() {
             let _ = std::fs::copy(source.join(name), &file);
@@ -198,21 +198,32 @@ mod tests {
         let target = root.join("target");
         std::fs::create_dir_all(&source).expect("create source");
         std::fs::create_dir_all(&target).expect("create target");
-        std::fs::write(source.join("account.json"), "{\"server\":\"new\"}").expect("write account");
-        std::fs::write(source.join("settings.json"), "{\"stale\":true}").expect("write settings");
+        let fixtures = [
+            ("account.json", "{\"server\":\"new\"}"),
+            ("settings.json", "{\"stale\":true}"),
+            ("ui-state.json", "{\"tab\":\"plan\"}"),
+            ("stopwatch-focus.json", "{\"taskId\":\"t1\"}"),
+            ("stopwatch-history.json", "[{\"kind\":\"work\"}]"),
+        ];
+        for (name, body) in fixtures {
+            std::fs::write(source.join(name), body).expect("write source fixture");
+        }
         std::fs::write(target.join("settings.json"), "{\"kept\":true}")
             .expect("write target settings");
 
         seed_from(&source, &target);
 
-        assert_eq!(
-            std::fs::read_to_string(target.join("account.json")).expect("copied account"),
-            "{\"server\":\"new\"}"
-        );
-        assert_eq!(
-            std::fs::read_to_string(target.join("settings.json")).expect("kept settings"),
-            "{\"kept\":true}"
-        );
+        for (name, body) in fixtures {
+            let expected = if name == "settings.json" {
+                "{\"kept\":true}"
+            } else {
+                body
+            };
+            assert_eq!(
+                std::fs::read_to_string(target.join(name)).expect("seeded file"),
+                expected
+            );
+        }
     }
 
     #[test]

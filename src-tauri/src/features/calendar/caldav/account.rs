@@ -19,7 +19,7 @@ pub use leases::{AccountScope, ClientLease};
 pub use service::AccountService;
 pub use storage::{AccountRepository, JsonAccountRepository};
 
-pub const ACCOUNT_FILE: &str = "account.json";
+pub use crate::storage::ACCOUNT_FILE;
 
 /// The persisted account. Contains no credentials.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
